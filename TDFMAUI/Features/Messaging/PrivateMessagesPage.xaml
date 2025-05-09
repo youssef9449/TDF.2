@@ -1,0 +1,92 @@
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TDFMAUI.Pages.PrivateMessagesPage"
+             Title="Private Messages"
+             BackgroundColor="{StaticResource Gray100}">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Header -->
+        <Grid Grid.Row="0" Padding="20,10" BackgroundColor="{StaticResource Primary}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <Button Grid.Column="0" 
+                        Text="
+                        
+                        Back" 
+                        Clicked="OnBackClicked"
+                        BackgroundColor="Transparent"
+                        TextColor="White"
+                        FontAttributes="Bold"/>
+                <Label Grid.Column="1" 
+                       Text="Private Messages" 
+                       TextColor="White"
+                       FontSize="24"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"/>
+            </Grid>
+        </Grid>
+
+        <!-- Messages List -->
+        <ScrollView Grid.Row="1" Margin="10">
+            <VerticalStackLayout>
+                <!-- Constrain width on Desktop/Tablet -->
+                <VerticalStackLayout.MaximumWidthRequest>
+                    <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="800" Desktop="700" />
+                </VerticalStackLayout.MaximumWidthRequest>
+                <VerticalStackLayout.HorizontalOptions>
+                     <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                </VerticalStackLayout.HorizontalOptions>
+
+                <CollectionView x:Name="messagesCollection"
+                           SelectionMode="Single"
+                           SelectionChanged="OnMessageSelected">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Frame Margin="0,5" 
+                                   Padding="15"
+                                   BorderColor="{StaticResource Gray300}"
+                                   BackgroundColor="White"
+                                   CornerRadius="10">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <VerticalStackLayout Grid.Column="0" Spacing="5">
+                                        <Label Text="{Binding SenderFullName}" 
+                                               FontAttributes="Bold"/>
+                                        <Label Text="{Binding Subject}" 
+                                               FontSize="16"/>
+                                        <Label Text="{Binding MessageDate, StringFormat='{0:MM/dd/yyyy HH:mm}'}" 
+                                               TextColor="{StaticResource Gray500}"
+                                               FontSize="12"/>
+                                    </VerticalStackLayout>
+                                    <Label Grid.Column="1" 
+                                           Text="
+                                           
+                                           "
+                                           VerticalOptions="Center"
+                                           TextColor="{StaticResource Primary}"/>
+                                </Grid>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- New Message Button -->
+        <Button Grid.Row="2"
+                Text="New Message"
+                Clicked="OnNewMessageClicked"
+                Margin="20,10"
+                BackgroundColor="{StaticResource Primary}"
+                TextColor="White"
+                FontAttributes="Bold"
+                HeightRequest="50"
+                CornerRadius="25"/>
+
+        <!-- Loading Indicator -->
+        <ActivityIndicator x:Name="loadingIndicator"
+                          Grid.RowSpan="3"
+                          IsRunning="False"
+                          IsVisible="False"
+                          HorizontalOptions="Center"
+                          VerticalOptions="Center"/>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:TDFMAUI.Pages"
+             xmlns:viewModels="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:models="clr-namespace:TDFShared.DTOs.Requests"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:vm="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:dtos="clr-namespace:TDFShared.DTOs.Requests;assembly=TDFShared"
+             x:Class="TDFMAUI.Pages.RequestsPage"
+             x:DataType="viewModels:RequestsViewModel"
+             Title="{Binding Title}">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="{OnIdiom Phone='10', Default='15'}">
+        <ActivityIndicator Grid.Row="0" Grid.RowSpan="4" 
+                           IsRunning="{Binding IsBusy}" 
+                           IsVisible="{Binding IsBusy}" 
+                           Color="{StaticResource Primary}" 
+                           HorizontalOptions="Center" 
+                           VerticalOptions="Center" 
+                           ZIndex="10"/> <!-- Ensure indicator is on top -->
+
+        <!-- Row 0: Title and New Request Button -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <Label Text="{Binding Title}"
+                   FontSize="{OnIdiom Phone=20, Default=24}" 
+                   FontAttributes="Bold"
+                   VerticalOptions="Center" />
+                   
+            <Button Grid.Column="1"
+                    Text="New Request" 
+                    Command="{Binding GoToAddRequestCommand}"
+                    BackgroundColor="{StaticResource Primary}"
+                    TextColor="White"
+                    HeightRequest="{OnIdiom Phone=35, Default=40}"
+                    WidthRequest="{OnIdiom Phone=100, Default=150}"
+                    FontSize="{OnIdiom Phone=12, Default=14}"
+                    CornerRadius="{OnIdiom Phone=18, Default=20}" />
+        </Grid>
+
+         <!-- Row 1: Filtering Controls -->
+         <StackLayout Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+             <Label Text="Show Pending Only:" VerticalOptions="Center"/>
+             <Switch IsToggled="{Binding ShowPendingOnly}" VerticalOptions="Center"/>
+             <!-- Add more filters here if needed (e.g., Type Picker) -->
+         </StackLayout>
+        
+        <!-- Row 2: Requests List -->
+        <RefreshView Grid.Row="2" 
+                     Command="{Binding RefreshRequestsCommand}"
+                     IsRefreshing="{Binding IsBusy}">
+            <ScrollView>
+                <VerticalStackLayout>
+                    <VerticalStackLayout.MaximumWidthRequest>
+                        <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="800" Desktop="700" />
+                    </VerticalStackLayout.MaximumWidthRequest>
+                    <VerticalStackLayout.HorizontalOptions>
+                        <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                    </VerticalStackLayout.HorizontalOptions>
+
+                    <CollectionView x:Name="RequestsCollectionView"
+                                    ItemsSource="{Binding Requests}"
+                                    SelectionMode="None"
+                                    EmptyView="No requests found.">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="dtos:RequestResponseDto">
+                                <Frame Padding="{OnIdiom Phone='10', Default='15'}" 
+                                       Margin="0,5" 
+                                       CornerRadius="5" 
+                                       BorderColor="LightGray">
+                                    <!-- Removed TapGestureRecognizer - Actions will be explicit buttons -->
+                                    
+                                    <!-- Layout for Request Info -->
+                                     <VerticalStackLayout Spacing="5">
+                                         <!-- User Info (Visible for Admins/Managers/HR) -->
+                                        <Label Text="{Binding UserName, StringFormat='User: {0}'}"
+                                               IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanManageRequests}"
+                                               FontAttributes="Italic"
+                                               FontSize="Small"/>
+                                        
+                                        <!-- Main Request Details -->
+                                         <Label Text="{Binding LeaveType}" FontAttributes="Bold" FontSize="Medium" />
+                                         <Label Text="{Binding RequestStartDate, StringFormat='From: {0:d}'}" FontSize="Small" />
+                                         <Label Text="{Binding RequestEndDate, StringFormat='To: {0:d}'}" IsVisible="{Binding RequestEndDate.HasValue}" FontSize="Small" />
+                                         <Label Text="{Binding RequestReason, StringFormat='Reason: {0}'}" FontSize="Small" LineBreakMode="WordWrap" IsVisible="{Binding RequestReason, Converter={StaticResource StringNotEmptyConverter}}"/>
+                                         <Label Text="{Binding Status, StringFormat='Status: {0}'}" FontAttributes="Bold" FontSize="Small" />
+                                         <Label Text="{Binding Remarks, StringFormat='Remarks: {0}'}" FontSize="Small" IsVisible="{Binding Remarks, Converter={StaticResource StringNotEmptyConverter}}"/>
+                                    
+                                        <!-- Action Buttons -->
+                                        <HorizontalStackLayout Spacing="5" Margin="0,5,0,0">
+                                            <!-- Edit Button -->
+                                             <Button Text="Edit"
+                                                     FontSize="Micro"
+                                                     Padding="8,4"
+                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=EditRequestCommand}"
+                                                     CommandParameter="{Binding .}"
+                                                     IsVisible="{Binding Status, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Pending'}" 
+                                                     />
+                                                     <!-- TODO: Add finer IsVisible logic based on user ownership vs admin role -->
+
+                                            <!-- Delete Button -->
+                                            <Button Text="Delete"
+                                                    FontSize="Micro"
+                                                    Padding="8,4"
+                                                    BackgroundColor="Red"
+                                                    TextColor="White"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=DeleteRequestCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    IsVisible="{Binding Status, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Pending'}"
+                                                    /> 
+                                                     <!-- TODO: Add finer IsVisible logic based on user ownership vs admin role -->
+
+                                            <!-- Approve Button -->
+                                            <Button Text="Approve"
+                                                    FontSize="Micro"
+                                                    Padding="8,4"
+                                                    BackgroundColor="Green"
+                                                    TextColor="White"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=ApproveRequestCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                     IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanApproveReject}"
+                                                     />
+                                                    <!-- TODO: Add finer IsVisible check based on status == Pending and user not being owner -->
+                                            
+                                            <!-- Reject Button -->
+                                            <Button Text="Reject"
+                                                    FontSize="Micro"
+                                                    Padding="8,4"
+                                                    BackgroundColor="OrangeRed"
+                                                    TextColor="White"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=RejectRequestCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                     IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanApproveReject}"
+                                                    /> 
+                                                    <!-- TODO: Add finer IsVisible check based on status == Pending and user not being owner -->
+
+                                            <!-- View Details Button (If needed separate from actions) -->
+                                            <Button Text="Details"
+                                                    FontSize="Micro"
+                                                    Padding="8,4"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=GoToRequestDetailsCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    />
+                                        </HorizontalStackLayout>
+                                    </VerticalStackLayout>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        <!-- Row 3: Optional Pagination Controls -->
+        <StackLayout Grid.Row="3" Orientation="Horizontal" HorizontalOptions="Center" Margin="0,10,0,0">
+            <!-- Add Pagination Buttons/Labels here if implementing pagination UI -->
+        </StackLayout>
+    </Grid>
+
+</ContentPage> 

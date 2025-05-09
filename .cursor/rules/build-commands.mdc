@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Build-commands
+
+This rule ensures proper execution of build commands in the Windows environment.
+
+When running build or compilation commands:
+
+1. Never use '&&' to chain commands as this causes failures in the Windows environment
+2. Always run commands separately (one at a time)
+3. For building projects, use the following pattern:
+   - First: `cd [ProjectDirectory]`
+   - Then (as a separate command): `dotnet build`
+
+4. For multi-step processes, break them into individual commands:
+   - Use separate tool calls for each step
+   - Verify completion of each step before proceeding
+   - Include clear error handling for each step
+
+5. Example of correct command usage:
+   - Correct: `cd TDFMAUI` followed by a separate command `dotnet build`
+   - Incorrect: `cd TDFMAUI && dotnet build`
+

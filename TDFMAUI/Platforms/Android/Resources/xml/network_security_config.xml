@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Debug overrides - trust user certificates in debug mode -->
+    <debug-overrides>
+        <trust-anchors>
+            <!-- Trust user added CAs while debuggable only -->
+            <certificates src="user" />
+            <certificates src="system" />
+        </trust-anchors>
+    </debug-overrides>
+
+    <!-- Base configuration - allow cleartext traffic for all domains -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Special configuration for our API server with maximum compatibility -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android emulator localhost -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <!-- Regular localhost -->
+        <domain includeSubdomains="true">localhost</domain>
+        <!-- Our development server -->
+        <domain includeSubdomains="true">192.168.100.3</domain>
+
+        <!-- Trust all certificates for these domains -->
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+            <!-- The following ensures we trust self-signed certificates -->
+            <certificates src="@raw/development_ca" overridePins="true" />
+        </trust-anchors>
+
+        <!-- Pin the expected certificate hash for extra security -->
+        <pin-set expiration="2099-12-31">
+            <!-- This is a placeholder hash - it will be ignored if the certificate doesn't match -->
+            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
+        </pin-set>
+    </domain-config>
+</network-security-config>

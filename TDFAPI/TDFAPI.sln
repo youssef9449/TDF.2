@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35919.96
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TDFAPI", "TDFAPI.csproj", "{7EC6E970-A6FC-6B40-DB4C-E8937134B84E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TDFShared", "..\TDFShared\TDFShared.csproj", "{C765A7FE-905C-DB1F-1376-A049918DF542}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7EC6E970-A6FC-6B40-DB4C-E8937134B84E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7EC6E970-A6FC-6B40-DB4C-E8937134B84E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7EC6E970-A6FC-6B40-DB4C-E8937134B84E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7EC6E970-A6FC-6B40-DB4C-E8937134B84E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C765A7FE-905C-DB1F-1376-A049918DF542}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C765A7FE-905C-DB1F-1376-A049918DF542}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C765A7FE-905C-DB1F-1376-A049918DF542}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C765A7FE-905C-DB1F-1376-A049918DF542}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {873A77F6-BF1B-48DB-B23B-2941E17F86F4}
+	EndGlobalSection
+EndGlobal

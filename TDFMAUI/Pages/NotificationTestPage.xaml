@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             x:Class="TDFMAUI.Pages.NotificationTestPage"
+             Title="Notification Test Page">
+    
+    <Grid RowDefinitions="Auto,*,Auto" 
+          Padding="20"
+          RowSpacing="20">
+        
+        <!-- Header -->
+        <VerticalStackLayout Grid.Row="0" Spacing="10">
+            <Label Text="Platform-Specific Notifications"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center" />
+            
+            <Label Text="{Binding PlatformInfo}"
+                   FontSize="16"
+                   HorizontalOptions="Center" />
+        </VerticalStackLayout>
+        
+        <!-- Notification Test Options -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="20" Padding="0,20">
+                 <!-- Constrain width on Desktop/Tablet -->
+                <VerticalStackLayout.MaximumWidthRequest>
+                    <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="700" Desktop="600" />
+                </VerticalStackLayout.MaximumWidthRequest>
+                <VerticalStackLayout.HorizontalOptions>
+                     <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                </VerticalStackLayout.HorizontalOptions>
+
+                <!-- Info Notification -->
+                <Border StrokeShape="RoundRectangle 8"
+                        Stroke="{StaticResource Gray300}"
+                        StrokeThickness="1"
+                        Padding="15">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Information Notification" 
+                               FontSize="18" 
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource Primary}" />
+                        
+                        <Entry Placeholder="Notification Title"
+                               Text="{Binding InfoTitle}" />
+                        
+                        <Entry Placeholder="Notification Message"
+                               Text="{Binding InfoMessage}" />
+                        
+                        <Button Text="Send Info Notification"
+                                Command="{Binding SendInfoCommand}"
+                                BackgroundColor="{StaticResource Primary}"
+                                HorizontalOptions="Fill" />
+                    </VerticalStackLayout>
+                </Border>
+                
+                <!-- Success Notification -->
+                <Border StrokeShape="RoundRectangle 8"
+                        Stroke="{StaticResource Gray300}"
+                        StrokeThickness="1"
+                        Padding="15">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Success Notification" 
+                               FontSize="18" 
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource Success}" />
+                        
+                        <Entry Placeholder="Notification Title"
+                               Text="{Binding SuccessTitle}" />
+                        
+                        <Entry Placeholder="Notification Message"
+                               Text="{Binding SuccessMessage}" />
+                        
+                        <Button Text="Send Success Notification"
+                                Command="{Binding SendSuccessCommand}"
+                                BackgroundColor="{StaticResource Success}"
+                                HorizontalOptions="Fill" />
+                    </VerticalStackLayout>
+                </Border>
+                
+                <!-- Warning Notification -->
+                <Border StrokeShape="RoundRectangle 8"
+                        Stroke="{StaticResource Gray300}"
+                        StrokeThickness="1"
+                        Padding="15">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Warning Notification" 
+                               FontSize="18" 
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource Warning}" />
+                        
+                        <Entry Placeholder="Notification Title"
+                               Text="{Binding WarningTitle}" />
+                        
+                        <Entry Placeholder="Notification Message"
+                               Text="{Binding WarningMessage}" />
+                        
+                        <Button Text="Send Warning Notification"
+                                Command="{Binding SendWarningCommand}"
+                                BackgroundColor="{StaticResource Warning}"
+                                HorizontalOptions="Fill" />
+                    </VerticalStackLayout>
+                </Border>
+                
+                <!-- Error Notification -->
+                <Border StrokeShape="RoundRectangle 8"
+                        Stroke="{StaticResource Gray300}"
+                        StrokeThickness="1"
+                        Padding="15">
+                    <VerticalStackLayout Spacing="15">
+                        <Label Text="Error Notification" 
+                               FontSize="18" 
+                               FontAttributes="Bold"
+                               TextColor="{StaticResource Danger}" />
+                        
+                        <Entry Placeholder="Notification Title"
+                               Text="{Binding ErrorTitle}" />
+                        
+                        <Entry Placeholder="Notification Message"
+                               Text="{Binding ErrorMessage}" />
+                        
+                        <Button Text="Send Error Notification"
+                                Command="{Binding SendErrorCommand}"
+                                BackgroundColor="{StaticResource Danger}"
+                                HorizontalOptions="Fill" />
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
+        </ScrollView>
+        
+        <!-- Notification History -->
+        <Button Grid.Row="2"
+                Text="View Notification History"
+                Command="{Binding ViewHistoryCommand}"
+                HorizontalOptions="Fill" />
+    </Grid>
+</ContentPage> 

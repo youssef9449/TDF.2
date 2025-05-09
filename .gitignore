@@ -1,0 +1,20 @@
+# Ignore all bin directories
+**/bin/
+
+# Ignore all release directories
+**/release/
+
+# Ignore intermediate build outputs
+**/obj/
+
+# Ignore user-specific Visual Studio settings
+*.user
+
+# Ignore Visual Studio solution user options
+*.suo
+
+# Ignore Visual Studio's hidden folder
+.vs/
+
+# Ignore JetBrains Rider's project-specific settings
+.idea/

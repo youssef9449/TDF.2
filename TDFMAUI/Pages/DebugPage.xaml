@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TDFMAUI.Pages.DebugPage"
+             Title="Debug"
+             BackgroundColor="#1a237e">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="15">
+             <!-- Constrain width on Desktop/Tablet -->
+            <VerticalStackLayout.MaximumWidthRequest>
+                <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="700" Desktop="600" />
+            </VerticalStackLayout.MaximumWidthRequest>
+            <VerticalStackLayout.HorizontalOptions>
+                 <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+            </VerticalStackLayout.HorizontalOptions>
+
+            <Label Text="Debug Information" 
+                   FontSize="24" 
+                   FontAttributes="Bold"
+                   TextColor="White"
+                   HorizontalOptions="Center"/>
+            
+            <Frame BackgroundColor="#0d47a1"
+                   CornerRadius="15"
+                   Padding="15"
+                   HasShadow="True">
+                <VerticalStackLayout>
+                    <Label Text="Connection Status:" 
+                           FontAttributes="Bold"
+                           TextColor="White"/>
+                    <Label x:Name="connectionStatusLabel" 
+                           TextColor="#bbdefb"/>
+                    
+                    <!-- Other debug info with same styling -->
+                </VerticalStackLayout>
+            </Frame>
+            
+            <Button Text="Refresh"
+                    Clicked="OnRefreshClicked"
+                    BackgroundColor="#64b5f6"
+                    TextColor="White"
+                    FontAttributes="Bold"
+                    CornerRadius="10"
+                    HeightRequest="50"/>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

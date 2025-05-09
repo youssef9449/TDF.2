@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35931.197 d17.13
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TDFShared", "TDFShared.csproj", "{3D4242A9-41E3-F04C-04DB-319095C0EDED}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3D4242A9-41E3-F04C-04DB-319095C0EDED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D4242A9-41E3-F04C-04DB-319095C0EDED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D4242A9-41E3-F04C-04DB-319095C0EDED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D4242A9-41E3-F04C-04DB-319095C0EDED}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F085ABE6-50CF-489D-B68B-3C4D9A1FF48C}
+	EndGlobalSection
+EndGlobal

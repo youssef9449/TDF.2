@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TDFMAUI.Pages.ProfilePage"
+             Title="Profile"
+             BackgroundColor="#1a237e">
+
+    <ScrollView>
+        <Grid RowDefinitions="Auto,Auto,Auto" Padding="20" RowSpacing="20">
+             <!-- Constrain width on Desktop/Tablet -->
+            <Grid.MaximumWidthRequest>
+                <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="700" Desktop="600" />
+            </Grid.MaximumWidthRequest>
+            <Grid.HorizontalOptions>
+                 <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+            </Grid.HorizontalOptions>
+
+            <!-- User Info -->
+            <Frame Grid.Row="0"
+                   BackgroundColor="#0d47a1"
+                   CornerRadius="15"
+                   Padding="20"
+                   HasShadow="True">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="User Profile" 
+                           FontSize="20" 
+                           FontAttributes="Bold"
+                           TextColor="White"
+                           HorizontalOptions="Center"/>
+                    
+                    <Label Text="Full Name:" 
+                           FontAttributes="Bold"
+                           TextColor="White"/>
+                    <Entry x:Name="fullNameEntry" 
+                           TextColor="#bbdefb"
+                           BackgroundColor="White"
+                           Placeholder="Enter your full name"/>
+                    
+                    <Label Text="Department:" 
+                           FontAttributes="Bold"
+                           TextColor="White"/>
+                    <Entry x:Name="departmentEntry" 
+                           TextColor="#bbdefb"
+                           BackgroundColor="White"
+                           Placeholder="Enter your department"/>
+                    
+                    <Label Text="Title:" 
+                           FontAttributes="Bold"
+                           TextColor="White"/>
+                    <Entry x:Name="titleEntry" 
+                           TextColor="#bbdefb"
+                           BackgroundColor="White"
+                           Placeholder="Enter your title"/>
+                    
+                    <!-- Other profile fields with same styling -->
+                </VerticalStackLayout>
+            </Frame>
+            
+            <!-- Change Password -->
+            <Frame Grid.Row="1"
+                   BackgroundColor="#0d47a1"
+                   CornerRadius="15"
+                   Padding="20"
+                   HasShadow="True">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="Change Password" 
+                           FontSize="20" 
+                           FontAttributes="Bold"
+                           TextColor="White"
+                           HorizontalOptions="Center"/>
+                    
+                    <!-- Password fields with same styling as login page -->
+                </VerticalStackLayout>
+            </Frame>
+            
+            <!-- Actions -->
+            <Button Grid.Row="2"
+                    Text="Save Changes"
+                    Clicked="OnSaveClicked"
+                    BackgroundColor="#64b5f6"
+                    TextColor="White"
+                    FontAttributes="Bold"
+                    CornerRadius="10"
+                    HeightRequest="50"/>
+        </Grid>
+    </ScrollView>
+</ContentPage>

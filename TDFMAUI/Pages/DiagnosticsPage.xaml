@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TDFMAUI.Pages.DiagnosticsPage"
+             Title="Diagnostics">
+    <ScrollView>
+        <VerticalStackLayout Padding="20">
+            <Label Text="App Diagnostics" FontSize="24" FontAttributes="Bold" Margin="0,0,0,20"/>
+            
+            <Frame BorderColor="Gray" Padding="10" Margin="0,0,0,10">
+                <VerticalStackLayout>
+                    <Label Text="API Connection" FontSize="18" FontAttributes="Bold"/>
+                    <Label x:Name="ApiStatusLabel" Text="Unknown" Margin="0,5,0,0"/>
+                    <Button x:Name="TestApiButton" Text="Test API Connection" Clicked="TestApiButton_Clicked" Margin="0,10,0,0"/>
+                </VerticalStackLayout>
+            </Frame>
+            
+            <Frame BorderColor="Gray" Padding="10" Margin="0,0,0,10">
+                <VerticalStackLayout>
+                    <Label Text="Network Status" FontSize="18" FontAttributes="Bold"/>
+                    <Label x:Name="NetworkStatusLabel" Text="Unknown" Margin="0,5,0,0"/>
+                    <Button x:Name="CheckNetworkButton" Text="Check Network Status" Clicked="CheckNetworkButton_Clicked" Margin="0,10,0,0"/>
+                </VerticalStackLayout>
+            </Frame>
+            
+            <Frame BorderColor="Gray" Padding="10" Margin="0,0,0,10">
+                <VerticalStackLayout>
+                    <Label Text="Configuration" FontSize="18" FontAttributes="Bold"/>
+                    <Label x:Name="ConfigLabel" Text="Loading..." Margin="0,5,0,0"/>
+                </VerticalStackLayout>
+            </Frame>
+            
+            <Frame BorderColor="Gray" Padding="10" Margin="0,0,0,10">
+                <VerticalStackLayout>
+                    <Label Text="Device Info" FontSize="18" FontAttributes="Bold"/>
+                    <Label x:Name="DeviceInfoLabel" Text="Loading..." Margin="0,5,0,0"/>
+                </VerticalStackLayout>
+            </Frame>
+            
+            <Frame BorderColor="Gray" Padding="10" Margin="0,0,0,10">
+                <VerticalStackLayout>
+                    <Label Text="Logs" FontSize="18" FontAttributes="Bold"/>
+                    <Label x:Name="LogsLabel" Text="No logs to display" Margin="0,5,0,0"/>
+                    <Button x:Name="RefreshLogsButton" Text="Refresh Logs" Clicked="RefreshLogsButton_Clicked" Margin="0,10,0,0"/>
+                    <Button x:Name="SaveLogsButton" Text="Save Logs" Clicked="SaveLogsButton_Clicked" Margin="0,10,0,0"/>
+                </VerticalStackLayout>
+            </Frame>
+            
+            <Button x:Name="ClearCacheButton" Text="Clear App Cache" Clicked="ClearCacheButton_Clicked" Margin="0,20,0,0"/>
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

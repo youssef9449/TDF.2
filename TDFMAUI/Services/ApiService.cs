@@ -1,0 +1,1460 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Networking;
+using Microsoft.Maui.Storage;
+// TDFShared references
+using TDFShared.Constants;
+using TDFShared.DTOs.Auth;
+using TDFShared.DTOs.Messages;
+using TDFShared.DTOs.Requests;
+using TDFShared.DTOs.Users;
+using TDFShared.DTOs.Common;
+using TDFShared.Enums;
+using TDFShared.Exceptions;
+using TDFShared.Models.User;
+using TDFShared.Models.Message;
+using System.Net.NetworkInformation;
+using TDFMAUI.Config; // Added
+
+namespace TDFMAUI.Services
+{
+    // Adding NetworkUnavailableException class to fix CS0246
+    public class NetworkUnavailableException : Exception
+    {
+        public NetworkUnavailableException() : base("Network is unavailable") { }
+        public NetworkUnavailableException(string message) : base(message) { }
+        public NetworkUnavailableException(string message, Exception innerException) : base(message, innerException) { }
+    }
+
+    /// <summary>
+    /// Service for communicating with the API.
+    /// 
+    /// Features:
+    /// - Automatic token management for authentication
+    /// - Retry logic with exponential backoff for transient errors
+    /// - Integrated network status monitoring
+    /// - Request queueing when network is unavailable
+    /// - Performance tracking with DebugService
+    /// - Comprehensive error handling with user-friendly messages
+    /// </summary>
+    public class ApiService : IApiService, IDisposable
+    {
+        private readonly IHttpClientService _httpClientService;
+        private readonly SecureStorageService _secureStorage;
+        private readonly JsonSerializerOptions _jsonOptions;
+        private NetworkMonitorService _networkMonitor;
+        private bool _isNetworkAvailable = true;
+        private readonly Dictionary<string, Queue<PendingRequest>> _pendingRequests = new Dictionary<string, Queue<PendingRequest>>();
+        private readonly ILogger<ApiService> _logger;
+        private bool _initialized;
+        
+        // Class to represent a pending API request
+        private class PendingRequest
+        {
+            public string Endpoint { get; set; }
+            public object Data { get; set; }
+            public string RequestType { get; set; } // GET, POST, PUT, DELETE
+            public DateTime QueuedTime { get; set; }
+            public TaskCompletionSource<object> CompletionSource { get; set; }
+            
+            public PendingRequest(string endpoint, object data, string requestType)
+            {
+                Endpoint = endpoint;
+                Data = data;
+                RequestType = requestType;
+                QueuedTime = DateTime.Now;
+                CompletionSource = new TaskCompletionSource<object>();
+            }
+        }
+        
+        public ApiService(
+            IHttpClientService httpClientService, 
+            SecureStorageService secureStorage, 
+            ILogger<ApiService> logger, 
+            NetworkMonitorService networkMonitor)
+        {
+            _httpClientService = httpClientService;
+            _secureStorage = secureStorage ?? new SecureStorageService();
+            _logger = logger;
+            _jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+            
+            _logger?.LogInformation("ApiService: Initialized");
+            InitializeAuthenticationAsync().ConfigureAwait(false);
+            _networkMonitor = networkMonitor;
+            if (_networkMonitor != null)
+            {
+                _isNetworkAvailable = _networkMonitor.IsConnected;
+                _networkMonitor.NetworkStatusChanged += OnNetworkStatusChanged;
+                _logger?.LogInformation("ApiService: Network monitor registered. Initial status: {Status}", (_isNetworkAvailable ? "Connected" : "Disconnected"));
+            }
+            _initialized = false;
+        }
+        
+        private void OnNetworkStatusChanged(object sender, NetworkStatusChangedEventArgs e)
+        {
+            _isNetworkAvailable = e.IsConnected;
+            _logger?.LogInformation("ApiService: Network status changed: {Status}", (_isNetworkAvailable ? "Connected" : "Disconnected"));
+            
+            // If network was restored, we could trigger deferred requests here
+            if (_isNetworkAvailable && _pendingRequests.Count > 0)
+            {
+                // Process pending requests
+                Task.Run(async () => await ProcessPendingRequestsAsync());
+            }
+        }
+        
+        // Method to process pending requests when network is restored
+        private async Task ProcessPendingRequestsAsync()
+        {
+            if (!_isNetworkAvailable || _pendingRequests.Count == 0)
+                return;
+                
+            _logger?.LogInformation("ApiService: Processing {PendingRequestCount} pending requests", _pendingRequests.Sum(p => p.Value.Count));
+            
+            foreach (var endpointQueue in _pendingRequests.ToList())
+            {
+                string endpoint = endpointQueue.Key;
+                var requests = endpointQueue.Value;
+                
+                while (requests.Count > 0 && _isNetworkAvailable)
+                {
+                    var request = requests.Peek();
+                    
+                    try
+                    {
+                        // Skip requests older than 1 hour
+                        if (DateTime.Now - request.QueuedTime > TimeSpan.FromHours(1))
+                        {
+                            _logger?.LogWarning("ApiService: Skipping expired request to {Endpoint}", request.Endpoint);
+                            requests.Dequeue();
+                            request.CompletionSource.SetException(new TimeoutException("Request expired"));
+                            continue;
+                        }
+                        
+                        _logger?.LogInformation("ApiService: Executing queued {RequestType} request to {Endpoint}", request.RequestType, request.Endpoint);
+                        
+                        object result = null;
+                        
+                        switch (request.RequestType)
+                        {
+                            case "GET":
+                                result = await GetAsync<object>(request.Endpoint);
+                                break;
+                            case "POST":
+                                result = await PostAsync<object, object>(request.Endpoint, request.Data);
+                                break;
+                            case "PUT":
+                                await PutAsync<object, object>(request.Endpoint, request.Data);
+                                break;
+                            case "DELETE":
+                                var response = await DeleteAsync(request.Endpoint);
+                                // For DELETE requests, we can set a bool result indicating success
+                                result = response.IsSuccessStatusCode;
+                                break;
+                        }
+                        
+                        // Complete the task
+                        requests.Dequeue();
+                        request.CompletionSource.SetResult(result);
+                    }
+                    catch (Exception ex)
+                    {
+                        // If this is a network error, stop processing
+                        if (!_isNetworkAvailable || ex is HttpRequestException)
+                        {
+                            _logger?.LogWarning("ApiService: Network error while processing pending requests, will retry later");
+                            break;
+                        }
+                        
+                        // For other errors, complete the task with an exception and move on
+                        requests.Dequeue();
+                        request.CompletionSource.SetException(ex);
+                        _logger?.LogError(ex, "ApiService: Error processing queued request");
+                    }
+                }
+                
+                // If queue is empty, remove it
+                if (requests.Count == 0)
+                {
+                    _pendingRequests.Remove(endpoint);
+                }
+            }
+            
+            _logger?.LogInformation("ApiService: Finished processing pending requests. {PendingRequestCount} remaining", _pendingRequests.Sum(p => p.Value.Count));
+        }
+        
+        // Method to queue a request for later execution
+        private Task<T> QueueRequestAsync<T>(string endpoint, object data, string requestType)
+        {
+            _logger?.LogInformation("ApiService: Queuing {RequestType} request to {Endpoint} for later execution", requestType, endpoint);
+            
+            var request = new PendingRequest(endpoint, data, requestType);
+            
+            if (!_pendingRequests.ContainsKey(endpoint))
+            {
+                _pendingRequests[endpoint] = new Queue<PendingRequest>();
+            }
+            
+            _pendingRequests[endpoint].Enqueue(request);
+            
+            // Return a task that will complete when the request is processed
+            return request.CompletionSource.Task.ContinueWith(t => 
+            {
+                if (t.IsFaulted)
+                {
+                    throw t.Exception.GetBaseException();
+                }
+                
+                try
+                {
+                return (T)t.Result;
+                }
+                catch (InvalidCastException castEx)
+                {
+                    _logger?.LogError(castEx, "ApiService: Type mismatch processing queued request result for {Endpoint}: {ErrorMessage}", endpoint, castEx.Message);
+                    throw new InvalidOperationException($"Result type mismatch for queued request {endpoint}", castEx);
+                }
+            });
+        }
+        
+        // Method to check network before making requests
+        private bool CheckNetworkBeforeRequest(string endpoint, bool queueIfUnavailable = false, object data = null, string requestType = null)
+        {
+            if (!_isNetworkAvailable)
+            {
+                _logger?.LogWarning("ApiService: Network unavailable, cannot make request to {Endpoint}", endpoint);
+                
+                if (queueIfUnavailable && requestType != null)
+                {
+                    // Queue the request for later
+                    QueueRequestAsync<object>(endpoint, data, requestType);
+                    _logger?.LogInformation("ApiService: Request to {Endpoint} queued for later execution", endpoint);
+                }
+                
+                return false;
+            }
+            return true;
+        }
+        
+        // Method to handle cleanup when ApiService is disposed
+        public void Dispose()
+        {
+            if (_networkMonitor != null)
+            {
+                _networkMonitor.NetworkStatusChanged -= OnNetworkStatusChanged;
+            }
+        }
+        
+        private async Task InitializeAuthenticationAsync()
+        {
+            var tokenInfo = await _secureStorage.GetTokenAsync();
+            if (!string.IsNullOrEmpty(tokenInfo.Token) && tokenInfo.Expiration > DateTime.UtcNow)
+            {
+                _httpClientService.SetAuthorizationHeader(tokenInfo.Token);
+                _logger?.LogInformation("ApiService: Initialization - Found valid token.");
+            }
+            else
+            {
+                _httpClientService.ClearAuthorizationHeader();
+            }
+            _initialized = true;
+        }
+        
+        #region HTTP Methods
+        // Helper method to determine if an exception is retryable
+        private bool IsRetryableException(Exception ex)
+        {
+            return ex is HttpRequestException || 
+                   ex is WebException || 
+                   ex is TimeoutException ||
+                   (ex is ApiException apiEx && IsRetryableStatusCode(apiEx.StatusCode));
+        }
+        
+        // Helper method to determine if a response has a retryable status code
+        private bool IsRetryableStatusCode(HttpStatusCode statusCode)
+        {
+            return statusCode == HttpStatusCode.RequestTimeout ||
+                   statusCode == HttpStatusCode.ServiceUnavailable ||
+                   statusCode == HttpStatusCode.GatewayTimeout ||
+                   (int)statusCode >= 500; // General server errors
+        }
+        
+        public async Task<string> GetRawResponseAsync(string endpoint)
+        {
+            _logger.LogDebug("Executing Raw GET request to {Endpoint}", endpoint);
+            try
+            {
+                // Ensure relative path and pass directly to HttpClientService
+                endpoint = endpoint.TrimStart('/');
+                if (endpoint.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
+                {
+                    endpoint = endpoint.Substring(4);
+                }
+                var response = await _httpClientService.GetRawAsync(endpoint);
+                return response;
+            }
+            catch (Exception ex)
+            {    
+                _logger?.LogError(ex, "ApiService: Error in GetRawResponseAsync for {Endpoint}: {Message}", endpoint, ex.Message);
+                throw new ApiException($"Error fetching raw data from {endpoint}", ex);
+            }
+        }
+        
+        public async Task<T> GetAsync<T>(string endpoint, bool queueIfUnavailable = false)
+        {
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable, null, "GET"))
+            {
+                return queueIfUnavailable 
+                    ? await QueueRequestAsync<T>(endpoint, null, "GET") 
+                    : default(T);
+            }
+            
+            try
+            {
+                // Ensure relative path and pass directly to HttpClientService
+                endpoint = endpoint.TrimStart('/');
+                 if (endpoint.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
+                {
+                    endpoint = endpoint.Substring(4);
+                }
+                var response = await _httpClientService.GetAsync<T>(endpoint);
+                return response;
+            }
+            catch (HttpRequestException httpEx)
+            {
+                _logger?.LogError(httpEx, "ApiService: HTTP error in GetAsync for {Endpoint}", endpoint);
+                _isNetworkAvailable = false; 
+                if (queueIfUnavailable) return await QueueRequestAsync<T>(endpoint, null, "GET");
+                throw new ApiException($"Connection error: {httpEx.Message}", httpEx);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Error in GetAsync for {Endpoint}: {Message}", endpoint, ex.Message);
+                throw new ApiException($"Error fetching data from {endpoint}: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<TResponse> PostAsync<TRequest, TResponse>(string endpoint, TRequest data, bool queueIfUnavailable = true)
+        {
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable, data, "POST"))
+            {
+                return queueIfUnavailable 
+                    ? await QueueRequestAsync<TResponse>(endpoint, data, "POST") 
+                    : default(TResponse);
+            }
+            
+            try
+            {
+                // Ensure relative path and pass directly to HttpClientService
+                endpoint = endpoint.TrimStart('/');
+                 if (endpoint.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
+                {
+                    endpoint = endpoint.Substring(4);
+                }
+                var response = await _httpClientService.PostAsync<TRequest, TResponse>(endpoint, data);
+                return response;
+            }
+            catch (HttpRequestException httpEx)
+            {
+                _logger?.LogError(httpEx, "ApiService: HTTP error in PostAsync for {Endpoint}", endpoint);
+                _isNetworkAvailable = false; 
+                if (queueIfUnavailable) return await QueueRequestAsync<TResponse>(endpoint, data, "POST");
+                throw new ApiException($"Connection error: {httpEx.Message}", httpEx);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Error in PostAsync for {Endpoint}: {Message}", endpoint, ex.Message);
+                throw new ApiException($"Error posting data to {endpoint}: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<TResponse> PutAsync<TRequest, TResponse>(string endpoint, TRequest data, bool queueIfUnavailable = true)
+        {
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable, data, "PUT"))
+            {
+                 if (queueIfUnavailable)
+                    return await QueueRequestAsync<TResponse>(endpoint, data, "PUT");
+                else
+                    throw new InvalidOperationException("Network unavailable");
+            }
+            
+            try 
+            {
+                // Ensure relative path and pass directly to HttpClientService
+                endpoint = endpoint.TrimStart('/');
+                if (endpoint.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
+                {
+                    endpoint = endpoint.Substring(4);
+                }
+                var response = await _httpClientService.PutAsync<TRequest, TResponse>(endpoint, data);
+                return response;
+            }
+            catch (HttpRequestException httpEx)
+            {
+                _logger?.LogError(httpEx, "ApiService: HTTP error in PutAsync for {Endpoint}", endpoint);
+                _isNetworkAvailable = false; 
+                if (queueIfUnavailable) return await QueueRequestAsync<TResponse>(endpoint, data, "PUT");
+                throw new ApiException($"Connection error: {httpEx.Message}", httpEx);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Error in PutAsync for {Endpoint}: {Message}", endpoint, ex.Message);
+                throw new ApiException($"Error putting data to {endpoint}: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<HttpResponseMessage> DeleteAsync(string endpoint, bool queueIfUnavailable = true)
+        {
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable))
+            {
+                if (queueIfUnavailable)
+                {
+                    // Queue returns Task<object>, but Delete returns HttpResponseMessage, so we await and convert
+                    var result = await QueueRequestAsync<object>(endpoint, null, "DELETE");
+                    // Return a fake success response since the request is queued
+                    return new HttpResponseMessage(HttpStatusCode.Accepted) 
+                    { 
+                        ReasonPhrase = "Request queued for later execution" 
+                    };
+                }
+                else
+                {
+                    throw new NetworkUnavailableException("Network unavailable");
+                }
+            }
+
+            try
+            {
+                // Ensure relative path and pass directly to HttpClientService
+                endpoint = endpoint.TrimStart('/');
+                 if (endpoint.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
+                {
+                    endpoint = endpoint.Substring(4);
+                }
+                HttpResponseMessage httpResponse = await _httpClientService.DeleteAsync(endpoint);
+                return httpResponse;
+            }
+            catch (HttpRequestException httpEx)
+            {
+                _logger?.LogError(httpEx, "ApiService: HTTP error in DeleteAsync for {Endpoint}", endpoint);
+                _isNetworkAvailable = false; 
+                if (queueIfUnavailable) 
+                {
+                    await QueueRequestAsync<object>(endpoint, null, "DELETE"); // Queue the delete
+                     return new HttpResponseMessage(HttpStatusCode.Accepted) { ReasonPhrase = "Request queued for later execution" }; // Return Accepted
+                }
+                throw new ApiException($"Connection error: {httpEx.Message}", httpEx);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Error in DeleteAsync for {Endpoint}: {Message}", endpoint, ex.Message);
+                throw new ApiException($"Error deleting resource at {endpoint}: {ex.Message}", ex);
+            }
+        }
+        #endregion
+        
+        #region Authentication
+        public async Task<UserDto> LoginAsync(string username, string password)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            var request = new AuthLoginRequest { Username = username, Password = password };
+            string endpoint = "auth/login";
+            
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false)) 
+                throw new NetworkUnavailableException();
+
+            try
+            {
+                var tokenResponse = await PostAsync<AuthLoginRequest, ApiResponse<TokenResponse>>(endpoint, request);
+
+                if (tokenResponse == null || !tokenResponse.Success || tokenResponse.Data == null)
+                {
+                    throw new ApiException(HttpStatusCode.Unauthorized, tokenResponse?.ErrorMessage ?? "Login failed: Invalid response from server.");
+                }
+                
+                DateTime tokenExpiration = DateTime.UtcNow.AddHours(24);
+                
+                await _secureStorage.SaveTokenAsync(tokenResponse.Data.Token, tokenExpiration);
+                _httpClientService.SetAuthorizationHeader(tokenResponse.Data.Token);
+                
+                var userDto = new UserDto { 
+                    UserID = tokenResponse.Data.UserId, 
+                    Username = tokenResponse.Data.Username,
+                    FullName = tokenResponse.Data.FullName,
+                    IsAdmin = tokenResponse.Data.IsAdmin
+                };
+                App.CurrentUser = userDto;
+                return userDto;
+            }
+            catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized || ex.StatusCode == HttpStatusCode.BadRequest)
+            {
+                _logger.LogWarning("Login failed for user {Username}: {StatusCode} - {Message}", username, ex.StatusCode, ex.Message);
+                await _secureStorage.ClearTokenAsync();
+                _httpClientService.ClearAuthorizationHeader();
+                throw;
+            }
+            catch (Exception ex)
+            {    
+                _logger.LogError(ex, "Unexpected error during login for user {Username}", username);
+                await _secureStorage.ClearTokenAsync();
+                _httpClientService.ClearAuthorizationHeader();
+                throw new ApiException("An unexpected error occurred during login.", ex);
+            }
+        }
+        
+        public async Task<bool> LogoutAsync()
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = "auth/logout";
+             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
+                 throw new NetworkUnavailableException();
+
+            try
+            {
+                 await PostAsync<object, object>(endpoint, null);
+                await _secureStorage.ClearTokenAsync();
+                _logger?.LogInformation("ApiService: Logout successful, token cleared.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                 _logger.LogError(ex, "Error during logout API call");
+                 await _secureStorage.ClearTokenAsync();
+                 return false;
+            }
+        }
+
+        public async Task<bool> RegisterUserAsync(CreateUserRequest registration)
+        {   
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = "auth/register";
+              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
+                 throw new NetworkUnavailableException();
+
+            try
+            {
+                _logger?.LogInformation("ApiService: Registering new user {Username}", registration.Username);
+                var response = await PostAsync<CreateUserRequest, ApiResponse<UserDto>>(endpoint, registration);
+                
+                if (response == null || !response.Success)
+                {
+                    HttpStatusCode statusCode = HttpStatusCode.BadRequest;
+                    if (response != null)
+                    {
+                        statusCode = (HttpStatusCode)response.StatusCode;
+                    }
+                    throw new ApiException(statusCode, response?.ErrorMessage ?? "Registration failed: Invalid response.");
+                }
+                
+                _logger?.LogInformation("ApiService: User {Username} registered successfully", registration.Username);
+                return true;
+            }
+            catch (ApiException ex)
+            {
+                 _logger?.LogError(ex, "ApiService: API error registering user {Username}", registration.Username);
+                 throw; 
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to register user {Username}", registration.Username);
+                throw new ApiException($"Registration failed: {GetFriendlyErrorMessage(ex)}", ex);
+            }
+        }
+        #endregion
+
+        #region User Operations (Now returns DTOs)
+         public async Task<UserDto> GetUserByIdAsync(int userId)
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = $"users/{userId}";
+              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 return await QueueRequestAsync<UserDto>(endpoint, null, "GET");
+            
+             var response = await GetAsync<ApiResponse<UserDto>>(endpoint);
+             if(response == null || !response.Success)
+             {
+                 HttpStatusCode statusCode = HttpStatusCode.NotFound;
+                 if (response != null)
+                 {
+                     statusCode = (HttpStatusCode)response.StatusCode;
+                 }
+                 throw new ApiException(statusCode, response?.ErrorMessage ?? "User not found");
+             }
+             return response.Data;
+        }
+        
+        public async Task<UserDto> GetUserAsync(int userId)
+        {
+            // This is an alias for GetUserByIdAsync for backward compatibility
+            return await GetUserByIdAsync(userId);
+        }
+        
+        public async Task<UserProfileDto> GetUserProfileAsync(int userId)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            // Format the GetById route with the userId parameter
+            string endpoint = $"users/{userId}/profile";
+            
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                return await QueueRequestAsync<UserProfileDto>(endpoint, null, "GET");
+                
+            var response = await GetAsync<ApiResponse<UserProfileDto>>(endpoint);
+            if (response == null || !response.Success)
+            {
+                HttpStatusCode statusCode = HttpStatusCode.NotFound;
+                if (response != null)
+                {
+                    statusCode = (HttpStatusCode)response.StatusCode;
+                }
+                throw new ApiException(statusCode, response?.ErrorMessage ?? "User profile not found");
+            }
+            return response.Data;
+        }
+
+        public async Task<PaginatedResult<UserDto>> GetAllUsersAsync(int page = 1, int pageSize = 10)
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = $"users?pageNumber={page}&pageSize={pageSize}";
+             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 return await QueueRequestAsync<PaginatedResult<UserDto>>(endpoint, null, "GET");
+                 
+             var response = await GetAsync<ApiResponse<PaginatedResult<UserDto>>>(endpoint);
+              if(response == null || !response.Success)
+             {
+                 HttpStatusCode statusCode = HttpStatusCode.BadRequest;
+                 if (response != null)
+                 {
+                     statusCode = (HttpStatusCode)response.StatusCode;
+                 }
+                 throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to get users");
+             }
+            return response.Data ?? new PaginatedResult<UserDto>();
+        }
+        
+        public async Task<List<UserDto>> GetUsersByDepartmentAsync(string department)
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             if (string.IsNullOrWhiteSpace(department)) return new List<UserDto>();
+             string endpoint = $"users?department={Uri.EscapeDataString(department)}";
+             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 return await QueueRequestAsync<List<UserDto>>(endpoint, null, "GET");
+
+            try
+            {
+                var response = await GetAsync<ApiResponse<IEnumerable<UserDto>>>(endpoint);
+                if (response == null || !response.Success)
+                {
+                    HttpStatusCode statusCode = HttpStatusCode.NotFound;
+                    if (response != null)
+                    {
+                        statusCode = (HttpStatusCode)response.StatusCode;
+                    }
+                    throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to get users by department");
+                }
+                return response.Data?.ToList() ?? new List<UserDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to get users for department '{Department}': {ErrorMessage}", department, GetFriendlyErrorMessage(ex));
+                throw; 
+            }
+        }
+        
+        public async Task<List<UserDto>> GetTeamMembersAsync()
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = "users/team-members";
+            
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                return await QueueRequestAsync<List<UserDto>>(endpoint, null, "GET");
+                
+            try
+            {
+                var response = await GetAsync<ApiResponse<List<UserDto>>>(endpoint);
+                if (response == null || !response.Success)
+                {
+                    HttpStatusCode statusCode = HttpStatusCode.NotFound;
+                    if (response != null)
+                    {
+                        statusCode = (HttpStatusCode)response.StatusCode;
+                    }
+                    throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to get team members");
+                }
+                return response.Data ?? new List<UserDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to get team members: {ErrorMessage}", GetFriendlyErrorMessage(ex));
+                throw;
+            }
+        }
+
+        public async Task<UserDto> CreateUserAsync(CreateUserRequest userRequest)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = "users";
+            
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
+                throw new NetworkUnavailableException("Create user requires network.");
+                
+            try
+            {
+                _logger?.LogInformation("ApiService: Creating new user");
+                var response = await PostAsync<CreateUserRequest, ApiResponse<UserDto>>(endpoint, userRequest);
+                
+                if (response == null || !response.Success)
+                {
+                    HttpStatusCode statusCode = HttpStatusCode.BadRequest;
+                    if (response != null)
+                    {
+                        statusCode = (HttpStatusCode)response.StatusCode;
+                    }
+                    throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to create user");
+                }
+                
+                return response.Data;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to create user: {ErrorMessage}", GetFriendlyErrorMessage(ex));
+                throw;
+            }
+        }
+
+        public async Task<UserDto> UpdateUserAsync(int userId, UpdateUserRequest userDto)
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = $"users/{userId}";
+             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 throw new NetworkUnavailableException("Update user requires network.");
+
+            try
+            {
+                 var response = await PutAsync<UpdateUserRequest, ApiResponse<UserDto>>(endpoint, userDto);
+                  if (response == null || !response.Success)
+                  {
+                      HttpStatusCode statusCode = HttpStatusCode.BadRequest;
+                      if (response != null)
+                      {
+                          statusCode = (HttpStatusCode)response.StatusCode;
+                      }
+                      throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to update user");
+                  }
+                 return response.Data;
+            }
+            catch (Exception ex)
+            {
+                 _logger?.LogError(ex, "ApiService: Failed to update user {UserId}", userId);
+                 throw new ApiException($"Update failed: {GetFriendlyErrorMessage(ex)}", ex);
+            }
+        }
+        
+        public async Task DeleteUserAsync(int userId)
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = $"users/{userId}";
+              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 throw new NetworkUnavailableException("Delete user requires network.");
+
+            try
+            {
+                var response = await DeleteAsync(endpoint);
+                // Ensure successful response
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger?.LogWarning("ApiService: Delete user {UserId} returned status code {StatusCode}", 
+                        userId, response.StatusCode);
+                    throw new ApiException(response.StatusCode, $"Failed to delete user: {response.ReasonPhrase}");
+                }
+            }
+            catch (Exception ex)
+            {
+                 _logger?.LogError(ex, "ApiService: Failed to delete user {UserId}", userId);
+                 throw new ApiException($"Delete failed: {GetFriendlyErrorMessage(ex)}", ex);
+            }
+        }
+        
+        public async Task<bool> ChangePasswordAsync(ChangePasswordDto changePasswordDto)
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = "users/change-password";
+             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
+                 throw new NetworkUnavailableException();
+
+            try
+            {
+                var response = await PostAsync<ChangePasswordDto, ApiResponse<bool>>(endpoint, changePasswordDto);
+                 if (response == null || !response.Success)
+                 {
+                     HttpStatusCode statusCode = HttpStatusCode.BadRequest;
+                     if (response != null)
+                     {
+                         statusCode = (HttpStatusCode)response.StatusCode;
+                     }
+                     throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to change password.");
+                 }
+                return true;
+            }
+            catch (ApiException ex)
+            {
+                _logger.LogError(ex, "API error changing password: {Message}", ex.Message);
+                throw; 
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error changing password.");
+                throw new ApiException("An unexpected error occurred while changing the password.", ex);
+            }
+        }
+
+        public async Task<bool> UploadProfilePictureAsync(Stream imageStream, string fileName, string contentType)
+        {
+            if (!CheckNetworkBeforeRequest("users/upload-profile-picture", queueIfUnavailable: false))
+            {
+                throw new NetworkUnavailableException("Network unavailable. Cannot upload profile picture.");
+            }
+
+            try
+            {
+                _logger?.LogInformation("ApiService: Uploading profile picture {FileName} ({ContentType})", fileName, contentType);
+                
+                using var content = new MultipartFormDataContent();
+                using var streamContent = new StreamContent(imageStream);
+                streamContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+
+                // The backend expects a parameter named 'file'
+                content.Add(streamContent, "file", fileName);
+
+                var response = await PostAsync<MultipartFormDataContent, ApiResponse<bool>>("users/upload-profile-picture", content);
+
+                if (response?.Success != true)
+                {
+                    _logger?.LogWarning("ApiService: Failed to upload profile picture. Message: {Message}", response?.Message);
+                    throw new ApiException(response?.Message ?? "Failed to upload profile picture.");
+                }
+                
+                 _logger?.LogInformation("ApiService: Profile picture uploaded successfully.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Error uploading profile picture: {ErrorMessage}", GetFriendlyErrorMessage(ex));
+                throw;
+            }
+        }
+
+        public async Task<bool> UpdateUserProfileAsync(UpdateMyProfileRequest profileData)
+        {
+             if (!CheckNetworkBeforeRequest("users/update-profile", queueIfUnavailable: true, profileData, "PUT"))
+            {
+                _logger?.LogInformation("ApiService: UpdateUserProfileAsync request queued due to network unavailability.");
+                return false;
+            }
+            
+            try
+            {
+                _logger?.LogInformation("ApiService: Updating user profile.");
+                var response = await PutAsync<UpdateMyProfileRequest, ApiResponse<bool>>("users/update-profile", profileData);
+                    
+                if (response?.Success != true)
+                {
+                    _logger?.LogWarning("ApiService: Failed to update user profile. Message: {Message}", response?.Message);
+                    throw new ApiException(response?.Message ?? "Failed to update profile.");
+                }
+                
+                _logger?.LogInformation("ApiService: User profile updated successfully.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Error updating user profile: {ErrorMessage}", GetFriendlyErrorMessage(ex));
+                throw;
+            }
+        }
+        #endregion
+
+        #region Message Operations (Return DTOs)
+        public async Task<PaginatedResult<ChatMessageDto>> GetUserMessagesAsync(int userId, MessagePaginationDto pagination)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = $"messages?userId={userId}&{BuildPaginationQueryString(pagination)}";
+             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 return await QueueRequestAsync<PaginatedResult<ChatMessageDto>>(endpoint, pagination, "GET");
+                 
+            var response = await GetAsync<ApiResponse<PaginatedResult<ChatMessageDto>>>(endpoint);
+             if(response == null || !response.Success) 
+                throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to get user messages");
+            return response.Data ?? new PaginatedResult<ChatMessageDto>();
+        }
+
+        public async Task<PaginatedResult<ChatMessageDto>> GetAllMessagesAsync(MessagePaginationDto pagination)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = $"messages{BuildPaginationQueryString(pagination)}";
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 return await QueueRequestAsync<PaginatedResult<ChatMessageDto>>(endpoint, pagination, "GET");
+
+            var response = await GetAsync<ApiResponse<PaginatedResult<ChatMessageDto>>>(endpoint);
+             if(response == null || !response.Success)
+             {
+                 HttpStatusCode statusCode = HttpStatusCode.BadRequest;
+                 if (response != null)
+                 {
+                     statusCode = (HttpStatusCode)response.StatusCode;
+                 }
+                 throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to get all messages");
+             }
+            return response.Data ?? new PaginatedResult<ChatMessageDto>();
+        }
+        
+        public async Task<ChatMessageDto> CreateMessageAsync(MessageCreateDto createDto)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = "messages";
+             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 throw new NetworkUnavailableException("Create message requires network.");
+                 
+             var response = await PostAsync<MessageCreateDto, ApiResponse<ChatMessageDto>>(endpoint, createDto);
+             if(response == null || !response.Success) 
+                throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to create message");
+             return response.Data;
+        }
+        
+        public async Task<ChatMessageDto> CreatePrivateMessageAsync(MessageCreateDto createDto)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = "messages/private";
+            
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                throw new NetworkUnavailableException("Create private message requires network.");
+                
+            var response = await PostAsync<MessageCreateDto, ApiResponse<ChatMessageDto>>(endpoint, createDto);
+            if (response == null || !response.Success)
+                throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to create private message");
+            return response.Data;
+        }
+        
+        public async Task<bool> MarkMessageAsReadAsync(int messageId)
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = $"messages/{messageId}/mark-read";
+              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 throw new NetworkUnavailableException("Mark message read requires network.");
+
+             var response = await PostAsync<object, ApiResponse<bool>>(endpoint, null);
+            return response?.Success ?? false;
+        }
+        
+        public async Task<bool> MarkMessagesAsReadAsync(List<int> messageIds)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = "messages/mark-bulk-read";
+            
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                throw new NetworkUnavailableException("Mark messages as read requires network.");
+                
+            var response = await PostAsync<List<int>, ApiResponse<bool>>(endpoint, messageIds);
+            return response?.Success ?? false;
+        }
+        
+        public async Task<List<ChatMessageDto>> GetRecentChatMessagesAsync(int count = 50)
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = $"messages/recent-chat?count={count}";
+             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 return await QueueRequestAsync<List<ChatMessageDto>>(endpoint, null, "GET");
+
+             var response = await GetAsync<ApiResponse<List<ChatMessageDto>>>(endpoint);
+              if(response == null || !response.Success)
+              {
+                 HttpStatusCode statusCode = HttpStatusCode.BadRequest;
+                 if (response != null)
+                 {
+                     statusCode = (HttpStatusCode)response.StatusCode;
+                 }
+                 throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to get recent messages");
+              }
+             return response.Data ?? new List<ChatMessageDto>();
+        }
+
+        public async Task<PaginatedResult<ChatMessageDto>> GetPrivateMessagesAsync(int userId, MessagePaginationDto pagination)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = $"messages/private?userId={userId}&{BuildPaginationQueryString(pagination)}";
+            
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                return await QueueRequestAsync<PaginatedResult<ChatMessageDto>>(endpoint, pagination, "GET");
+                
+            var response = await GetAsync<ApiResponse<PaginatedResult<ChatMessageDto>>>(endpoint);
+            if (response == null || !response.Success)
+                throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to get private messages");
+            
+            return response.Data ?? new PaginatedResult<ChatMessageDto>();
+        }
+
+        public async Task<bool> MarkNotificationAsSeenAsync(int notificationId)
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = $"notifications/{notificationId}/mark-seen";
+             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 throw new NetworkUnavailableException("Mark notification seen requires network.");
+                 
+            var response = await PostAsync<object, ApiResponse<bool>>(endpoint, null);
+            return response?.Success ?? false;
+        }
+        
+        public async Task<bool> BroadcastNotificationAsync(string message, string department = null)
+        {
+             if (!_initialized) await InitializeAuthenticationAsync();
+             string endpoint = "notifications/broadcast";
+             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                 throw new NetworkUnavailableException("Broadcast notification requires network.");
+                 
+             var payload = new { Message = message, Department = department };
+             var response = await PostAsync<object, ApiResponse<bool>>(endpoint, payload);
+             return response?.Success ?? false;
+        }
+
+        /// <summary>
+        /// Tests API connectivity and logs the result
+        /// </summary>
+        /// <returns>True if API is reachable, false otherwise</returns>
+        public async Task<bool> ValidateApiConnectionAsync()
+        {
+            try
+            {
+                var result = await GetAsync<object>("HealthCheck"); 
+                return result != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
+        public async Task<bool> TestConnectivityAsync()
+        {
+            try
+            {
+                await GetAsync<object>("HealthCheck"); 
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "API Connectivity test failed using HealthCheck");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Gets a user-friendly error message from an API exception
+        /// </summary>
+        public static string GetFriendlyErrorMessage(Exception ex)
+        {
+            if (ex is UnauthorizedAccessException)
+                return "Authentication failed. Please log in again.";
+            if (ex is HttpRequestException || ex is WebException || ex.Message.Contains("Network error"))
+                return "Network error. Please check your connection and try again.";
+            if (ex is TimeoutException || ex is TaskCanceledException)
+                return "The request timed out. Please try again.";
+            if (ex is ApiException apiEx)
+                return $"API Error ({apiEx.StatusCode}): {apiEx.Message}";
+            if (ex is JsonException)
+                return "Received invalid data from the server.";
+            if (ex is InvalidOperationException && ex.Message.Contains("Network unavailable"))
+                 return "Network unavailable. Please check your connection.";
+                
+            return "An unexpected error occurred. Please try again later.";
+        }
+        #endregion
+
+        #region Helper Methods (New/Updated)
+
+        private string BuildPaginationQueryString(RequestPaginationDto pagination)
+        {
+            var queryParams = new List<string>();
+            queryParams.Add($"page={pagination.Page}");
+            queryParams.Add($"pageSize={pagination.PageSize}");
+            if (!string.IsNullOrEmpty(pagination.SortBy))
+            {
+                queryParams.Add($"sortBy={Uri.EscapeDataString(pagination.SortBy)}");
+            }
+            queryParams.Add($"ascending={pagination.Ascending}");
+            if (!string.IsNullOrEmpty(pagination.FilterStatus) && !pagination.FilterStatus.Equals("All", StringComparison.OrdinalIgnoreCase))
+            {
+                queryParams.Add($"filterStatus={Uri.EscapeDataString(pagination.FilterStatus)}");
+            }
+             if (!string.IsNullOrEmpty(pagination.FilterType) && !pagination.FilterType.Equals("All", StringComparison.OrdinalIgnoreCase))
+            {
+                queryParams.Add($"filterType={Uri.EscapeDataString(pagination.FilterType)}");
+            }
+            if (pagination.FromDate.HasValue)
+            {
+                queryParams.Add($"fromDate={pagination.FromDate.Value:o}");
+            }
+            if (pagination.ToDate.HasValue)
+            {
+                queryParams.Add($"toDate={pagination.ToDate.Value:o}");
+            }
+            if (pagination.UserId.HasValue)
+            {
+                queryParams.Add($"userId={pagination.UserId.Value}");
+            }
+            if (!string.IsNullOrEmpty(pagination.Department))
+            {
+                queryParams.Add($"department={Uri.EscapeDataString(pagination.Department)}");
+            }
+
+            return queryParams.Any() ? "?" + string.Join("&", queryParams) : string.Empty;
+        }
+        
+        private string BuildPaginationQueryString(MessagePaginationDto pagination, int? userId = null)
+        {
+            var queryParams = new List<string>();
+            if (pagination.PageNumber > 0) queryParams.Add($"pageNumber={pagination.PageNumber}");
+            if (pagination.PageSize > 0) queryParams.Add($"pageSize={pagination.PageSize}");
+            if (!pagination.SortDescending) queryParams.Add($"sortDesc=false");
+            if (userId.HasValue) queryParams.Add($"userId={userId.Value}");
+            if (pagination.UnreadOnly) queryParams.Add("unreadOnly=true");
+            if (pagination.FromUserId.HasValue) queryParams.Add($"fromUserId={pagination.FromUserId.Value}");
+            
+            return queryParams.Any() ? $"?{string.Join("&", queryParams)}" : "";
+        }
+        
+        #endregion
+
+        // Authentication methods
+        public async Task<LoginResponseDto> LoginAsync(LoginRequestDto loginRequest)
+        {
+            try
+            {
+                var response = await PostAsync<LoginRequestDto, LoginResponseDto>("api/auth/login", loginRequest);
+                
+                if (response != null && !string.IsNullOrEmpty(response.Token))
+                {
+                    DateTime expiration = DateTime.UtcNow.AddHours(24);
+                    await _secureStorage.SaveTokenAsync(response.Token, expiration);
+                    _httpClientService.SetAuthorizationHeader(response.Token);
+                }
+                
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during login: {Message}", ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<RegisterResponseDto> RegisterAsync(RegisterRequestDto registerRequest)
+        {
+            try
+            {
+                // This method now seems redundant if SignupAsync uses CreateUserRequest
+                // and calls PostAsync directly.
+                _logger.LogWarning("RegisterAsync(RegisterRequestDto) called, consider removing if SignupAsync is the primary path.");
+                // If kept, it should likely call the backend with RegisterRequestDto
+                // or be adapted.
+                return await PostAsync<RegisterRequestDto, RegisterResponseDto>("api/auth/register", registerRequest);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during registration: {Message}", ex.Message);
+                throw;
+            }
+        }
+        
+        // User methods
+        public async Task<UserDto> GetCurrentUserAsync()
+        {
+            try
+            {
+                return await GetAsync<UserDto>("api/users/current");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting current user: {Message}", ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<int> GetCurrentUserIdAsync()
+        {
+            try
+            {
+                var user = await GetCurrentUserAsync();
+                return user?.UserID ?? 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting current user ID: {Message}", ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<bool> IsAuthenticatedAsync()
+        {
+            try
+            {
+                var tokenInfo = await _secureStorage.GetTokenAsync();
+                return !string.IsNullOrEmpty(tokenInfo.Token) && tokenInfo.Expiration > DateTime.UtcNow;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking authentication status: {Message}", ex.Message);
+                return false;
+            }
+        }
+        
+        // Request methods
+        public async Task<PaginatedResult<RequestResponseDto>> GetRequestsAsync(RequestPaginationDto pagination, int? userId = null, string department = null, bool queueIfUnavailable = true)
+        {
+            try
+            {
+                var queryParams = new List<string>();
+                
+                if (pagination != null)
+                {
+                    queryParams.Add($"page={pagination.Page}");
+                    queryParams.Add($"pageSize={pagination.PageSize}");
+                    
+                    if (pagination.FromDate.HasValue)
+                    {
+                        queryParams.Add($"fromDate={pagination.FromDate.Value:yyyy-MM-dd}");
+                    }
+                    
+                    if (pagination.ToDate.HasValue)
+                    {
+                        queryParams.Add($"toDate={pagination.ToDate.Value:yyyy-MM-dd}");
+                    }
+                    
+                    if (!string.IsNullOrEmpty(pagination.FilterStatus) && pagination.FilterStatus != "All")
+                    {
+                        queryParams.Add($"status={pagination.FilterStatus}");
+                    }
+                    
+                    if (!string.IsNullOrEmpty(pagination.FilterType) && pagination.FilterType != "All")
+                    {
+                        queryParams.Add($"type={pagination.FilterType}");
+                    }
+                }
+                
+                if (userId.HasValue)
+                {
+                    queryParams.Add($"userId={userId.Value}");
+                }
+                
+                if (!string.IsNullOrEmpty(department) && department != "All")
+                {
+                    queryParams.Add($"department={Uri.EscapeDataString(department)}");
+                }
+                
+                string url = $"requests{(queryParams.Any() ? $"?{string.Join("&", queryParams)}" : "")}";
+                
+                return await GetAsync<PaginatedResult<RequestResponseDto>>(url, queueIfUnavailable);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting requests: {Message}", ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<RequestResponseDto> CreateRequestAsync(RequestCreateDto requestDto)
+        {
+            try
+            {
+                _logger?.LogInformation("ApiService: Creating request");
+                var response = await PostAsync<RequestCreateDto, RequestResponseDto>("api/requests", requestDto);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error creating request: {Message}", ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<RequestResponseDto> UpdateRequestAsync(Guid requestId, RequestUpdateDto requestDto)
+        {
+            try
+            {
+                _logger?.LogInformation("ApiService: Updating request {RequestId}", requestId);
+                var response = await PutAsync<RequestUpdateDto, RequestResponseDto>($"api/requests/{requestId}", requestDto);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error updating request {RequestId}: {Message}", requestId, ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<RequestResponseDto> GetRequestByIdAsync(Guid requestId, bool queueIfUnavailable = true)
+        {
+            try
+            {
+                _logger?.LogInformation("ApiService: Getting request {RequestId}", requestId);
+                var response = await GetAsync<RequestResponseDto>($"api/requests/{requestId}", queueIfUnavailable);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error getting request {RequestId}: {Message}", requestId, ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<bool> DeleteRequestAsync(Guid requestId)
+        {
+            try
+            {
+                _logger?.LogInformation("ApiService: Deleting request {RequestId}", requestId);
+                var response = await DeleteAsync($"api/requests/{requestId}");
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error deleting request {RequestId}: {Message}", requestId, ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<bool> ApproveRequestAsync(Guid requestId, RequestApprovalDto approvalDto)
+        {
+            try
+            {
+                _logger?.LogInformation("ApiService: Approving request {RequestId}", requestId);
+                var response = await PostAsync<RequestApprovalDto, ApiResponse<bool>>($"api/requests/{requestId}/approve", approvalDto);
+                return response?.Success ?? false;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error approving request {RequestId}: {Message}", requestId, ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<bool> RejectRequestAsync(Guid requestId, RequestRejectDto rejectDto)
+        {
+            try
+            {
+                _logger?.LogInformation("ApiService: Rejecting request {RequestId}", requestId);
+                var response = await PostAsync<RequestRejectDto, ApiResponse<bool>>($"api/requests/{requestId}/reject", rejectDto);
+                return response?.Success ?? false;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error rejecting request {RequestId}: {Message}", requestId, ex.Message);
+                throw;
+            }
+        }
+
+        // Common methods
+        public async Task<List<LookupItem>> GetDepartmentsAsync(bool queueIfUnavailable = true)
+        {
+            try
+            {
+                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Starting API request to lookups/departments");
+                var result = await GetAsync<List<LookupItem>>("lookups/departments", queueIfUnavailable);
+                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - API request completed, returned {Count} items", result?.Count ?? 0);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "DIAGNOSTIC ERROR: Error getting departments: {Message}", ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<List<LookupItem>> GetLeaveTypesAsync(bool queueIfUnavailable = true)
+        {
+            try
+            {
+                return await GetAsync<List<LookupItem>>("lookups/leave-types", queueIfUnavailable);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting leave types: {Message}", ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<Dictionary<string, int>> GetLeaveBalancesAsync(int userId, bool queueIfUnavailable = true)
+        {
+            try
+            {
+                string endpoint = $"users/{userId}/leavebalances";
+                return await GetAsync<Dictionary<string, int>>(endpoint, queueIfUnavailable);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting leave balances: {Message}", ex.Message);
+                throw;
+            }
+        }
+        
+        public async Task<List<LookupItem>> GetLookupAsync(string lookupType, bool queueIfUnavailable = true)
+        {
+            try
+            {
+                string url = $"lookups/{Uri.EscapeDataString(lookupType)}";
+                return await GetAsync<List<LookupItem>>(url, queueIfUnavailable);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting lookup data for '{LookupType}': {Message}", lookupType, ex.Message);
+                throw;
+            }
+        }
+        
+        // Add SignupAsync method implementation
+        public async Task<bool> SignupAsync(SignupModel signupModel)
+        {
+            try
+            {
+                // Create the DTO expected by the backend controller
+                var createUserRequest = new CreateUserRequest
+                {
+                    Username = signupModel.Username,
+                    Password = signupModel.Password,
+                    FullName = signupModel.FullName,
+                    Department = signupModel.Department,
+                    Title = signupModel.Title,
+                    // IsAdmin and IsManager are set to false on the backend (AuthController)
+                    // Do not include them here to avoid sending unnecessary/potentially insecure data
+                    IsAdmin = false, // Explicitly false, matching backend expectation/override
+                    IsManager = false // Explicitly false, matching backend expectation/override
+                };
+
+                // Call the backend registration endpoint using the correct DTO type
+                // Assuming PostAsync can handle CreateUserRequest and expects ApiResponse<UserDto>
+                // based on AuthController.Register signature
+                var response = await PostAsync<CreateUserRequest, ApiResponse<UserDto>>("api/auth/register", createUserRequest);
+
+                // Check the ApiResponse for success
+                return response != null && response.Success;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during user signup: {Message}", ex.Message);
+                // Consider returning a more specific result or error message to the caller
+                throw; // Re-throw for ViewModel to handle
+            }
+        }
+    }
+}

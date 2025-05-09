@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TDFMAUI.Controls.NotificationToast"
+             x:Name="this">
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <!-- Animation resources -->
+            <Style x:Key="ToastStyle" TargetType="Border">
+                <Setter Property="Opacity" Value="0" />
+                <Setter Property="TranslationY" Value="-30" />
+            </Style>
+        </ResourceDictionary>
+    </ContentView.Resources>
+    
+    <Grid VerticalOptions="Start" 
+          HorizontalOptions="Fill" 
+          Margin="10,10,10,0" 
+          ZIndex="999">
+        <Border x:Name="ToastBorder"
+                Style="{StaticResource ToastStyle}"
+                BackgroundColor="{Binding Source={x:Reference this}, Path=BackgroundColor}"
+                StrokeThickness="0"
+                StrokeShape="RoundRectangle 8"
+                HorizontalOptions="Fill"
+                VerticalOptions="Start">
+            <Grid Padding="15,10" ColumnDefinitions="Auto,*,Auto">
+                <!-- Icon (optional) -->
+                <Image x:Name="IconImage"
+                       Grid.Column="0"
+                       WidthRequest="24"
+                       HeightRequest="24"
+                       VerticalOptions="Center"
+                       IsVisible="{Binding Source={x:Reference this}, Path=ShowIcon}"
+                       Source="{Binding Source={x:Reference this}, Path=IconSource}" />
+                
+                <!-- Message -->
+                <VerticalStackLayout Grid.Column="1" 
+                                    Spacing="2" 
+                                    Padding="{Binding Source={x:Reference this}, Path=ShowIcon, Converter={StaticResource BoolToThicknessConverter}, ConverterParameter='5,0,0,0|0,0,0,0'}">
+                    <Label x:Name="TitleLabel"
+                           Text="{Binding Source={x:Reference this}, Path=Title}"
+                           TextColor="{Binding Source={x:Reference this}, Path=TitleColor}"
+                           FontAttributes="Bold"
+                           LineBreakMode="TailTruncation"
+                           IsVisible="{Binding Source={x:Reference this}, Path=Title, Converter={StaticResource StringNotEmptyConverter}}" />
+                    
+                    <Label x:Name="MessageLabel"
+                           Text="{Binding Source={x:Reference this}, Path=Message}"
+                           TextColor="{Binding Source={x:Reference this}, Path=TextColor}"
+                           LineBreakMode="WordWrap"
+                           MaxLines="3" />
+                </VerticalStackLayout>
+                
+                <!-- Close button -->
+                <Button Grid.Column="2"
+                        Text="×"
+                        FontSize="18"
+                        WidthRequest="30"
+                        HeightRequest="30"
+                        Padding="0"
+                        CornerRadius="15"
+                        VerticalOptions="Start"
+                        HorizontalOptions="End"
+                        BackgroundColor="Transparent"
+                        TextColor="{Binding Source={x:Reference this}, Path=CloseButtonColor}"
+                        Clicked="OnCloseButtonClicked"
+                        IsVisible="{Binding Source={x:Reference this}, Path=ShowCloseButton}" />
+            </Grid>
+        </Border>
+    </Grid>
+</ContentView> 

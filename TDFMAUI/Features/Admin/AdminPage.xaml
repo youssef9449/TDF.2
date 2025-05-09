@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TDFMAUI.Features.Admin.AdminPage" 
+             Title="Admin"
+             BackgroundColor="#1a237e">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Header -->
+        <HorizontalStackLayout Grid.Row="0" Padding="20">
+            <Button Text="←" 
+                    Clicked="OnBackClicked"
+                    BackgroundColor="Transparent"
+                    TextColor="White"
+                    FontSize="20"
+                    WidthRequest="50"/>
+            <Label Text="Admin Panel"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   TextColor="White"
+                   HorizontalOptions="CenterAndExpand"/>
+        </HorizontalStackLayout>
+
+        <!-- Content -->
+        <Grid Grid.Row="1" Padding="20">
+            <Grid.ColumnDefinitions>
+                <OnIdiom x:TypeArguments="ColumnDefinitionCollection">
+                    <OnIdiom.Phone>
+                        <ColumnDefinitionCollection>
+                            <ColumnDefinition Width="*" />
+                        </ColumnDefinitionCollection>
+                    </OnIdiom.Phone>
+                    <OnIdiom.Tablet>
+                        <ColumnDefinitionCollection>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </ColumnDefinitionCollection>
+                    </OnIdiom.Tablet>
+                    <OnIdiom.Desktop>
+                         <ColumnDefinitionCollection>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </ColumnDefinitionCollection>
+                    </OnIdiom.Desktop>
+                </OnIdiom>
+            </Grid.ColumnDefinitions>
+             <Grid.RowDefinitions>
+                 <OnIdiom x:TypeArguments="RowDefinitionCollection">
+                    <OnIdiom.Phone>
+                         <RowDefinitionCollection>
+                            <RowDefinition Height="Auto" />
+                            <!-- Add more rows if needed for phone layout -->
+                         </RowDefinitionCollection>
+                    </OnIdiom.Phone>
+                     <OnIdiom.Tablet>
+                         <RowDefinitionCollection>
+                            <RowDefinition Height="Auto" />
+                         </RowDefinitionCollection>
+                     </OnIdiom.Tablet>
+                     <OnIdiom.Desktop>
+                         <RowDefinitionCollection>
+                            <RowDefinition Height="Auto" />
+                         </RowDefinitionCollection>
+                    </OnIdiom.Desktop>
+                 </OnIdiom>
+            </Grid.RowDefinitions>
+
+            <!-- Users Section -->
+            <Frame x:Name="UsersSectionFrame" BackgroundColor="#0d47a1" 
+                   Padding="15"
+                   CornerRadius="15"
+                   Grid.Column="0" 
+                   Grid.Row="0">
+                 <Frame.Style>
+                    <Style TargetType="Frame">
+                        <Setter Property="Grid.Column" Value="0" />
+                        <Setter Property="Grid.Row" Value="0" />
+                        <Style.Triggers>
+                             <DataTrigger TargetType="Frame" Binding="{Binding Source={RelativeSource AncestorType={x:Type Grid}}, Path=Width}" Value="0"> <!-- Placeholder, ideally bind to idiom -->
+                                <Setter Property="Grid.ColumnSpan" Value="1" />
+                                <Setter Property="Margin" Value="0,0,0,10" /> <!-- Add margin below on phone -->
+                             </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Frame.Style>
+
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="Users" 
+                           FontSize="20" 
+                           FontAttributes="Bold"
+                           TextColor="White"/>
+                    <Button Text="Add User"
+                            Clicked="OnAddUserClicked"
+                            BackgroundColor="#64b5f6"
+                            TextColor="White"
+                            CornerRadius="10"/>
+                    <!-- Future: Add a simplified user list view here -->
+                </VerticalStackLayout>
+            </Frame>
+            
+            <!-- Example: Requests Section (Adapt as needed) -->
+            <Frame x:Name="RequestsSectionFrame" BackgroundColor="#0d47a1" 
+                   Padding="15"
+                   CornerRadius="15"
+                   Grid.Column="1" 
+                   Grid.Row="0">
+                 <Frame.Style>
+                    <Style TargetType="Frame">
+                        <Setter Property="Grid.Column" Value="1" />
+                        <Setter Property="Grid.Row" Value="0" />
+                        <Style.Triggers>
+                             <DataTrigger TargetType="Frame" Binding="{Binding Source={RelativeSource AncestorType={x:Type Grid}}, Path=Width}" Value="0"> <!-- Placeholder, ideally bind to idiom -->
+                                <Setter Property="Grid.Column" Value="0" /> 
+                                <Setter Property="Grid.Row" Value="1" />
+                                <Setter Property="Grid.ColumnSpan" Value="1" />
+                                <Setter Property="Margin" Value="0,0,0,10" />
+                             </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Frame.Style>
+
+                 <VerticalStackLayout Spacing="15">
+                    <Label Text="Requests" 
+                           FontSize="20" 
+                           FontAttributes="Bold"
+                           TextColor="White"/>
+                    <Button Text="Manage Requests"
+                            Clicked="OnManageRequestsClicked"
+                            BackgroundColor="#64b5f6"
+                            TextColor="White"
+                            CornerRadius="10"/>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Placeholder for Activity Indicator -->
+            <ActivityIndicator x:Name="loadingIndicator" Grid.RowSpan="2" Grid.ColumnSpan="2" IsVisible="False" IsRunning="False" HorizontalOptions="Center" VerticalOptions="Center" />
+        </Grid>
+    </Grid>
+    
+    <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup>
+            <VisualState Name="Phone">
+                <VisualState.StateTriggers>
+                    <AdaptiveTrigger MinWindowWidth="0" />
+                </VisualState.StateTriggers>
+                <VisualState.Setters>
+                    <Setter TargetName="UsersSectionFrame" Property="Grid.Column" Value="0" />
+                    <Setter TargetName="UsersSectionFrame" Property="Grid.ColumnSpan" Value="1" />
+                    <Setter TargetName="UsersSectionFrame" Property="Frame.Margin" Value="0,0,0,10" />
+                    <Setter TargetName="RequestsSectionFrame" Property="Grid.Column" Value="0" />
+                    <Setter TargetName="RequestsSectionFrame" Property="Grid.Row" Value="1" />
+                    <Setter TargetName="RequestsSectionFrame" Property="Grid.ColumnSpan" Value="1" />
+                </VisualState.Setters>
+            </VisualState>
+            <VisualState Name="Desktop">
+                <VisualState.StateTriggers>
+                    <AdaptiveTrigger MinWindowWidth="640" />
+                </VisualState.StateTriggers>
+            </VisualState>
+        </VisualStateGroup>
+    </VisualStateManager.VisualStateGroups>
+</ContentPage> 

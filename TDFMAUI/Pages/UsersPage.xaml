@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Name="usersPage" xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             x:Class="TDFMAUI.Pages.UsersPage"
+             Title="Users"
+             BackgroundColor="{StaticResource Gray100}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="{OnIdiom Phone='10', Tablet='15', Desktop='20'}">
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <Label Text="Online Users" 
+                   FontSize="{OnIdiom Phone=20, Default=24}" 
+                   FontAttributes="Bold"
+                   VerticalOptions="Center" />
+                   
+            <!-- Desktop/Tablet Button Layout -->
+            <HorizontalStackLayout Grid.Column="1" Spacing="10"
+                                  IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}">
+                <Button x:Name="myStatusButton"
+                        Text="My Status"
+                        Clicked="OnMyStatusClicked"
+                        BackgroundColor="{StaticResource Primary}"
+                        TextColor="White"
+                        HeightRequest="40"
+                        WidthRequest="120"
+                        CornerRadius="20" />
+                
+                <Button x:Name="refreshButton"
+                        Text="↻"
+                        Clicked="OnRefreshClicked"
+                        BackgroundColor="{StaticResource Secondary}"
+                        TextColor="White"
+                        HeightRequest="40"
+                        WidthRequest="40"
+                        CornerRadius="20" />
+            </HorizontalStackLayout>
+            
+            <!-- Phone Button Layout -->
+            <VerticalStackLayout Grid.Column="1" Spacing="5" HorizontalOptions="End"
+                                IsVisible="{x:Static helpers:DeviceHelper.UseCompactUI}">
+                <Button x:Name="myStatusButtonMobile"
+                        Text="My Status"
+                        Clicked="OnMyStatusClicked"
+                        BackgroundColor="{StaticResource Primary}"
+                        TextColor="White"
+                        HeightRequest="35"
+                        WidthRequest="100"
+                        FontSize="12"
+                        CornerRadius="18" />
+                
+                <Button x:Name="refreshButtonMobile"
+                        Text="↻"
+                        Clicked="OnRefreshClicked"
+                        BackgroundColor="{StaticResource Secondary}"
+                        TextColor="White"
+                        HeightRequest="35"
+                        WidthRequest="35"
+                        CornerRadius="18" />
+            </VerticalStackLayout>
+        </Grid>
+        
+        <!-- User list -->
+        <RefreshView Grid.Row="1" x:Name="refreshView" IsRefreshing="False" RefreshColor="{StaticResource Primary}">
+            <ScrollView>
+                <VerticalStackLayout>
+                    <!-- Constrain width on Desktop/Tablet -->
+                    <VerticalStackLayout.MaximumWidthRequest>
+                        <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="800" Desktop="900" />
+                    </VerticalStackLayout.MaximumWidthRequest>
+                    <VerticalStackLayout.HorizontalOptions>
+                        <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                    </VerticalStackLayout.HorizontalOptions>
+                    
+                    <CollectionView x:Name="usersCollection" 
+                                    EmptyView="No users currently online">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Frame Margin="0,5" 
+                                       Padding="{OnIdiom Phone='10', Default='15'}" 
+                                       BackgroundColor="White" 
+                                       CornerRadius="10"
+                                       BorderColor="{StaticResource Gray300}">
+                                    <!-- Desktop/Tablet Layout -->
+                                    <Grid ColumnDefinitions="Auto,*,Auto"
+                                          IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}">
+                                        <!-- Status indicator -->
+                                        <Frame Grid.Column="0" 
+                                               BackgroundColor="{Binding StatusColor}" 
+                                               WidthRequest="16" 
+                                               HeightRequest="16" 
+                                               CornerRadius="8"
+                                               Padding="0"
+                                               VerticalOptions="Center"
+                                               Margin="0,0,10,0" />
+                                        
+                                        <!-- User info -->
+                                        <VerticalStackLayout Grid.Column="1" Spacing="5">
+                                            <Label Text="{Binding FullName}" 
+                                                   FontAttributes="Bold" 
+                                                   FontSize="16" />
+                                                   
+                                            <Label Text="{Binding Department}" 
+                                                   TextColor="{StaticResource Gray600}" 
+                                                   FontSize="14" />
+                                                   
+                                            <Label Text="{Binding StatusMessage}" 
+                                                   IsVisible="{Binding HasStatusMessage}"
+                                                   TextColor="{StaticResource Gray500}"
+                                                   FontSize="12"
+                                                   MaxLines="2"
+                                                   LineBreakMode="TailTruncation" />
+                                        </VerticalStackLayout>
+                                        
+                                        <!-- Action buttons -->
+                                        <HorizontalStackLayout Grid.Column="2" 
+                                                    Spacing="10"
+                                                    VerticalOptions="Center">
+                                            <Button Text="Message"
+                                                    Command="{Binding BindingContext.MessageCommand, Source={x:Reference usersPage}}"
+                                                    CommandParameter="{Binding UserId}"
+                                                    BackgroundColor="{StaticResource Primary}"
+                                                    TextColor="White"
+                                                    HeightRequest="35"
+                                                    WidthRequest="90"
+                                                    CornerRadius="18"
+                                                    FontSize="14" />
+                                                    
+                                            <Button Text="Profile"
+                                                    Command="{Binding BindingContext.ViewProfileCommand, Source={x:Reference usersPage}}"
+                                                    CommandParameter="{Binding UserId}"
+                                                    BackgroundColor="{StaticResource Secondary}"
+                                                    TextColor="White"
+                                                    HeightRequest="35"
+                                                    WidthRequest="90"
+                                                    CornerRadius="18"
+                                                    FontSize="14" />
+                                        </HorizontalStackLayout>
+                                    </Grid>
+                                    
+                                    <!-- Mobile Layout - Simplified -->
+                                    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto"
+                                          IsVisible="{x:Static helpers:DeviceHelper.UseCompactUI}"
+                                          RowSpacing="8">
+                                        <!-- Status indicator and Name -->
+                                        <Frame Grid.Row="0" Grid.Column="0" 
+                                               BackgroundColor="{Binding StatusColor}" 
+                                               WidthRequest="12" 
+                                               HeightRequest="12" 
+                                               CornerRadius="6"
+                                               Padding="0"
+                                               VerticalOptions="Center"
+                                               Margin="0,0,8,0" />
+                                               
+                                        <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="2">
+                                            <Label Text="{Binding FullName}" 
+                                                   FontAttributes="Bold" 
+                                                   FontSize="14" />
+                                            <Label Text="{Binding Department}" 
+                                                   TextColor="{StaticResource Gray600}" 
+                                                   FontSize="12" />
+                                        </VerticalStackLayout>
+                                        
+                                        <!-- Status message -->
+                                        <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                                               Text="{Binding StatusMessage}" 
+                                               IsVisible="{Binding HasStatusMessage}"
+                                               TextColor="{StaticResource Gray500}"
+                                               FontSize="12"
+                                               MaxLines="2"
+                                               LineBreakMode="TailTruncation" />
+                                        
+                                        <!-- Buttons -->
+                                        <HorizontalStackLayout Grid.Row="0" Grid.Column="2" 
+                                                     Spacing="5"
+                                                     VerticalOptions="Center">
+                                            <Button Text="Message"
+                                                    Command="{Binding BindingContext.MessageCommand, Source={x:Reference usersPage}}"
+                                                    CommandParameter="{Binding UserId}"
+                                                    BackgroundColor="{StaticResource Primary}"
+                                                    TextColor="White"
+                                                    HeightRequest="30"
+                                                    WidthRequest="70"
+                                                    CornerRadius="15"
+                                                    FontSize="11"
+                                                    Padding="0" />
+                                                    
+                                            <Button Text="Profile"
+                                                    Command="{Binding BindingContext.ViewProfileCommand, Source={x:Reference usersPage}}"
+                                                    CommandParameter="{Binding UserId}"
+                                                    BackgroundColor="{StaticResource Secondary}"
+                                                    TextColor="White"
+                                                    HeightRequest="30"
+                                                    WidthRequest="70"
+                                                    CornerRadius="15"
+                                                    FontSize="11"
+                                                    Padding="0" />
+                                        </HorizontalStackLayout>
+                                    </Grid>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        
+        <!-- Loading indicator -->
+        <ActivityIndicator Grid.Row="1"
+                           x:Name="loadingIndicator"
+                           IsVisible="False"
+                           IsRunning="False"
+                           Color="{StaticResource Primary}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center" />
+                           
+        <!-- My status display -->
+        <Frame Grid.Row="2" 
+               IsVisible="False" 
+               x:Name="myStatusFrame"
+               Margin="0,10,0,0"
+               Padding="{OnIdiom Phone='10', Default='15'}"
+               BackgroundColor="White"
+               BorderColor="{StaticResource Gray300}"
+               CornerRadius="10">
+            <VerticalStackLayout>
+                <VerticalStackLayout.MaximumWidthRequest>
+                    <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="600" Desktop="700" />
+                </VerticalStackLayout.MaximumWidthRequest>
+                <VerticalStackLayout.HorizontalOptions>
+                    <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                </VerticalStackLayout.HorizontalOptions>
+            
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+                    <Frame Grid.Row="0" 
+                           Grid.Column="0" 
+                           x:Name="myStatusIndicator"
+                           BackgroundColor="LightGreen" 
+                           WidthRequest="{OnIdiom Phone=12, Default=16}" 
+                           HeightRequest="{OnIdiom Phone=12, Default=16}" 
+                           CornerRadius="{OnIdiom Phone=6, Default=8}"
+                           Padding="0"
+                           VerticalOptions="Center"
+                           Margin="0,0,10,0" />
+                           
+                    <Label Grid.Row="0" 
+                           Grid.Column="1" 
+                           Text="Online" 
+                           x:Name="myStatusLabel"
+                           FontAttributes="Bold"
+                           FontSize="{OnIdiom Phone=14, Default=16}"
+                           VerticalOptions="Center" />
+                           
+                    <Button Grid.Row="0"
+                            Grid.Column="2"
+                            Text="Change"
+                            Clicked="OnChangeStatusClicked"
+                            BackgroundColor="{StaticResource Primary}"
+                            TextColor="White"
+                            HeightRequest="{OnIdiom Phone=30, Default=35}"
+                            WidthRequest="{OnIdiom Phone=70, Default=90}"
+                            CornerRadius="{OnIdiom Phone=15, Default=18}"
+                            FontSize="{OnIdiom Phone=12, Default=14}" />
+                            
+                    <Entry Grid.Row="1"
+                           Grid.Column="0"
+                           Grid.ColumnSpan="3"
+                           Placeholder="Set status message..."
+                           x:Name="statusMessageEntry"
+                           Margin="0,10,0,0"
+                           FontSize="{OnIdiom Phone=14, Default=16}"
+                           Completed="OnStatusMessageCompleted" />
+                           
+                    <HorizontalStackLayout Grid.Row="2"
+                                           Grid.Column="0"
+                                           Grid.ColumnSpan="3"
+                                           Margin="0,10,0,0">
+                        <CheckBox x:Name="availableForChatCheckbox"
+                                  IsChecked="True"
+                                  CheckedChanged="OnAvailableForChatChanged"
+                                  VerticalOptions="Center" />
+                        <Label Text="Available for chat"
+                               FontSize="{OnIdiom Phone=14, Default=16}"
+                               VerticalOptions="Center"
+                               Margin="5,0,0,0" />
+                    </HorizontalStackLayout>
+                </Grid>
+            </VerticalStackLayout>
+        </Frame>
+    </Grid>
+</ContentPage> 

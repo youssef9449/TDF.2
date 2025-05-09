@@ -1,0 +1,138 @@
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:msgModels="clr-namespace:TDFShared.Models.Message;assembly=TDFShared"
+             x:Class="TDFMAUI.Pages.GlobalMessagesPage"
+             x:DataType="vm:GlobalMessagesViewModel"
+             Title="Global Messages"
+             BackgroundColor="{StaticResource Gray100}">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Header -->
+        <Grid Grid.Row="0" Padding="{OnIdiom Phone='10,10', Default='20,10'}" BackgroundColor="{StaticResource Primary}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <Button Grid.Column="0" 
+                        Text="Back" 
+                        Clicked="OnBackClicked"
+                        BackgroundColor="Transparent"
+                        TextColor="White"
+                        FontSize="{OnIdiom Phone=14, Default=16}"
+                        FontAttributes="Bold"/>
+                <Label Grid.Column="1" 
+                       Text="Global Messages" 
+                       TextColor="White"
+                       FontSize="{OnIdiom Phone=20, Default=24}"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"/>
+                
+                <!-- Add refresh button on desktop/tablet -->
+                <Button Grid.Column="2"
+                        Text="↻"
+                        Command="{Binding RefreshCommand}"
+                        BackgroundColor="Transparent"
+                        TextColor="White"
+                        HeightRequest="40"
+                        WidthRequest="40"
+                        FontSize="{OnIdiom Phone=16, Default=20}"
+                        IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}"/>
+            </Grid>
+        </Grid>
+
+        <!-- Messages List -->
+        <ScrollView Grid.Row="1" Margin="{OnIdiom Phone='10', Default='15'}">
+            <VerticalStackLayout>
+                <!-- Constrain width on Desktop/Tablet -->
+                <VerticalStackLayout.MaximumWidthRequest>
+                    <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="800" Desktop="700" />
+                </VerticalStackLayout.MaximumWidthRequest>
+                <VerticalStackLayout.HorizontalOptions>
+                     <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                </VerticalStackLayout.HorizontalOptions>
+
+                <CollectionView x:Name="messagesCollection"
+                           ItemsSource="{Binding Messages}"
+                           SelectionMode="Single"
+                           SelectionChanged="OnMessageSelected"
+                           EmptyView="No messages available">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="msgModels:ChatMessageModel">
+                            <Frame Margin="0,5" 
+                                   Padding="{OnIdiom Phone='10', Default='15'}"
+                                   BorderColor="{StaticResource Gray300}"
+                                   BackgroundColor="White"
+                                   CornerRadius="10">
+                                <Grid>
+                                    <!-- Desktop/Tablet Layout -->
+                                    <Grid ColumnDefinitions="*,Auto" IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}">
+                                        <VerticalStackLayout Grid.Column="0" Spacing="5">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <Label Text="{Binding FromUserName}" 
+                                                       FontAttributes="Bold"
+                                                       FontSize="16"/>
+                                                <Label Grid.Column="1" 
+                                                       Text="{Binding SentAt, StringFormat='{0:MM/dd/yyyy HH:mm}'}" 
+                                                       TextColor="{StaticResource Gray500}"
+                                                       FontSize="12"/>
+                                            </Grid>
+                                            <Label Text="{Binding Content}" 
+                                                   FontSize="16"/>
+                                        </VerticalStackLayout>
+                                    </Grid>
+                                    
+                                    <!-- Mobile Layout - More compact -->
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" 
+                                          IsVisible="{x:Static helpers:DeviceHelper.UseCompactUI}"
+                                          RowSpacing="3">
+                                        <Label Grid.Row="0" Grid.Column="0" 
+                                               Text="{Binding FromUserName}" 
+                                               FontAttributes="Bold"
+                                               FontSize="14"/>
+                                        <Label Grid.Row="0" Grid.Column="1" 
+                                               Text="{Binding SentAt, StringFormat='{0:MM/dd HH:mm}'}" 
+                                               TextColor="{StaticResource Gray500}"
+                                               FontSize="10"
+                                               HorizontalOptions="End"/>
+                                        <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                               Text="{Binding Content}" 
+                                               FontSize="13"/>
+                                    </Grid>
+                                </Grid>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Message Entry Area -->
+        <Grid Grid.Row="2" 
+              ColumnDefinitions="*, Auto" 
+              Padding="{OnIdiom Phone='10,5', Default='20,10'}"
+              BackgroundColor="White"
+              ColumnSpacing="10">
+            <Entry Grid.Column="0"
+                   Placeholder="Type your message here..."
+                   Text="{Binding NewMessageText}"
+                   FontSize="{OnIdiom Phone=14, Default=16}"
+                   VerticalOptions="Center" />
+            <Button Grid.Column="1"
+                    Text="Send"
+                    Command="{Binding SendMessageCommand}"
+                    BackgroundColor="{StaticResource Primary}"
+                    TextColor="White"
+                    HeightRequest="{OnIdiom Phone=40, Default=50}"
+                    WidthRequest="{OnIdiom Phone=60, Default=80}"
+                    FontSize="{OnIdiom Phone=12, Default=14}"
+                    CornerRadius="{OnIdiom Phone=20, Default=25}"/>
+        </Grid>
+
+        <!-- Loading Indicator -->
+        <ActivityIndicator x:Name="loadingIndicator"
+                          Grid.RowSpan="3"
+                          IsRunning="False"
+                          IsVisible="False"
+                          HorizontalOptions="Center"
+                          VerticalOptions="Center"/>
+    </Grid>
+</ContentPage>

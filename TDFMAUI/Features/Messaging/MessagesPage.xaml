@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:vm="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:models="clr-namespace:TDFShared.Models.Message;assembly=TDFShared"
+             xmlns:pages="clr-namespace:TDFMAUI.Pages"
+             xmlns:converters="clr-namespace:TDFMAUI.Converters"
+             x:DataType="vm:MessagesViewModel"
+             x:Class="TDFMAUI.Pages.MessagesPage"
+             Title="Messages"
+             BackgroundColor="{StaticResource Gray100}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="{OnIdiom Phone='10', Default='15'}">
+        
+        <!-- Responsive Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,15">
+            <Label Text="Messages" 
+                   FontSize="{OnIdiom Phone=20, Default=24}" 
+                   FontAttributes="Bold"
+                   VerticalOptions="Center" />
+            
+            <!-- Desktop/Tablet Button Layout -->
+            <HorizontalStackLayout Grid.Column="1" Spacing="10"
+                                   IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}">
+                <Button Text="New Message"
+                        Clicked="OnNewMessageClicked"
+                        Style="{StaticResource ButtonPrimary}" 
+                        HeightRequest="40"
+                        WidthRequest="120"/>
+                <Button Text="↻"
+                        Command="{Binding LoadMessagesCommand}"
+                        Style="{StaticResource ButtonSecondaryCircular}" 
+                        HeightRequest="40"
+                        WidthRequest="40" />
+            </HorizontalStackLayout>
+
+            <!-- Phone Button Layout -->
+             <VerticalStackLayout Grid.Column="1" Spacing="5" HorizontalOptions="End"
+                                 IsVisible="{x:Static helpers:DeviceHelper.UseCompactUI}">
+                 <Button Text="New Message"
+                        Clicked="OnNewMessageClicked"
+                        Style="{StaticResource ButtonPrimary}" 
+                        HeightRequest="35"
+                        FontSize="12" />
+                <Button Text="↻"
+                        Command="{Binding LoadMessagesCommand}"
+                        Style="{StaticResource ButtonSecondaryCircular}" 
+                        HeightRequest="35"
+                        WidthRequest="35" />
+            </VerticalStackLayout>
+        </Grid>
+        
+        <!-- Messages list -->
+        <RefreshView Grid.Row="1" Command="{Binding LoadMessagesCommand}" IsRefreshing="{Binding IsLoading}" RefreshColor="{StaticResource Primary}">
+            <ScrollView>
+                <VerticalStackLayout> 
+                    <!-- Constrain width on Desktop/Tablet -->
+                    <VerticalStackLayout.MaximumWidthRequest>
+                        <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="800" Desktop="700" />
+                    </VerticalStackLayout.MaximumWidthRequest>
+                    <VerticalStackLayout.HorizontalOptions>
+                         <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                    </VerticalStackLayout.HorizontalOptions>
+
+                    <CollectionView ItemsSource="{Binding Messages}" 
+                                    SelectionMode="Single"
+                                    SelectedItem="{Binding SelectedMessage}"
+                                    EmptyView="No messages to display">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="models:MessageModel">
+                                <Frame Margin="0,5" 
+                                       Padding="{OnIdiom Phone='10', Default='15'}" 
+                                       BackgroundColor="#FFC107" 
+                                       CornerRadius="10"
+                                       BorderColor="{StaticResource Gray300}">
+                                    <Grid>
+                                        <!-- Desktop/Tablet Layout -->
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto"
+                                              IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}">
+                                            <!-- Sender with online status -->
+                                            <Grid Grid.Row="0" 
+                                                  Grid.Column="0"
+                                                  ColumnDefinitions="Auto,*">
+                                                
+                                                <!-- Online status indicator -->
+                                                <Frame Grid.Column="0"
+                                                       BackgroundColor="{Binding SenderStatusColorHex}"
+                                                       WidthRequest="12"
+                                                       HeightRequest="12"
+                                                       CornerRadius="6"
+                                                       Padding="0"
+                                                       VerticalOptions="Center"
+                                                       Margin="0,0,10,0"
+                                                       IsVisible="{Binding ShowSenderStatus}" />
+                                                       
+                                                <Label Grid.Column="1"
+                                                       Text="{Binding SenderName}" 
+                                                       FontAttributes="Bold"
+                                                       FontSize="16" />
+                                            </Grid>
+                                            
+                                            <!-- Message preview -->
+                                            <Label Grid.Row="1"
+                                                   Grid.Column="0"
+                                                   Text="{Binding Content, Mode=OneWay}" 
+                                                   MaxLines="2"
+                                                   LineBreakMode="TailTruncation"
+                                                   TextColor="{StaticResource Gray600}"
+                                                   Margin="0,5,0,0" />
+                                            
+                                            <!-- Date -->
+                                            <Label Grid.Row="2"
+                                                   Grid.Column="0"
+                                                   Text="{Binding SentAt, StringFormat='{0:g}'}" 
+                                                   FontSize="12"
+                                                   TextColor="{StaticResource Gray500}"
+                                                   Margin="0,5,0,0" />
+                                            
+                                            <!-- Unread indicator -->
+                                            <Frame Grid.Row="0"
+                                                   Grid.Column="1"
+                                                   Grid.RowSpan="3"
+                                                   IsVisible="{Binding IsUnread}"
+                                                   BackgroundColor="{StaticResource Primary}"
+                                                   WidthRequest="10"
+                                                   HeightRequest="10"
+                                                   CornerRadius="5"
+                                                   Padding="0"
+                                                   VerticalOptions="Start"
+                                                   HorizontalOptions="End" />
+                                        </Grid>
+                                        
+                                        <!-- Mobile Layout - Simplified -->
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" RowSpacing="2"
+                                              IsVisible="{x:Static helpers:DeviceHelper.UseCompactUI}">
+                                            <!-- Header row: Sender name and timestamp -->
+                                            <StackLayout Grid.Column="0" Grid.Row="0" Orientation="Horizontal">
+                                                <Frame BackgroundColor="{Binding SenderStatusColorHex, Mode=OneWay}"
+                                                       WidthRequest="8"
+                                                       HeightRequest="8"
+                                                       CornerRadius="4"
+                                                       Padding="0"
+                                                       VerticalOptions="Center"
+                                                       Margin="0,0,5,0"
+                                                       IsVisible="{Binding ShowSenderStatus}" />
+                                                <Label Text="{Binding SenderName}" 
+                                                       FontAttributes="Bold"
+                                                       FontSize="14" />
+                                            </StackLayout>
+                                            <Label Grid.Column="1" Grid.Row="0"
+                                                   Text="{Binding SentAt, StringFormat='{0:t}'}" 
+                                                   FontSize="10"
+                                                   TextColor="{StaticResource Gray500}"
+                                                   HorizontalOptions="End"/>
+                                                       
+                                            <!-- Content preview -->
+                                            <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                                   Text="{Binding Content, Mode=OneWay}" 
+                                                   MaxLines="1"
+                                                   LineBreakMode="TailTruncation"
+                                                   TextColor="{StaticResource Gray600}"
+                                                   FontSize="12" />
+                                                   
+                                            <!-- Unread indicator -->
+                                            <Frame Grid.Row="0" Grid.Column="1"
+                                                   IsVisible="{Binding IsUnread}"
+                                                   BackgroundColor="{StaticResource Primary}"
+                                                   WidthRequest="8"
+                                                   HeightRequest="8"
+                                                   CornerRadius="4"
+                                                   Padding="0"
+                                                   VerticalOptions="Start"
+                                                   HorizontalOptions="Start" />
+                                        </Grid>
+                                    </Grid>
+                                </Frame>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+             </ScrollView>
+        </RefreshView>
+    </Grid>
+</ContentPage>

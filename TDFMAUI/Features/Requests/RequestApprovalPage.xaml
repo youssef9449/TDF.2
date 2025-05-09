@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:controls="clr-namespace:TDFMAUI.Controls"
+             xmlns:models="clr-namespace:TDFShared.DTOs.Requests;assembly=TDFShared"
+             xmlns:converters="clr-namespace:TDFMAUI.Converters"
+             xmlns:vm="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:dtos="clr-namespace:TDFShared.DTOs.Requests;assembly=TDFShared"
+             x:Class="TDFMAUI.Pages.RequestApprovalPage"
+             Title="Request Approval">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <converters:DateTimeToStringConverter x:Key="DateTimeToStringConverter" />
+            <converters:IsPendingConverter x:Key="IsPendingConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <ContentPage.BindingContext>
+        <vm:RequestApprovalViewModel />
+    </ContentPage.BindingContext>
+
+    <Grid RowDefinitions="Auto, Auto, *, Auto" ColumnDefinitions="*, Auto" Padding="10" RowSpacing="10">
+        
+        <!-- Loading Indicator -->
+        <ActivityIndicator Grid.RowSpan="4" Grid.ColumnSpan="2" 
+                           IsVisible="{Binding IsLoading}" 
+                           IsRunning="{Binding IsLoading}" 
+                           HorizontalOptions="Center" VerticalOptions="Center" />
+
+        <!-- Filters Header (Mobile) -->
+        <Button Grid.Row="0" Grid.ColumnSpan="2" Text="Show Filters" 
+                Clicked="OnToggleFiltersClicked" 
+                IsVisible="{Binding IsLoading, Converter={StaticResource InverseBoolConverter}}">
+             <Button.Triggers>
+                <DataTrigger TargetType="Button" Binding="{Binding Source={x:Reference FiltersPanel}, Path=IsVisible}" Value="True">
+                    <Setter Property="Text" Value="Hide Filters"/>
+                </DataTrigger>
+            </Button.Triggers>
+             <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup Name="AdaptiveStates">
+                    <VisualState Name="Desktop">
+                         <VisualState.Setters>
+                            <Setter Property="IsVisible" Value="False"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState Name="Mobile">
+                        <VisualState.Setters>
+                            <Setter Property="IsVisible" Value="True"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+        </Button>
+
+        <!-- Filters Panel (Mobile and Desktop) -->
+        <VerticalStackLayout x:Name="FiltersPanel" Grid.Row="1" Grid.ColumnSpan="2" Spacing="10" IsVisible="False">
+             <VisualStateManager.VisualStateGroups>
+                 <VisualStateGroup Name="AdaptiveStates">
+                     <VisualState Name="Desktop">
+                         <VisualState.Setters>
+                            <Setter Property="IsVisible" Value="True"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                     <VisualState Name="Mobile">
+                         <VisualState.Setters>
+                            <Setter Property="IsVisible" Value="False"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+
+            <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="10">
+                 <Label Grid.Row="0" Grid.Column="0" Text="From Date:" VerticalOptions="Center"/>
+                <DatePicker Grid.Row="1" Grid.Column="0" Date="{Binding FromDate}" />
+                
+                <Label Grid.Row="0" Grid.Column="1" Text="To Date:" VerticalOptions="Center"/>
+                <DatePicker Grid.Row="1" Grid.Column="1" Date="{Binding ToDate}" />
+                
+                <Label Grid.Row="0" Grid.Column="2" Text="Status:" VerticalOptions="Center"/>
+                <Picker Grid.Row="1" Grid.Column="2" ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus}"/>
+                
+                <Label Grid.Row="0" Grid.Column="3" Text="Type:" VerticalOptions="Center"/>
+                <Picker Grid.Row="1" Grid.Column="3" ItemsSource="{Binding TypeOptions}" SelectedItem="{Binding SelectedType}"/>
+                
+                <!-- Department filter only for HR -->
+                <Label Grid.Row="0" Grid.Column="4" Text="Department:" IsVisible="{Binding IsHR}" VerticalOptions="Center"/>
+                <Picker Grid.Row="1" Grid.Column="4" ItemsSource="{Binding DepartmentOptions}" SelectedItem="{Binding SelectedDepartment}" IsVisible="{Binding IsHR}"/>
+            </Grid>
+                            </VerticalStackLayout>
+
+        <!-- Desktop Statistics -->
+        <Border x:Name="DesktopStatsView" Grid.Row="2" Grid.Column="1" Padding="10" StrokeShape="RoundRectangle 5" IsVisible="False">
+            <VisualStateManager.VisualStateGroups>
+                 <VisualStateGroup Name="AdaptiveStates">
+                     <VisualState Name="Desktop">
+                         <VisualState.Setters>
+                             <Setter Property="IsVisible" Value="True"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState Name="Mobile">
+                        <VisualState.Setters>
+                             <Setter Property="IsVisible" Value="False"/>
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+            <VerticalStackLayout Spacing="10">
+                <Label Text="Statistics" FontAttributes="Bold" FontSize="Medium"/>
+                <Label Text="{Binding PendingCount, StringFormat='Pending: {0}'}"/>
+                <Label Text="{Binding ApprovedCount, StringFormat='Approved: {0}'}"/>
+                <Label Text="{Binding RejectedCount, StringFormat='Rejected: {0}'}"/>
+                            </VerticalStackLayout>
+                        </Border>
+                        
+        <!-- Request List -->
+        <CollectionView x:Name="RequestsApprovalCollectionView" Grid.Row="2" Grid.Column="0" ItemsSource="{Binding Requests}" SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="dtos:RequestResponseDto">
+                    <Frame Padding="10" Margin="5" CornerRadius="5" BorderColor="LightGray">
+                        <Grid>
+                            <!-- Desktop View -->
+                            <Grid ColumnDefinitions="*,*,*,*,Auto,Auto,Auto" 
+                                  RowDefinitions="Auto,Auto" 
+                                  ColumnSpacing="10"
+                                  IsVisible="{OnIdiom Desktop=true, Phone=false, Tablet=true, Default=true}">
+                                <Label Grid.Column="0" Text="{Binding UserName}" VerticalOptions="Center"/>
+                                <Label Grid.Column="1" Text="{Binding LeaveType}" VerticalOptions="Center"/>
+                                <Label Grid.Column="2" Text="{Binding RequestStartDate, StringFormat='{0:d}'}" VerticalOptions="Center"/>
+                                <Label Grid.Column="3" Text="{Binding Status}" VerticalOptions="Center" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}"/>
+                                <Button Grid.Column="4" Text="Approve" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ApproveCommand}" CommandParameter="{Binding Id}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
+                                <Button Grid.Column="5" Text="Reject" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=RejectCommand}" CommandParameter="{Binding Id}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
+                                <Button Grid.Column="6" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ViewCommand}" CommandParameter="{Binding Id}"/>
+                            </Grid>
+                            
+                            <!-- Mobile View -->
+                            <StackLayout Spacing="5" IsVisible="{OnIdiom Desktop=false, Phone=true, Tablet=false, Default=false}">
+                                <Label Text="{Binding UserName}" FontAttributes="Bold"/>
+                                <Label Text="{Binding LeaveType}"/>
+                                <Label Text="{Binding RequestStartDate, StringFormat='From: {0:d}'}"/>
+                                <Label Text="{Binding Status}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}"/>
+                                <HorizontalStackLayout Spacing="5" Margin="0,5,0,0">
+                                    <Button Text="Approve" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ApproveCommand}" CommandParameter="{Binding Id}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
+                                    <Button Text="Reject" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=RejectCommand}" CommandParameter="{Binding Id}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
+                                    <Button Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ViewCommand}" CommandParameter="{Binding Id}"/>
+                                </HorizontalStackLayout>
+                            </StackLayout>
+                        </Grid>
+                    </Frame>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+         <!-- Placeholder for Pagination Controls -->
+        <Label Grid.Row="3" Grid.ColumnSpan="2" Text="Pagination placeholder" HorizontalOptions="Center" Margin="10"/>
+
+    </Grid>
+</ContentPage> 

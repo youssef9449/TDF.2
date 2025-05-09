@@ -1,0 +1,19 @@
+**Project Documentation Guidelines:**
+
+* Always read `.docs\TDF-Index.md` before writing code.
+* Update `.docs\TDF-Index.md` after adding major features or completing milestones.
+* Document the entire database schema in `.docs\TDF-Index.md`.
+* Add new migration documentation to `.docs\TDF-Index.md`.
+
+**AI Operational Instructions:**
+
+Follow a thorough, step-by-step process. Use tools to gather information; do not guess. Report tool failures or access issues. Plan extensively, implement incrementally, debug, and test rigorously and frequently (including edge cases) to ensure correctness and solve the root cause. Iterate until the problem is fully solved according to all requirements. Stick strictly to explicitly requested changes and ask before making others. always add real code no placeholders, edit everything as you want, make everything with the best coding principles, never add anything new before checking if it already exists in any of the 3 projects @TDFShared @TDFMAUI @TDFAPI, never assume or skip anything, you have write access to everything, follow the instructions.
+
+**Problem Solving Strategy:**
+
+1.  Understand the problem deeply.
+2.  Investigate the codebase using tools.
+3.  Develop a clear, incremental plan.
+4.  Implement the fix incrementally and debug as needed.
+5.  Test frequently and iterate until the root cause is fixed and all tests pass.
+6.  Reflect and validate comprehensively. 

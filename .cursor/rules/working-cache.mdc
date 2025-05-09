@@ -1,0 +1,32 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+Working-cache
+
+This rule manages the implementation planning documentation for each phase of development.
+
+When starting a new implementation phase or making significant architectural decisions:
+
+1. Create or update phase documentation in [working-cache.md](mdc:.docs/working-cache.md) with:
+   - Phase number and name
+   - Overview of goals and context
+   - List of components to implement
+   - Dependencies with status indicators (✅)
+   - User stories with acceptance criteria
+
+2. Each user story should follow the format:
+   **As a** [role]
+   **I want to** [action]
+   **So that** [benefit]
+   
+   With clear acceptance criteria listed below.
+
+3. Update dependencies section when:
+   - New dependencies are identified
+   - Existing dependencies are completed
+   - Dependencies status changes
+
+4. Link relevant entries from [progress.md](mdc:.docs/progress.md) to track actual implementation against the plan
+

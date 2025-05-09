@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pages="clr-namespace:TDFMAUI.Features.Requests"
+             x:Class="TDFMAUI.Features.Requests.RequestDetailsPage"
+             Title="Request Details"
+             BackgroundColor="{StaticResource Gray100}">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Header -->
+        <HorizontalStackLayout Grid.Row="0" Padding="20">
+            <Button Text="←" 
+                    Clicked="OnBackClicked"
+                    BackgroundColor="Transparent"
+                    TextColor="{StaticResource Primary}"
+                    FontSize="20"
+                    WidthRequest="50"/>
+            <Label Text="Request Details"
+                   FontSize="24"
+                   FontAttributes="Bold"
+                   HorizontalOptions="CenterAndExpand"/>
+        </HorizontalStackLayout>
+
+        <!-- Content -->
+        <ScrollView Grid.Row="1" Padding="20">
+            <VerticalStackLayout Spacing="15">
+                <!-- Constrain width on Desktop/Tablet -->
+                <VerticalStackLayout.MaximumWidthRequest>
+                    <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="800" Desktop="700" />
+                </VerticalStackLayout.MaximumWidthRequest>
+                <VerticalStackLayout.HorizontalOptions>
+                     <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                </VerticalStackLayout.HorizontalOptions>
+
+                <Frame BackgroundColor="White" Padding="15">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="{Binding Request.RequestType, StringFormat='Type: {0}'}"
+                               FontSize="20"
+                               FontAttributes="Bold"/>
+                        <Label Text="{Binding Request.RequestReason, StringFormat='Reason: {0}'}"
+                               TextColor="Gray"/>
+                        <Label Text="{Binding Request.RequestStatus, StringFormat='Status: {0}'}"
+                               FontAttributes="Bold"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <Frame BackgroundColor="White" Padding="15">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Request Details"
+                               FontSize="18"
+                               FontAttributes="Bold"/>
+                        <Label Text="{Binding Request.RequestReason}"
+                               TextColor="Gray"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <Frame BackgroundColor="White" Padding="15">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Timeline"
+                               FontSize="18"
+                               FontAttributes="Bold"/>
+                        <Label Text="{Binding Request.CreatedAt, StringFormat='Submitted On: {0:g}'}"
+                               TextColor="Gray"/>
+                        <Label Text="{Binding Request.ApprovedAt, StringFormat='Approved/Rejected On: {0:g}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.ApprovedAt.HasValue}"/>
+                        <Label Text="{Binding Request.RequestCloser, StringFormat='Approved/Rejected By: {0}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.RequestCloser, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
+                        <Label Text="{Binding Request.RequestRejectReason, StringFormat='Rejection Reason: {0}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.RequestRejectReason, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <Frame BackgroundColor="White" Padding="15">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Request Dates"
+                               FontSize="18"
+                               FontAttributes="Bold"/>
+                        <Label Text="{Binding Request.RequestFromDay, StringFormat='From: {0:d}'}"
+                               TextColor="Gray"/>
+                        <Label Text="{Binding Request.RequestToDay, StringFormat='To: {0:d}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.RequestToDay.HasValue}"/>
+                        <Label Text="{Binding Request.RequestBeginningTime, StringFormat='Start Time: {0:hh\:mm}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.RequestBeginningTime.HasValue}"/>
+                        <Label Text="{Binding Request.RequestEndingTime, StringFormat='End Time: {0:hh\:mm}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.RequestEndingTime.HasValue}"/>
+                        <Label Text="{Binding Request.RequestNumberOfDays, StringFormat='Number of Days: {0}'}"
+                               TextColor="Gray"/>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <Frame BackgroundColor="White" Padding="15">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="HR Status"
+                               FontSize="18"
+                               FontAttributes="Bold"/>
+                        <Label Text="{Binding Request.RequestHRStatus, StringFormat='HR Status: {0}'}"
+                               TextColor="Gray"/>
+                        <Label Text="{Binding Request.RequestHRCloser, StringFormat='HR Approved/Rejected By: {0}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.RequestHRCloser, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
+                    </VerticalStackLayout>
+                </Frame>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Buttons -->
+        <FlexLayout Grid.Row="2" Padding="20" JustifyContent="Start" Wrap="Wrap">
+            <Button Text="Edit Request"
+                    Command="{Binding EditRequestCommand}"
+                    BackgroundColor="Transparent"
+                    TextColor="{StaticResource Primary}"
+                    Margin="0,0,10,5"
+                    IsVisible="{Binding CanEdit}"/>
+            <Button Text="Delete Request"
+                    Command="{Binding DeleteRequestCommand}"
+                    BackgroundColor="Red"
+                    TextColor="White"
+                    Margin="0,0,10,5"
+                    IsVisible="{Binding CanDelete}"/>
+            <Button Text="Approve"
+                    Command="{Binding ApproveRequestCommand}"
+                    BackgroundColor="Green"
+                    TextColor="White"
+                    Margin="0,0,10,5"
+                    IsVisible="{Binding CanApprove}"/>
+            <Button Text="Reject"
+                    Command="{Binding RejectRequestCommand}"
+                    BackgroundColor="Orange"
+                    TextColor="White"
+                    Margin="0,0,10,5"
+                    IsVisible="{Binding CanReject}"/>
+            <Button Text="Back"
+                    Command="{Binding BackCommand}"
+                    BackgroundColor="Transparent"
+                    TextColor="{StaticResource Primary}"
+                    Margin="0,0,0,5"/>
+        </FlexLayout>
+
+        <!-- Loading Indicator -->
+        <ActivityIndicator x:Name="loadingIndicator"
+                          Grid.Row="2"
+                          IsVisible="False"
+                          IsRunning="False"
+                          Color="{StaticResource Primary}"
+                          HorizontalOptions="Center"
+                          VerticalOptions="Center"/>
+    </Grid>
+</ContentPage> 

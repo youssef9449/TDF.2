@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:vm="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="TDFMAUI.Features.Auth.LoginPage"
+             x:DataType="vm:LoginPageViewModel"
+             Title="Login"
+             BackgroundColor="{StaticResource PrimaryDark}">
+
+    <Grid RowDefinitions="*" ColumnDefinitions="*">
+        <BoxView Grid.Row="0" Grid.Column="0" BackgroundColor="{StaticResource PrimaryDark}"/>
+        <ScrollView Grid.Row="0" Grid.Column="0" VerticalOptions="Center">
+             <VerticalStackLayout
+                Margin="30, 20"
+                Padding="30"
+                Spacing="20"
+                VerticalOptions="Center"
+                HorizontalOptions="Center">
+                <VerticalStackLayout.MaximumWidthRequest>
+                    <OnIdiom x:TypeArguments="x:Double" Phone="600" Tablet="500" Desktop="450" />
+                </VerticalStackLayout.MaximumWidthRequest>
+                 <Frame CornerRadius="15" BackgroundColor="{StaticResource Primary}" Padding="25" HasShadow="True">
+                     <VerticalStackLayout Spacing="20">
+                        <Image Source="tdf_logo.png" HeightRequest="80" HorizontalOptions="Center">
+                            <Image.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnDiagnosticsClicked" NumberOfTapsRequired="3" />
+                            </Image.GestureRecognizers>
+                        </Image>
+                        <Label Text="TDF System" FontSize="28" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
+                        <Border StrokeShape="RoundRectangle 10" Stroke="{StaticResource PrimaryLight}" BackgroundColor="{StaticResource PrimaryDark}">
+                            <Entry Placeholder="Username" PlaceholderColor="{StaticResource PrimaryLighter}" TextColor="White" Text="{Binding Username}" IsEnabled="{Binding IsNotBusy}" BackgroundColor="Transparent" Margin="15,0" Keyboard="Email" ReturnCommand="{Binding LoginCommand}" ClearButtonVisibility="WhileEditing"/>
+                        </Border>
+                        <Border StrokeShape="RoundRectangle 10" Stroke="{StaticResource PrimaryLight}" BackgroundColor="{StaticResource PrimaryDark}">
+                            <Entry Placeholder="Password" PlaceholderColor="{StaticResource PrimaryLighter}" TextColor="White" IsPassword="True" Text="{Binding Password}" IsEnabled="{Binding IsNotBusy}" BackgroundColor="Transparent" Margin="15,0" ReturnCommand="{Binding LoginCommand}" ClearButtonVisibility="WhileEditing"/>
+                        </Border>
+                        <Button Text="LOGIN"
+                                Command="{Binding LoginCommand}"
+                                BackgroundColor="{StaticResource PrimaryLight}"
+                                TextColor="White"
+                                FontAttributes="Bold"
+                                FontSize="16"
+                                CornerRadius="10"
+                                HeightRequest="50"/>
+
+                        <Label Text="{Binding ErrorMessage}"
+                               TextColor="OrangeRed"
+                               IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyConverter}}"
+                               HorizontalOptions="Center"
+                               Margin="0,10,0,0"/>
+
+                        <Label Text="Don't have an account? Sign Up" TextColor="{StaticResource PrimaryLighter}" HorizontalOptions="Center">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnSignupClicked"/>
+                            </Label.GestureRecognizers>
+                        </Label>
+                    </VerticalStackLayout>
+                 </Frame>
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</ContentPage>

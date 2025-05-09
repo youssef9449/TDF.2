@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Name="notificationsPage" xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             x:Class="TDFMAUI.Pages.NotificationsPage"
+             Title="Notifications"
+             BackgroundColor="{StaticResource Gray100}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="{OnIdiom Phone='10', Default='15'}">
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <Label Text="Notifications" 
+                   FontSize="{OnIdiom Phone=20, Default=24}" 
+                   FontAttributes="Bold"
+                   VerticalOptions="Center" />
+                   
+            <!-- Desktop/Tablet button -->
+            <Button Grid.Column="1"
+                    Text="Mark All Read"
+                    Clicked="OnMarkAllReadClicked"
+                    BackgroundColor="{StaticResource Primary}"
+                    TextColor="White"
+                    HeightRequest="40"
+                    WidthRequest="{OnIdiom Phone=110, Default=130}"
+                    FontSize="{OnIdiom Phone=12, Default=14}"
+                    CornerRadius="20"
+                    IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}" />
+                    
+            <!-- Mobile button (more compact) -->
+            <Button Grid.Column="1"
+                    Text="Mark All"
+                    Clicked="OnMarkAllReadClicked"
+                    BackgroundColor="{StaticResource Primary}"
+                    TextColor="White"
+                    HeightRequest="35"
+                    WidthRequest="80"
+                    FontSize="12"
+                    CornerRadius="18"
+                    IsVisible="{x:Static helpers:DeviceHelper.UseCompactUI}" />
+        </Grid>
+        
+        <!-- Notifications list -->
+        <RefreshView Grid.Row="1" x:Name="refreshView" IsRefreshing="False" RefreshColor="{StaticResource Primary}">
+            <ScrollView>
+                <VerticalStackLayout>
+                     <!-- Constrain width on Desktop/Tablet -->
+                    <VerticalStackLayout.MaximumWidthRequest>
+                        <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="800" Desktop="700" />
+                    </VerticalStackLayout.MaximumWidthRequest>
+                    <VerticalStackLayout.HorizontalOptions>
+                         <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                    </VerticalStackLayout.HorizontalOptions>
+
+                    <CollectionView x:Name="notificationsCollection" 
+                                    EmptyView="No notifications to display"
+                                    SelectionMode="None">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <SwipeView>
+                                    <SwipeView.RightItems>
+                                        <SwipeItems>
+                                            <SwipeItem Text="Delete"
+                                                       BackgroundColor="Red"
+                                                       Command="{Binding BindingContext.DeleteCommand, Source={x:Reference notificationsPage}}"
+                                                       CommandParameter="{Binding NotificationId}" />
+                                        </SwipeItems>
+                                    </SwipeView.RightItems>
+                                    
+                                    <Frame Margin="0,5" 
+                                           Padding="{OnIdiom Phone='10', Default='15'}" 
+                                           BackgroundColor="{Binding BackgroundColor}" 
+                                           CornerRadius="10"
+                                           BorderColor="{StaticResource Gray300}">
+                                           
+                                        <!-- Desktop/Tablet Layout -->
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto"
+                                              IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}">
+                                            <!-- Notification message -->
+                                            <Label Grid.Row="0"
+                                                   Grid.Column="0"
+                                                   Text="{Binding Message}" 
+                                                   TextColor="Black"
+                                                   FontSize="16" />
+                                            
+                                            <!-- Timestamp -->
+                                            <Label Grid.Row="1"
+                                                   Grid.Column="0"
+                                                   Text="{Binding TimestampFormatted}" 
+                                                   TextColor="{StaticResource Gray600}"
+                                                   FontSize="12"
+                                                   Margin="0,5,0,0" />
+                                            
+                                            <!-- Sender info -->
+                                            <Label Grid.Row="2"
+                                                   Grid.Column="0"
+                                                   Text="{Binding SenderName}" 
+                                                   IsVisible="{Binding HasSender}"
+                                                   TextColor="{StaticResource Gray600}"
+                                                   FontSize="12"
+                                                   Margin="0,5,0,0" />
+                                            
+                                            <!-- Seen indicator -->
+                                            <Frame Grid.Row="0"
+                                                   Grid.Column="1"
+                                                   Grid.RowSpan="3"
+                                                   IsVisible="{Binding IsNotSeen}"
+                                                   BackgroundColor="{StaticResource Primary}"
+                                                   WidthRequest="10"
+                                                   HeightRequest="10"
+                                                   CornerRadius="5"
+                                                   Padding="0"
+                                                   VerticalOptions="Start"
+                                                   HorizontalOptions="End" />
+                                        </Grid>
+                                        
+                                        <!-- Mobile Layout - More compact -->
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto"
+                                              IsVisible="{x:Static helpers:DeviceHelper.UseCompactUI}"
+                                              RowSpacing="3">
+                                            <Grid Grid.Row="0" Grid.Column="0" ColumnDefinitions="*,Auto">
+                                                <Label Text="{Binding Message}" 
+                                                       TextColor="Black"
+                                                       MaxLines="2"
+                                                       LineBreakMode="TailTruncation"
+                                                       FontSize="14" />
+                                                       
+                                                <!-- Seen indicator (mobile) -->
+                                                <Frame Grid.Column="1"
+                                                       IsVisible="{Binding IsNotSeen}"
+                                                       BackgroundColor="{StaticResource Primary}"
+                                                       WidthRequest="8"
+                                                       HeightRequest="8"
+                                                       CornerRadius="4"
+                                                       Padding="0"
+                                                       VerticalOptions="Start"
+                                                       HorizontalOptions="End" />
+                                            </Grid>
+                                            
+                                            <!-- Footer info (timestamp & sender) -->
+                                            <StackLayout Grid.Row="1" Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                                <Label Text="{Binding TimestampFormatted}" 
+                                                       TextColor="{StaticResource Gray600}"
+                                                       FontSize="10" />
+                                                
+                                                <Label Text="{Binding SenderName}" 
+                                                       IsVisible="{Binding HasSender}"
+                                                       TextColor="{StaticResource Gray600}"
+                                                       FontSize="10" />
+                                            </StackLayout>
+                                        </Grid>
+                                        
+                                        <Frame.GestureRecognizers>
+                                            <TapGestureRecognizer 
+                                                Command="{Binding BindingContext.ViewCommand, Source={x:Reference notificationsPage}}"
+                                                CommandParameter="{Binding NotificationId}" />
+                                        </Frame.GestureRecognizers>
+                                    </Frame>
+                                </SwipeView>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        
+        <!-- Loading indicator -->
+        <ActivityIndicator Grid.Row="1"
+                           x:Name="loadingIndicator"
+                           IsVisible="False"
+                           IsRunning="False"
+                           Color="{StaticResource Primary}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center" />
+    </Grid>
+</ContentPage> 

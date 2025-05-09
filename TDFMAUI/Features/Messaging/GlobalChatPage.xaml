@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TDFMAUI.Pages.GlobalChatPage"
+             Title="Global Chat">
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Padding="10" BackgroundColor="#f0f0f0">
+            <Button Grid.Column="0" 
+                    Text="Back" 
+                    Clicked="OnBackClicked" 
+                    WidthRequest="80" />
+            <Label Grid.Column="1" 
+                   Text="Global Chat" 
+                   HorizontalOptions="Center" 
+                   VerticalOptions="Center"
+                   FontSize="18"
+                   FontAttributes="Bold" />
+            <Button Grid.Column="2" 
+                    x:Name="refreshButton"
+                    Text="Refresh" 
+                    Clicked="OnRefreshClicked" 
+                    WidthRequest="80" />
+        </Grid>
+        
+        <!-- Messages Area -->
+        <ScrollView Grid.Row="1" x:Name="chatScrollView">
+            <VerticalStackLayout x:Name="chatDisplay" Padding="10" Spacing="10">
+                <!-- Messages will be added here dynamically -->
+                <Label x:Name="noMessagesLabel" 
+                       Text="No messages yet. Be the first to say something!" 
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"
+                       Margin="0,50,0,0"
+                       IsVisible="False" />
+            </VerticalStackLayout>
+        </ScrollView>
+        
+        <ActivityIndicator Grid.Row="1" 
+                          x:Name="loadingIndicator" 
+                          IsRunning="False" 
+                          IsVisible="False"
+                          HorizontalOptions="Center"
+                          VerticalOptions="Center" />
+        
+        <!-- Input Area -->
+        <Grid Grid.Row="2" ColumnDefinitions="*, Auto" Padding="10">
+            <Entry Grid.Column="0" 
+                   x:Name="messageInput" 
+                   Placeholder="Type a message..." 
+                   Completed="OnMessageInputCompleted" 
+                   VerticalOptions="Center" />
+            <Button Grid.Column="1" 
+                    x:Name="sendButton"
+                    Text="Send" 
+                    Clicked="OnSendClicked" 
+                    WidthRequest="80" />
+        </Grid>
+    </Grid>
+</ContentPage> 

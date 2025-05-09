@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:dtos="clr-namespace:TDFShared.DTOs.Requests;assembly=TDFShared"
+             xmlns:converters="clr-namespace:TDFMAUI.Converters"
+             xmlns:viewmodels="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             x:DataType="viewmodels:ReportsViewModel" 
+             x:Class="TDFMAUI.Pages.ReportsPage"
+             Title="Leave Reports"
+             BackgroundColor="{StaticResource Gray100}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
+            <converters:DateTimeToStringConverter x:Key="DateTimeToStringConverter" Format="d"/>
+            <!-- Add NullableDateTimeToDateTimeConverter if needed for DatePickers -->
+        </ResourceDictionary>
+    </ContentPage.Resources>
+    
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="15" RowSpacing="15">
+        <!-- Header -->
+        <Label Text="Leave Request Reports" 
+               FontSize="24" 
+               FontAttributes="Bold" 
+               HorizontalOptions="Center"
+               Grid.Row="0"
+               Margin="0,0,0,15"/>
+        
+        <!-- Filters -->
+        <Frame Grid.Row="1" BorderColor="LightGray" Padding="15" CornerRadius="10" HasShadow="True">
+            <VerticalStackLayout Spacing="15">
+                <Label Text="Filters" FontAttributes="Bold" FontSize="18"/>
+                
+                <Grid RowDefinitions="Auto,Auto,Auto" ColumnSpacing="15" RowSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <OnIdiom x:TypeArguments="ColumnDefinitionCollection">
+                            <OnIdiom.Phone>
+                                <ColumnDefinitionCollection>
+                                    <ColumnDefinition Width="*" />
+                                </ColumnDefinitionCollection>
+                            </OnIdiom.Phone>
+                            <OnIdiom.Tablet>
+                                <ColumnDefinitionCollection>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </ColumnDefinitionCollection>
+                            </OnIdiom.Tablet>
+                            <OnIdiom.Default>
+                                <ColumnDefinitionCollection>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </ColumnDefinitionCollection>
+                            </OnIdiom.Default>
+                        </OnIdiom>
+                    </Grid.ColumnDefinitions>
+                    <!-- Adjust Row/Column placement for Phone if needed -->
+                    
+                    <Label Text="Status" VerticalOptions="Center">
+                        <Label.Style>
+                            <Style TargetType="Label">
+                                <Setter Property="Grid.Row" Value="0" />
+                                <Setter Property="Grid.Column" Value="0" />
+                            </Style>
+                        </Label.Style>
+                    </Label>
+                    <!-- Bind Status Picker -->
+                    <Picker Title="Select Status"
+                            ItemsSource="{Binding StatusOptions}" 
+                            SelectedItem="{Binding SelectedStatus}">
+                        <Picker.Style>
+                            <Style TargetType="Picker">
+                                <Setter Property="Grid.Row" Value="0" />
+                                <Setter Property="Grid.Column" Value="1" />
+                                <Style.Triggers>
+                                    <DataTrigger TargetType="Picker" Binding="{OnIdiom Phone=True, Desktop=False}" Value="True">
+                                        <Setter Property="Grid.ColumnSpan" Value="1" />
+                                        <!-- May need Grid.Row adjustment too -->
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Picker.Style>
+                     </Picker>
+                    
+                    <Label Text="From Date" VerticalOptions="Center">
+                         <Label.Style>
+                            <Style TargetType="Label">
+                                <Setter Property="Grid.Row" Value="1" />
+                                <Setter Property="Grid.Column" Value="0" />
+                            </Style>
+                        </Label.Style>
+                    </Label>
+                    <!-- Bind Date Pickers -->
+                    <DatePicker Format="D"
+                                Date="{Binding FromDate}">
+                         <DatePicker.Style>
+                            <Style TargetType="DatePicker">
+                                <Setter Property="Grid.Row" Value="1" />
+                                <Setter Property="Grid.Column" Value="1" />
+                                 <Style.Triggers>
+                                    <DataTrigger TargetType="DatePicker" Binding="{OnIdiom Phone=True, Desktop=False}" Value="True">
+                                        <Setter Property="Grid.ColumnSpan" Value="1" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DatePicker.Style>
+                     </DatePicker> 
+                    
+                    <Label Text="To Date" VerticalOptions="Center">
+                         <Label.Style>
+                            <Style TargetType="Label">
+                                <Setter Property="Grid.Row" Value="2" />
+                                <Setter Property="Grid.Column" Value="0" />
+                            </Style>
+                        </Label.Style>
+                    </Label>
+                    <DatePicker Format="D"
+                                Date="{Binding ToDate}">
+                         <DatePicker.Style>
+                            <Style TargetType="DatePicker">
+                                <Setter Property="Grid.Row" Value="2" />
+                                <Setter Property="Grid.Column" Value="1" />
+                                 <Style.Triggers>
+                                    <DataTrigger TargetType="DatePicker" Binding="{OnIdiom Phone=True, Desktop=False}" Value="True">
+                                        <Setter Property="Grid.ColumnSpan" Value="1" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DatePicker.Style>
+                    </DatePicker> 
+                </Grid>
+                
+                <!-- Bind Apply Filters Button -->
+                <Button Text="Apply Filters" 
+                        Command="{Binding LoadRequestsCommand}" 
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        HorizontalOptions="Fill"/>
+            </VerticalStackLayout>
+        </Frame>
+        
+        <!-- Results -->
+        <!-- Bind RefreshView -->
+        <RefreshView Grid.Row="2" 
+                     Command="{Binding RefreshRequestsCommand}" 
+                     IsRefreshing="{Binding IsLoading}">
+            <ScrollView>
+            <VerticalStackLayout Spacing="10">
+                 <!-- Constrain width on Desktop/Tablet -->
+                <VerticalStackLayout.MaximumWidthRequest>
+                    <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="900" Desktop="800" />
+                </VerticalStackLayout.MaximumWidthRequest>
+                <VerticalStackLayout.HorizontalOptions>
+                      <OnIdiom Desktop="Center" Phone="Fill" Tablet="Center" />
+                 </VerticalStackLayout.HorizontalOptions>
+
+                <!-- Bind Count Label -->
+                <Label Text="{Binding RequestCountText}" 
+                       FontAttributes="Bold"
+                       Margin="0,10,0,5"/>
+                
+                <!-- Bind CollectionView -->
+                <CollectionView ItemsSource="{Binding Requests}"
+                                SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="dtos:RequestResponseDto">
+                            <!-- Add TapGestureRecognizer for navigation -->
+                            <Frame Padding="15" Margin="0,5" CornerRadius="10" BorderColor="LightGray" HasShadow="True">
+                                <Frame.GestureRecognizers>
+                                     <TapGestureRecognizer 
+                                         Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:ReportsViewModel}}, Path=NavigateToDetailsAsyncCommand}"
+                                         CommandParameter="{Binding .}" />
+                                </Frame.GestureRecognizers>
+                                <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                                    <Label Text="{Binding UserName}"
+                                           Grid.Row="0" 
+                                           Grid.Column="0"
+                                           FontAttributes="Bold" 
+                                           FontSize="16"/>
+                                    
+                                    <Label Text="{Binding LeaveType}"
+                                           Grid.Row="1" 
+                                           Grid.Column="0"
+                                           FontSize="14"/>
+                                    
+                                    <Label Grid.Row="2" 
+                                           Grid.Column="0"
+                                           FontSize="14" 
+                                           TextColor="Gray">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="From: "/>
+                                                <Span Text="{Binding RequestStartDate, Converter={StaticResource DateTimeToStringConverter}}"/>
+                                                <Span Text=" To: "/>
+                                                <Span Text="{Binding RequestEndDate, Converter={StaticResource DateTimeToStringConverter}}"/>
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                    
+                                    <Label Text="{Binding Status}"
+                                           Grid.Row="0" 
+                                           Grid.Column="1"
+                                           TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}"
+                                           FontAttributes="Bold"
+                                           HorizontalOptions="End"/>
+                                    
+                                    <Label Text="{Binding CreatedDate, StringFormat='{0:MM/dd/yyyy}'}" 
+                                           Grid.Row="1" 
+                                           Grid.Column="1"
+                                           Grid.RowSpan="2"
+                                           FontSize="12" 
+                                           TextColor="Gray"
+                                           VerticalOptions="End"
+                                           HorizontalOptions="End"/> 
+                                </Grid>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                    <CollectionView.EmptyView>
+                        <Label Text="No leave requests to display" 
+                               FontSize="16"
+                               TextColor="Gray"
+                               HorizontalOptions="Center" 
+                               VerticalOptions="Center"/>
+                    </CollectionView.EmptyView>
+                </CollectionView>
+                
+                <!-- Bind ActivityIndicator -->
+                <ActivityIndicator IsVisible="{Binding IsLoading}" 
+                                   IsRunning="{Binding IsLoading}" 
+                                   HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+        
+        <!-- Footer -->
+        <!-- Bind Add Button -->
+        <Button Grid.Row="3" 
+                Text="Add New Request" 
+                Command="{Binding NavigateToAddRequestCommand}"
+                Style="{StaticResource SuccessButtonStyle}"
+                HorizontalOptions="Fill"
+                Margin="0,15,0,0"/>
+    </Grid>
+</ContentPage> 

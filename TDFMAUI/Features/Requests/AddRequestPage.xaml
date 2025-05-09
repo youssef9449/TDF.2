@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:vm="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:viewModels="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:models="clr-namespace:TDFMAUI.Models"
+             xmlns:converters="clr-namespace:TDFMAUI.Converters"
+             x:DataType="viewModels:AddRequestViewModel"
+             x:Class="TDFMAUI.Features.Requests.AddRequestPage"
+             Title="{Binding IsEditMode, Converter={StaticResource BoolToStringConverter}, ConverterParameter='Edit Leave Request|Add Leave Request'}"
+             BackgroundColor="#1a237e">
+
+    <!-- Define Converters if needed, e.g., for Title -->
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <helpers:BoolToStringConverter x:Key="BoolToStringConverter" />
+            <converters:ValidationStateToColorConverter x:Key="ValidationColorConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="{OnIdiom Phone='15', Default='20'}">
+        <Label Grid.Row="0"
+               Text="{Binding Title, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
+               FontSize="{OnIdiom Phone=20, Default=24}"
+               FontAttributes="Bold"
+               TextColor="White"
+               HorizontalOptions="Center"
+               Margin="0,0,0,20"/>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="15">
+                <VerticalStackLayout.MaximumWidthRequest>
+                    <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="700" Desktop="600" />
+                </VerticalStackLayout.MaximumWidthRequest>
+                <VerticalStackLayout.HorizontalOptions>
+                     <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                </VerticalStackLayout.HorizontalOptions>
+
+                <!-- Validation Errors Summary Removed -->
+                <!-- 
+                <CollectionView ItemsSource="{Binding ValidationErrors}"
+                                IsVisible="{Binding HasErrors}"
+                                Margin="0,0,0,10">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Label Text="{Binding .}" TextColor="OrangeRed" FontSize="Small" Padding="15,5" BackgroundColor="#40000000"/>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                     <CollectionView.EmptyView>
+                        <Label Text=""/>
+                    </CollectionView.EmptyView>
+                </CollectionView>
+                -->
+
+                <Frame BackgroundColor="#0d47a1"
+                       Padding="{OnIdiom Phone='12', Default='15'}"
+                       CornerRadius="15"
+                       HasShadow="True">
+                    <VerticalStackLayout Spacing="{OnIdiom Phone='12', Default='15'}">
+
+                        <!-- Common Fields Layout using MVVM -->
+                        <Grid ColumnDefinitions="1*,2*" ColumnSpacing="10" RowSpacing="15">
+                            <!-- User Picker - Commented out for now, needs ViewModel properties
+                            <Label Grid.Row="0" Grid.Column="0"
+                                   Text="User"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   VerticalOptions="Center"/>
+                            <Picker Grid.Row="0" Grid.Column="1"
+                                   ItemsSource="{Binding Users}"
+                                   SelectedItem="{Binding SelectedUser}"
+                                   Title="Select User"
+                                   TextColor="White"
+                                   BackgroundColor="#1565c0"/>
+                             -->
+
+                            <Label Grid.Row="1" Grid.Column="0"
+                                   Text="Leave Type"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   VerticalOptions="Center"/>
+                            <Border Grid.Row="1" Grid.Column="1" StrokeThickness="1"
+                                    Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='LeaveType'}"
+                                    Padding="0" BackgroundColor="#1565c0">
+                                <Picker ItemsSource="{Binding LeaveTypes}"
+                                        SelectedItem="{Binding SelectedLeaveType}"
+                                        Title="Select Leave Type"
+                                        TextColor="White"
+                                        BackgroundColor="Transparent"/>
+                            </Border>
+
+                            <Label Grid.Row="2" Grid.Column="0"
+                                   Text="Start Date"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   VerticalOptions="Center"/>
+                            <Border Grid.Row="2" Grid.Column="1" StrokeThickness="1"
+                                    Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartDate'}"
+                                    Padding="0">
+                                <DatePicker Date="{Binding StartDate}"
+                                            Format="D"/>
+                            </Border>
+
+                            <Label Grid.Row="3" Grid.Column="0"
+                                   Text="End Date"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   VerticalOptions="Center"/>
+                            <Border Grid.Row="3" Grid.Column="1" StrokeThickness="1"
+                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndDate'}"
+                                     Padding="0">
+                                 <DatePicker Date="{Binding EndDate}"
+                                             Format="D"/>
+                             </Border>
+
+                             <!-- Partial Day Selection Toggle -->
+                            <Label Grid.Row="4" Grid.Column="0" Text="Partial Day?" TextColor="White" VerticalOptions="Center"/>
+                            <CheckBox Grid.Row="4" Grid.Column="1" IsChecked="{Binding IsPartialDay}" Color="White" HorizontalOptions="Start"/>
+
+
+                             <!-- Partial Day Time Pickers (conditional visibility) -->
+                            <Grid Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
+                                  IsVisible="{Binding IsPartialDay}" ColumnSpacing="10" Margin="0,5,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <VerticalStackLayout Grid.Column="0">
+                                    <Label Text="Start Time" TextColor="White" FontSize="Small"/>
+                                    <Border StrokeThickness="1"
+                                            Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartTime'}"
+                                            Padding="0">
+                                         <TimePicker Time="{Binding StartTime}" />
+                                     </Border>
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="1">
+                                    <Label Text="End Time" TextColor="White" FontSize="Small"/>
+                                    <Border StrokeThickness="1"
+                                            Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndTime'}"
+                                            Padding="0">
+                                         <TimePicker Time="{Binding EndTime}" />
+                                     </Border>
+                                </VerticalStackLayout>
+                            </Grid>
+
+
+                            <Label Grid.Row="6" Grid.Column="0"
+                                   Text="Reason"
+                                   FontAttributes="Bold"
+                                   TextColor="White"
+                                   VerticalOptions="Start"/>
+                            <Border Grid.Row="6" Grid.Column="1" StrokeThickness="1"
+                                    Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='Reason'}"
+                                    Padding="0">
+                                <Editor Text="{Binding RequestReason}"
+                                        Placeholder="Enter reason for leave (optional)"
+                                        MaxLength="200"
+                                        AutoSize="TextChanges"
+                                        HeightRequest="80"/>
+                            </Border>
+                        </Grid>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <ActivityIndicator IsRunning="{Binding IsBusy}"
+                                   IsVisible="{Binding IsBusy}"
+                                   Color="White"
+                                   HorizontalOptions="Center"/>
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <FlexLayout Grid.Row="2"
+                    Wrap="Wrap"
+                    JustifyContent="Center"
+                    Direction="Row"
+                    Margin="0,10,0,0">
+            <Button Text="Submit"
+                    Command="{Binding SubmitRequestCommand}"
+                    IsEnabled="{Binding IsNotBusy}"
+                    BackgroundColor="#64b5f6"
+                    TextColor="White"
+                    WidthRequest="{OnIdiom Phone=100, Default=120}"
+                    HeightRequest="{OnIdiom Phone=40, Default=45}"
+                    FontSize="{OnIdiom Phone=14, Default=16}"
+                    CornerRadius="10"
+                    Margin="5" />
+            <Button Text="Cancel"
+                    Command="{Binding CancelCommand}"
+                    IsEnabled="{Binding IsNotBusy}"
+                    BackgroundColor="#9e9e9e"
+                    TextColor="White"
+                    WidthRequest="{OnIdiom Phone=100, Default=120}"
+                    HeightRequest="{OnIdiom Phone=40, Default=45}"
+                    FontSize="{OnIdiom Phone=14, Default=16}"
+                    CornerRadius="10"
+                    Margin="5" />
+        </FlexLayout>
+    </Grid>
+</ContentPage>

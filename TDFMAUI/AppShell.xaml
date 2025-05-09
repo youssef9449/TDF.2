@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="TDFMAUI.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:TDFMAUI"
+    xmlns:pages="clr-namespace:TDFMAUI.Pages"
+    xmlns:admin="clr-namespace:TDFMAUI.Features.Admin"
+    xmlns:messaging="clr-namespace:TDFMAUI.Features.Messaging"
+    xmlns:requests="clr-namespace:TDFMAUI.Features.Requests"
+    Shell.FlyoutBehavior="Flyout"
+    FlyoutBackgroundColor="#512BD4">
+
+    <Shell.FlyoutHeader>
+        <Grid HeightRequest="100" BackgroundColor="#512BD4">
+            <Label Text="TDF Leave Management"
+                   TextColor="White"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"/>
+        </Grid>
+    </Shell.FlyoutHeader>
+
+    <TabBar>
+        <Tab Title="Home" Icon="home.png">
+            <ShellContent ContentTemplate="{DataTemplate local:MainPage}" />
+        </Tab>
+
+        <Tab Title="Messages" Icon="messages.png">
+            <ShellContent ContentTemplate="{DataTemplate pages:MessagesPage}" />
+        </Tab>
+
+        <Tab Title="Users" Icon="users.png">
+            <ShellContent ContentTemplate="{DataTemplate pages:UsersPage}" />
+        </Tab>
+
+        <Tab Title="Notifications" Icon="notifications.png">
+            <ShellContent ContentTemplate="{DataTemplate pages:NotificationsPage}" />
+        </Tab>
+
+        <Tab Title="Requests" Icon="requests.png">
+            <ShellContent ContentTemplate="{DataTemplate pages:RequestsPage}" />
+        </Tab>
+
+        <Tab Title="Profile" Icon="profile.png">
+            <ShellContent ContentTemplate="{DataTemplate pages:UserProfilePage}" />
+        </Tab>
+    </TabBar>
+
+    <FlyoutItem Title="My Requests" Icon="list.png">
+        <ShellContent
+            Title="My Requests"
+            ContentTemplate="{DataTemplate pages:RequestsPage}"
+            Route="RequestPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Private Messages" Icon="private_message.png">
+        <ShellContent
+            Title="Private Messages"
+            ContentTemplate="{DataTemplate pages:PrivateMessagesPage}"
+            Route="PrivateMessagesPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Global Messages" Icon="global_message.png">
+        <ShellContent
+            Title="Global Messages"
+            ContentTemplate="{DataTemplate pages:GlobalMessagesPage}"
+            Route="GlobalMessagesPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Reports" Icon="report.png" IsVisible="{Binding IsAdmin}">
+        <ShellContent
+            Title="Reports"
+            ContentTemplate="{DataTemplate pages:ReportsPage}"
+            Route="ReportsPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="My Team" Icon="team.png" IsVisible="{Binding IsManager}">
+        <ShellContent
+            Title="My Team"
+            ContentTemplate="{DataTemplate pages:MyTeamPage}"
+            Route="MyTeamPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Global Chat" Icon="chat.png">
+        <ShellContent
+            Title="Global Chat"
+            ContentTemplate="{DataTemplate pages:GlobalChatPage}"
+            Route="GlobalChatPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Admin" Icon="admin.png" IsVisible="{Binding IsAdmin}">
+        <ShellContent
+            Title="Admin"
+            ContentTemplate="{DataTemplate admin:AdminPage}"
+            Route="AdminPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Debug" Icon="bug.png" IsVisible="{Binding IsDevelopmentMode}">
+        <ShellContent
+            Title="Debug Tools"
+            ContentTemplate="{DataTemplate pages:DebugPage}"
+            Route="DebugPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Diagnostics" Icon="bug.png">
+        <ShellContent
+            Title="Diagnostics"
+            ContentTemplate="{DataTemplate pages:DiagnosticsPage}"
+            Route="DiagnosticsPage" />
+    </FlyoutItem>
+
+    <MenuItem Text="Logout"
+              IconImageSource="logout.png"
+              Clicked="OnLogoutClicked"/>
+
+</Shell>

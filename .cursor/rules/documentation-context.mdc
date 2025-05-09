@@ -1,0 +1,34 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Documentation-context
+
+This rule ensures all changes and implementations align with the project's core documentation.
+
+When implementing features or fixing issues:
+
+1. Check [TDF-Index.md](mdc:.docs/TDF-Index.md) to ensure changes follow:
+   - Project structure and relationships
+   - Development guidelines
+   - Technical requirements
+   - Documentation standards
+
+2. Verify against [implementation-plan.md](mdc:.docs/implementation-plan.md) for:
+   - Current implementation phase
+   - Testing & validation requirements
+   - Class relationships and SOLID principles
+   - Development milestones
+
+3. Maintain documentation consistency:
+   - Update relevant sections in TDF-Index.md
+   - Mark completed items in implementation-plan.md
+   - Follow established directory structures
+   - Adhere to defined class relationships
+
+4. Integration with other rules:
+   - Use with Progress-update for work logging
+   - Use with Project-Update for documentation syncing
+   - Reference core docs when implementing Working-cache items
+

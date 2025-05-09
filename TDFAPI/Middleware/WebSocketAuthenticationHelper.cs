@@ -53,7 +53,7 @@ namespace TDFAPI.Middleware
                     ValidIssuer = _issuer,
                     ValidAudience = _audience,
                     ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero
+                    ClockSkew = TimeSpan.FromMinutes(1) // Match HTTP auth clock skew
                 };
 
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);

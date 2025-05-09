@@ -8,8 +8,6 @@ using TDFShared.Enums;
 using Microsoft.EntityFrameworkCore;
 using TDFAPI.Data;
 using TDFAPI.Models;
-using Microsoft.Extensions.Logging;
-using System.Threading.Tasks;
 using TDFShared.Models.Request;
 using TDFAPI.Services;
 
@@ -113,6 +111,7 @@ namespace TDFAPI.Repositories
                 IsAdmin = userDto.IsAdmin,
                 IsManager = userDto.IsManager,
                 IsHR = false,
+                Role = "User", // Set default role
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true,
                 isConnected = false,

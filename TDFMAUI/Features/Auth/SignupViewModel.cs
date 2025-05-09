@@ -213,7 +213,49 @@ namespace TDFMAUI.Features.Auth
                 if (success)
                 {
                     _logger?.LogInformation("Signup successful for user: {Username}. Navigating to login.", Username);
-                    await Shell.Current.GoToAsync("//LoginPage");
+                    if (Shell.Current != null)
+                    {
+                        await Shell.Current.GoToAsync("//LoginPage");
+                    }
+                    else
+                    {
+                        _logger?.LogWarning("Shell.Current is null. Attempting fallback navigation to LoginPage.");
+                        try
+                        {
+                            var loginPage = App.Services?.GetService<LoginPage>();
+                            if (loginPage != null)
+                            {
+                                // Reset the navigation stack to LoginPage
+                                if (Application.Current?.MainPage?.Navigation != null)
+                                {
+                                    // Clear existing modal pages first if any, then reset main page
+                                    if (Application.Current.MainPage.Navigation.ModalStack.Any())
+                                    {
+                                        await Application.Current.MainPage.Navigation.PopModalAsync(false); // No animation
+                                    }
+                                    Application.Current.MainPage = new NavigationPage(loginPage);
+                                }
+                                else if (Application.Current != null)
+                                {
+                                     Application.Current.MainPage = new NavigationPage(loginPage);
+                                }
+                                else
+                                {
+                                    throw new InvalidOperationException("Application.Current is null.");
+                                }
+                            }
+                            else
+                            {
+                                throw new InvalidOperationException("LoginPage could not be resolved from DI container.");
+                            }
+                        }
+                        catch (Exception navEx)
+                        {
+                            _logger?.LogError(navEx, "Fallback navigation to LoginPage failed.");
+                            ErrorMessage = "Signup successful, but automatic navigation to login failed. Please restart the app or navigate manually.";
+                            HasError = true;
+                        }
+                    }
                 }
                 else
                 {
@@ -316,4 +358,4 @@ namespace TDFMAUI.Features.Auth
             await LoadLookupsAsync();
         }
     }
-} 
+}

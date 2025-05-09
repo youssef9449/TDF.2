@@ -35,9 +35,9 @@ namespace TDFAPI.Models
         [StringLength(255)]
         public string Department { get; set; }
 
-        // Ignored in DbContext configuration - legacy column
-        // public string? Role { get; set; }
-
+        // Ignored in DbContext configuration - legacy column - RE-ENABLING
+        public string? Role { get; set; }
+ 
         public byte[]? Picture { get; set; }
 
         public bool isConnected { get; set; } // Note: C# convention usually uses PascalCase (IsConnected)

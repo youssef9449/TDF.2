@@ -1,5 +1,7 @@
 # Ignore all bin directories
 **/bin/
+# But DO NOT ignore the TDFAPI config.ini
+!TDFAPI/bin/config.ini
 
 # Ignore all release directories
 **/release/

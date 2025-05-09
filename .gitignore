@@ -1,7 +1,7 @@
 # Ignore all bin directories
 **/bin/
-# But DO NOT ignore the TDFAPI config.ini
-!TDFAPI/bin/config.ini
+# But DO NOT ignore the TDFAPI config.ini in its specific Debug path
+!TDFAPI/bin/Debug/net8.0/config.ini
 
 # Ignore all release directories
 **/release/

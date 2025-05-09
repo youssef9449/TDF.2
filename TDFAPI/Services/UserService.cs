@@ -62,13 +62,13 @@ namespace TDFAPI.Services
                 throw new ValidationException($"Username '{userDto.Username}' is already taken.");
             }
 
-            // Check password strength before hashing
-            if (!AuthService.IsPasswordStrong(userDto.Password))
-            {
-                _logger.LogWarning("User creation failed: Password does not meet strength requirements");
-                throw new ValidationException("Password does not meet strength requirements. It should be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.");
-            }
-
+            // Check password strength before hashing - REMOVED as per user request
+            // if (!AuthService.IsPasswordStrong(userDto.Password))
+            // {
+            //     _logger.LogWarning("User creation failed: Password does not meet strength requirements");
+            //     throw new ValidationException("Password does not meet strength requirements. It should be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.");
+            // }
+ 
             var passwordHash = _authService.HashPassword(userDto.Password, out string salt);
             
             // Pass the DTO and auth data to repository
@@ -103,13 +103,13 @@ namespace TDFAPI.Services
         
         public async Task<bool> ChangePasswordAsync(int userId, string currentPassword, string newPassword)
         {
-            // Check new password strength
-            if (!AuthService.IsPasswordStrong(newPassword))
-            {
-                _logger.LogWarning("Password change failed for user {UserId}: New password does not meet strength requirements.", userId);
-                return false;
-            }
-
+            // Check new password strength - REMOVED as per user request
+            // if (!AuthService.IsPasswordStrong(newPassword))
+            // {
+            //     _logger.LogWarning("Password change failed for user {UserId}: New password does not meet strength requirements.", userId);
+            //     return false;
+            // }
+ 
             var user = await _userRepository.GetUserAuthDataAsync(userId);
             if (user == null || string.IsNullOrEmpty(user.PasswordHash) || string.IsNullOrEmpty(user.PasswordSalt))
             {

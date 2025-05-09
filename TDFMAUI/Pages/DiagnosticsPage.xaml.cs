@@ -140,6 +140,8 @@ namespace TDFMAUI.Pages
             finally
             {
                 TestApiButton.IsEnabled = true;
+                // Refresh logs to display the API test result
+                await RefreshLogs();
             }
         }
         

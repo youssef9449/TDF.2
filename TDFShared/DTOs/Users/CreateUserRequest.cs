@@ -21,7 +21,8 @@ namespace TDFShared.DTOs.Users
         /// </summary>
         [JsonPropertyName("password")]
         [Required(ErrorMessage = "Password is required")]
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be between 6 and 100 characters")]
+        // MinimumLength validation removed as per user request
+        [StringLength(100, ErrorMessage = "Password cannot exceed 100 characters")]
         public string Password { get; set; }
         
         /// <summary>

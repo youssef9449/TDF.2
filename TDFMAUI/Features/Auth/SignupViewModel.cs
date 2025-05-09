@@ -193,9 +193,9 @@ namespace TDFMAUI.Features.Auth
                 HasError = true;
                 return;
             }
-
+ 
             // Password strength validation has been removed to allow any password
-
+ 
             var signupModel = new SignupModel
             {
                 Username = Username,
@@ -235,13 +235,18 @@ namespace TDFMAUI.Features.Auth
                         try
                         {
                             var errorResponse = System.Text.Json.JsonSerializer.Deserialize<TDFShared.DTOs.Common.ApiResponse<object>>(apiEx.ResponseContent, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-                            if (errorResponse != null && !string.IsNullOrWhiteSpace(errorResponse.Message))
+                            if (errorResponse != null)
                             {
-                                apiErrorMessage = errorResponse.Message;
                                 if (errorResponse.Errors != null && errorResponse.Errors.Any())
                                 {
-                                    apiErrorMessage += " Details: " + string.Join("; ", errorResponse.Errors.SelectMany(kv => kv.Value));
+                                    // Prioritize detailed validation errors
+                                    apiErrorMessage = string.Join("; ", errorResponse.Errors.SelectMany(kv => $"{kv.Key}: {string.Join(", ", kv.Value)}"));
                                 }
+                                else if (!string.IsNullOrWhiteSpace(errorResponse.Message))
+                                {
+                                    apiErrorMessage = errorResponse.Message;
+                                }
+                                // If neither Errors nor Message is present in errorResponse, apiErrorMessage remains apiEx.Message ("Bad Request")
                             }
                         }
                         catch { /* Ignore if not a standard ApiResponse format */ }

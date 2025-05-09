@@ -115,7 +115,17 @@ namespace TDFMAUI
                     string section = isDevelopment ? "ApiSettings:Development" : "ApiSettings:Production";
 
                     options.BaseUrl = builder.Configuration[$"{section}:BaseUrl"];
+                    if (string.IsNullOrEmpty(options.BaseUrl))
+                    {
+                        options.BaseUrl = "https://192.168.100.3:5001/api/"; // Default fallback
+                        System.Diagnostics.Debug.WriteLine($"Warning: {section}:BaseUrl not found in configuration. Using default DI BaseUrl: {options.BaseUrl}");
+                    }
                     options.WebSocketUrl = builder.Configuration[$"{section}:WebSocketUrl"];
+                    if (string.IsNullOrEmpty(options.WebSocketUrl))
+                    {
+                        options.WebSocketUrl = "wss://192.168.100.3:5001/ws"; // Default fallback
+                        System.Diagnostics.Debug.WriteLine($"Warning: {section}:WebSocketUrl not found in configuration. Using default DI WebSocketUrl: {options.WebSocketUrl}");
+                    }
                     options.Timeout = int.TryParse(builder.Configuration["ApiSettings:Timeout"], out int timeout) ? timeout : 30;
                     options.DevelopmentMode = isDevelopment;
                 });

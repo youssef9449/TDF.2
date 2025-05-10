@@ -259,14 +259,17 @@ namespace TDFMAUI
                 // On Android, we can check the intent extras
 #if ANDROID
                 var context = Android.App.Application.Context;
-                var packageManager = context.PackageManager;
-                var intent = packageManager?.GetLaunchIntentForPackage(context.PackageName);
+                var currentPackageName = context.PackageName;
+                if (context.PackageManager != null && !string.IsNullOrEmpty(currentPackageName))
+                {
+                    var intent = context.PackageManager.GetLaunchIntentForPackage(currentPackageName);
 
-                if (intent?.Extras != null && intent.Extras.ContainsKey("safe_mode"))
+                    if (intent?.Extras != null && intent.Extras.ContainsKey("safe_mode"))
                 {
                     SafeMode = intent.Extras.GetBoolean("safe_mode", false);
                     System.Diagnostics.Debug.WriteLine($"Safe mode from intent: {SafeMode}");
                 }
+            } // <<< Add this closing brace for the 'if (context.PackageManager != null ...)' block
 #endif
 
                 // Log the safe mode status

@@ -48,6 +48,24 @@
                 "${workspaceFolder}/TDF.sln"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "maui: build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+                "/property:GenerateFullPaths=true",
+                "/verbosity:detailed"
+            ],
+            "problemMatcher": "$msCompile",
+            "options": {
+                "shell": {
+                    "executable": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+                    "args": [] // Can add shell-specific args here if needed, like -NoProfile
+                }
+            }
         }
     ]
 }

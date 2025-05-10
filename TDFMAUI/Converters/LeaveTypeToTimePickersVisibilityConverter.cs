@@ -4,24 +4,21 @@ using Microsoft.Maui.Controls;
 
 namespace TDFMAUI.Converters
 {
-    public class InverseBoolConverter : IValueConverter
+    public class LeaveTypeToTimePickersVisibilityConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is bool boolValue)
+            if (value is string leaveType)
             {
-                return !boolValue;
+                return leaveType == "Permission" || leaveType == "External Assignment";
             }
-            return value; // Or throw an exception, or return false, depending on desired behavior
+            return false;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is bool boolValue)
-            {
-                return !boolValue;
-            }
-            return value; // Or throw an exception
+            // Not needed for one-way binding
+            throw new NotImplementedException();
         }
     }
 }

@@ -160,7 +160,7 @@ namespace TDFMAUI.Services
             }
         }
         
-        private async void SendActivityPing(object state)
+        private async void SendActivityPing(object? state)
         {
             if (App.CurrentUser != null && _webSocketService.IsConnected)
             {
@@ -175,7 +175,7 @@ namespace TDFMAUI.Services
             }
         }
         
-        private void OnUserStatusChanged(object sender, UserStatusEventArgs e)
+        private void OnUserStatusChanged(object? sender, UserStatusEventArgs e)
         {
             if (_userStatuses.TryGetValue(e.UserId, out var userInfo))
             {
@@ -202,7 +202,7 @@ namespace TDFMAUI.Services
             UserStatusChanged?.Invoke(this, args);
         }
         
-        private void OnUserAvailabilityChanged(object sender, UserAvailabilityEventArgs e)
+        private void OnUserAvailabilityChanged(object? sender, UserAvailabilityEventArgs e)
         {
             if (_userStatuses.TryGetValue(e.UserId, out var userInfo))
             {
@@ -228,7 +228,7 @@ namespace TDFMAUI.Services
             UserAvailabilityChanged?.Invoke(this, args);
         }
         
-        private void OnAvailabilitySet(object sender, AvailabilitySetEventArgs e)
+        private void OnAvailabilitySet(object? sender, AvailabilitySetEventArgs e)
         {
             _logger.LogInformation("Confirmation received: Availability set to {IsAvailable}", e.IsAvailable);
             if (App.CurrentUser != null && _userStatuses.TryGetValue(App.CurrentUser.UserID, out var userInfo))
@@ -238,7 +238,7 @@ namespace TDFMAUI.Services
             AvailabilityConfirmed?.Invoke(this, e);
         }
 
-        private void OnStatusUpdateConfirmed(object sender, StatusUpdateConfirmedEventArgs e)
+        private void OnStatusUpdateConfirmed(object? sender, StatusUpdateConfirmedEventArgs e)
         {
             _logger.LogInformation("Confirmation received: Status updated to {Status} ({StatusMessage})", e.Status, e.StatusMessage ?? "null");
             if (App.CurrentUser != null && _userStatuses.TryGetValue(App.CurrentUser.UserID, out var userInfo))
@@ -249,7 +249,7 @@ namespace TDFMAUI.Services
             StatusUpdateConfirmed?.Invoke(this, e);
         }
 
-        private void OnErrorReceived(object sender, WebSocketErrorEventArgs e)
+        private void OnErrorReceived(object? sender, WebSocketErrorEventArgs e)
         {
             // Forward to PresenceErrorReceived event
             PresenceErrorReceived?.Invoke(this, e);
@@ -349,7 +349,7 @@ namespace TDFMAUI.Services
                 // If this is the current user, update via WebSocket
                 if (App.CurrentUser != null && App.CurrentUser.UserID == userId)
                 {
-                    await UpdateStatusAsync(status, null); // Use the existing method for the current user
+                    await UpdateStatusAsync(status, string.Empty); // Use the existing method for the current user
                 }
                 else
                 {

@@ -134,7 +134,7 @@ namespace TDFMAUI
                 // URLs are the same for dev and prod, load them directly.
                 // DevelopmentMode will be set by ApiConfig.Initialize to true to allow IP cert bypass.
                 string configSection = "ApiSettings:Development"; // Or "ApiSettings:Production", as they are the same
-                
+
                 ApiConfig.BaseUrl = builder.Configuration[$"{configSection}:BaseUrl"];
                 ApiConfig.WebSocketUrl = builder.Configuration[$"{configSection}:WebSocketUrl"];
                 ApiConfig.Timeout = int.TryParse(builder.Configuration["ApiSettings:Timeout"], out int timeout) ? timeout : 30;
@@ -239,7 +239,10 @@ namespace TDFMAUI
             builder.Services.AddSingleton<BoolToThicknessConverter>();
             builder.Services.AddSingleton<StringNotEmptyConverter>();
             builder.Services.AddSingleton<BooleanInverter>();
+            builder.Services.AddSingleton<InverseBoolConverter>();  // Added for AddRequestPage.xaml
             builder.Services.AddSingleton<BooleanToVisibilityConverter>();
+            builder.Services.AddSingleton<LeaveTypeToTimePickersVisibilityConverter>();
+            builder.Services.AddSingleton<ValidationStateToColorConverter>();  // Added for AddRequestPage.xaml
 
             // Register pages with dependencies
             builder.Services.AddTransient<MessagesPage>();

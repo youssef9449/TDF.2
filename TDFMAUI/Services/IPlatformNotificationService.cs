@@ -16,7 +16,7 @@ namespace TDFMAUI.Services
         /// <param name="notificationType">The type/severity of the notification</param>
         /// <param name="data">Additional data for the notification</param>
         /// <returns>True if the notification was successfully shown</returns>
-        Task<bool> ShowNotificationAsync(string title, string message, NotificationType notificationType = NotificationType.Info, string data = null);
+        Task<bool> ShowNotificationAsync(string title, string message, NotificationType notificationType = NotificationType.Info, string? data = null);
         
         /// <summary>
         /// Shows a local platform-specific notification
@@ -26,7 +26,7 @@ namespace TDFMAUI.Services
         /// <param name="type">The type/severity of the notification</param>
         /// <param name="data">Additional data for the notification</param>
         /// <returns>True if the notification was shown successfully</returns>
-        Task<bool> ShowLocalNotificationAsync(string title, string message, NotificationType type, string data = null);
+        Task<bool> ShowLocalNotificationAsync(string title, string message, NotificationType type, string? data = null);
         
         /// <summary>
         /// Schedules a notification to be delivered at a specific time
@@ -36,7 +36,7 @@ namespace TDFMAUI.Services
         /// <param name="deliveryTime">The delivery time of the notification</param>
         /// <param name="data">Additional data for the notification</param>
         /// <returns>True if the notification was scheduled successfully</returns>
-        Task<bool> ScheduleNotificationAsync(string title, string message, DateTime deliveryTime, string data = null);
+        Task<bool> ScheduleNotificationAsync(string title, string message, DateTime deliveryTime, string? data = null);
         
         /// <summary>
         /// Cancels a scheduled notification

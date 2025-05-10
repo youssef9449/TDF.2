@@ -1121,8 +1121,8 @@ namespace TDFMAUI.Services
             await SendMessageAsync(new
             {
                 type = "update_status",
-                status = status,
-                statusMessage = statusMessage,
+                status = status ?? string.Empty,
+                statusMessage = statusMessage ?? string.Empty,
                 timestamp = DateTime.UtcNow
             });
         }

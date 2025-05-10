@@ -6,7 +6,9 @@
             "type": "maui",
             "request": "launch",
             "project": "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
-            "preLaunchTask": "maui: build"
+            "preLaunchTask": "maui: build",
+            "targetFramework": "net8.0-android"
+            // should prompt you to select from available devices/emulators.
         },
         {
             // Use IntelliSense to find out which attributes exist for C# debugging

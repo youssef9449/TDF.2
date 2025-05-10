@@ -131,16 +131,16 @@ namespace TDFMAUI
                 });
 
                 // Manually load into static class for easier access (consider singleton service instead)
-                bool isDevelopmentMode = bool.TryParse(builder.Configuration["ApiSettings:DevelopmentMode"], out bool devMode) ? devMode : true;
-                string configSection = isDevelopmentMode ? "ApiSettings:Development" : "ApiSettings:Production";
-
+                // URLs are the same for dev and prod, load them directly.
+                // DevelopmentMode will be set by ApiConfig.Initialize to true to allow IP cert bypass.
+                string configSection = "ApiSettings:Development"; // Or "ApiSettings:Production", as they are the same
+                
                 ApiConfig.BaseUrl = builder.Configuration[$"{configSection}:BaseUrl"];
                 ApiConfig.WebSocketUrl = builder.Configuration[$"{configSection}:WebSocketUrl"];
                 ApiConfig.Timeout = int.TryParse(builder.Configuration["ApiSettings:Timeout"], out int timeout) ? timeout : 30;
-                ApiConfig.DevelopmentMode = isDevelopmentMode;
 
                 // Add some debug info
-                System.Diagnostics.Debug.WriteLine($"Using config: Mode={ApiConfig.DevelopmentMode}, BaseUrl={ApiConfig.BaseUrl}, WebSocketUrl={ApiConfig.WebSocketUrl}");
+                System.Diagnostics.Debug.WriteLine($"Config loaded for static ApiConfig: BaseUrl={ApiConfig.BaseUrl}, WebSocketUrl={ApiConfig.WebSocketUrl}");
 
                 // Test API connectivity after configuration
                 Task.Run(async () => {
@@ -166,8 +166,8 @@ namespace TDFMAUI
             builder.Services.AddLogging(loggingBuilder =>
             {
                 loggingBuilder.AddDebug();
-                // Change minimum level from Trace to Error to hide Warnings, Info, Debug, Trace
-                loggingBuilder.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Error);
+                // Set minimum level to Information to see our diagnostic logs
+                loggingBuilder.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
             });
 #else
             // In release mode, only log warnings and errors
@@ -198,22 +198,15 @@ namespace TDFMAUI
             builder.Services.AddSingleton<LookupService>();
             builder.Services.AddSingleton<ILookupService>(sp => sp.GetRequiredService<LookupService>());
 
-            // Register our custom HttpClientHandler
+            // Always register DevelopmentHttpClientHandler since we need to bypass cert validation for the IP address in all modes.
             builder.Services.AddSingleton<DevelopmentHttpClientHandler>();
-
-            // Register HttpClient with our custom handler
             builder.Services.AddSingleton<HttpClient>(sp =>
             {
-                // Use our custom handler that handles SSL certificate validation
                 var handler = sp.GetRequiredService<DevelopmentHttpClientHandler>();
                 var logger = sp.GetRequiredService<ILogger<HttpClient>>();
-
-                logger.LogInformation("Creating HttpClient with custom handler");
-
-                return new HttpClient(handler)
-                {
-                    // BaseAddress and Timeout will be set by HttpClientService using IOptions<ApiSettings>
-                };
+                logger.LogInformation("Creating HttpClient with DevelopmentHttpClientHandler (for IP address target)");
+                return new HttpClient(handler);
+                // BaseAddress and Timeout will be set by HttpClientService using IOptions<ApiSettings>
             });
 
             // Register RequestService
@@ -305,8 +298,9 @@ namespace TDFMAUI
                 App.Services = app.Services;
                 logger?.LogInformation("App.Services initialized with ServiceProvider");
 
-                // Initialize ApiConfig
-                ApiConfig.Initialize(true);
+                // Initialize ApiConfig with isDevelopment: true to ensure DevelopmentHttpClientHandler bypasses SSL validation for the IP.
+                ApiConfig.Initialize(isDevelopment: true);
+                System.Diagnostics.Debug.WriteLine("ApiConfig.Initialize called with isDevelopment: true (to enable IP cert bypass)");
 
                 // Test AppShell resolution - this can help identify DI issues
                 try {

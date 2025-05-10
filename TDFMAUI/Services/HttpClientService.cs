@@ -58,16 +58,22 @@ namespace TDFMAUI.Services
 
         public void SetAuthorizationHeader(string token)
         {
-            _httpClient.DefaultRequestHeaders.Authorization = string.IsNullOrEmpty(token) 
-                ? null 
-                : new AuthenticationHeaderValue("Bearer", token);
-            _logger.LogTrace("Authorization header set.");
+            if (string.IsNullOrEmpty(token))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = null;
+                _logger.LogInformation("HttpClientService: SetAuthorizationHeader - Token was null/empty, header CLEARED.");
+            }
+            else
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                _logger.LogInformation("HttpClientService: SetAuthorizationHeader - Bearer token SET. Token starts with: {TokenStart}", token.Length > 10 ? token.Substring(0, 10) + "..." : token);
+            }
         }
 
         public void ClearAuthorizationHeader()
         {
             _httpClient.DefaultRequestHeaders.Authorization = null;
-             _logger.LogTrace("Authorization header cleared.");
+            _logger.LogInformation("HttpClientService: ClearAuthorizationHeader - Authorization header CLEARED.");
         }
 
         public async Task<T> GetAsync<T>(string endpoint)

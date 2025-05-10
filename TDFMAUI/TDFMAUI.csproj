@@ -22,7 +22,8 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<WarningsNotAsErrors>NU1605</WarningsNotAsErrors>
-
+		<NullabilityInfoContextSupport>true</NullabilityInfoContextSupport>
+		
 		<!-- Windows Specific -->
 		<WindowsPackageType>None</WindowsPackageType>
 		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>

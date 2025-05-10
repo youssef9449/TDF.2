@@ -94,18 +94,37 @@ namespace TDFMAUI.Services
                     _logger.LogInformation("DIAGNOSTIC: Directly calling departments endpoint");
                     var departments = await _apiService.GetDepartmentsAsync();
 
-                    if (departments != null && departments.Any()) {
-                        _logger.LogInformation("DIAGNOSTIC: Successfully got {Count} departments directly", departments.Count);
+                    // Enhanced logging for department data received by LookupService
+                    if (departments == null)
+                    {
+                        _logger.LogWarning("DIAGNOSTIC: _apiService.GetDepartmentsAsync() returned a NULL list to LookupService.");
+                    }
+                    else
+                    {
+                        _logger.LogInformation("DIAGNOSTIC: _apiService.GetDepartmentsAsync() returned a list with {Count} items to LookupService.", departments.Count);
+                        if (departments.Any())
+                        {
+                            // Log details of the first department to inspect deserialized values
+                            var firstDept = departments[0];
+                            _logger.LogInformation("DIAGNOSTIC: First department received by LookupService - Id: {Id}, Name: {Name}, Value (from JSON 'category'): {Value}, Description: {Description}, SortOrder: {SortOrder}",
+                                                   firstDept.Id, firstDept.Name, firstDept.Value, firstDept.Description, firstDept.SortOrder);
+                        }
+                    }
+
+                    if (departments != null) { // Allow empty list as a valid response (previous fix)
+                        _logger.LogInformation("DIAGNOSTIC: Successfully processed departments list (Count: {Count})", departments.Count);
                         _departments = departments;
                         _isDataLoaded = true;
                         
                     System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE] Final State: Departments loaded: {_departments?.Count ?? 0}");
                     _logger.LogInformation("DIAGNOSTIC: Final loaded state - Departments: {DeptCount}", _departments?.Count ?? 0);
                 }
-                else {
-                        _logger.LogWarning("DIAGNOSTIC: Department endpoint returned no data");
+                else { // This block will now only be hit if 'departments' is explicitly null
+                        _logger.LogWarning("DIAGNOSTIC: Department data was null after API call, treating as failure to load.");
                      _isDataLoaded = false;
-                     throw new Exception("Failed to load department lookup data from API.");
+                     // Consider if throwing an exception here is still desired if API can legitimately return null
+                     // For now, keeping original logic for null response being an error.
+                     throw new Exception("Failed to load department lookup data from API (API returned null).");
                 }
             }
             catch (Exception ex)

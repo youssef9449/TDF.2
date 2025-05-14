@@ -7,57 +7,126 @@
              x:Class="TDFMAUI.Features.Auth.LoginPage"
              x:DataType="vm:LoginPageViewModel"
              Title="Login"
-             BackgroundColor="{StaticResource PrimaryDark}">
+             BackgroundColor="White">
 
-    <Grid RowDefinitions="*" ColumnDefinitions="*">
-        <BoxView Grid.Row="0" Grid.Column="0" BackgroundColor="{StaticResource PrimaryDark}"/>
-        <ScrollView Grid.Row="0" Grid.Column="0" VerticalOptions="Center">
-             <VerticalStackLayout
-                Margin="30, 20"
-                Padding="30"
-                Spacing="20"
-                VerticalOptions="Center"
-                HorizontalOptions="Center">
-                <VerticalStackLayout.MaximumWidthRequest>
-                    <OnIdiom x:TypeArguments="x:Double" Phone="600" Tablet="500" Desktop="450" />
-                </VerticalStackLayout.MaximumWidthRequest>
-                 <Frame CornerRadius="15" BackgroundColor="{StaticResource Primary}" Padding="25" HasShadow="True">
-                     <VerticalStackLayout Spacing="20">
-                        <Image Source="tdf_logo.png" HeightRequest="80" HorizontalOptions="Center">
-                            <Image.GestureRecognizers>
-                                <TapGestureRecognizer Tapped="OnDiagnosticsClicked" NumberOfTapsRequired="3" />
-                            </Image.GestureRecognizers>
-                        </Image>
-                        <Label Text="TDF System" FontSize="28" FontAttributes="Bold" TextColor="White" HorizontalOptions="Center"/>
-                        <Border StrokeShape="RoundRectangle 10" Stroke="{StaticResource PrimaryLight}" BackgroundColor="{StaticResource PrimaryDark}">
-                            <Entry Placeholder="Username" PlaceholderColor="{StaticResource PrimaryLighter}" TextColor="White" Text="{Binding Username}" IsEnabled="{Binding IsNotBusy}" BackgroundColor="Transparent" Margin="15,0" Keyboard="Email" ReturnCommand="{Binding LoginCommand}" ClearButtonVisibility="WhileEditing"/>
-                        </Border>
-                        <Border StrokeShape="RoundRectangle 10" Stroke="{StaticResource PrimaryLight}" BackgroundColor="{StaticResource PrimaryDark}">
-                            <Entry Placeholder="Password" PlaceholderColor="{StaticResource PrimaryLighter}" TextColor="White" IsPassword="True" Text="{Binding Password}" IsEnabled="{Binding IsNotBusy}" BackgroundColor="Transparent" Margin="15,0" ReturnCommand="{Binding LoginCommand}" ClearButtonVisibility="WhileEditing"/>
-                        </Border>
-                        <Button Text="LOGIN"
-                                Command="{Binding LoginCommand}"
-                                BackgroundColor="{StaticResource PrimaryLight}"
-                                TextColor="White"
-                                FontAttributes="Bold"
-                                FontSize="16"
-                                CornerRadius="10"
-                                HeightRequest="50"/>
+    <ContentPage.Resources>
+        <Style x:Key="EntryStyle" TargetType="Entry">
+            <Setter Property="TextColor" Value="#333333" />
+            <Setter Property="BackgroundColor" Value="#F5F5F7" />
+            <Setter Property="PlaceholderColor" Value="#999999" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="HeightRequest" Value="50" />
+            <Setter Property="ReturnCommand" Value="{Binding LoginCommand}" />
+            <Setter Property="ClearButtonVisibility" Value="WhileEditing" />
+            <Setter Property="IsEnabled" Value="{Binding IsNotBusy}" />
+        </Style>
+    </ContentPage.Resources>
 
-                        <Label Text="{Binding ErrorMessage}"
-                               TextColor="OrangeRed"
-                               IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyConverter}}"
-                               HorizontalOptions="Center"
-                               Margin="0,10,0,0"/>
-
-                        <Label Text="Don't have an account? Sign Up" TextColor="{StaticResource PrimaryLighter}" HorizontalOptions="Center">
-                            <Label.GestureRecognizers>
-                                <TapGestureRecognizer Tapped="OnSignupClicked"/>
-                            </Label.GestureRecognizers>
-                        </Label>
-                    </VerticalStackLayout>
-                 </Frame>
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
+        <!-- Top safe area padding -->
+        <BoxView Grid.Row="0" BackgroundColor="White" HeightRequest="0" />
+        
+        <!-- Main content -->
+        <ScrollView Grid.Row="1" VerticalOptions="FillAndExpand">
+            <VerticalStackLayout Padding="24,20" Spacing="24">
+                <!-- Logo and title -->
+                <VerticalStackLayout Spacing="16" Margin="0,40,0,30">
+                    <Image Source="tdf_logo.png" HeightRequest="80" HorizontalOptions="Center">
+                        <Image.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnDiagnosticsClicked" NumberOfTapsRequired="3" />
+                        </Image.GestureRecognizers>
+                    </Image>
+                    <Label Text="TDF System" FontSize="28" FontAttributes="Bold" TextColor="#333333" HorizontalOptions="Center"/>
+                    <Label Text="Welcome back, please sign in" FontSize="16" TextColor="#666666" HorizontalOptions="Center"/>
+                </VerticalStackLayout>
+                
+                <!-- Login form - set width based on platform without using DataTrigger -->
+                <Grid HorizontalOptions="Center" WidthRequest="400">
+                    <Frame BorderColor="Transparent" BackgroundColor="Transparent" Padding="0" HasShadow="False">
+                        <VerticalStackLayout Spacing="16">
+                            <!-- Username input -->
+                            <Frame CornerRadius="10" Padding="0" BackgroundColor="#F5F5F7" HasShadow="False" BorderColor="Transparent">
+                                <Entry Style="{StaticResource EntryStyle}" 
+                                       Placeholder="Email" 
+                                       Text="{Binding Username}" 
+                                       Keyboard="Email"
+                                       Margin="15,0" />
+                            </Frame>
+                            
+                            <!-- Password input -->
+                            <Frame CornerRadius="10" Padding="0" BackgroundColor="#F5F5F7" HasShadow="False" BorderColor="Transparent">
+                                <Entry Style="{StaticResource EntryStyle}" 
+                                       Placeholder="Password" 
+                                       IsPassword="True" 
+                                       Text="{Binding Password}"
+                                       Margin="15,0" />
+                            </Frame>
+                            
+                            <!-- Error message -->
+                            <Label Text="{Binding ErrorMessage}"
+                                   TextColor="#FF3B30"
+                                   IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyConverter}}"
+                                   HorizontalOptions="Start"
+                                   FontSize="14"
+                                   Margin="5,0,0,0"/>
+                            
+                            <!-- Login button - using platform-specific styling -->
+                            <Button Text="Sign In"
+                                    Command="{Binding LoginCommand}"
+                                    TextColor="White"
+                                    FontAttributes="Bold"
+                                    FontSize="16"
+                                    CornerRadius="{OnPlatform iOS=25, MacCatalyst=25, Default=10}"
+                                    HeightRequest="50"
+                                    Margin="0,20,0,0">
+                                <Button.BackgroundColor>
+                                    <OnPlatform x:TypeArguments="Color">
+                                        <On Platform="iOS, MacCatalyst" Value="#007AFF" />
+                                        <On Platform="Android" Value="#1a73e8" />
+                                        <On Platform="WinUI" Value="#0078d4" />
+                                    </OnPlatform>
+                                </Button.BackgroundColor>
+                            </Button>
+                            
+                            <!-- Forgot password with real functionality -->
+                            <Label Text="Forgot Password?" 
+                                   HorizontalOptions="Center" 
+                                   FontSize="15"
+                                   Margin="0,15,0,0">
+                                <Label.TextColor>
+                                    <OnPlatform x:TypeArguments="Color">
+                                        <On Platform="iOS, MacCatalyst" Value="#007AFF" />
+                                        <On Platform="Android" Value="#1a73e8" />
+                                        <On Platform="WinUI" Value="#0078d4" />
+                                    </OnPlatform>
+                                </Label.TextColor>
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnForgotPasswordClicked" />
+                                </Label.GestureRecognizers>
+                            </Label>
+                        </VerticalStackLayout>
+                    </Frame>
+                </Grid>
             </VerticalStackLayout>
         </ScrollView>
+        
+        <!-- Sign up section at bottom -->
+        <VerticalStackLayout Grid.Row="2" BackgroundColor="White" Padding="0,15,0,30">
+            <BoxView HeightRequest="1" BackgroundColor="#E5E5EA" Margin="0,0,0,20" />
+            <Label Text="Don't have an account? Sign Up" 
+                   HorizontalOptions="Center" 
+                   FontSize="16">
+                <Label.TextColor>
+                    <OnPlatform x:TypeArguments="Color">
+                        <On Platform="iOS, MacCatalyst" Value="#007AFF" />
+                        <On Platform="Android" Value="#1a73e8" />
+                        <On Platform="WinUI" Value="#0078d4" />
+                    </OnPlatform>
+                </Label.TextColor>
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnSignupClicked"/>
+                </Label.GestureRecognizers>
+            </Label>
+        </VerticalStackLayout>
     </Grid>
 </ContentPage>

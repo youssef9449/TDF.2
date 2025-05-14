@@ -4,16 +4,16 @@
 	<PropertyGroup>
 		<TargetFrameworks>net8.0-ios;net8.0-maccatalyst;net8.0-android</TargetFrameworks>
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0</TargetFrameworks>
-		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
-		<!-- <TargetFrameworks>$(TargetFrameworks);net8.0-tizen</TargetFrameworks> -->
-
-		<!-- Note for MacCatalyst:
-	   The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
-	   When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
-	   The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
-	   either BOTH runtimes must be indicated or ONLY macatalyst-x64.
-	   -->
-		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
+		
+		<!-- Disable AOT compilation for all platforms -->
+		<RunAOTCompilation>false</RunAOTCompilation>
+		<PublishTrimmed>false</PublishTrimmed>
+		<EnablePackageSourceMapping>false</EnablePackageSourceMapping>
+		
+		<!-- Specify only x64 architecture for Windows -->
+		<RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">win10-x64</RuntimeIdentifiers>
+		<RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">iossimulator-x64</RuntimeIdentifiers>
+		<RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">maccatalyst-x64</RuntimeIdentifiers>
 
 		<OutputType>Exe</OutputType>
 		<RootNamespace>TDFMAUI</RootNamespace>
@@ -22,7 +22,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>disable</Nullable>
 		<WarningsNotAsErrors>NU1605</WarningsNotAsErrors>
-		<NoWarn>$(NoWarn);CS1998;CS8632;CS0067</NoWarn> <!-- Suppress specific C# warnings -->
+		<NoWarn>$(NoWarn);CS1998;CS8632;CS0067;NU1100</NoWarn> <!-- Suppress specific C# warnings and NuGet warnings -->
 		<NullabilityInfoContextSupport>true</NullabilityInfoContextSupport>
 		
 		<!-- Windows Specific -->
@@ -45,6 +45,11 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
+		
+		<!-- Fix missing AppManifest error -->
+		<GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
+		<CreateAppxPackageOnBuild>false</CreateAppxPackageOnBuild>
+		<EnableMsixTooling>false</EnableMsixTooling>
 	</PropertyGroup>
 
 	<!-- Android specific JAVAC options -->
@@ -71,7 +76,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<!-- PackageReference Include="CommunityToolkit.Maui" Version="9.0.1" /-->
 		<PackageReference Include="CommunityToolkit.Maui" Version="8.0.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.1" />
@@ -81,10 +85,7 @@
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<!-- Added to resolve package downgrade errors -->
-		<PackageReference Include="System.Collections" Version="4.3.0" />
-		<PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0" />
-		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" /> <!-- Added JWT package -->
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -128,4 +129,69 @@
 	    <Version>8.0.100</Version>
 	  </PackageReference>
 	</ItemGroup>
+
+	<!-- Windows Specific -->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<ApplicationId>com.companyname.tdfmaui</ApplicationId>
+		<WindowsPackageType>None</WindowsPackageType>
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+		<EnableMsixTooling>false</EnableMsixTooling>
+		<GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+		<AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
+		<PackageCertificateKeyFile>TDFMAUI_TemporaryKey.pfx</PackageCertificateKeyFile>
+		<AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+		<AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
+		<AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
+		<GenerateTestArtifacts>False</GenerateTestArtifacts>
+		<HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+		<UseWinUI>true</UseWinUI>
+		<EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+	</PropertyGroup>
+	
+	<!-- Create missing directories for Windows build -->
+	<Target Name="CreateAppManifestDirectory" BeforeTargets="BeforeBuild" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<MakeDir Directories="$(ProjectDir)obj\Debug\net8.0-windows10.0.19041.0\MsixContent" />
+		<WriteLinesToFile File="$(ProjectDir)obj\Debug\net8.0-windows10.0.19041.0\MsixContent\AppxManifest.xml" 
+						  Lines="&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+&lt;Package xmlns=&quot;http://schemas.microsoft.com/appx/manifest/foundation/windows10&quot;
+         xmlns:uap=&quot;http://schemas.microsoft.com/appx/manifest/uap/windows10&quot;
+         xmlns:rescap=&quot;http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities&quot;
+         IgnorableNamespaces=&quot;uap rescap&quot;&gt;
+  &lt;Identity Name=&quot;com.companyname.tdfmaui&quot;
+            Publisher=&quot;CN=User Name&quot;
+            Version=&quot;1.0.0.0&quot; /&gt;
+  &lt;Properties&gt;
+    &lt;DisplayName&gt;TDFMAUI&lt;/DisplayName&gt;
+    &lt;PublisherDisplayName&gt;Company Name&lt;/PublisherDisplayName&gt;
+    &lt;Logo&gt;Assets\appiconStoreLogo.png&lt;/Logo&gt;
+  &lt;/Properties&gt;
+  &lt;Dependencies&gt;
+    &lt;TargetDeviceFamily Name=&quot;Windows.Universal&quot; MinVersion=&quot;10.0.17763.0&quot; MaxVersionTested=&quot;10.0.19041.0&quot; /&gt;
+    &lt;TargetDeviceFamily Name=&quot;Windows.Desktop&quot; MinVersion=&quot;10.0.17763.0&quot; MaxVersionTested=&quot;10.0.19041.0&quot; /&gt;
+  &lt;/Dependencies&gt;
+  &lt;Resources&gt;
+    &lt;Resource Language=&quot;x-generate&quot; /&gt;
+  &lt;/Resources&gt;
+  &lt;Applications&gt;
+    &lt;Application Id=&quot;App&quot; Executable=&quot;$targetnametoken$.exe&quot; EntryPoint=&quot;$targetentrypoint$&quot;&gt;
+      &lt;uap:VisualElements DisplayName=&quot;TDFMAUI&quot;
+                          Description=&quot;TDFMAUI&quot;
+                          Square150x150Logo=&quot;Assets\appiconMediumTile.png&quot;
+                          Square44x44Logo=&quot;Assets\appiconLogo.png&quot;
+                          BackgroundColor=&quot;transparent&quot;&gt;
+        &lt;uap:DefaultTile Square71x71Logo=&quot;Assets\appiconSmallTile.png&quot; Wide310x150Logo=&quot;Assets\appiconWideTile.png&quot; Square310x310Logo=&quot;Assets\appiconLargeTile.png&quot; ShortName=&quot;TDFMAUI&quot;&gt;
+          &lt;uap:ShowNameOnTiles&gt;
+            &lt;uap:ShowOn Tile=&quot;square150x150Logo&quot; /&gt;
+            &lt;uap:ShowOn Tile=&quot;wide310x150Logo&quot; /&gt;
+          &lt;/uap:ShowNameOnTiles&gt;
+        &lt;/uap:DefaultTile&gt;
+        &lt;uap:SplashScreen Image=&quot;Assets\splashSplashScreen.png&quot; /&gt;
+      &lt;/uap:VisualElements&gt;
+    &lt;/Application&gt;
+  &lt;/Applications&gt;
+  &lt;Capabilities&gt;
+    &lt;rescap:Capability Name=&quot;runFullTrust&quot; /&gt;
+  &lt;/Capabilities&gt;
+&lt;/Package&gt;" Overwrite="true"/>
+	</Target>
 </Project>

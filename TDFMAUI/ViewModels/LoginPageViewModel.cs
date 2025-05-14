@@ -42,6 +42,17 @@ namespace TDFMAUI.ViewModels
             _serviceProvider = serviceProvider;
         }
 
+        /// <summary>
+        /// Clears login data when returning to the login page
+        /// </summary>
+        public void ClearLoginData()
+        {
+            // Only clear password for security, keep username for convenience
+            Password = string.Empty;
+            ErrorMessage = string.Empty;
+            IsBusy = false;
+        }
+
         // Determine if the login command can execute
         private bool CanLogin() => !string.IsNullOrWhiteSpace(Username) && 
                                    !string.IsNullOrWhiteSpace(Password) && 

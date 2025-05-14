@@ -134,6 +134,7 @@
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
 		<ApplicationId>com.companyname.tdfmaui</ApplicationId>
 		<WindowsPackageType>None</WindowsPackageType>
+		<WindowsPackageTargetPlatform>x64</WindowsPackageTargetPlatform>
 		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 		<EnableMsixTooling>false</EnableMsixTooling>
 		<GenerateAppInstallerFile>False</GenerateAppInstallerFile>

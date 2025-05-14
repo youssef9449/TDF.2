@@ -298,11 +298,14 @@ namespace TDFMAUI
                     return;
                 }
 
-                // Configure global SSL settings
-                ApiConfig.ConfigureGlobalSslSettings();
+                // Configure global SSL settings - DISABLED
+                // ApiConfig.ConfigureGlobalSslSettings();
 
-                // Initialize API config with safe mode if needed
-                ApiConfig.Initialize(isDevelopment: true, safeMode: SafeMode);
+                // Initialize API config with safe mode if needed - DISABLED
+                // ApiConfig.Initialize(isDevelopment: true, safeMode: SafeMode);
+
+                // Just set the development mode flag without running connectivity tests
+                ApiConfig.IsDevelopmentMode = true;
 
                 if (SafeMode)
                 {

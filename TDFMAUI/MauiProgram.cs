@@ -142,11 +142,11 @@ namespace TDFMAUI
                 // Add some debug info
                 System.Diagnostics.Debug.WriteLine($"Config loaded for static ApiConfig: BaseUrl={ApiConfig.BaseUrl}, WebSocketUrl={ApiConfig.WebSocketUrl}");
 
-                // Test API connectivity after configuration
-                Task.Run(async () => {
-                    bool isConnected = await ApiConfig.TestApiConnectivityAsync();
-                    System.Diagnostics.Debug.WriteLine($"--- API Connectivity Test Result: {(isConnected ? "SUCCESS" : "FAILURE")} ---");
-                });
+                // Test API connectivity after configuration - DISABLED
+                // Task.Run(async () => {
+                //     bool isConnected = await ApiConfig.TestApiConnectivityAsync();
+                //     System.Diagnostics.Debug.WriteLine($"--- API Connectivity Test Result: {(isConnected ? "SUCCESS" : "FAILURE")} ---");
+                // });
             }
             catch (Exception ex)
             {
@@ -371,32 +371,32 @@ namespace TDFMAUI
                     }
                 };
 
-                // Start network monitoring
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        await networkService.StartMonitoringAsync();
-                        wsLogger.LogInformation("Network monitoring started");
-                    }
-                    catch (Exception ex)
-                    {
-                        wsLogger.LogCritical(ex, "Failed to start network monitoring");
-
-                        // Log critical errors to a file in app data directory
-                        var appDataPath = FileSystem.AppDataDirectory;
-                        var errorLogPath = Path.Combine(appDataPath, "error.log");
-
-                        try
-                        {
-                            File.AppendAllText(errorLogPath, $"{DateTime.Now}: {ex.Message}\n{ex.StackTrace}\n\n");
-                        }
-                        catch
-                        {
-                            // If we can't even write to the log file, there's not much else we can do
-                        }
-                    }
-                });
+                // Start network monitoring - DISABLED
+                // Task.Run(async () =>
+                // {
+                //     try
+                //     {
+                //         await networkService.StartMonitoringAsync();
+                //         wsLogger.LogInformation("Network monitoring started");
+                //     }
+                //     catch (Exception ex)
+                //     {
+                //         wsLogger.LogCritical(ex, "Failed to start network monitoring");
+                //
+                //         // Log critical errors to a file in app data directory
+                //         var appDataPath = FileSystem.AppDataDirectory;
+                //         var errorLogPath = Path.Combine(appDataPath, "error.log");
+                //
+                //         try
+                //         {
+                //             File.AppendAllText(errorLogPath, $"{DateTime.Now}: {ex.Message}\n{ex.StackTrace}\n\n");
+                //         }
+                //         catch
+                //         {
+                //             // If we can't even write to the log file, there's not much else we can do
+                //         }
+                //     }
+                // });
             }
             catch (Exception ex)
             {

@@ -10,8 +10,11 @@
     xmlns:requests="clr-namespace:TDFMAUI.Features.Requests"
     xmlns:users="clr-namespace:TDFMAUI.Features.Users"
     Shell.FlyoutBehavior="Flyout"
+    Shell.FlyoutWidth="300"
     FlyoutBackgroundColor="#512BD4">
 
+    <!-- Left flyout header disabled for now -->
+    <!--
     <Shell.FlyoutHeader>
         <Grid HeightRequest="100" BackgroundColor="#512BD4">
             <Label Text="TDF Leave Management"
@@ -22,11 +25,16 @@
                    VerticalOptions="Center"/>
         </Grid>
     </Shell.FlyoutHeader>
+    -->
 
     <!-- Right Flyout for Online Users -->
     <Shell.FlyoutContent>
         <users:OnlineUsersFlyout x:Name="onlineUsersFlyout" />
     </Shell.FlyoutContent>
+
+    <!-- Configure the flyout behavior -->
+    <Shell.FlyoutBehavior>Flyout</Shell.FlyoutBehavior>
+    <Shell.FlyoutPosition>End</Shell.FlyoutPosition>
 
     <TabBar>
         <Tab Title="Home" Icon="home.png">
@@ -54,6 +62,8 @@
         </Tab>
     </TabBar>
 
+    <!-- Left flyout items disabled for now -->
+    <!--
     <FlyoutItem Title="My Requests" Icon="list.png">
         <ShellContent
             Title="My Requests"
@@ -116,7 +126,9 @@
             ContentTemplate="{DataTemplate pages:DiagnosticsPage}"
             Route="DiagnosticsPage" />
     </FlyoutItem>
+    -->
 
+    <!-- Keep the logout menu item accessible through other means -->
     <MenuItem Text="Logout"
               IconImageSource="logout.png"
               Clicked="OnLogoutClicked"/>

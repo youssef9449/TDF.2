@@ -40,13 +40,38 @@ namespace TDFMAUI.Services
         public void SetUserDetails(UserDetailsDto? userDetails)
         {
             _currentUser = userDetails;
-            // Optionally raise an event here if other parts of the app need to react to login/logout
+
+            // Convert UserDetailsDto to UserDto for App.CurrentUser
+            if (userDetails != null)
+            {
+                var userDto = new UserDto
+                {
+                    UserID = userDetails.UserId,
+                    Username = userDetails.UserName,
+                    FullName = userDetails.FullName,
+                    Department = userDetails.Department,
+                    // Set other properties as needed
+                };
+
+                // Set App.CurrentUser
+                App.CurrentUser = userDto;
+                _logger.LogInformation("Set App.CurrentUser to {UserId} ({FullName})", userDto.UserID, userDto.FullName);
+            }
+
+            // Raise the event
+            UserDetailsChanged?.Invoke(this, userDetails);
         }
 
         public void ClearUserDetails()
         {
             _currentUser = null;
-            // Optionally raise event
+
+            // Clear App.CurrentUser
+            App.CurrentUser = null;
+            _logger.LogInformation("Cleared App.CurrentUser");
+
+            // Raise event
+            UserDetailsChanged?.Invoke(this, null);
         }
 
         public bool HasRole(string role)
@@ -59,4 +84,4 @@ namespace TDFMAUI.Services
             return _currentUser.Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
         }
     }
-} 
+}

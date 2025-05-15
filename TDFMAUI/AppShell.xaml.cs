@@ -67,6 +67,10 @@ namespace TDFMAUI
                     Task.Run(async () => await onlineUsersFlyout.Initialize());
                 }
 
+                // Configure swipe gesture for right flyout
+                _logger?.LogInformation("Configuring right swipe gesture for flyout.");
+                SetupRightSwipeGesture();
+
                 _logger?.LogInformation("AppShell constructor completed successfully.");
             }
             catch (Exception ex)
@@ -141,6 +145,24 @@ namespace TDFMAUI
         protected new void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private void SetupRightSwipeGesture()
+        {
+            try
+            {
+                // Set the flyout position to End (right side)
+                FlyoutPosition = FlyoutPosition.End;
+
+                // Enable the flyout
+                FlyoutBehavior = FlyoutBehavior.Flyout;
+
+                _logger?.LogInformation("Right swipe gesture configured successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Failed to configure right swipe gesture.");
+            }
         }
     }
 }

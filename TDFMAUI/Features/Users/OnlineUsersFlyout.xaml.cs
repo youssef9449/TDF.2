@@ -10,11 +10,22 @@ namespace TDFMAUI.Features.Users
 {
     public partial class OnlineUsersFlyout : ContentView, IDisposable
     {
-        private readonly IUserPresenceService _userPresenceService;
-        private readonly ILogger<OnlineUsersFlyout> _logger;
+        private IUserPresenceService _userPresenceService;
+        private ILogger<OnlineUsersFlyout> _logger;
 
         private ObservableCollection<UserViewModel> _users = new();
         private bool _isDisposed;
+
+        // Default constructor required for XAML
+        public OnlineUsersFlyout()
+        {
+            InitializeComponent();
+
+            // We'll initialize this properly in OnHandlerChanged
+            _users = new ObservableCollection<UserViewModel>();
+            usersCollection.ItemsSource = _users;
+            refreshView.Command = new Command(async () => await RefreshUsers());
+        }
 
         public OnlineUsersFlyout(IUserPresenceService userPresenceService, ILogger<OnlineUsersFlyout> logger)
         {
@@ -29,6 +40,17 @@ namespace TDFMAUI.Features.Users
 
         public async Task Initialize()
         {
+            // If services aren't initialized yet, try to get them from DI
+            if (_userPresenceService == null)
+            {
+                _userPresenceService = App.Services?.GetService<IUserPresenceService>();
+                if (_userPresenceService == null)
+                {
+                    // Still null, can't proceed
+                    return;
+                }
+            }
+
             // Subscribe to events
             _userPresenceService.UserStatusChanged += OnUserStatusChanged;
             _userPresenceService.UserAvailabilityChanged += OnUserAvailabilityChanged;
@@ -44,10 +66,13 @@ namespace TDFMAUI.Features.Users
 
         private void UnsubscribeFromEvents()
         {
-            // Unsubscribe from events
-            _userPresenceService.UserStatusChanged -= OnUserStatusChanged;
-            _userPresenceService.UserAvailabilityChanged -= OnUserAvailabilityChanged;
-            _userPresenceService.PresenceErrorReceived -= OnPresenceErrorReceived;
+            // Unsubscribe from events if service is available
+            if (_userPresenceService != null)
+            {
+                _userPresenceService.UserStatusChanged -= OnUserStatusChanged;
+                _userPresenceService.UserAvailabilityChanged -= OnUserAvailabilityChanged;
+                _userPresenceService.PresenceErrorReceived -= OnPresenceErrorReceived;
+            }
         }
 
         private async Task RefreshUsers()
@@ -55,6 +80,22 @@ namespace TDFMAUI.Features.Users
             if (App.CurrentUser == null)
             {
                 return;
+            }
+
+            // If services aren't initialized yet, try to get them from DI
+            if (_userPresenceService == null)
+            {
+                _userPresenceService = App.Services?.GetService<IUserPresenceService>();
+                if (_userPresenceService == null)
+                {
+                    // Still null, can't proceed
+                    return;
+                }
+            }
+
+            if (_logger == null)
+            {
+                _logger = App.Services?.GetService<ILogger<OnlineUsersFlyout>>();
             }
 
             loadingIndicator.IsVisible = true;
@@ -73,7 +114,7 @@ namespace TDFMAUI.Features.Users
                     {
                         _users.Add(new UserViewModel
                         {
-                            UserId = user.Id,
+                            UserId = user.UserId,
                             Username = user.Username,
                             FullName = user.FullName,
                             Department = user.Department,
@@ -89,7 +130,14 @@ namespace TDFMAUI.Features.Users
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to load online users: {Message}", ex.Message);
+                if (_logger != null)
+                {
+                    _logger.LogError(ex, "Failed to load online users: {Message}", ex.Message);
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading online users: {ex.Message}");
+                }
 
                 // Show error message to user
                 await MainThread.InvokeOnMainThreadAsync(async () =>
@@ -128,12 +176,12 @@ namespace TDFMAUI.Features.Users
                 {
                     userVM.Status = e.Status;
                     userVM.StatusColor = GetStatusColor(e.Status);
-                    _logger.LogDebug("Updated UI for user {UserId} status change to {Status}", e.UserId, e.Status);
+                    _logger?.LogDebug("Updated UI for user {UserId} status change to {Status}", e.UserId, e.Status);
                 }
                 else
                 {
                     // User might have come online and wasn't in the list before
-                    _logger.LogDebug("User {UserId} status changed but not found in current list. Refreshing list.", e.UserId);
+                    _logger?.LogDebug("User {UserId} status changed but not found in current list. Refreshing list.", e.UserId);
                     // Consider adding the new user directly or trigger a refresh as a fallback
                     Task.Run(async () => await RefreshUsers());
                 }
@@ -148,18 +196,18 @@ namespace TDFMAUI.Features.Users
                 if (userVM != null)
                 {
                     userVM.IsAvailableForChat = e.IsAvailableForChat;
-                    _logger.LogDebug("Updated UI for user {UserId} availability change to {IsAvailable}", e.UserId, e.IsAvailableForChat);
+                    _logger?.LogDebug("Updated UI for user {UserId} availability change to {IsAvailable}", e.UserId, e.IsAvailableForChat);
                 }
                 else
                 {
-                    _logger.LogDebug("User {UserId} availability changed but not found in current list.", e.UserId);
+                    _logger?.LogDebug("User {UserId} availability changed but not found in current list.", e.UserId);
                 }
             });
         }
 
         private void OnPresenceErrorReceived(object sender, WebSocketErrorEventArgs e)
         {
-            _logger.LogError("UI Received Error: Code={Code}, Message={Message}", e.ErrorCode ?? "N/A", e.ErrorMessage);
+            _logger?.LogError("UI Received Error: Code={Code}, Message={Message}", e.ErrorCode ?? "N/A", e.ErrorMessage);
 
             MainThread.BeginInvokeOnMainThread(() =>
             {

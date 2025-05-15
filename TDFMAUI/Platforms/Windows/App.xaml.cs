@@ -27,20 +27,35 @@ namespace TDFMAUI.WinUI
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
-            // Handle application exit
-            this.Exiting += App_Exiting;
+            // We can't use Exiting event directly in WinUI 3
+            // Instead, we'll use the Application.Current.Suspending event
+            Microsoft.Maui.ApplicationModel.AppActions.OnAppAction += (sender, args) => {
+                if (args.AppAction.Id == "app_closing")
+                {
+                    // Update user status to Offline when the app is closing
+                    if (DeviceHelper.IsDesktop)
+                    {
+                        UpdateUserStatusToOffline();
+                    }
+                }
+            };
 
             this.InitializeComponent(); // If this throws, AppDomain.CurrentDomain.UnhandledException should catch it.
         }
 
-        private void App_Exiting(object sender, Microsoft.UI.Xaml.ExitEventArgs e)
+        // Use Application.Current.Exit event instead of OnLaunched
+        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
-            // Update user status to Offline when the app is closing
-            // Verify we're on a desktop platform using DeviceHelper
-            if (DeviceHelper.IsDesktop)
-            {
-                UpdateUserStatusToOffline();
-            }
+            base.OnLaunched(args);
+
+            // Register for process exit
+            AppDomain.CurrentDomain.ProcessExit += (sender, e) => {
+                // Update user status to Offline when the app is closing
+                if (DeviceHelper.IsDesktop)
+                {
+                    UpdateUserStatusToOffline();
+                }
+            };
         }
 
         private void UpdateUserStatusToOffline()

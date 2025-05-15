@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using TDFMAUI.Services;
+using TDFShared.Enums;
 
 namespace TDFMAUI.ViewModels
 {
@@ -23,7 +24,7 @@ namespace TDFMAUI.ViewModels
 
         [ObservableProperty]
         private string? _errorMessage;
-        
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsNotBusy))]
         private bool _isBusy;
@@ -31,7 +32,7 @@ namespace TDFMAUI.ViewModels
         public bool IsNotBusy => !IsBusy;
 
         public LoginPageViewModel(
-            IAuthService authService, 
+            IAuthService authService,
             WebSocketService webSocketService,
             ILogger<LoginPageViewModel> logger,
             IServiceProvider serviceProvider)
@@ -54,8 +55,8 @@ namespace TDFMAUI.ViewModels
         }
 
         // Determine if the login command can execute
-        private bool CanLogin() => !string.IsNullOrWhiteSpace(Username) && 
-                                   !string.IsNullOrWhiteSpace(Password) && 
+        private bool CanLogin() => !string.IsNullOrWhiteSpace(Username) &&
+                                   !string.IsNullOrWhiteSpace(Password) &&
                                    !IsBusy;
 
         [RelayCommand(CanExecute = nameof(CanLogin))]
@@ -66,17 +67,17 @@ namespace TDFMAUI.ViewModels
             try
             {
                 _logger.LogInformation("Login attempt for user: {Username}", Username);
-                
+
                 // Use non-null assertion because CanLogin ensures they are not null/whitespace
                 var userDetails = await _authService.LoginAsync(Username!, Password!);
 
                 if (userDetails != null)
                 {
                     // Guard against null properties with null conditional operators and default values
-                    _logger.LogInformation("Login successful for user ID: {UserId}, Name: {FullName}", 
-                        userDetails.UserId, 
+                    _logger.LogInformation("Login successful for user ID: {UserId}, Name: {FullName}",
+                        userDetails.UserId,
                         userDetails.FullName ?? "Unknown");
-                    
+
                     // Store needed data in a try-catch to handle any issues
                     try
                     {
@@ -84,7 +85,12 @@ namespace TDFMAUI.ViewModels
                         _logger.LogInformation("Setting up WebSocket connection after successful login");
                         var webSocketService = _serviceProvider.GetRequiredService<IWebSocketService>();
                         await webSocketService.ConnectAsync();
-                        
+
+                        // Update user status to Online
+                        _logger.LogInformation("Updating user status to Online after login");
+                        var userPresenceService = _serviceProvider.GetRequiredService<IUserPresenceService>();
+                        await userPresenceService.UpdateStatusAsync(UserPresenceStatus.Online, "");
+
                         // Navigate to main page
                         _logger.LogInformation("Navigating to main page after successful login");
                         if (Shell.Current != null)
@@ -117,7 +123,7 @@ namespace TDFMAUI.ViewModels
                     {
                         _logger.LogError(ex, "Error during post-login navigation or WebSocket setup");
                         ErrorMessage = "Login successful, but there was an issue connecting to services. Some features may be limited.";
-                        
+
                         // Try to navigate anyway, even if WebSocket failed
                         _logger.LogInformation("Attempting secondary navigation to main page after WebSocket error.");
                         if (Shell.Current != null)
@@ -167,7 +173,7 @@ namespace TDFMAUI.ViewModels
                 ErrorMessage = "An unexpected error occurred. Please try again.";
             }
             finally
-            {                
+            {
                 IsBusy = false;
             }
         }
@@ -179,4 +185,4 @@ namespace TDFMAUI.ViewModels
         //     await Shell.Current.GoToAsync("SignupPage"); // Assuming route name
         // }
     }
-} 
+}

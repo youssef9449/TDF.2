@@ -321,18 +321,4 @@ namespace TDFMAUI.Pages
             });
         }
     }
-    
-    public class UserViewModel
-    {
-        public int UserId { get; set; }
-        public string Username { get; set; }
-        public string FullName { get; set; }
-        public string Department { get; set; }
-        public UserPresenceStatus Status { get; set; }
-        public UserPresenceStatus NewStatus { get; set; }   
-        public string StatusMessage { get; set; }
-        public bool IsAvailableForChat { get; set; }
-        public bool HasStatusMessage { get; set; }
-        public Color StatusColor { get; set; }
-    }
 } 

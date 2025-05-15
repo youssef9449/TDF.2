@@ -11,9 +11,23 @@
     Shell.FlyoutBehavior="Flyout"
     FlyoutBackgroundColor="#512BD4">
 
+    <Shell.TitleView>
+        <Grid ColumnDefinitions="*,Auto">
+            <!-- Existing Title or leave empty for page titles to show -->
+            <ImageButton Grid.Column="1"
+                         Source="users_panel_icon.png" 
+                         Clicked="OpenUsersFlyout_Tapped" 
+                         IsVisible="{Binding Source={RelativeSource AncestorType={x:Type local:AppShell}}, Path=IsDesktopUser}"
+                         HeightRequest="30"
+                         WidthRequest="30"
+                         Margin="0,0,10,0"
+                         VerticalOptions="Center" />
+        </Grid>
+    </Shell.TitleView>
+
     <Shell.FlyoutHeader>
         <Grid HeightRequest="100" BackgroundColor="#512BD4">
-            <Label Text="TDF Leave Management"
+            <Label Text="TDF Internal System"
                    TextColor="White"
                    FontSize="20"
                    FontAttributes="Bold"
@@ -97,13 +111,6 @@
             Route="AdminPage" />
     </FlyoutItem>
 
-    <FlyoutItem Title="Debug" Icon="bug.png" IsVisible="{Binding IsDevelopmentMode}">
-        <ShellContent
-            Title="Debug Tools"
-            ContentTemplate="{DataTemplate pages:DebugPage}"
-            Route="DebugPage" />
-    </FlyoutItem>
-
     <FlyoutItem Title="Diagnostics" Icon="bug.png">
         <ShellContent
             Title="Diagnostics"
@@ -114,5 +121,12 @@
     <MenuItem Text="Logout"
               IconImageSource="logout.png"
               Clicked="OnLogoutClicked"/>
+
+    <!-- Add a ShellItem for our right-side user panel -->
+    <ShellItem x:Name="RightSideFlyoutItem" Route="users" FlyoutItemIsVisible="False">
+        <ShellContent x:Name="RightSideUsersFlyout"
+                     ContentTemplate="{DataTemplate local:UsersRightPanel}"
+                     Shell.NavBarIsVisible="False" />
+    </ShellItem>
 
 </Shell>

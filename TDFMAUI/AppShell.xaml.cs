@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using TDFMAUI.Config;
 using Microsoft.Extensions.Logging;
 using TDFMAUI.Features.Requests;
+using TDFMAUI.Helpers;
 
 namespace TDFMAUI
 {
@@ -19,6 +20,7 @@ namespace TDFMAUI
         public bool IsManager => App.CurrentUser?.Roles?.Contains("Manager", StringComparer.OrdinalIgnoreCase) ?? false;
 
         public bool IsDevelopmentMode => ApiConfig.DevelopmentMode;
+        public bool IsDesktopUser => DeviceHelper.IsDesktop;
 
         public AppShell(IAuthService authService, ILogger<AppShell> logger)
         {
@@ -35,6 +37,9 @@ namespace TDFMAUI
                     _logger?.LogInformation("Calling InitializeComponent...");
                     InitializeComponent();
                     _logger?.LogInformation("AppShell InitializeComponent successful.");
+
+                    // Register routes for navigation
+                    Routing.RegisterRoute("users", typeof(UsersRightPanel));
                 }
                 catch (Exception ex)
                 {
@@ -125,5 +130,30 @@ namespace TDFMAUI
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
+        //region Right-Side Users Flyout Logic
+
+        // Method to open the user flyout panel using Shell navigation
+        public void ShowUserPanel()
+        {
+            Shell.Current.GoToAsync("//users");
+        }
+
+        // Method to ensure we can get back to the main page
+        public void CloseUserPanel()
+        {
+            Shell.Current.GoToAsync("//main");
+        }
+
+        // These methods replace the old RightSideUsersFlyout methods
+        private async void OpenUsersFlyout_Tapped(object sender, EventArgs e)
+        {
+            await Shell.Current.GoToAsync("//users");
+        }
+
+        // The close method is now handled in the UsersRightPanel itself
+        // Gesture handlers are removed as we use Shell navigation instead
+
+        //endregion
     }
 }

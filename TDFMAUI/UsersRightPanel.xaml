@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TDFMAUI.UsersRightPanel"
+             xmlns:viewModels="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:converters="clr-namespace:TDFMAUI.Converters"
+             BackgroundColor="LightSlateGray"
+             Shell.NavBarIsVisible="False">
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:ByteArrayToImageSourceConverter x:Key="ByteArrayToImageSourceConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto, *" ColumnDefinitions="*, Auto" Padding="10" BackgroundColor="#F0F0F0">
+        <Label Grid.Row="0" Grid.Column="0" Text="Users Online" FontSize="Title" FontAttributes="Bold" VerticalOptions="Center"/>
+        <Button Grid.Row="0" Grid.Column="1" Text="X" Clicked="ClosePanel_Clicked" HorizontalOptions="End" VerticalOptions="Center" BackgroundColor="Transparent" TextColor="Black" Padding="5" Margin="0" WidthRequest="40" HeightRequest="40" FontAttributes="Bold"/>
+
+        <RefreshView Grid.Row="1" Grid.ColumnSpan="2" x:Name="refreshView" IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshUsersCommand}">
+            <CollectionView x:Name="usersCollection" ItemsSource="{Binding Users}" SelectionMode="None">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="viewModels:UserViewModel">
+                        <Frame Padding="10" Margin="5" CornerRadius="5" BorderColor="{StaticResource Gray300}" BackgroundColor="White">
+                            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
+                                <Image Grid.Column="0"
+                                       Source="{Binding ProfilePictureData, Converter={StaticResource ByteArrayToImageSourceConverter}}"
+                                       Aspect="AspectFill"
+                                       HeightRequest="50"
+                                       WidthRequest="50">
+                                    <Image.Clip>
+                                        <EllipseGeometry Center="25,25" RadiusX="25" RadiusY="25" />
+                                    </Image.Clip>
+                                </Image>
+
+                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                    <Label Text="{Binding FullName}" FontAttributes="Bold" FontSize="Medium"/>
+                                    <Label Text="{Binding Department}" FontSize="Small" TextColor="{StaticResource Gray600}"/>
+                                    <Label Text="{Binding StatusMessage}" FontSize="Small" TextColor="{StaticResource Gray500}" IsVisible="{Binding HasStatusMessage}"/>
+                                </VerticalStackLayout>
+
+                                <Frame Grid.Column="2" 
+                                       BackgroundColor="{Binding StatusColor}" 
+                                       WidthRequest="12" 
+                                       HeightRequest="12" 
+                                       CornerRadius="6"
+                                       Padding="0"
+                                       VerticalOptions="Center"
+                                       HorizontalOptions="End" />
+                            </Grid>
+                        </Frame>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+                <CollectionView.EmptyView>
+                    <StackLayout Padding="20" HorizontalOptions="Center" VerticalOptions="Center">
+                        <Label Text="No users online or an error occurred." HorizontalTextAlignment="Center" />
+                    </StackLayout>
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </RefreshView>
+        
+        <ActivityIndicator x:Name="loadingIndicator"
+                           Grid.Row="1" Grid.ColumnSpan="2"
+                           IsVisible="{Binding IsLoading}"
+                           IsRunning="{Binding IsLoading}"
+                           Color="{StaticResource Primary}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center" />
+    </Grid>
+
+</ContentPage> 

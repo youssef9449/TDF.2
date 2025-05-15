@@ -111,6 +111,9 @@ namespace TDFMAUI
             base.OnDisappearing();
             App.UserChanged -= OnUserChanged;
 
+            // Unsubscribe from the Navigated event
+            this.Navigated -= OnShellNavigated;
+
             // Clean up the online users flyout
             if (onlineUsersFlyout != null)
             {
@@ -153,32 +156,49 @@ namespace TDFMAUI
                 // Enable the flyout
                 FlyoutBehavior = FlyoutBehavior.Flyout;
 
-                // Add a swipe gesture recognizer to the main content
-                MainThread.BeginInvokeOnMainThread(() =>
-                {
-                    // Add a swipe gesture recognizer to show the flyout
-                    var swipeGesture = new SwipeGestureRecognizer
-                    {
-                        Direction = SwipeDirection.Right
-                    };
+                // We'll handle the swipe gesture in each page instead
+                // Subscribe to the Navigated event to add gesture recognizers to new pages
+                this.Navigated += OnShellNavigated;
 
-                    swipeGesture.Swiped += (sender, e) =>
-                    {
-                        // Show the flyout when swiping right
-                        FlyoutIsPresented = true;
-                    };
-
-                    // Add the gesture recognizer to the shell
-                    this.GestureRecognizers.Add(swipeGesture);
-
-                    _logger?.LogInformation("Right swipe gesture recognizer added successfully.");
-                });
+                _logger?.LogInformation("Shell Navigated event handler registered.");
 
                 _logger?.LogInformation("Right swipe gesture configured successfully.");
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Failed to configure right swipe gesture: {0}", ex.Message);
+            }
+        }
+
+        private void OnShellNavigated(object sender, ShellNavigatedEventArgs e)
+        {
+            try
+            {
+                // Get the current page
+                if (CurrentPage != null)
+                {
+                    // Add a swipe gesture recognizer to the current page
+                    var swipeGesture = new SwipeGestureRecognizer
+                    {
+                        Direction = SwipeDirection.Right
+                    };
+
+                    swipeGesture.Swiped += (s, args) =>
+                    {
+                        // Show the flyout when swiping right
+                        FlyoutIsPresented = true;
+                        _logger?.LogInformation("Right swipe detected, showing flyout.");
+                    };
+
+                    // Add the gesture recognizer to the current page
+                    CurrentPage.GestureRecognizers.Add(swipeGesture);
+
+                    _logger?.LogInformation("Added right swipe gesture recognizer to page: {0}", CurrentPage.GetType().Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error adding gesture recognizer to page: {0}", ex.Message);
             }
         }
     }

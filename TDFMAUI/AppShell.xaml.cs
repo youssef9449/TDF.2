@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using TDFMAUI.Config;
 using Microsoft.Extensions.Logging;
 using TDFMAUI.Features.Requests;
+using TDFMAUI.Features.Users;
 
 namespace TDFMAUI
 {
@@ -13,6 +14,7 @@ namespace TDFMAUI
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AppShell> _logger;
+        private readonly IUserPresenceService _userPresenceService;
 
         public bool IsAdmin => App.CurrentUser?.Roles?.Contains("Admin", StringComparer.OrdinalIgnoreCase) ?? false;
         public bool IsHR => App.CurrentUser?.Roles?.Contains("HR", StringComparer.OrdinalIgnoreCase) ?? false;
@@ -20,7 +22,7 @@ namespace TDFMAUI
 
         public bool IsDevelopmentMode => ApiConfig.DevelopmentMode;
 
-        public AppShell(IAuthService authService, ILogger<AppShell> logger)
+        public AppShell(IAuthService authService, ILogger<AppShell> logger, IUserPresenceService userPresenceService)
         {
             try
             {
@@ -44,6 +46,7 @@ namespace TDFMAUI
                 }
 
                 _authService = authService;
+                _userPresenceService = userPresenceService;
 
                 // Register routes for navigation
                 _logger?.LogInformation("AppShell registering routes.");
@@ -56,6 +59,14 @@ namespace TDFMAUI
 
                 // Hook into user changed event to refresh admin status
                 App.UserChanged += OnUserChanged;
+
+                // Initialize the online users flyout
+                if (onlineUsersFlyout != null)
+                {
+                    _logger?.LogInformation("Initializing online users flyout.");
+                    Task.Run(async () => await onlineUsersFlyout.Initialize());
+                }
+
                 _logger?.LogInformation("AppShell constructor completed successfully.");
             }
             catch (Exception ex)
@@ -96,6 +107,12 @@ namespace TDFMAUI
         {
             base.OnDisappearing();
             App.UserChanged -= OnUserChanged;
+
+            // Clean up the online users flyout
+            if (onlineUsersFlyout != null)
+            {
+                onlineUsersFlyout.Cleanup();
+            }
         }
 
         private async void OnLogoutClicked(object sender, EventArgs e)

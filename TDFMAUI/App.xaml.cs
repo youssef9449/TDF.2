@@ -10,6 +10,7 @@ using TDFShared.Exceptions;
 using TDFMAUI.Features.Admin;
 using TDFMAUI.ViewModels;
 using Microsoft.Extensions.Logging;
+using TDFShared.Enums;
 
 namespace TDFMAUI
 {
@@ -445,31 +446,42 @@ namespace TDFMAUI
             // When app goes to background, reconnect socket when it comes back
             DebugService.LogInfo("App", "Application going to sleep");
 
-            // Reconnect WebSocket if it's not connected - DEFER THIS
-            /*
-            if (_webSocketService != null && !_webSocketService.IsConnected)
+            // For non-mobile devices, update user status to Offline when app is closed
+            if (DeviceHelper.IsDesktop || (!DeviceHelper.IsMobile && DeviceHelper.IsLargeScreen))
             {
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        var secureStorage = Services.GetService<SecureStorageService>();
-                        if (secureStorage != null)
-                        {
-                            var (token, _) = await secureStorage.GetTokenAsync();
-                            if (!string.IsNullOrEmpty(token))
-                            {
-                                await _webSocketService.ConnectAsync(token);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        DebugService.LogError("App", $"Error reconnecting WebSocket: {ex.Message}");
-                    }
-                });
+                UpdateUserStatusToOffline();
             }
-            */
+        }
+
+        private void UpdateUserStatusToOffline()
+        {
+            if (CurrentUser != null)
+            {
+                try
+                {
+                    var userPresenceService = Services.GetService<IUserPresenceService>();
+                    if (userPresenceService != null)
+                    {
+                        // Run this in a fire-and-forget manner since we're shutting down
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                DebugService.LogInfo("App", "Setting user status to Offline on app closing");
+                                await userPresenceService.UpdateStatusAsync(TDFShared.Enums.UserPresenceStatus.Offline, "");
+                            }
+                            catch (Exception ex)
+                            {
+                                DebugService.LogError("App", $"Error updating user status to Offline: {ex.Message}");
+                            }
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DebugService.LogError("App", $"Error getting UserPresenceService: {ex.Message}");
+                }
+            }
         }
 
         protected override void OnResume()

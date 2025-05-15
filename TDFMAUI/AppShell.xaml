@@ -8,6 +8,7 @@
     xmlns:admin="clr-namespace:TDFMAUI.Features.Admin"
     xmlns:messaging="clr-namespace:TDFMAUI.Features.Messaging"
     xmlns:requests="clr-namespace:TDFMAUI.Features.Requests"
+    xmlns:users="clr-namespace:TDFMAUI.Features.Users"
     Shell.FlyoutBehavior="Flyout"
     FlyoutBackgroundColor="#512BD4">
 
@@ -21,6 +22,11 @@
                    VerticalOptions="Center"/>
         </Grid>
     </Shell.FlyoutHeader>
+
+    <!-- Right Flyout for Online Users -->
+    <Shell.FlyoutContent>
+        <users:OnlineUsersFlyout x:Name="onlineUsersFlyout" />
+    </Shell.FlyoutContent>
 
     <TabBar>
         <Tab Title="Home" Icon="home.png">

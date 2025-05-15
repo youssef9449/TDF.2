@@ -92,7 +92,6 @@ namespace TDFMAUI
             Routing.RegisterRoute(nameof(MessagesPage), typeof(MessagesPage));
 
             // Debug routes
-            Routing.RegisterRoute(nameof(DebugPage), typeof(DebugPage));
             Routing.RegisterRoute(nameof(DiagnosticsPage), typeof(DiagnosticsPage));
 
             // Admin routes
@@ -152,7 +151,7 @@ namespace TDFMAUI
             try
             {
                 // Set the flyout position to End (right side)
-                FlyoutPosition = FlyoutPosition.End;
+                this.SetValue(Shell.FlyoutPositionProperty, Microsoft.Maui.Controls.FlyoutPosition.End);
 
                 // Enable the flyout
                 FlyoutBehavior = FlyoutBehavior.Flyout;

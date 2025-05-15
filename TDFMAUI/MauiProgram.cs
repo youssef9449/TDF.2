@@ -250,7 +250,6 @@ namespace TDFMAUI
             builder.Services.AddTransient<RequestsPage>();
             builder.Services.AddTransient<AdminPage>();
             builder.Services.AddTransient<AddRequestPage>();
-            builder.Services.AddTransient<DebugPage>();
             builder.Services.AddTransient<DiagnosticsPage>(); // Add our new diagnostics page
             builder.Services.AddTransient<UsersPage>();
             builder.Services.AddTransient<UserProfilePage>();

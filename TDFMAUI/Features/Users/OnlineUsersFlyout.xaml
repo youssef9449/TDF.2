@@ -14,55 +14,53 @@
     <Grid RowDefinitions="Auto,*" Padding="10">
         <!-- Header -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-            <Label Text="Online Users" 
-                   FontSize="20" 
+            <Label Text="Online Users"
+                   FontSize="20"
                    FontAttributes="Bold"
                    VerticalOptions="Center" />
-            
+
             <Button Grid.Column="1"
                     Text="↻"
                     Clicked="OnRefreshClicked"
-                    BackgroundColor="{StaticResource Secondary}"
+                    BackgroundColor="{StaticResource Primary}"
                     TextColor="White"
                     HeightRequest="40"
                     WidthRequest="40"
                     CornerRadius="20" />
         </Grid>
-        
+
         <!-- User list -->
         <RefreshView Grid.Row="1" x:Name="refreshView" IsRefreshing="False" RefreshColor="{StaticResource Primary}">
             <ScrollView>
                 <VerticalStackLayout>
-                    <CollectionView x:Name="usersCollection" 
+                    <CollectionView x:Name="usersCollection"
                                     EmptyView="No users currently online">
                         <CollectionView.ItemTemplate>
                             <DataTemplate>
                                 <Grid Margin="0,5" Padding="10">
-                                    <Frame BackgroundColor="White" 
+                                    <Frame BackgroundColor="White"
                                            CornerRadius="10"
                                            BorderColor="{StaticResource Gray300}"
                                            HasShadow="True">
                                         <Grid RowDefinitions="Auto" ColumnDefinitions="Auto,*,Auto" Padding="5">
                                             <!-- Profile Picture -->
-                                            <Frame Grid.Column="0" 
-                                                   CornerRadius="25"
-                                                   HeightRequest="50" 
+                                            <Border Grid.Column="0"
+                                                   StrokeShape="RoundRectangle 25,25,25,25"
+                                                   HeightRequest="50"
                                                    WidthRequest="50"
-                                                   Padding="0"
-                                                   IsClippedToBounds="True"
-                                                   BorderColor="{Binding StatusColor}"
-                                                   BorderStrokeThickness="2"
+                                                   Stroke="{Binding StatusColor}"
+                                                   StrokeThickness="2"
                                                    Margin="0,0,10,0">
                                                 <Image Source="{Binding ProfilePictureData, Converter={StaticResource ByteArrayToImageSourceConverter}}"
                                                        Aspect="AspectFill"
                                                        HeightRequest="50"
                                                        WidthRequest="50" />
-                                            </Frame>
-                                            
+                                            </Border>
+
                                             <!-- User Info -->
                                             <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                                                <Label Text="{Binding FullName}" 
-                                                       FontAttributes="Bold" 
+                                                <Label Text="{Binding FullName}"
+                                                       FontAttributes="Bold"
                                                        FontSize="16" />
                                                 <Label>
                                                     <Label.FormattedText>
@@ -73,13 +71,13 @@
                                                     </Label.FormattedText>
                                                 </Label>
                                             </VerticalStackLayout>
-                                            
+
                                             <!-- Status Indicator -->
-                                            <Frame Grid.Column="2" 
-                                                   BackgroundColor="{Binding StatusColor}" 
-                                                   WidthRequest="16" 
-                                                   HeightRequest="16" 
-                                                   CornerRadius="8"
+                                            <Border Grid.Column="2"
+                                                   BackgroundColor="{Binding StatusColor}"
+                                                   WidthRequest="16"
+                                                   HeightRequest="16"
+                                                   StrokeShape="RoundRectangle 8,8,8,8"
                                                    Padding="0"
                                                    VerticalOptions="Center"
                                                    HorizontalOptions="End" />
@@ -92,7 +90,7 @@
                 </VerticalStackLayout>
             </ScrollView>
         </RefreshView>
-        
+
         <!-- Loading indicator -->
         <ActivityIndicator Grid.Row="1"
                            x:Name="loadingIndicator"

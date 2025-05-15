@@ -1,6 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
+
         {
             // Use IntelliSense to find out which attributes exist for C# debugging
             // Use hover for the description of the existing attributes
@@ -30,6 +31,46 @@
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach"
+        },
+        {
+            // Configuration for debugging TDFMAUI on Android emulator
+            "name": "Debug Android Emulator",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+                "-t:Run",
+                "-f:net8.0-android",
+                "--no-restore"
+            ],
+            "cwd": "${workspaceFolder}/TDFMAUI",
+            "stopAtEntry": false,
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            // Configuration for debugging TDFMAUI on Windows
+            "name": "Debug Windows",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+                "-t:Run",
+                "-f:net8.0-windows10.0.19041.0",
+                "--no-restore"
+            ],
+            "cwd": "${workspaceFolder}/TDFMAUI",
+            "stopAtEntry": false,
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
         }
     ]
 }

@@ -11,7 +11,8 @@
     xmlns:users="clr-namespace:TDFMAUI.Features.Users"
     Shell.FlyoutBehavior="Flyout"
     Shell.FlyoutWidth="300"
-    FlyoutBackgroundColor="#512BD4">
+    FlyoutBackgroundColor="#512BD4"
+    FlyoutIsPresented="False">
 
     <!-- Left flyout header disabled for now -->
     <!--
@@ -34,7 +35,6 @@
 
     <!-- Configure the flyout behavior -->
     <Shell.FlyoutBehavior>Flyout</Shell.FlyoutBehavior>
-    <Shell.FlyoutPosition>End</Shell.FlyoutPosition>
 
     <TabBar>
         <Tab Title="Home" Icon="home.png">

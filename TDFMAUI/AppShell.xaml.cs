@@ -150,17 +150,35 @@ namespace TDFMAUI
         {
             try
             {
-                // Set the flyout position to End (right side) using XAML instead
-                // We'll rely on the XAML declaration: <Shell.FlyoutPosition>End</Shell.FlyoutPosition>
-
                 // Enable the flyout
                 FlyoutBehavior = FlyoutBehavior.Flyout;
+
+                // Add a swipe gesture recognizer to the main content
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    // Add a swipe gesture recognizer to show the flyout
+                    var swipeGesture = new SwipeGestureRecognizer
+                    {
+                        Direction = SwipeDirection.Right
+                    };
+
+                    swipeGesture.Swiped += (sender, e) =>
+                    {
+                        // Show the flyout when swiping right
+                        FlyoutIsPresented = true;
+                    };
+
+                    // Add the gesture recognizer to the shell
+                    this.GestureRecognizers.Add(swipeGesture);
+
+                    _logger?.LogInformation("Right swipe gesture recognizer added successfully.");
+                });
 
                 _logger?.LogInformation("Right swipe gesture configured successfully.");
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Failed to configure right swipe gesture.");
+                _logger?.LogError(ex, "Failed to configure right swipe gesture: {0}", ex.Message);
             }
         }
     }

@@ -251,5 +251,21 @@ namespace TDFAPI.Services
                 throw;
             }
         }
+
+        public async Task<IEnumerable<UserDto>> GetOnlineUsersAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Fetching online users from repository.");
+                return await _userRepository.GetOnlineUsersAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving online users: {Message}", ex.Message);
+                // Depending on policy, you might return empty list or rethrow
+                // For now, rethrowing to make it visible if repository layer fails.
+                throw;
+            }
+        }
     }
 }

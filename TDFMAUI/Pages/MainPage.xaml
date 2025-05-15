@@ -9,45 +9,49 @@
         <!-- Header -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20">
             <VerticalStackLayout>
-                <Label Text="Welcome," 
-                       FontSize="24" 
-                       FontAttributes="Bold" 
+                <Label Text="Welcome,"
+                       FontSize="24"
+                       FontAttributes="Bold"
                        TextColor="White"/>
-                <Label x:Name="userNameLabel" 
-                       Text="User" 
-                       FontSize="18" 
+                <Label x:Name="userNameLabel"
+                       Text="User"
+                       FontSize="18"
                        TextColor="#bbdefb"/>
             </VerticalStackLayout>
-            <Button Grid.Column="1" 
-                    Text="Logout" 
-                    Clicked="OnLogoutClicked" 
-                    BackgroundColor="#64b5f6" 
-                    TextColor="White" 
-                    HeightRequest="40" 
-                    CornerRadius="20"/>
+            <Button Grid.Column="1"
+                    Clicked="OnLogoutClicked"
+                    BackgroundColor="#64b5f6"
+                    TextColor="White"
+                    HeightRequest="40"
+                    WidthRequest="40"
+                    CornerRadius="20">
+                <Button.ImageSource>
+                    <FileImageSource File="logout.png" />
+                </Button.ImageSource>
+            </Button>
         </Grid>
 
         <!-- Main Content -->
         <Grid Grid.Row="1" ColumnDefinitions="*,*" RowDefinitions="*,*" ColumnSpacing="20" RowSpacing="20">
             <!-- Cards -->
-            <Frame Grid.Row="0" Grid.Column="0" 
+            <Frame Grid.Row="0" Grid.Column="0"
                    BackgroundColor="#0d47a1"
                    CornerRadius="15"
                    Padding="20"
                    HasShadow="True">
                 <VerticalStackLayout Spacing="15">
-                    <Label Text="Leave Requests" 
-                           FontSize="20" 
-                           FontAttributes="Bold" 
+                    <Label Text="Leave Requests"
+                           FontSize="20"
+                           FontAttributes="Bold"
                            TextColor="White"/>
-                    <Label Text="Submit and track your leave requests" 
-                           FontSize="14" 
+                    <Label Text="Submit and track your leave requests"
+                           FontSize="14"
                            TextColor="#bbdefb"/>
-                    <Button Text="Manage Requests" 
-                            Clicked="OnLeaveRequestClicked" 
-                            BackgroundColor="#64b5f6" 
-                            TextColor="White" 
-                            HeightRequest="50" 
+                    <Button Text="Manage Requests"
+                            Clicked="OnLeaveRequestClicked"
+                            BackgroundColor="#64b5f6"
+                            TextColor="White"
+                            HeightRequest="50"
                             CornerRadius="25"/>
                 </VerticalStackLayout>
             </Frame>
@@ -56,11 +60,11 @@
         </Grid>
 
         <!-- Footer -->
-        <Label Grid.Row="2" 
-               Text="© 2025 TDF Application" 
-               FontSize="12" 
-               TextColor="#bbdefb" 
-               HorizontalOptions="Center" 
+        <Label Grid.Row="2"
+               Text="© 2025 TDF Application"
+               FontSize="12"
+               TextColor="#bbdefb"
+               HorizontalOptions="Center"
                Margin="0,20,0,0"/>
     </Grid>
 </ContentPage>

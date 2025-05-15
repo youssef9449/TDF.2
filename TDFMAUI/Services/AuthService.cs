@@ -11,8 +11,10 @@ using Microsoft.Extensions.Logging;
 using TDFShared.DTOs.Auth;
 using TDFShared.DTOs.Users;
 using TDFShared.DTOs.Common;
+using TDFShared.Enums;
 using TDFMAUI.Config;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.ApplicationModel;
 
 namespace TDFMAUI.Services;
 
@@ -26,7 +28,7 @@ public class AuthService : IAuthService
     private readonly string _baseApiUrl;
 
     public AuthService(
-        SecureStorageService secureStorageService, 
+        SecureStorageService secureStorageService,
         IUserProfileService userProfileService,
         HttpClient httpClient,
         ILogger<AuthService> logger)
@@ -34,33 +36,33 @@ public class AuthService : IAuthService
         try
         {
             // Log entry immediately, before any potential null checks
-            logger?.LogInformation("AuthService constructor started."); 
-            
+            logger?.LogInformation("AuthService constructor started.");
+
             // Log each dependency resolution
             logger?.LogInformation("Checking SecureStorageService...");
             _secureStorageService = secureStorageService ?? throw new ArgumentNullException(nameof(secureStorageService));
             logger?.LogInformation("SecureStorageService resolved successfully.");
-            
+
             logger?.LogInformation("Checking UserProfileService...");
             _userProfileService = userProfileService ?? throw new ArgumentNullException(nameof(userProfileService));
             logger?.LogInformation("UserProfileService resolved successfully.");
-            
+
             logger?.LogInformation("Checking HttpClient...");
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             logger?.LogInformation("HttpClient resolved successfully.");
-            
+
             logger?.LogInformation("Saving logger reference...");
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             logger?.LogInformation("Getting ApiConfig.BaseUrl...");
             _baseApiUrl = ApiConfig.BaseUrl ?? throw new InvalidOperationException("API Base URL is not configured.");
             // Ensure _baseApiUrl doesn't end with a slash to prevent double slashes in URL construction
             _baseApiUrl = _baseApiUrl.TrimEnd('/');
             logger?.LogInformation("BaseUrl obtained: {BaseUrl}", _baseApiUrl);
-            
+
             logger?.LogInformation("Initializing JsonSerializerOptions...");
             _serializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            
+
             _logger?.LogInformation("AuthService constructor finished successfully.");
         }
         catch (Exception ex)
@@ -97,11 +99,11 @@ public class AuthService : IAuthService
                 {
                     // First try to deserialize as ApiResponse<TokenResponse>
                     var apiResponse = JsonSerializer.Deserialize<ApiResponse<TokenResponse>>(apiResponseContent, options);
-                    
+
                     if (apiResponse?.Data != null && !string.IsNullOrEmpty(apiResponse.Data.Token))
                     {
                         _logger.LogInformation("Login successful for user {Username} using ApiResponse<TokenResponse> format", username);
-                        
+
                         // Create UserDetailsDto from TokenResponse data
                         var userDetails = new UserDetailsDto
                         {
@@ -111,7 +113,7 @@ public class AuthService : IAuthService
                             Roles = new List<string>(),
                             Department = apiResponse.Data.User?.Department // Extract department if available
                         };
-                        
+
                         // Add roles from token response if available
                         if (apiResponse.Data.Roles != null && apiResponse.Data.Roles.Length > 0)
                         {
@@ -122,34 +124,34 @@ public class AuthService : IAuthService
                         {
                             userDetails.Roles.Add("Admin");
                         }
-                        
+
                         // Store the token and user details
                         await _secureStorageService.SaveTokenAsync(apiResponse.Data.Token, apiResponse.Data.Expiration);
                         _userProfileService.SetUserDetails(userDetails);
-                        
+
                         return userDetails;
                     }
-                    
+
                     _logger.LogWarning("ApiResponse<TokenResponse> format succeeded but data or token was null/empty");
                 }
                 catch (JsonException jsonEx)
                 {
                     _logger.LogWarning(jsonEx, "Failed to deserialize as ApiResponse<TokenResponse>, trying direct LoginResponseDto format");
-                    
+
                     // Fall back to the direct format if needed
                     try
                     {
                         var loginResponse = JsonSerializer.Deserialize<LoginResponseDto>(apiResponseContent, options);
-                        
+
                         if (loginResponse?.UserDetails != null && !string.IsNullOrEmpty(loginResponse.Token))
                         {
                             _logger.LogInformation("Login successful for user {Username} using direct LoginResponseDto format", username);
-                            
+
                             // Ensure all properties are properly initialized
                             loginResponse.UserDetails.FullName ??= string.Empty;
                             loginResponse.UserDetails.UserName ??= string.Empty;
                             loginResponse.UserDetails.Roles ??= new List<string>();
-                            
+
                             DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
                             await _secureStorageService.SaveTokenAsync(loginResponse.Token, expiration);
                             _userProfileService.SetUserDetails(loginResponse.UserDetails);
@@ -161,7 +163,7 @@ public class AuthService : IAuthService
                         _logger.LogError(innerEx, "Failed to deserialize login response in fallback format");
                     }
                 }
-                
+
                 _logger.LogError("Login API call successful but response format could not be parsed. Response: {Response}", apiResponseContent);
                 return null;
             }
@@ -170,12 +172,12 @@ public class AuthService : IAuthService
                 string errorContent = await response.Content.ReadAsStringAsync();
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.BadRequest)
                 {
-                    _logger.LogWarning("Login failed for user {Username}. Status: {StatusCode}. Reason: {ReasonPhrase}. Content: {Content}", 
+                    _logger.LogWarning("Login failed for user {Username}. Status: {StatusCode}. Reason: {ReasonPhrase}. Content: {Content}",
                         username, response.StatusCode, response.ReasonPhrase, errorContent);
                 }
                 else
                 {
-                    _logger.LogError("Login API call failed for user {Username}. Status: {StatusCode}. Reason: {ReasonPhrase}. Content: {Content}", 
+                    _logger.LogError("Login API call failed for user {Username}. Status: {StatusCode}. Reason: {ReasonPhrase}. Content: {Content}",
                         username, response.StatusCode, response.ReasonPhrase, errorContent);
                 }
                 return null;
@@ -196,14 +198,56 @@ public class AuthService : IAuthService
     public async Task LogoutAsync()
     {
         _logger.LogInformation("Logging out user.");
-        _userProfileService.ClearUserDetails();
-        await _secureStorageService.RemoveTokenAsync();
-        
-        // Navigate back to the login page after logout
-        // Using Shell navigation, assuming LoginPage is registered with the route "//LoginPage"
-        // The double slash ensures navigation from the root, replacing the current navigation stack.
+
         try
         {
+            // Try to update user status to Offline before clearing credentials
+            // This needs to be done before clearing user details and token
+            if (App.CurrentUser != null)
+            {
+                try
+                {
+                    // Get the UserPresenceService from DI
+                    var serviceProvider = IPlatformApplication.Current?.Services;
+                    if (serviceProvider != null)
+                    {
+                        var userPresenceService = serviceProvider.GetService<IUserPresenceService>();
+                        if (userPresenceService != null)
+                        {
+                            _logger.LogInformation("Setting user status to Offline before logout");
+                            await userPresenceService.UpdateStatusAsync(UserPresenceStatus.Offline, "");
+                        }
+                    }
+                }
+                catch (Exception statusEx)
+                {
+                    _logger.LogError(statusEx, "Failed to update user status to Offline during logout");
+                    // Continue with logout even if status update fails
+                }
+            }
+
+            // Call the API to logout (which will also update status on server-side)
+            try
+            {
+                var apiService = IPlatformApplication.Current?.Services?.GetService<ApiService>();
+                if (apiService != null)
+                {
+                    await apiService.LogoutAsync();
+                }
+            }
+            catch (Exception apiEx)
+            {
+                _logger.LogError(apiEx, "Failed to call logout API endpoint");
+                // Continue with local logout even if API call fails
+            }
+
+            // Clear local user data
+            _userProfileService.ClearUserDetails();
+            await _secureStorageService.RemoveTokenAsync();
+
+            // Navigate back to the login page after logout
+            // Using Shell navigation, assuming LoginPage is registered with the route "//LoginPage"
+            // The double slash ensures navigation from the root, replacing the current navigation stack.
             await Shell.Current.GoToAsync("//LoginPage");
             _logger.LogInformation("Navigated to LoginPage after logout.");
         }
@@ -274,7 +318,7 @@ public class AuthService : IAuthService
                 roles.AddRange(jwtToken.Claims
                     .Where(claim => claim.Type == ClaimTypes.Role || claim.Type == "role") // Check common role claim types
                     .Select(claim => claim.Value));
-                
+
                 _logger.LogInformation("Retrieved roles from token: {Roles}", string.Join(", ", roles));
             }
             else
@@ -307,7 +351,7 @@ public class AuthService : IAuthService
                 var jwtToken = handler.ReadJwtToken(token);
                 // Look for a 'department' claim (this might be custom)
                 department = jwtToken.Claims.FirstOrDefault(claim => claim.Type == "department")?.Value;
-                
+
                 if (!string.IsNullOrEmpty(department))
                 {
                      _logger.LogInformation("Retrieved department from token: {Department}", department);
@@ -359,7 +403,7 @@ public class AuthService : IAuthService
             }
             else
             {
-                _logger.LogWarning("Failed to retrieve user details for {UserId}. Status: {StatusCode}", 
+                _logger.LogWarning("Failed to retrieve user details for {UserId}. Status: {StatusCode}",
                     userId, response.StatusCode);
                 return null;
             }
@@ -373,4 +417,4 @@ public class AuthService : IAuthService
 
     // Implement other IAuthService methods if they exist
     // e.g., IsUserAuthenticatedAsync, LoginAsync, LogoutAsync
-} 
+}

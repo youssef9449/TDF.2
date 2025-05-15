@@ -3,13 +3,22 @@
     "configurations": [
 
         {
+            "name": ".NET MAUI Launch",
+            "type": "maui",
+            "request": "launch",
+            "project": "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+            "preLaunchTask": "maui: build",
+            "targetFramework": "net8.0-android"
+            // should prompt you to select from available devices/emulators.
+        },
+        {
             // Use IntelliSense to find out which attributes exist for C# debugging
             // Use hover for the description of the existing attributes
             // For further information visit https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md.
             "name": ".NET Core Launch (web)",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
+            "preLaunchTask": "build-tdfapi",
             // If you have changed target frameworks, make sure to update the program path.
             "program": "${workspaceFolder}/TDFAPI/bin/Debug/net8.0/TDFAPI.dll",
             "args": [],
@@ -25,6 +34,9 @@
             },
             "sourceFileMap": {
                 "/Views": "${workspaceFolder}/Views"
+            },
+            "logging": {
+                "moduleLoad": false
             }
         },
         {

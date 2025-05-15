@@ -346,5 +346,32 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred uploading the profile picture."));
             }
         }
+
+        [HttpGet("online")]
+        [Authorize] // All authenticated users can see who is online, or adjust roles if needed
+        public async Task<ActionResult<ApiResponse<IEnumerable<UserDto>>>> GetOnlineUsers()
+        {
+            try
+            {
+                _logger.LogInformation("Attempting to retrieve online users.");
+                var onlineUsers = await _userService.GetOnlineUsersAsync();
+                
+                if (onlineUsers == null)
+                {
+                    // This case might occur if the repository method itself returns null,
+                    // though typically it would return an empty list.
+                    _logger.LogWarning("GetOnlineUsersAsync from service returned null.");
+                    return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(new List<UserDto>(), "No online users found or service returned null."));
+                }
+
+                _logger.LogInformation("Successfully retrieved {Count} online users.", onlineUsers.Count());
+                return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(onlineUsers));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving online users: {Message}", ex.Message);
+                return StatusCode(500, ApiResponse<IEnumerable<UserDto>>.ErrorResponse("An error occurred while retrieving online users."));
+            }
+        }
     }
-} 
+}

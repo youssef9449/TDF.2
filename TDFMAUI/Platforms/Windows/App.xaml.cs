@@ -3,6 +3,10 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Maui.ApplicationModel;
+using TDFMAUI.Services;
+using TDFShared.Enums;
+using TDFMAUI.Helpers;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -23,7 +27,75 @@ namespace TDFMAUI.WinUI
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
+            // We can't use Exiting event directly in WinUI 3
+            // Instead, we'll use the Application.Current.Suspending event
+            Microsoft.Maui.ApplicationModel.AppActions.OnAppAction += (sender, args) => {
+                if (args.AppAction.Id == "app_closing")
+                {
+                    // Update user status to Offline when the app is closing
+                    if (DeviceHelper.IsDesktop)
+                    {
+                        UpdateUserStatusToOffline();
+                    }
+                }
+            };
+
             this.InitializeComponent(); // If this throws, AppDomain.CurrentDomain.UnhandledException should catch it.
+        }
+
+        // Use Application.Current.Exit event instead of OnLaunched
+        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+        {
+            base.OnLaunched(args);
+
+            // Register for process exit
+            AppDomain.CurrentDomain.ProcessExit += (sender, e) => {
+                // Update user status to Offline when the app is closing
+                if (DeviceHelper.IsDesktop)
+                {
+                    UpdateUserStatusToOffline();
+                }
+            };
+        }
+
+        private void UpdateUserStatusToOffline()
+        {
+            try
+            {
+                // Get the current user
+                var currentUser = TDFMAUI.App.CurrentUser;
+                if (currentUser != null)
+                {
+                    // Get the UserPresenceService from DI
+                    var services = IPlatformApplication.Current?.Services;
+                    if (services != null)
+                    {
+                        var userPresenceService = services.GetService<IUserPresenceService>();
+                        if (userPresenceService != null)
+                        {
+                            // Run this synchronously since we're shutting down
+                            Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    Debug.WriteLine("Setting user status to Offline on Windows app exit");
+                                    await userPresenceService.UpdateStatusAsync(UserPresenceStatus.Offline, "");
+                                    // Give it a moment to complete the request
+                                    await Task.Delay(500);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"Error updating user status to Offline: {ex.Message}");
+                                }
+                            }).Wait(1000); // Wait up to 1 second for the status update to complete
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error in UpdateUserStatusToOffline: {ex.Message}");
+            }
         }
 
         private void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)

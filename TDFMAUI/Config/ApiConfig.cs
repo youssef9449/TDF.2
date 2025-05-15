@@ -29,6 +29,13 @@ namespace TDFMAUI.Config
         // Development mode flag - controls certificate validation
         public static bool DevelopmentMode { get; set; } = false;
 
+        // Alias for DevelopmentMode for compatibility
+        public static bool IsDevelopmentMode
+        {
+            get => DevelopmentMode;
+            set => DevelopmentMode = value;
+        }
+
         // Safe mode flag - used when recovering from crashes
         public static bool SafeMode { get; set; } = false;
 

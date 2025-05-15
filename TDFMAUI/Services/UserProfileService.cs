@@ -31,12 +31,23 @@ namespace TDFMAUI.Services
 
         public UserDetailsDto? CurrentUser => _currentUser;
         public bool IsLoggedIn => _currentUser != null;
-        public void SetUserDetails(UserDetailsDto? userDetails) { _currentUser = userDetails; }
-        public void ClearUserDetails() { _currentUser = null; }
+
+        public void SetUserDetails(UserDetailsDto? userDetails)
+        {
+            _currentUser = userDetails;
+            // Optionally raise an event here if other parts of the app need to react to login/logout
+        }
+
+        public void ClearUserDetails()
+        {
+            _currentUser = null;
+            // Optionally raise event
+        }
+
         public bool HasRole(string role)
         {
             if (_currentUser?.Roles == null || string.IsNullOrEmpty(role)) return false;
             return _currentUser.Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
         }
     }
-} 
+}

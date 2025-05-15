@@ -10,6 +10,7 @@ using TDFShared.Exceptions;
 using TDFMAUI.Features.Admin;
 using TDFMAUI.ViewModels;
 using Microsoft.Extensions.Logging;
+using TDFShared.Enums;
 
 namespace TDFMAUI
 {
@@ -259,14 +260,17 @@ namespace TDFMAUI
                 // On Android, we can check the intent extras
 #if ANDROID
                 var context = Android.App.Application.Context;
-                var packageManager = context.PackageManager;
-                var intent = packageManager?.GetLaunchIntentForPackage(context.PackageName);
+                var currentPackageName = context.PackageName;
+                if (context.PackageManager != null && !string.IsNullOrEmpty(currentPackageName))
+                {
+                    var intent = context.PackageManager.GetLaunchIntentForPackage(currentPackageName);
 
-                if (intent?.Extras != null && intent.Extras.ContainsKey("safe_mode"))
+                    if (intent?.Extras != null && intent.Extras.ContainsKey("safe_mode"))
                 {
                     SafeMode = intent.Extras.GetBoolean("safe_mode", false);
                     System.Diagnostics.Debug.WriteLine($"Safe mode from intent: {SafeMode}");
                 }
+            } // <<< Add this closing brace for the 'if (context.PackageManager != null ...)' block
 #endif
 
                 // Log the safe mode status
@@ -295,11 +299,14 @@ namespace TDFMAUI
                     return;
                 }
 
-                // Configure global SSL settings
-                ApiConfig.ConfigureGlobalSslSettings();
+                // Configure global SSL settings - DISABLED
+                // ApiConfig.ConfigureGlobalSslSettings();
 
-                // Initialize API config with safe mode if needed
-                ApiConfig.Initialize(isDevelopment: true, safeMode: SafeMode);
+                // Initialize API config with safe mode if needed - DISABLED
+                // ApiConfig.Initialize(isDevelopment: true, safeMode: SafeMode);
+
+                // Just set the development mode flag without running connectivity tests
+                ApiConfig.IsDevelopmentMode = true;
 
                 if (SafeMode)
                 {
@@ -439,31 +446,42 @@ namespace TDFMAUI
             // When app goes to background, reconnect socket when it comes back
             DebugService.LogInfo("App", "Application going to sleep");
 
-            // Reconnect WebSocket if it's not connected - DEFER THIS
-            /*
-            if (_webSocketService != null && !_webSocketService.IsConnected)
+            // For non-mobile devices, update user status to Offline when app is closed
+            if (DeviceHelper.IsDesktop || (!DeviceHelper.IsMobile && DeviceHelper.IsLargeScreen))
             {
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        var secureStorage = Services.GetService<SecureStorageService>();
-                        if (secureStorage != null)
-                        {
-                            var (token, _) = await secureStorage.GetTokenAsync();
-                            if (!string.IsNullOrEmpty(token))
-                            {
-                                await _webSocketService.ConnectAsync(token);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        DebugService.LogError("App", $"Error reconnecting WebSocket: {ex.Message}");
-                    }
-                });
+                UpdateUserStatusToOffline();
             }
-            */
+        }
+
+        private void UpdateUserStatusToOffline()
+        {
+            if (CurrentUser != null)
+            {
+                try
+                {
+                    var userPresenceService = Services.GetService<IUserPresenceService>();
+                    if (userPresenceService != null)
+                    {
+                        // Run this in a fire-and-forget manner since we're shutting down
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                DebugService.LogInfo("App", "Setting user status to Offline on app closing");
+                                await userPresenceService.UpdateStatusAsync(TDFShared.Enums.UserPresenceStatus.Offline, "");
+                            }
+                            catch (Exception ex)
+                            {
+                                DebugService.LogError("App", $"Error updating user status to Offline: {ex.Message}");
+                            }
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DebugService.LogError("App", $"Error getting UserPresenceService: {ex.Message}");
+                }
+            }
         }
 
         protected override void OnResume()

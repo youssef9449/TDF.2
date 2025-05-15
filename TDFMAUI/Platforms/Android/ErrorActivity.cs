@@ -105,11 +105,26 @@ namespace TDFMAUI
                         MainActivity.LogToFile("ErrorActivity", "User requested app restart");
 
                         // Create an intent to restart the app
-                        var intent = PackageManager.GetLaunchIntentForPackage(PackageName);
-                        intent.AddFlags(ActivityFlags.ClearTop);
-                        intent.PutExtra("safe_mode", true); // Add a flag to indicate safe mode
-                        StartActivity(intent);
-                        Process.KillProcess(Process.MyPid());
+                        var currentPackageName = PackageName;
+                        if (!string.IsNullOrEmpty(currentPackageName))
+                        {
+                            var intent = PackageManager.GetLaunchIntentForPackage(currentPackageName);
+                            if (intent != null)
+                            {
+                                intent.AddFlags(ActivityFlags.ClearTop);
+                                intent.PutExtra("safe_mode", true); // Add a flag to indicate safe mode
+                                StartActivity(intent);
+                                Process.KillProcess(Process.MyPid());
+                            }
+                            else
+                            {
+                                MainActivity.LogToFile("ErrorActivity", "Failed to get launch intent for restart.");
+                            }
+                        }
+                        else
+                        {
+                            MainActivity.LogToFile("ErrorActivity", "PackageName was null or empty, cannot restart.");
+                        }
                     }
                     catch (Exception ex)
                     {

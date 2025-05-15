@@ -46,7 +46,7 @@ namespace TDFMAUI.Services
 
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _secureStorage = secureStorage;
-            
+
             // Setup reconnect timer but don't start it yet
             _reconnectTimer = new Timer(ReconnectCallback, null, Timeout.Infinite, Timeout.Infinite);
 
@@ -97,7 +97,10 @@ namespace TDFMAUI.Services
 
                 // Add authentication header
                 _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
-                
+
+                // Log token length for debugging (don't log the actual token)
+                _logger.LogDebug("WebSocket using token of length {TokenLength}", token?.Length ?? 0);
+
                 // Add explicit certificate validation for development mode
                 if (ApiConfig.DevelopmentMode)
                 {
@@ -113,22 +116,22 @@ namespace TDFMAUI.Services
                 {
                     // Set a reasonable timeout for the connection
                     _cancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(15));
-                    
+
                     await _webSocket.ConnectAsync(serverUri, _cancellationTokenSource.Token);
-                    
+
                     // Create a new cancellation token source now that connection succeeded
                     _cancellationTokenSource.Dispose();
                     _cancellationTokenSource = new CancellationTokenSource();
-                    
+
                     _logger.LogInformation("Connected to WebSocket server");
 
                     // Reset reconnect attempts on successful connection
                     _reconnectAttempts = 0;
-                    
+
                     // Raise connection status event on the UI thread
                     MainThread.BeginInvokeOnMainThread(() => {
-                        ConnectionStatusChanged?.Invoke(this, new ConnectionStatusEventArgs 
-                        { 
+                        ConnectionStatusChanged?.Invoke(this, new ConnectionStatusEventArgs
+                        {
                             IsConnected = true,
                             Timestamp = DateTime.UtcNow
                         });
@@ -138,8 +141,8 @@ namespace TDFMAUI.Services
                     StartReceiving();
 
                     // Send a ping to verify connection
-                    await SendMessageAsync(new 
-                    { 
+                    await SendMessageAsync(new
+                    {
                         type = "ping",
                         timestamp = DateTime.UtcNow
                     });
@@ -153,9 +156,37 @@ namespace TDFMAUI.Services
                     // Return false but don't throw - allow the app to function without WebSocket
                     return false;
                 }
+                catch (WebSocketException wsEx) when (wsEx.Message.Contains("401"))
+                {
+                    _logger.LogError(wsEx, "Authentication failed (401 Unauthorized) when connecting to WebSocket server. Token may be invalid or expired.");
+
+                    // Raise error event
+                    MainThread.BeginInvokeOnMainThread(() => {
+                        ErrorReceived?.Invoke(this, new WebSocketErrorEventArgs
+                        {
+                            ErrorCode = "401",
+                            ErrorMessage = "Authentication failed. Please log out and log in again.",
+                            Timestamp = DateTime.UtcNow
+                        });
+                    });
+
+                    await CleanupExistingConnectionAsync();
+                    return false;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to connect to WebSocket server - continuing app in limited functionality mode");
+
+                    // Raise error event
+                    MainThread.BeginInvokeOnMainThread(() => {
+                        ErrorReceived?.Invoke(this, new WebSocketErrorEventArgs
+                        {
+                            ErrorCode = ex.GetType().Name,
+                            ErrorMessage = ex.Message,
+                            Timestamp = DateTime.UtcNow
+                        });
+                    });
+
                     await CleanupExistingConnectionAsync();
                     // Return false instead of throwing to allow the app to continue
                     return false;
@@ -176,13 +207,13 @@ namespace TDFMAUI.Services
                 {
                     // Cancel any ongoing operations
                     _cancellationTokenSource?.Cancel();
-                    
+
                     // Attempt a graceful close if needed
                     if (_webSocket.State == WebSocketState.Open)
                     {
                         // Use a new cancellation token with a short timeout for closing
                         using var closeTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                        await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client closing connection", 
+                        await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Client closing connection",
                             closeTokenSource.Token);
                     }
                 }
@@ -214,14 +245,14 @@ namespace TDFMAUI.Services
             var receiveBuffer = new ArraySegment<byte>(buffer);
             var messageBuilder = new StringBuilder();
             var message = new StringBuilder();
-            
+
             try
             {
                 while (_webSocket.State == WebSocketState.Open)
                 {
                     WebSocketReceiveResult receiveResult = null;
-                    
-                    try 
+
+                    try
                     {
                         receiveResult = await _webSocket.ReceiveAsync(receiveBuffer, _cancellationTokenSource.Token);
                     }
@@ -250,29 +281,29 @@ namespace TDFMAUI.Services
                         _logger.LogError(ex, "Error receiving WebSocket message");
                         break;
                     }
-                    
+
                     if (receiveResult == null)
                     {
                         _logger.LogWarning("WebSocket receive result is null");
                         break;
                     }
-                    
+
                     if (receiveResult.MessageType == WebSocketMessageType.Close)
                     {
                         _logger.LogInformation("WebSocket close frame received");
                         await HandleDisconnect(true);
                         break;
                     }
-                    
+
                     messageBuilder.Append(Encoding.UTF8.GetString(buffer, 0, receiveResult.Count));
-                    
+
                     if (receiveResult.EndOfMessage)
                     {
                         var jsonMessage = messageBuilder.ToString();
                         messageBuilder.Clear();
-                        
+
                         _logger.LogDebug("WebSocket message received: {MessageLength} bytes", jsonMessage.Length);
-                        
+
                         try
                         {
                             await ProcessMessageAsync(jsonMessage);
@@ -345,7 +376,7 @@ namespace TDFMAUI.Services
                         HandleNotificationsSeen(root);
                         break;
                     // New Handlers Added:
-                    case "availability_set": 
+                    case "availability_set":
                         HandleAvailabilitySet(root);
                         break;
                     case "status_updated": // Handle confirmation if API sends it
@@ -386,32 +417,32 @@ namespace TDFMAUI.Services
                     string senderName = "System";
                     string message = string.Empty;
                     DateTime timestamp = DateTime.UtcNow;
-                    
+
                     // Extract notification ID
                     if (notificationElement.TryGetProperty("notificationId", out var idElement))
                     {
                         notificationId = idElement.GetInt32();
                     }
-                    
+
                     // Extract sender info
                     if (notificationElement.TryGetProperty("senderId", out var senderIdElement) &&
                         senderIdElement.ValueKind != JsonValueKind.Null)
                     {
                         senderId = senderIdElement.GetInt32();
                     }
-                    
+
                     if (notificationElement.TryGetProperty("senderName", out var senderNameElement) &&
                         senderNameElement.ValueKind != JsonValueKind.Null)
                     {
                         senderName = senderNameElement.GetString() ?? "System";
                     }
-                    
+
                     // Extract message
                     if (notificationElement.TryGetProperty("message", out var messageElement))
                     {
                         message = messageElement.GetString() ?? string.Empty;
                     }
-                    
+
                     // Extract timestamp
                     if (notificationElement.TryGetProperty("timestamp", out var timeElement))
                     {
@@ -420,7 +451,7 @@ namespace TDFMAUI.Services
                             timestamp = parsedTime;
                         }
                     }
-                    
+
                     // Create notification event args
                     var eventArgs = new NotificationEventArgs
                     {
@@ -432,7 +463,7 @@ namespace TDFMAUI.Services
                         Type = NotificationType.Info,
                         Timestamp = timestamp
                     };
-                    
+
                     // Raise event on UI thread
                     MainThread.BeginInvokeOnMainThread(() => {
                         NotificationReceived?.Invoke(this, eventArgs);
@@ -453,27 +484,27 @@ namespace TDFMAUI.Services
                 int senderId = 0;
                 string senderName = null;
                 DateTime timestamp = DateTime.UtcNow;
-                
+
                 if (element.TryGetProperty("message", out var messageElement))
                 {
                     message = messageElement.GetString();
                 }
-                
+
                 if (element.TryGetProperty("senderId", out var senderIdElement))
                 {
                     senderId = senderIdElement.GetInt32();
                 }
-                
+
                 if (element.TryGetProperty("senderName", out var senderNameElement))
                 {
                     senderName = senderNameElement.GetString();
                 }
-                
+
                 if (element.TryGetProperty("timestamp", out var timestampElement))
                 {
                     timestamp = timestampElement.GetDateTime();
                 }
-                
+
                 // Raise events on UI thread
                 MainThread.BeginInvokeOnMainThread(() => {
                     ChatMessageReceived?.Invoke(this, new ChatMessageEventArgs
@@ -483,7 +514,7 @@ namespace TDFMAUI.Services
                         Message = message,
                         Timestamp = timestamp
                     });
-                    
+
                     // Also raise as generic notification for systems that don't handle chat specifically
                     NotificationReceived?.Invoke(this, new NotificationEventArgs
                     {
@@ -512,32 +543,32 @@ namespace TDFMAUI.Services
                 int senderId = 0;
                 string senderName = null;
                 DateTime timestamp = DateTime.UtcNow;
-                
+
                 if (element.TryGetProperty("messageId", out var messageIdElement))
                 {
                     messageId = messageIdElement.GetInt32();
                 }
-                
+
                 if (element.TryGetProperty("message", out var messageElement))
                 {
                     message = messageElement.GetString();
                 }
-                
+
                 if (element.TryGetProperty("senderId", out var senderIdElement))
                 {
                     senderId = senderIdElement.GetInt32();
                 }
-                
+
                 if (element.TryGetProperty("senderName", out var senderNameElement))
                 {
                     senderName = senderNameElement.GetString();
                 }
-                
+
                 if (element.TryGetProperty("timestamp", out var timestampElement))
                 {
                     timestamp = timestampElement.GetDateTime();
                 }
-                
+
                 // Raise event on the UI thread
                 MainThread.BeginInvokeOnMainThread(() => {
                     ChatMessageReceived?.Invoke(this, new ChatMessageEventArgs
@@ -563,13 +594,13 @@ namespace TDFMAUI.Services
             {
                 int receiverId = 0;
                 List<int> messageIds = new List<int>();
-                
+
                 if (element.TryGetProperty("receiverId", out var receiverIdElement))
                 {
                     receiverId = receiverIdElement.GetInt32();
                 }
-                
-                if (element.TryGetProperty("messageIds", out var messageIdsElement) && 
+
+                if (element.TryGetProperty("messageIds", out var messageIdsElement) &&
                     messageIdsElement.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var idElement in messageIdsElement.EnumerateArray())
@@ -577,7 +608,7 @@ namespace TDFMAUI.Services
                         messageIds.Add(idElement.GetInt32());
                     }
                 }
-                
+
                 // Raise event on the UI thread
                 MainThread.BeginInvokeOnMainThread(() => {
                     MessageStatusChanged?.Invoke(this, new MessageStatusEventArgs
@@ -601,13 +632,13 @@ namespace TDFMAUI.Services
             {
                 int receiverId = 0;
                 List<int> messageIds = new List<int>();
-                
+
                 if (element.TryGetProperty("receiverId", out var receiverIdElement))
                 {
                     receiverId = receiverIdElement.GetInt32();
                 }
-                
-                if (element.TryGetProperty("messageIds", out var messageIdsElement) && 
+
+                if (element.TryGetProperty("messageIds", out var messageIdsElement) &&
                     messageIdsElement.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var idElement in messageIdsElement.EnumerateArray())
@@ -615,7 +646,7 @@ namespace TDFMAUI.Services
                         messageIds.Add(idElement.GetInt32());
                     }
                 }
-                
+
                 // Raise event on the UI thread
                 MainThread.BeginInvokeOnMainThread(() => {
                     MessageStatusChanged?.Invoke(this, new MessageStatusEventArgs
@@ -643,40 +674,40 @@ namespace TDFMAUI.Services
                 string machineName = null;
                 string presenceStatus = "Offline";
                 string statusMessage = null;
-                
+
                 if (element.TryGetProperty("userId", out var userIdElement))
                 {
                     userId = userIdElement.GetInt32();
                 }
-                
+
                 if (element.TryGetProperty("username", out var usernameElement))
                 {
                     username = usernameElement.GetString();
                 }
-                
+
                 if (element.TryGetProperty("isConnected", out var isConnectedElement))
                 {
                     isConnected = isConnectedElement.GetBoolean();
                 }
-                
+
                 if (element.TryGetProperty("machineName", out var machineNameElement) &&
                     machineNameElement.ValueKind != JsonValueKind.Null)
                 {
                     machineName = machineNameElement.GetString();
                 }
-                
+
                 if (element.TryGetProperty("presenceStatus", out var presenceStatusElement) &&
                     presenceStatusElement.ValueKind != JsonValueKind.Null)
                 {
                     presenceStatus = presenceStatusElement.GetString() ?? "Offline";
                 }
-                
+
                 if (element.TryGetProperty("statusMessage", out var statusMessageElement) &&
                     statusMessageElement.ValueKind != JsonValueKind.Null)
                 {
                     statusMessage = statusMessageElement.GetString();
                 }
-                
+
                 // Raise event on the UI thread
                 MainThread.BeginInvokeOnMainThread(() => {
                     UserStatusChanged?.Invoke(this, new UserStatusEventArgs
@@ -704,18 +735,18 @@ namespace TDFMAUI.Services
                 string message = null;
                 string title = "System Notification";
                 NotificationType type = NotificationType.Info;
-                
+
                 if (element.TryGetProperty("message", out var messageElement))
                 {
                     message = messageElement.GetString();
                 }
-                
+
                 if (element.TryGetProperty("title", out var titleElement) &&
                     titleElement.ValueKind != JsonValueKind.Null)
                 {
                     title = titleElement.GetString() ?? "System Notification";
                 }
-                
+
                 if (element.TryGetProperty("type", out var typeElement) &&
                     typeElement.ValueKind == JsonValueKind.String)
                 {
@@ -733,7 +764,7 @@ namespace TDFMAUI.Services
                         type = NotificationType.Success;
                     }
                 }
-                
+
                 // Raise event on the UI thread
                 MainThread.BeginInvokeOnMainThread(() => {
                     NotificationReceived?.Invoke(this, new NotificationEventArgs
@@ -760,38 +791,38 @@ namespace TDFMAUI.Services
                 bool isConnected = false;
                 string presenceStatus = "Offline";
                 string statusMessage = null;
-                
+
                 if (element.TryGetProperty("userId", out var userIdElement))
                 {
                     userId = userIdElement.GetInt32();
                 }
-                
+
                 if (element.TryGetProperty("username", out var usernameElement))
                 {
                     username = usernameElement.GetString();
                 }
-                
+
                 if (element.TryGetProperty("isConnected", out var isConnectedElement))
                 {
                     isConnected = isConnectedElement.GetBoolean();
                 }
-                
+
                 if (element.TryGetProperty("presenceStatus", out var presenceStatusElement) &&
                     presenceStatusElement.ValueKind != JsonValueKind.Null)
                 {
                     presenceStatus = presenceStatusElement.GetString() ?? "Offline";
                 }
-                
+
                 if (element.TryGetProperty("statusMessage", out var statusMessageElement) &&
                     statusMessageElement.ValueKind != JsonValueKind.Null)
                 {
                     statusMessage = statusMessageElement.GetString();
                 }
-                
+
                 // Log the update
-                _logger.LogDebug("User status change: {Username} is now {Status}", 
+                _logger.LogDebug("User status change: {Username} is now {Status}",
                     username, presenceStatus);
-                
+
                 // Raise event on the UI thread
                 MainThread.BeginInvokeOnMainThread(() => {
                     UserStatusChanged?.Invoke(this, new UserStatusEventArgs
@@ -818,26 +849,26 @@ namespace TDFMAUI.Services
                 int userId = 0;
                 string username = null;
                 bool isAvailableForChat = false;
-                
+
                 if (element.TryGetProperty("userId", out var userIdElement))
                 {
                     userId = userIdElement.GetInt32();
                 }
-                
+
                 if (element.TryGetProperty("username", out var usernameElement))
                 {
                     username = usernameElement.GetString();
                 }
-                
+
                 if (element.TryGetProperty("isAvailableForChat", out var availableElement))
                 {
                     isAvailableForChat = availableElement.GetBoolean();
                 }
-                
+
                 // Log the update
-                _logger.LogDebug("User availability change: {Username} is now {Available} for chat", 
+                _logger.LogDebug("User availability change: {Username} is now {Available} for chat",
                     username, isAvailableForChat ? "available" : "unavailable");
-                
+
                 // Raise event on the UI thread
                 MainThread.BeginInvokeOnMainThread(() => {
                     UserAvailabilityChanged?.Invoke(this, new UserAvailabilityEventArgs
@@ -861,17 +892,17 @@ namespace TDFMAUI.Services
             {
                 int messageId = 0;
                 string status = null;
-                
+
                 if (element.TryGetProperty("messageId", out var messageIdElement))
                 {
                     messageId = messageIdElement.GetInt32();
                 }
-                
+
                 if (element.TryGetProperty("status", out var statusElement))
                 {
                     status = statusElement.GetString();
                 }
-                
+
                 if (Enum.TryParse<MessageStatus>(status, true, out var parsedStatus))
                 {
                     _logger.LogInformation("Received status update for message {MessageId}: {Status}", messageId, parsedStatus);
@@ -888,14 +919,14 @@ namespace TDFMAUI.Services
         {
             // Raise disconnect event on the UI thread
             MainThread.BeginInvokeOnMainThread(() => {
-                ConnectionStatusChanged?.Invoke(this, new ConnectionStatusEventArgs 
-                { 
+                ConnectionStatusChanged?.Invoke(this, new ConnectionStatusEventArgs
+                {
                     IsConnected = false,
                     WasClean = wasClean,
                     Timestamp = DateTime.UtcNow
                 });
             });
-            
+
             if (!wasClean)
             {
                 // Try to reconnect if the disconnect wasn't clean
@@ -915,27 +946,27 @@ namespace TDFMAUI.Services
                 _logger.LogWarning("Max reconnect attempts reached ({MaxAttempts})", MaxReconnectAttempts);
                 return;
             }
-            
+
             _reconnectAttempts++;
-            
+
             // Exponential backoff (1s, 2s, 4s, 8s, 16s...)
             var delayMs = (int)Math.Min(1000 * Math.Pow(2, _reconnectAttempts - 1), 30000); // Max 30 seconds
-            
-            _logger.LogInformation("Scheduling reconnect attempt {Attempt} in {DelayMs}ms", 
+
+            _logger.LogInformation("Scheduling reconnect attempt {Attempt} in {DelayMs}ms",
                 _reconnectAttempts, delayMs);
-                
+
             _reconnectTimer.Change(delayMs, Timeout.Infinite);
         }
 
         private void ReconnectCallback(object? state)
         {
-            _logger.LogInformation("Attempting to reconnect (attempt {Attempt}/{MaxAttempts})", 
+            _logger.LogInformation("Attempting to reconnect (attempt {Attempt}/{MaxAttempts})",
                 _reconnectAttempts, MaxReconnectAttempts);
-                
+
             try
             {
                 var success = ConnectAsync().ConfigureAwait(false).GetAwaiter().GetResult();
-                
+
                 if (success)
                 {
                     _logger.LogInformation("Reconnection successful");
@@ -952,8 +983,8 @@ namespace TDFMAUI.Services
                     _logger.LogWarning("Failed to reconnect after {MaxAttempts} attempts", MaxReconnectAttempts);
                     // Notify the UI that we've given up on reconnection
                     MainThread.BeginInvokeOnMainThread(() => {
-                        ConnectionStatusChanged?.Invoke(this, new ConnectionStatusEventArgs 
-                        { 
+                        ConnectionStatusChanged?.Invoke(this, new ConnectionStatusEventArgs
+                        {
                             IsConnected = false,
                             WasClean = false,
                             Timestamp = DateTime.UtcNow,
@@ -979,17 +1010,17 @@ namespace TDFMAUI.Services
                 _logger.LogWarning("Cannot send message: WebSocket is not connected");
                 return;
             }
-            
+
             try
             {
                 var json = JsonSerializer.Serialize(message);
                 var bytes = Encoding.UTF8.GetBytes(json);
                 await _webSocket.SendAsync(
-                    new ArraySegment<byte>(bytes), 
-                    WebSocketMessageType.Text, 
-                    true, 
+                    new ArraySegment<byte>(bytes),
+                    WebSocketMessageType.Text,
+                    true,
                     _cancellationTokenSource?.Token ?? CancellationToken.None);
-                    
+
                 _logger.LogDebug("Sent WebSocket message: {Message}", json);
             }
             catch (Exception ex)
@@ -1007,14 +1038,14 @@ namespace TDFMAUI.Services
                 if (_webSocket?.State == WebSocketState.Open)
                 {
                     _logger.LogInformation("Disconnecting from WebSocket server...");
-                    
+
                     if (sendCloseFrame)
                     {
                         try
                         {
                             using var closeTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                            await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, 
-                                "Client initiated disconnect", 
+                            await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure,
+                                "Client initiated disconnect",
                                 closeTokenSource.Token);
                             _logger.LogInformation("WebSocket closed gracefully");
                         }
@@ -1027,11 +1058,11 @@ namespace TDFMAUI.Services
 
                 // Always clean up resources
                 await CleanupExistingConnectionAsync();
-                
+
                 // Notify that we're disconnected
                 MainThread.BeginInvokeOnMainThread(() => {
-                    ConnectionStatusChanged?.Invoke(this, new ConnectionStatusEventArgs 
-                    { 
+                    ConnectionStatusChanged?.Invoke(this, new ConnectionStatusEventArgs
+                    {
                         IsConnected = false,
                         Timestamp = DateTime.UtcNow
                     });
@@ -1121,12 +1152,12 @@ namespace TDFMAUI.Services
             await SendMessageAsync(new
             {
                 type = "update_status",
-                status = status,
-                statusMessage = statusMessage,
+                status = status ?? string.Empty,
+                statusMessage = statusMessage ?? string.Empty,
                 timestamp = DateTime.UtcNow
             });
         }
-        
+
         public async Task SetAvailableForChatAsync(bool isAvailable)
         {
             await SendMessageAsync(new
@@ -1136,7 +1167,7 @@ namespace TDFMAUI.Services
                 timestamp = DateTime.UtcNow
             });
         }
-        
+
         // Add the ping method to record activity
         public async Task SendActivityPingAsync()
         {
@@ -1188,12 +1219,12 @@ namespace TDFMAUI.Services
             try
             {
                 int notificationId = 0;
-                
+
                 if (element.TryGetProperty("notificationId", out var notificationIdElement))
                 {
                     notificationId = notificationIdElement.GetInt32();
                 }
-                
+
                 // You could raise an event or update UI directly
                 // For now, just log it
                 _logger.LogDebug("Notification {NotificationId} marked as seen", notificationId);
@@ -1203,14 +1234,14 @@ namespace TDFMAUI.Services
                 _logger.LogError(ex, "Error handling notification seen message");
             }
         }
-        
+
         private void HandleNotificationsSeen(JsonElement element)
         {
             try
             {
                 var notificationIds = new List<int>();
-                
-                if (element.TryGetProperty("notificationIds", out var idsElement) && 
+
+                if (element.TryGetProperty("notificationIds", out var idsElement) &&
                     idsElement.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var idElement in idsElement.EnumerateArray())
@@ -1218,9 +1249,9 @@ namespace TDFMAUI.Services
                         notificationIds.Add(idElement.GetInt32());
                     }
                 }
-                
+
                 // You could raise an event or update UI directly
-                _logger.LogDebug("Multiple notifications marked as seen: {NotificationIds}", 
+                _logger.LogDebug("Multiple notifications marked as seen: {NotificationIds}",
                     string.Join(", ", notificationIds));
             }
             catch (Exception ex)
@@ -1247,9 +1278,9 @@ namespace TDFMAUI.Services
                 _logger.LogInformation("Server confirmed availability set to: {IsAvailable}", isAvailable);
                 // Raise the event
                 MainThread.BeginInvokeOnMainThread(() => {
-                    AvailabilitySet?.Invoke(this, new AvailabilitySetEventArgs 
-                    { 
-                        IsAvailable = isAvailable, 
+                    AvailabilitySet?.Invoke(this, new AvailabilitySetEventArgs
+                    {
+                        IsAvailable = isAvailable,
                         Timestamp = timestamp
                     });
                 });
@@ -1284,10 +1315,10 @@ namespace TDFMAUI.Services
                 _logger.LogInformation("Server confirmed status updated to: {Status} ({StatusMessage})", status, statusMessage ?? "null");
                 // Raise the event
                  MainThread.BeginInvokeOnMainThread(() => {
-                    StatusUpdateConfirmed?.Invoke(this, new StatusUpdateConfirmedEventArgs 
-                    { 
-                        Status = status, 
-                        StatusMessage = statusMessage, 
+                    StatusUpdateConfirmed?.Invoke(this, new StatusUpdateConfirmedEventArgs
+                    {
+                        Status = status,
+                        StatusMessage = statusMessage,
                         Timestamp = timestamp
                     });
                  });
@@ -1297,7 +1328,7 @@ namespace TDFMAUI.Services
                 _logger.LogError(ex, "Error handling status_updated message");
             }
         }
-        
+
         private void HandleError(JsonElement element)
         {
              try
@@ -1320,7 +1351,7 @@ namespace TDFMAUI.Services
                 }
 
                 _logger.LogError("Received error from server: Code={ErrorCode}, Message={ErrorMessage}", errorCode ?? "N/A", errorMessage);
-                
+
                 // Raise a specific error event
                  MainThread.BeginInvokeOnMainThread(() => {
                      ErrorReceived?.Invoke(this, new WebSocketErrorEventArgs

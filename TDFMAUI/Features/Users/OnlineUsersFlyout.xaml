@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:converters="clr-namespace:TDFMAUI.Converters"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             x:Class="TDFMAUI.Features.Users.OnlineUsersFlyout">
+
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <converters:ByteArrayToImageSourceConverter x:Key="ByteArrayToImageSourceConverter" />
+        </ResourceDictionary>
+    </ContentView.Resources>
+
+    <Grid RowDefinitions="Auto,*" Padding="10">
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <Label Text="Online Users"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   VerticalOptions="Center" />
+
+            <Button Grid.Column="1"
+                    Text="↻"
+                    Clicked="OnRefreshClicked"
+                    BackgroundColor="{StaticResource Primary}"
+                    TextColor="White"
+                    HeightRequest="40"
+                    WidthRequest="40"
+                    CornerRadius="20" />
+        </Grid>
+
+        <!-- User list -->
+        <RefreshView Grid.Row="1" x:Name="refreshView" IsRefreshing="False" RefreshColor="{StaticResource Primary}">
+            <ScrollView>
+                <VerticalStackLayout>
+                    <CollectionView x:Name="usersCollection"
+                                    EmptyView="No users currently online">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,5" Padding="10">
+                                    <Frame BackgroundColor="White"
+                                           CornerRadius="10"
+                                           BorderColor="{StaticResource Gray300}"
+                                           HasShadow="True">
+                                        <Grid RowDefinitions="Auto" ColumnDefinitions="Auto,*,Auto" Padding="5">
+                                            <!-- Profile Picture -->
+                                            <Border Grid.Column="0"
+                                                   StrokeShape="RoundRectangle 25,25,25,25"
+                                                   HeightRequest="50"
+                                                   WidthRequest="50"
+                                                   Stroke="{Binding StatusColor}"
+                                                   StrokeThickness="2"
+                                                   Margin="0,0,10,0">
+                                                <Image Source="{Binding ProfilePictureData, Converter={StaticResource ByteArrayToImageSourceConverter}}"
+                                                       Aspect="AspectFill"
+                                                       HeightRequest="50"
+                                                       WidthRequest="50" />
+                                            </Border>
+
+                                            <!-- User Info -->
+                                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                                <Label Text="{Binding FullName}"
+                                                       FontAttributes="Bold"
+                                                       FontSize="16" />
+                                                <Label>
+                                                    <Label.FormattedText>
+                                                        <FormattedString>
+                                                            <Span Text="- " />
+                                                            <Span Text="{Binding Department}" />
+                                                        </FormattedString>
+                                                    </Label.FormattedText>
+                                                </Label>
+                                            </VerticalStackLayout>
+
+                                            <!-- Status Indicator -->
+                                            <Border Grid.Column="2"
+                                                   BackgroundColor="{Binding StatusColor}"
+                                                   WidthRequest="16"
+                                                   HeightRequest="16"
+                                                   StrokeShape="RoundRectangle 8,8,8,8"
+                                                   Padding="0"
+                                                   VerticalOptions="Center"
+                                                   HorizontalOptions="End" />
+                                        </Grid>
+                                    </Frame>
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+
+        <!-- Loading indicator -->
+        <ActivityIndicator Grid.Row="1"
+                           x:Name="loadingIndicator"
+                           IsVisible="False"
+                           IsRunning="False"
+                           Color="{StaticResource Primary}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center" />
+    </Grid>
+</ContentView>

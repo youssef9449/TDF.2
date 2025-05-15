@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using TDFMAUI.Services;
+using TDFShared.Enums;
 
 namespace TDFMAUI.ViewModels
 {
@@ -23,7 +24,7 @@ namespace TDFMAUI.ViewModels
 
         [ObservableProperty]
         private string? _errorMessage;
-        
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsNotBusy))]
         private bool _isBusy;
@@ -31,7 +32,7 @@ namespace TDFMAUI.ViewModels
         public bool IsNotBusy => !IsBusy;
 
         public LoginPageViewModel(
-            IAuthService authService, 
+            IAuthService authService,
             WebSocketService webSocketService,
             ILogger<LoginPageViewModel> logger,
             IServiceProvider serviceProvider)
@@ -42,9 +43,20 @@ namespace TDFMAUI.ViewModels
             _serviceProvider = serviceProvider;
         }
 
+        /// <summary>
+        /// Clears login data when returning to the login page
+        /// </summary>
+        public void ClearLoginData()
+        {
+            // Only clear password for security, keep username for convenience
+            Password = string.Empty;
+            ErrorMessage = string.Empty;
+            IsBusy = false;
+        }
+
         // Determine if the login command can execute
-        private bool CanLogin() => !string.IsNullOrWhiteSpace(Username) && 
-                                   !string.IsNullOrWhiteSpace(Password) && 
+        private bool CanLogin() => !string.IsNullOrWhiteSpace(Username) &&
+                                   !string.IsNullOrWhiteSpace(Password) &&
                                    !IsBusy;
 
         [RelayCommand(CanExecute = nameof(CanLogin))]
@@ -55,17 +67,17 @@ namespace TDFMAUI.ViewModels
             try
             {
                 _logger.LogInformation("Login attempt for user: {Username}", Username);
-                
+
                 // Use non-null assertion because CanLogin ensures they are not null/whitespace
                 var userDetails = await _authService.LoginAsync(Username!, Password!);
 
                 if (userDetails != null)
                 {
                     // Guard against null properties with null conditional operators and default values
-                    _logger.LogInformation("Login successful for user ID: {UserId}, Name: {FullName}", 
-                        userDetails.UserId, 
+                    _logger.LogInformation("Login successful for user ID: {UserId}, Name: {FullName}",
+                        userDetails.UserId,
                         userDetails.FullName ?? "Unknown");
-                    
+
                     // Store needed data in a try-catch to handle any issues
                     try
                     {
@@ -73,74 +85,81 @@ namespace TDFMAUI.ViewModels
                         _logger.LogInformation("Setting up WebSocket connection after successful login");
                         var webSocketService = _serviceProvider.GetRequiredService<IWebSocketService>();
                         await webSocketService.ConnectAsync();
-                        
+
+                        // Update user status to Online
+                        _logger.LogInformation("Updating user status to Online after login");
+                        var userPresenceService = _serviceProvider.GetRequiredService<IUserPresenceService>();
+                        await userPresenceService.UpdateStatusAsync(UserPresenceStatus.Online, "");
+
                         // Navigate to main page
                         _logger.LogInformation("Navigating to main page after successful login");
-                        if (Shell.Current != null)
+
+                        // Always create a new AppShell and set it as MainPage
+                        try
                         {
-                            await Shell.Current.GoToAsync($"//{nameof(MainPage)}");
+                            var appShell = _serviceProvider?.GetService<AppShell>();
+                            if (appShell != null && Application.Current != null)
+                            {
+                                _logger.LogInformation("Setting AppShell as MainPage");
+                                Application.Current.MainPage = appShell;
+
+                                // Wait a moment for the shell to initialize
+                                await Task.Delay(100);
+
+                                // Now try to navigate if Shell.Current is available
+                                if (Shell.Current != null)
+                                {
+                                    _logger.LogInformation("Shell.Current is now available, navigating to MainPage");
+                                    await Shell.Current.GoToAsync($"//{nameof(MainPage)}");
+                                }
+                            }
+                            else
+                            {
+                                throw new InvalidOperationException("AppShell could not be resolved or Application.Current is null.");
+                            }
                         }
-                        else
+                        catch (Exception shellEx)
                         {
-                            _logger.LogWarning("Shell.Current is null. Attempting to set AppShell as MainPage.");
-                            try
-                            {
-                                var appShell = _serviceProvider?.GetService<AppShell>();
-                                if (appShell != null && Application.Current != null)
-                                {
-                                    Application.Current.MainPage = appShell;
-                                }
-                                else
-                                {
-                                    throw new InvalidOperationException("AppShell could not be resolved or Application.Current is null.");
-                                }
-                            }
-                            catch (Exception shellEx)
-                            {
-                                _logger.LogError(shellEx, "Failed to set AppShell as MainPage after login.");
-                                ErrorMessage = "Login successful, but failed to navigate to the main application page. Please restart.";
-                            }
+                            _logger.LogError(shellEx, "Failed to set AppShell as MainPage after login.");
+                            ErrorMessage = "Login successful, but failed to navigate to the main application page. Please restart.";
                         }
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error during post-login navigation or WebSocket setup");
                         ErrorMessage = "Login successful, but there was an issue connecting to services. Some features may be limited.";
-                        
+
                         // Try to navigate anyway, even if WebSocket failed
                         _logger.LogInformation("Attempting secondary navigation to main page after WebSocket error.");
-                        if (Shell.Current != null)
+
+                        // Always create a new AppShell and set it as MainPage for consistency
+                        try
                         {
-                            try
+                            var appShell = _serviceProvider?.GetService<AppShell>();
+                            if (appShell != null && Application.Current != null)
                             {
-                                await Shell.Current.GoToAsync($"//{nameof(MainPage)}");
+                                _logger.LogInformation("Setting AppShell as MainPage (secondary navigation)");
+                                Application.Current.MainPage = appShell;
+
+                                // Wait a moment for the shell to initialize
+                                await Task.Delay(100);
+
+                                // Now try to navigate if Shell.Current is available
+                                if (Shell.Current != null)
+                                {
+                                    _logger.LogInformation("Shell.Current is now available, navigating to MainPage (secondary navigation)");
+                                    await Shell.Current.GoToAsync($"//{nameof(MainPage)}");
+                                }
                             }
-                            catch (Exception navEx)
+                            else
                             {
-                                _logger.LogError(navEx, "Secondary Shell navigation failure after WebSocket error");
-                                ErrorMessage = "Unable to proceed after login (Shell error). Please restart the application.";
+                                throw new InvalidOperationException("AppShell could not be resolved or Application.Current is null for secondary navigation.");
                             }
                         }
-                        else
+                        catch (Exception shellEx)
                         {
-                            _logger.LogWarning("Shell.Current is null for secondary navigation. Attempting to set AppShell as MainPage.");
-                            try
-                            {
-                                var appShell = _serviceProvider?.GetService<AppShell>();
-                                if (appShell != null && Application.Current != null)
-                                {
-                                    Application.Current.MainPage = appShell;
-                                }
-                                else
-                                {
-                                    throw new InvalidOperationException("AppShell could not be resolved or Application.Current is null for secondary navigation.");
-                                }
-                            }
-                            catch (Exception shellEx)
-                            {
-                                _logger.LogError(shellEx, "Failed to set AppShell as MainPage during secondary navigation attempt.");
-                                ErrorMessage = "Unable to proceed after login (AppShell setup error). Please restart the application.";
-                            }
+                            _logger.LogError(shellEx, "Failed to set AppShell as MainPage during secondary navigation attempt.");
+                            ErrorMessage = "Unable to proceed after login (AppShell setup error). Please restart the application.";
                         }
                     }
                 }
@@ -156,7 +175,7 @@ namespace TDFMAUI.ViewModels
                 ErrorMessage = "An unexpected error occurred. Please try again.";
             }
             finally
-            {                
+            {
                 IsBusy = false;
             }
         }
@@ -168,4 +187,4 @@ namespace TDFMAUI.ViewModels
         //     await Shell.Current.GoToAsync("SignupPage"); // Assuming route name
         // }
     }
-} 
+}

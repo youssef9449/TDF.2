@@ -264,12 +264,22 @@ namespace TDFMAUI.Services
             var tokenInfo = await _secureStorage.GetTokenAsync();
             if (!string.IsNullOrEmpty(tokenInfo.Token) && tokenInfo.Expiration > DateTime.UtcNow)
             {
+                _logger?.LogInformation("ApiService: InitializeAuthenticationAsync - Found valid token in secure storage. Token: {Token}, Expires: {Expiration}", tokenInfo.Token.Length > 10 ? tokenInfo.Token.Substring(0, 10) + "..." : tokenInfo.Token, tokenInfo.Expiration);
                 _httpClientService.SetAuthorizationHeader(tokenInfo.Token);
-                _logger?.LogInformation("ApiService: Initialization - Found valid token.");
+                _logger?.LogInformation("ApiService: Initialization - Authorization header SET with stored token.");
             }
             else
             {
+                if (string.IsNullOrEmpty(tokenInfo.Token))
+                {
+                    _logger?.LogWarning("ApiService: InitializeAuthenticationAsync - No token found in secure storage.");
+                }
+                else
+                {
+                    _logger?.LogWarning("ApiService: InitializeAuthenticationAsync - Token found but expired. Expires: {Expiration}, Current UTC: {UtcNow}", tokenInfo.Expiration, DateTime.UtcNow);
+                }
                 _httpClientService.ClearAuthorizationHeader();
+                _logger?.LogInformation("ApiService: Initialization - Authorization header CLEARED.");
             }
             _initialized = true;
         }

@@ -18,7 +18,7 @@ namespace TDFMAUI.Services
             _localStorage = localStorage;
         }
 
-        public async Task<bool> ShowNotificationAsync(string title, string message, NotificationType notificationType = NotificationType.Info, string data = null)
+        public async Task<bool> ShowNotificationAsync(string title, string message, NotificationType notificationType = NotificationType.Info, string? data = null)
         {
             try
             {
@@ -49,7 +49,7 @@ namespace TDFMAUI.Services
             }
         }
 
-        private async Task<bool> ShowDesktopNotificationAsync(string title, string message, NotificationType notificationType, string data = null)
+        private async Task<bool> ShowDesktopNotificationAsync(string title, string message, NotificationType notificationType, string? data = null)
         {
             try
             {
@@ -84,7 +84,7 @@ namespace TDFMAUI.Services
             }
         }
 
-        private async Task<bool> ShowMobileNotificationAsync(string title, string message, NotificationType notificationType, string data = null)
+        private async Task<bool> ShowMobileNotificationAsync(string title, string message, NotificationType notificationType, string? data = null)
         {
             try
             {
@@ -120,7 +120,7 @@ namespace TDFMAUI.Services
             }
         }
 
-        private async Task ShowInAppNotificationAsync(string title, string message, NotificationType notificationType, string data = null)
+        private async Task ShowInAppNotificationAsync(string title, string message, NotificationType notificationType, string? data = null)
         {
             try
             {
@@ -178,7 +178,7 @@ namespace TDFMAUI.Services
             return status;
         }
 
-        private async Task LogNotificationAsync(string title, string message, NotificationType type, string data = null)
+        private async Task LogNotificationAsync(string title, string message, NotificationType type, string? data = null)
         {
             try
             {
@@ -241,7 +241,7 @@ namespace TDFMAUI.Services
         // Event for in-app notifications
         public event EventHandler<NotificationEventArgs> InAppNotificationRequested;
 
-        public Task<bool> ShowLocalNotificationAsync(string title, string message, NotificationType type, string data = null)
+        public Task<bool> ShowLocalNotificationAsync(string title, string message, NotificationType type, string? data = null)
         {
             try
             {
@@ -258,7 +258,7 @@ namespace TDFMAUI.Services
             }
         }
         
-        public Task<bool> ScheduleNotificationAsync(string title, string message, DateTime deliveryTime, string data = null)
+        public Task<bool> ScheduleNotificationAsync(string title, string message, DateTime deliveryTime, string? data = null)
         {
             _logger.LogInformation("Scheduling notification: {Title} for {DeliveryTime}", title, deliveryTime);
             // Scheduled notifications would require platform-specific implementation

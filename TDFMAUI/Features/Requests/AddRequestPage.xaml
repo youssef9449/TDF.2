@@ -4,7 +4,6 @@
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              xmlns:vm="clr-namespace:TDFMAUI.ViewModels"
              xmlns:viewModels="clr-namespace:TDFMAUI.ViewModels"
-             xmlns:models="clr-namespace:TDFMAUI.Models"
              xmlns:converters="clr-namespace:TDFMAUI.Converters"
              x:DataType="viewModels:AddRequestViewModel"
              x:Class="TDFMAUI.Features.Requests.AddRequestPage"
@@ -16,6 +15,15 @@
         <ResourceDictionary>
             <helpers:BoolToStringConverter x:Key="BoolToStringConverter" />
             <converters:ValidationStateToColorConverter x:Key="ValidationColorConverter" />
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <converters:LeaveTypeToTimePickersVisibilityConverter x:Key="LeaveTypeToTimePickersVisibilityConverter" />
+
+            <Style x:Key="FormFieldTitleLabelStyle" TargetType="Label">
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="TextColor" Value="White" />
+                <Setter Property="VerticalOptions" Value="Center" />
+                <Setter Property="Margin" Value="0,0,0,5" /> <!-- Add some bottom margin for stacked layout -->
+            </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -59,75 +67,46 @@
                        HasShadow="True">
                     <VerticalStackLayout Spacing="{OnIdiom Phone='12', Default='15'}">
 
-                        <!-- Common Fields Layout using MVVM -->
-                        <Grid ColumnDefinitions="1*,2*" ColumnSpacing="10" RowSpacing="15">
-                            <!-- User Picker - Commented out for now, needs ViewModel properties
-                            <Label Grid.Row="0" Grid.Column="0"
-                                   Text="User"
-                                   FontAttributes="Bold"
-                                   TextColor="White"
-                                   VerticalOptions="Center"/>
-                            <Picker Grid.Row="0" Grid.Column="1"
-                                   ItemsSource="{Binding Users}"
-                                   SelectedItem="{Binding SelectedUser}"
-                                   Title="Select User"
-                                   TextColor="White"
-                                   BackgroundColor="#1565c0"/>
-                             -->
+                        <!-- Layout for Desktop/Tablet (Grid) -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" RowSpacing="15"
+                              IsVisible="{Binding Source={x:Static helpers:DeviceHelper.UseCompactUI}, Converter={StaticResource InverseBoolConverter}}">
+                            <!-- User Picker - Commented out -->
+                            <!--
+                            <Label Grid.Row="0" Grid.Column="0" Text="User" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                            <Picker Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Users}" SelectedItem="{Binding SelectedUser}" Title="Select User" TextColor="White" BackgroundColor="#1565c0"/>
+                            -->
 
-                            <Label Grid.Row="1" Grid.Column="0"
-                                   Text="Leave Type"
-                                   FontAttributes="Bold"
-                                   TextColor="White"
-                                   VerticalOptions="Center"/>
+                            <Label Grid.Row="1" Grid.Column="0" Text="Leave Type" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                             <Border Grid.Row="1" Grid.Column="1" StrokeThickness="1"
                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='LeaveType'}"
                                     Padding="0" BackgroundColor="#1565c0">
-                                <Picker ItemsSource="{Binding LeaveTypes}"
-                                        SelectedItem="{Binding SelectedLeaveType}"
-                                        Title="Select Leave Type"
-                                        TextColor="White"
-                                        BackgroundColor="Transparent"/>
+                                <Picker ItemsSource="{Binding LeaveTypes}" SelectedItem="{Binding SelectedLeaveType}" Title="Select Leave Type" TextColor="White" BackgroundColor="Transparent"/>
                             </Border>
 
-                            <Label Grid.Row="2" Grid.Column="0"
-                                   Text="Start Date"
-                                   FontAttributes="Bold"
-                                   TextColor="White"
-                                   VerticalOptions="Center"/>
+                            <Label Grid.Row="2" Grid.Column="0" Text="Start Date" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                             <Border Grid.Row="2" Grid.Column="1" StrokeThickness="1"
                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartDate'}"
                                     Padding="0">
-                                <DatePicker Date="{Binding StartDate}"
-                                            Format="D"/>
+                                <DatePicker Date="{Binding StartDate}" Format="D"/>
                             </Border>
 
-                            <Label Grid.Row="3" Grid.Column="0"
-                                   Text="End Date"
-                                   FontAttributes="Bold"
-                                   TextColor="White"
-                                   VerticalOptions="Center"/>
+                            <Label Grid.Row="3" Grid.Column="0" Text="End Date" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                             <Border Grid.Row="3" Grid.Column="1" StrokeThickness="1"
                                      Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndDate'}"
                                      Padding="0">
-                                 <DatePicker Date="{Binding EndDate}"
-                                             Format="D"/>
+                                 <DatePicker Date="{Binding EndDate}" Format="D"/>
                              </Border>
 
-                             <!-- Partial Day Selection Toggle -->
-                            <Label Grid.Row="4" Grid.Column="0" Text="Partial Day?" TextColor="White" VerticalOptions="Center"/>
-                            <CheckBox Grid.Row="4" Grid.Column="1" IsChecked="{Binding IsPartialDay}" Color="White" HorizontalOptions="Start"/>
-
-
-                             <!-- Partial Day Time Pickers (conditional visibility) -->
-                            <Grid Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
-                                  IsVisible="{Binding IsPartialDay}" ColumnSpacing="10" Margin="0,5,0,0">
+                            <!-- Time Pickers for Permission/External Assignment - Desktop/Tablet -->
+                            <Grid Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
+                                  IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToTimePickersVisibilityConverter}}"
+                                  ColumnSpacing="10" Margin="0,5,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <VerticalStackLayout Grid.Column="0">
-                                    <Label Text="Start Time" TextColor="White" FontSize="Small"/>
+                                    <Label Text="From Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                                     <Border StrokeThickness="1"
                                             Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartTime'}"
                                             Padding="0">
@@ -135,7 +114,7 @@
                                      </Border>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1">
-                                    <Label Text="End Time" TextColor="White" FontSize="Small"/>
+                                    <Label Text="To Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                                     <Border StrokeThickness="1"
                                             Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndTime'}"
                                             Padding="0">
@@ -144,22 +123,67 @@
                                 </VerticalStackLayout>
                             </Grid>
 
-
-                            <Label Grid.Row="6" Grid.Column="0"
-                                   Text="Reason"
-                                   FontAttributes="Bold"
-                                   TextColor="White"
-                                   VerticalOptions="Start"/>
-                            <Border Grid.Row="6" Grid.Column="1" StrokeThickness="1"
+                            <Label Grid.Row="5" Grid.Column="0" Text="Reason" Style="{StaticResource FormFieldTitleLabelStyle}" VerticalOptions="Start"/>
+                            <Border Grid.Row="5" Grid.Column="1" StrokeThickness="1"
                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='Reason'}"
                                     Padding="0">
-                                <Editor Text="{Binding RequestReason}"
-                                        Placeholder="Enter reason for leave (optional)"
-                                        MaxLength="200"
-                                        AutoSize="TextChanges"
-                                        HeightRequest="80"/>
+                                <Editor Text="{Binding RequestReason}" Placeholder="Enter reason for leave (optional)" MaxLength="200" AutoSize="TextChanges" HeightRequest="80"/>
                             </Border>
                         </Grid>
+
+                        <!-- Layout for Phone (VerticalStackLayout) -->
+                        <VerticalStackLayout Spacing="10"
+                                             IsVisible="{Binding Source={x:Static helpers:DeviceHelper.UseCompactUI}}">
+                            <!-- User Picker - Commented out -->
+                            <!--
+                            <Label Text="User" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                            <Picker ItemsSource="{Binding Users}" SelectedItem="{Binding SelectedUser}" Title="Select User" TextColor="White" BackgroundColor="#1565c0"/>
+                            -->
+
+                            <Label Text="Leave Type" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                            <Border StrokeThickness="1"
+                                    Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='LeaveType'}"
+                                    Padding="0" BackgroundColor="#1565c0">
+                                <Picker ItemsSource="{Binding LeaveTypes}" SelectedItem="{Binding SelectedLeaveType}" Title="Select Leave Type" TextColor="White" BackgroundColor="Transparent"/>
+                            </Border>
+
+                            <Label Text="Start Date" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                            <Border StrokeThickness="1"
+                                    Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartDate'}"
+                                    Padding="0">
+                                <DatePicker Date="{Binding StartDate}" Format="D"/>
+                            </Border>
+
+                            <Label Text="End Date" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                            <Border StrokeThickness="1"
+                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndDate'}"
+                                     Padding="0">
+                                 <DatePicker Date="{Binding EndDate}" Format="D"/>
+                             </Border>
+
+                            <!-- Time Pickers for Permission/External Assignment - Phone -->
+                            <VerticalStackLayout IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToTimePickersVisibilityConverter}}" Spacing="10" Margin="0,5,0,0">
+                                <Label Text="From Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                                <Border StrokeThickness="1"
+                                        Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartTime'}"
+                                        Padding="0">
+                                     <TimePicker Time="{Binding StartTime}" />
+                                 </Border>
+                                <Label Text="To Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                                <Border StrokeThickness="1"
+                                        Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndTime'}"
+                                        Padding="0">
+                                     <TimePicker Time="{Binding EndTime}" />
+                                 </Border>
+                            </VerticalStackLayout>
+                            
+                            <Label Text="Reason" Style="{StaticResource FormFieldTitleLabelStyle}" VerticalOptions="Start"/>
+                            <Border StrokeThickness="1"
+                                    Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='Reason'}"
+                                    Padding="0">
+                                <Editor Text="{Binding RequestReason}" Placeholder="Enter reason for leave (optional)" MaxLength="200" AutoSize="TextChanges" HeightRequest="80"/>
+                            </Border>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
                 </Frame>
 

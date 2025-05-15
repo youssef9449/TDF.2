@@ -32,7 +32,6 @@ namespace TDFMAUI.ViewModels
         // New private fields
         private ObservableCollection<string> _leaveTypes = new ObservableCollection<string>(); // Use ObservableCollection if types might change
         private string _selectedLeaveType = string.Empty;
-        private bool _isPartialDay;
         private bool _isBusy;
 
         public bool IsEditMode
@@ -110,21 +109,6 @@ namespace TDFMAUI.ViewModels
             set => SetProperty(ref _requestEndingTime, value);
         }
 
-        public bool IsPartialDay
-        {
-            get => _isPartialDay;
-            set {
-                SetProperty(ref _isPartialDay, value);
-                if (!value) // If not partial day, clear times
-                {
-                    StartTime = null;
-                    EndTime = null;
-                }
-                 // Trigger validation potentially?
-                 Validate();
-            }
-        }
-
         public List<string> ValidationErrors
         {
             get => _validationErrors;
@@ -156,8 +140,8 @@ namespace TDFMAUI.ViewModels
             LeaveType = this._selectedLeaveType,
             RequestStartDate = this._requestFromDay,
             RequestEndDate = this._requestToDay ?? this._requestFromDay,
-            RequestBeginningTime = this.IsPartialDay ? this._requestBeginningTime : null,
-            RequestEndingTime = this.IsPartialDay ? this._requestEndingTime : null,
+            RequestBeginningTime = (this.SelectedLeaveType == "Permission" || this.SelectedLeaveType == "External Assignment") ? this._requestBeginningTime : null,
+            RequestEndingTime = (this.SelectedLeaveType == "Permission" || this.SelectedLeaveType == "External Assignment") ? this._requestEndingTime : null,
             RequestReason = this._requestReason
         };
 
@@ -166,8 +150,8 @@ namespace TDFMAUI.ViewModels
             LeaveType = this._selectedLeaveType,
             RequestStartDate = this._requestFromDay,
             RequestEndDate = this._requestToDay ?? this._requestFromDay,
-            RequestBeginningTime = this.IsPartialDay ? this._requestBeginningTime : null,
-            RequestEndingTime = this.IsPartialDay ? this._requestEndingTime : null,
+            RequestBeginningTime = (this.SelectedLeaveType == "Permission" || this.SelectedLeaveType == "External Assignment") ? this._requestBeginningTime : null,
+            RequestEndingTime = (this.SelectedLeaveType == "Permission" || this.SelectedLeaveType == "External Assignment") ? this._requestEndingTime : null,
             RequestReason = this._requestReason,
             Remarks = null
         };
@@ -195,15 +179,22 @@ namespace TDFMAUI.ViewModels
                 StartDate = existingRequest.RequestStartDate;
                 EndDate = existingRequest.RequestEndDate;
 
-                IsPartialDay = existingRequest.RequestBeginningTime.HasValue || existingRequest.RequestEndingTime.HasValue;
-                StartTime = existingRequest.RequestBeginningTime;
-                EndTime = existingRequest.RequestEndingTime;
+                // If it's a type that uses time, populate StartTime and EndTime
+                if (existingRequest.LeaveType == "Permission" || existingRequest.LeaveType == "External Assignment")
+                {
+                    StartTime = existingRequest.RequestBeginningTime;
+                    EndTime = existingRequest.RequestEndingTime;
+                }
+                else
+                {
+                    StartTime = null;
+                    EndTime = null;
+                }
 
                 _requestType = existingRequest.LeaveType;
                 _requestFromDay = existingRequest.RequestStartDate;
                 _requestToDay = existingRequest.RequestEndDate;
-                _requestBeginningTime = existingRequest.RequestBeginningTime;
-                _requestEndingTime = existingRequest.RequestEndingTime;
+                // _requestBeginningTime and _requestEndingTime are directly bound to StartTime and EndTime properties
             }
             else
             {
@@ -211,7 +202,8 @@ namespace TDFMAUI.ViewModels
                 RequestId = Guid.NewGuid();
                 StartDate = DateTime.Today;
                 EndDate = DateTime.Today;
-                IsPartialDay = false;
+                StartTime = null; // Initialize to null for new requests
+                EndTime = null;   // Initialize to null for new requests
             }
         }
 
@@ -321,21 +313,40 @@ namespace TDFMAUI.ViewModels
                 errors.Add("End date cannot be before the start date.");
             }
 
-            if (IsPartialDay)
+            if (SelectedLeaveType == "Permission" || SelectedLeaveType == "External Assignment")
             {
                 if (!StartTime.HasValue || !EndTime.HasValue)
                 {
-                    errors.Add("Both start and end times must be provided for a partial day request.");
+                    errors.Add("Both From Time and To Time must be provided for this leave type.");
                 }
                 else if (EndTime.Value <= StartTime.Value)
                 {
-                    errors.Add("End time must be after the start time for a partial day request.");
+                    errors.Add("To Time must be after From Time.");
                 }
 
-                if (!EndDate.HasValue || EndDate.Value.Date != StartDate.Date)
+                // For Permission or External Assignment, they must be on the same day.
+                // StartDate and EndDate pickers should ideally enforce this or be a single day picker.
+                // For now, we'll validate that if EndDate is set, it's the same as StartDate.
+                if (EndDate.HasValue && EndDate.Value.Date != StartDate.Date)
                 {
-                    errors.Add("Partial day requests must start and end on the same calendar day.");
+                    errors.Add("Permissions and External Assignments must start and end on the same calendar day.");
                 }
+                 // Also, ensure EndDate is set if it's a time-based request, effectively making it a single-day event.
+                if (!EndDate.HasValue)
+                {
+                     // Silently set EndDate to StartDate for these types if not already set,
+                     // or add a validation error if strict single-day selection is required from UI.
+                     // For now, let's assume UI might allow EndDate to be null initially.
+                     // If EndDate is null, the DTOs will use StartDate.
+                }
+            }
+            else // For other leave types, ensure times are null
+            {
+                // This logic is implicitly handled by DTOs now, but good to be aware
+                // if (StartTime.HasValue || EndTime.HasValue)
+                // {
+                //    errors.Add("Time fields should not be set for this leave type.");
+                // }
             }
 
             ValidationErrors = errors;

@@ -6,7 +6,6 @@ using System.Runtime.CompilerServices;
 using TDFMAUI.Config;
 using Microsoft.Extensions.Logging;
 using TDFMAUI.Features.Requests;
-using TDFMAUI.Helpers;
 
 namespace TDFMAUI
 {
@@ -14,6 +13,7 @@ namespace TDFMAUI
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AppShell> _logger;
+        private readonly IUserPresenceService _userPresenceService;
 
         public bool IsAdmin => App.CurrentUser?.Roles?.Contains("Admin", StringComparer.OrdinalIgnoreCase) ?? false;
         public bool IsHR => App.CurrentUser?.Roles?.Contains("HR", StringComparer.OrdinalIgnoreCase) ?? false;
@@ -22,7 +22,7 @@ namespace TDFMAUI
         public bool IsDevelopmentMode => ApiConfig.DevelopmentMode;
         public bool IsDesktopUser => DeviceHelper.IsDesktop;
 
-        public AppShell(IAuthService authService, ILogger<AppShell> logger)
+        public AppShell(IAuthService authService, ILogger<AppShell> logger, IUserPresenceService userPresenceService)
         {
             try
             {
@@ -49,6 +49,7 @@ namespace TDFMAUI
                 }
 
                 _authService = authService;
+                _userPresenceService = userPresenceService;
 
                 // Register routes for navigation
                 _logger?.LogInformation("AppShell registering routes.");
@@ -61,6 +62,18 @@ namespace TDFMAUI
 
                 // Hook into user changed event to refresh admin status
                 App.UserChanged += OnUserChanged;
+
+                // Initialize the online users flyout
+                if (onlineUsersFlyout != null)
+                {
+                    _logger?.LogInformation("Initializing online users flyout.");
+                    Task.Run(async () => await onlineUsersFlyout.Initialize());
+                }
+
+                // Configure swipe gesture for right flyout
+                _logger?.LogInformation("Configuring right swipe gesture for flyout.");
+                SetupRightSwipeGesture();
+
                 _logger?.LogInformation("AppShell constructor completed successfully.");
             }
             catch (Exception ex)
@@ -82,7 +95,6 @@ namespace TDFMAUI
             Routing.RegisterRoute(nameof(MessagesPage), typeof(MessagesPage));
 
             // Debug routes
-            Routing.RegisterRoute(nameof(DebugPage), typeof(DebugPage));
             Routing.RegisterRoute(nameof(DiagnosticsPage), typeof(DiagnosticsPage));
 
             // Admin routes
@@ -101,6 +113,15 @@ namespace TDFMAUI
         {
             base.OnDisappearing();
             App.UserChanged -= OnUserChanged;
+
+            // Unsubscribe from the Navigated event
+            this.Navigated -= OnShellNavigated;
+
+            // Clean up the online users flyout
+            if (onlineUsersFlyout != null)
+            {
+                onlineUsersFlyout.Cleanup();
+            }
         }
 
         private async void OnLogoutClicked(object sender, EventArgs e)
@@ -130,30 +151,5 @@ namespace TDFMAUI
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
-
-        //region Right-Side Users Flyout Logic
-
-        // Method to open the user flyout panel using Shell navigation
-        public void ShowUserPanel()
-        {
-            Shell.Current.GoToAsync("//users");
-        }
-
-        // Method to ensure we can get back to the main page
-        public void CloseUserPanel()
-        {
-            Shell.Current.GoToAsync("//main");
-        }
-
-        // These methods replace the old RightSideUsersFlyout methods
-        private async void OpenUsersFlyout_Tapped(object sender, EventArgs e)
-        {
-            await Shell.Current.GoToAsync("//users");
-        }
-
-        // The close method is now handled in the UsersRightPanel itself
-        // Gesture handlers are removed as we use Shell navigation instead
-
-        //endregion
     }
 }

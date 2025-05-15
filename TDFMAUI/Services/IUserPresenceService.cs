@@ -14,7 +14,7 @@ namespace TDFMAUI.Services
         Task UpdateStatusAsync(UserPresenceStatus status, string statusMessage = null);
         Task SetAvailabilityForChatAsync(bool isAvailable);
         UserPresenceStatus ParseStatus(string status);
-        
+
         // Events
         event EventHandler<UserStatusChangedEventArgs> UserStatusChanged;
         event EventHandler<UserAvailabilityChangedEventArgs> UserAvailabilityChanged;
@@ -22,7 +22,7 @@ namespace TDFMAUI.Services
         event EventHandler<StatusUpdateConfirmedEventArgs> StatusUpdateConfirmed;
         event EventHandler<WebSocketErrorEventArgs> PresenceErrorReceived;
     }
-    
+
     public class UserPresenceInfo
     {
         public int UserId { get; set; }
@@ -33,16 +33,17 @@ namespace TDFMAUI.Services
         public bool IsAvailableForChat { get; set; }
         public string Department { get; set; }
         public DateTime LastActivityTime { get; set; }
+        public byte[] ProfilePictureData { get; set; }
         public int Id => UserId; // ID property alias for backward compatibility
     }
-    
+
     public class UserStatusChangedEventArgs : EventArgs
     {
         public int UserId { get; set; }
         public UserPresenceStatus Status { get; set; }
         public string Username { get; set; }
     }
-    
+
     public class UserAvailabilityChangedEventArgs : EventArgs
     {
         public int UserId { get; set; }
@@ -50,4 +51,4 @@ namespace TDFMAUI.Services
         public bool IsAvailableForChat { get; set; }
         public DateTime Timestamp { get; set; }
     }
-} 
+}

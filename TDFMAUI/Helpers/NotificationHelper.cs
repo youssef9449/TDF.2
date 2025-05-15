@@ -64,7 +64,7 @@ namespace TDFMAUI.Helpers
             string title, 
             string message, 
             NotificationType type = NotificationType.Info,
-            string data = null)
+            string? data = null)
         {
             // Record the notification
             _notificationHistory.Add(new NotificationRecord
@@ -75,7 +75,11 @@ namespace TDFMAUI.Helpers
                 Timestamp = DateTime.Now,
                 Data = data
             });
-            
+
+            // Assuming the operation is successful if no exceptions occur
+            // Actual notification display logic might be asynchronous and return a more meaningful boolean
+            // return await Task.FromResult(true); // This line made the subsequent code unreachable
+
             if (_platformNotificationService != null)
             {
                 return await _platformNotificationService.ShowNotificationAsync(title, message, type, data);

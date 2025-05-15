@@ -58,16 +58,22 @@ namespace TDFMAUI.Services
 
         public void SetAuthorizationHeader(string token)
         {
-            _httpClient.DefaultRequestHeaders.Authorization = string.IsNullOrEmpty(token) 
-                ? null 
-                : new AuthenticationHeaderValue("Bearer", token);
-            _logger.LogTrace("Authorization header set.");
+            if (string.IsNullOrEmpty(token))
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = null;
+                _logger.LogInformation("HttpClientService: SetAuthorizationHeader - Token was null/empty, header CLEARED.");
+            }
+            else
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                _logger.LogInformation("HttpClientService: SetAuthorizationHeader - Bearer token SET. Token starts with: {TokenStart}", token.Length > 10 ? token.Substring(0, 10) + "..." : token);
+            }
         }
 
         public void ClearAuthorizationHeader()
         {
             _httpClient.DefaultRequestHeaders.Authorization = null;
-             _logger.LogTrace("Authorization header cleared.");
+            _logger.LogInformation("HttpClientService: ClearAuthorizationHeader - Authorization header CLEARED.");
         }
 
         public async Task<T> GetAsync<T>(string endpoint)
@@ -87,14 +93,33 @@ namespace TDFMAUI.Services
                         return default(T);
                     }
                     contentStream.Position = 0; // Reset stream position
-                    return await JsonSerializer.DeserializeAsync<T>(contentStream, _jsonOptions);
+                    var apiResponse = await JsonSerializer.DeserializeAsync<ApiResponse<T>>(contentStream, _jsonOptions);
+
+                    if (apiResponse != null)
+                    {
+                        if (apiResponse.Success)
+                        {
+                            return apiResponse.Data;
+                        }
+                        // If HTTP status was success, but API response indicates failure
+                        _logger.LogWarning("API call to {Endpoint} returned success status code but application-level failure: {Message}", endpoint, apiResponse.Message);
+                        // EnsureSuccessStatusCodeAsync would have thrown for non-2xx. This handles 2xx with "Success": false.
+                        // We use the status code from the ApiResponse if available, otherwise the HTTP response's.
+                        var effectiveStatusCode = apiResponse.StatusCode != 0 ? (HttpStatusCode)apiResponse.StatusCode : response.StatusCode;
+                        throw new ApiException(effectiveStatusCode, apiResponse.Message ?? $"API operation failed for {endpoint} despite a success status code.", await response.Content.ReadAsStringAsync());
+                    }
+                    
+                    _logger.LogWarning("Deserialized ApiResponse was null for GET {Endpoint}, though HTTP status was {StatusCode}", endpoint, response.StatusCode);
+                    // This case (null apiResponse after successful HTTP and deserialization attempt) is unusual.
+                    // Throwing an exception is safer than returning default(T) which might hide issues.
+                    throw new ApiException(response.StatusCode, $"Failed to obtain a valid API response structure from {endpoint}.", await response.Content.ReadAsStringAsync());
                 }
                 catch (JsonException jsonEx)
                 {
                     _logger.LogError(jsonEx, "JSON Deserialization Error on GET {Endpoint}", endpoint);
-                    var content = await response.Content.ReadAsStringAsync();
-                    _logger.LogError("Raw Response Content: {Content}", content);
-                    throw new ApiException($"Failed to deserialize response from {endpoint}", jsonEx);
+                    var content = await response.Content.ReadAsStringAsync(); // Content already read if JsonException on ApiResponse<T>
+                    _logger.LogError("Raw Response Content (at JsonException): {Content}", content); // Log it again for clarity here
+                    throw new ApiException($"Failed to deserialize response from {endpoint}. Details: {jsonEx.Message}", jsonEx);
                 }
             });
         }

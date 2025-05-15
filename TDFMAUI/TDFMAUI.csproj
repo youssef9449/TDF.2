@@ -4,12 +4,12 @@
 	<PropertyGroup>
 		<TargetFrameworks>net8.0-ios;net8.0-maccatalyst;net8.0-android</TargetFrameworks>
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0</TargetFrameworks>
-		
+
 		<!-- Disable AOT compilation for all platforms -->
 		<RunAOTCompilation>false</RunAOTCompilation>
 		<PublishTrimmed>false</PublishTrimmed>
 		<EnablePackageSourceMapping>false</EnablePackageSourceMapping>
-		
+
 		<!-- Specify only x64 architecture for Windows -->
 		<RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">win10-x64</RuntimeIdentifiers>
 		<RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">iossimulator-x64</RuntimeIdentifiers>
@@ -24,7 +24,7 @@
 		<WarningsNotAsErrors>NU1605</WarningsNotAsErrors>
 		<NoWarn>$(NoWarn);CS1998;CS8632;CS0067;NU1100</NoWarn> <!-- Suppress specific C# warnings and NuGet warnings -->
 		<NullabilityInfoContextSupport>true</NullabilityInfoContextSupport>
-		
+
 		<!-- Windows Specific -->
 		<WindowsPackageType>None</WindowsPackageType>
 		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
@@ -45,11 +45,18 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
-		
+
 		<!-- Fix missing AppManifest error -->
 		<GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
 		<CreateAppxPackageOnBuild>false</CreateAppxPackageOnBuild>
 		<EnableMsixTooling>false</EnableMsixTooling>
+		<DisableMsixProjectCapabilityAddedByProject>true</DisableMsixProjectCapabilityAddedByProject>
+		<WindowsPackageType>None</WindowsPackageType>
+
+		<!-- Settings for standalone execution -->
+		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 	</PropertyGroup>
 
 	<!-- Android specific JAVAC options -->
@@ -128,6 +135,8 @@
 	  <PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop">
 	    <Version>8.0.100</Version>
 	  </PackageReference>
+	  <!-- Add direct reference to Microsoft.WindowsAppSDK to control the version -->
+	  <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240802000" />
 	</ItemGroup>
 
 	<!-- Windows Specific -->
@@ -147,13 +156,46 @@
 		<HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
 		<UseWinUI>true</UseWinUI>
 		<EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+
+		<!-- Additional settings to disable MSIX packaging and enable standalone execution -->
+		<EnableDefaultPageItems>false</EnableDefaultPageItems>
+		<EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+		<DisableEmbeddedXbf>true</DisableEmbeddedXbf>
+		<DisableMsixProjectCapabilityAddedByProject>true</DisableMsixProjectCapabilityAddedByProject>
+		<DisableXbfLineInfo>true</DisableXbfLineInfo>
+		<GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+
+		<!-- Settings for standalone execution -->
+		<SelfContained>true</SelfContained>
+		<RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+		<PublishSingleFile>false</PublishSingleFile>
+		<PublishReadyToRun>false</PublishReadyToRun>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<DebugType>embedded</DebugType>
+
+		<!-- Additional settings for standalone execution -->
+		<UseRidGraph>true</UseRidGraph>
+		<EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+		<EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
+		<EnableUnsafeUTF7Encoding>true</EnableUnsafeUTF7Encoding>
+		<EventSourceSupport>true</EventSourceSupport>
+		<HttpActivityPropagationSupport>true</HttpActivityPropagationSupport>
+		<MetadataUpdaterSupport>true</MetadataUpdaterSupport>
+		<UseSystemResourceKeys>false</UseSystemResourceKeys>
+		<DebuggerSupport>true</DebuggerSupport>
+		<StartupHookSupport>true</StartupHookSupport>
 	</PropertyGroup>
-	
+
 	<!-- Create missing directories for Windows build -->
 	<Target Name="CreateAppManifestDirectory" BeforeTargets="BeforeBuild" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<!-- Create both directory paths that might be needed -->
 		<MakeDir Directories="$(ProjectDir)obj\Debug\net8.0-windows10.0.19041.0\MsixContent" />
-		<WriteLinesToFile File="$(ProjectDir)obj\Debug\net8.0-windows10.0.19041.0\MsixContent\AppxManifest.xml" 
-						  Lines="&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
+		<MakeDir Directories="$(ProjectDir)obj\Debug\net8.0-windows10.0.19041.0\win10-x64\MsixContent" />
+
+		<!-- Define the AppManifest content -->
+		<PropertyGroup>
+			<AppManifestContent>&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
 &lt;Package xmlns=&quot;http://schemas.microsoft.com/appx/manifest/foundation/windows10&quot;
          xmlns:uap=&quot;http://schemas.microsoft.com/appx/manifest/uap/windows10&quot;
          xmlns:rescap=&quot;http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities&quot;
@@ -193,6 +235,115 @@
   &lt;Capabilities&gt;
     &lt;rescap:Capability Name=&quot;runFullTrust&quot; /&gt;
   &lt;/Capabilities&gt;
-&lt;/Package&gt;" Overwrite="true"/>
+&lt;/Package&gt;</AppManifestContent>
+		</PropertyGroup>
+
+		<!-- Write the file to both possible locations -->
+		<WriteLinesToFile File="$(ProjectDir)obj\Debug\net8.0-windows10.0.19041.0\MsixContent\AppxManifest.xml"
+						  Lines="$(AppManifestContent)" Overwrite="true"/>
+		<WriteLinesToFile File="$(ProjectDir)obj\Debug\net8.0-windows10.0.19041.0\win10-x64\MsixContent\AppxManifest.xml"
+						  Lines="$(AppManifestContent)" Overwrite="true"/>
+	</Target>
+
+	<!-- Bypass the problematic PRI generation task -->
+	<Target Name="BypassPriGenTask" BeforeTargets="_GeneratePriFiles;GeneratePriFile;_GenerateProjectPriFile" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<PropertyGroup>
+			<GenerateMsixPackageWithoutPriFiles>true</GenerateMsixPackageWithoutPriFiles>
+			<MsixGenerateAppxPackageOnBuild>false</MsixGenerateAppxPackageOnBuild>
+			<GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
+			<AppxBundle>Never</AppxBundle>
+			<GenerateAppInstallerFile>false</GenerateAppInstallerFile>
+			<AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+			<MsixSkipResourceGeneration>true</MsixSkipResourceGeneration>
+		</PropertyGroup>
+	</Target>
+
+	<!-- Completely disable the ExpandPriContent task -->
+	<Target Name="DisableExpandPriContent" BeforeTargets="Build" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<PropertyGroup>
+			<ExpandPriContentDependsOn></ExpandPriContentDependsOn>
+		</PropertyGroup>
+	</Target>
+
+	<!-- Override the problematic PRI generation targets -->
+	<Target Name="_GeneratePriFiles" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'" />
+	<Target Name="GeneratePriFile" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'" />
+	<Target Name="_GenerateProjectPriFile" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'" />
+
+	<!-- Override the problematic task with an empty implementation -->
+	<Target Name="DisablePriGeneration" BeforeTargets="BeforeBuild" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<PropertyGroup>
+			<!-- Disable PRI generation completely -->
+			<GeneratePriFile>false</GeneratePriFile>
+			<GeneratePriIndexName>false</GeneratePriIndexName>
+			<GenerateProjectPriFile>false</GenerateProjectPriFile>
+			<MsixSkipResourceGeneration>true</MsixSkipResourceGeneration>
+		</PropertyGroup>
+	</Target>
+
+	<!-- Disable all Windows App SDK packaging -->
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<EnableMsixTooling>false</EnableMsixTooling>
+		<WindowsPackageType>None</WindowsPackageType>
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+	</PropertyGroup>
+
+	<!-- Copy all required files for standalone execution -->
+	<Target Name="CopyFilesForStandaloneExecution" AfterTargets="Build" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<!-- Copy appsettings.json to output directory -->
+		<Copy SourceFiles="$(ProjectDir)appsettings.json"
+			  DestinationFolder="$(OutDir)"
+			  SkipUnchangedFiles="true" />
+
+		<!-- Create a .runtimeconfig.json file to ensure proper runtime loading -->
+		<PropertyGroup>
+			<RuntimeConfigContent>
+{
+  "runtimeOptions": {
+    "tfm": "net8.0",
+    "framework": {
+      "name": "Microsoft.NETCore.App",
+      "version": "8.0.0"
+    },
+    "configProperties": {
+      "System.Reflection.Metadata.MetadataUpdater.IsSupported": true
+    }
+  }
+}
+			</RuntimeConfigContent>
+		</PropertyGroup>
+		<WriteLinesToFile File="$(OutDir)TDFMAUI.runtimeconfig.json"
+						  Lines="$(RuntimeConfigContent)"
+						  Overwrite="true"
+						  Condition="!Exists('$(OutDir)TDFMAUI.runtimeconfig.json')" />
+	</Target>
+
+	<!-- Create a standalone publish profile -->
+	<Target Name="CreateStandalonePublishProfile" AfterTargets="Build" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<PropertyGroup>
+			<PublishProfileContent>
+&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;Project&gt;
+  &lt;PropertyGroup&gt;
+    &lt;Configuration&gt;Release&lt;/Configuration&gt;
+    &lt;Platform&gt;x64&lt;/Platform&gt;
+    &lt;PublishDir&gt;bin\Release\net8.0-windows10.0.19041.0\win10-x64\publish\&lt;/PublishDir&gt;
+    &lt;PublishProtocol&gt;FileSystem&lt;/PublishProtocol&gt;
+    &lt;TargetFramework&gt;net8.0-windows10.0.19041.0&lt;/TargetFramework&gt;
+    &lt;RuntimeIdentifier&gt;win10-x64&lt;/RuntimeIdentifier&gt;
+    &lt;SelfContained&gt;true&lt;/SelfContained&gt;
+    &lt;PublishSingleFile&gt;false&lt;/PublishSingleFile&gt;
+    &lt;PublishReadyToRun&gt;false&lt;/PublishReadyToRun&gt;
+    &lt;IncludeNativeLibrariesForSelfExtract&gt;true&lt;/IncludeNativeLibrariesForSelfExtract&gt;
+    &lt;IncludeAllContentForSelfExtract&gt;true&lt;/IncludeAllContentForSelfExtract&gt;
+  &lt;/PropertyGroup&gt;
+&lt;/Project&gt;
+			</PublishProfileContent>
+		</PropertyGroup>
+		<MakeDir Directories="$(ProjectDir)Properties\PublishProfiles" Condition="!Exists('$(ProjectDir)Properties\PublishProfiles')" />
+		<WriteLinesToFile File="$(ProjectDir)Properties\PublishProfiles\win-x64.pubxml"
+						  Lines="$(PublishProfileContent)"
+						  Overwrite="true"
+						  Condition="!Exists('$(ProjectDir)Properties\PublishProfiles\win-x64.pubxml')" />
 	</Target>
 </Project>

@@ -1,8 +1,14 @@
 {
   "profiles": {
     "Windows Machine": {
-      "commandName": "MsixPackage",
-      "nativeDebugging": false
+      "commandName": "Project",
+      "nativeDebugging": true
+    },
+    "Windows (Standalone)": {
+      "commandName": "Executable",
+      "executablePath": "$(TargetDir)\\TDFMAUI.exe",
+      "workingDirectory": "$(TargetDir)",
+      "nativeDebugging": true
     }
   }
 }

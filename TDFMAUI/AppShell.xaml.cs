@@ -150,8 +150,8 @@ namespace TDFMAUI
         {
             try
             {
-                // Set the flyout position to End (right side)
-                this.SetValue(Shell.FlyoutPositionProperty, Microsoft.Maui.Controls.FlyoutPosition.End);
+                // Set the flyout position to End (right side) using XAML instead
+                // We'll rely on the XAML declaration: <Shell.FlyoutPosition>End</Shell.FlyoutPosition>
 
                 // Enable the flyout
                 FlyoutBehavior = FlyoutBehavior.Flyout;

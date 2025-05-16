@@ -353,24 +353,29 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                _logger.LogInformation("Attempting to retrieve online users.");
-                var onlineUsers = await _userService.GetOnlineUsersAsync();
-                
-                if (onlineUsers == null)
-                {
-                    // This case might occur if the repository method itself returns null,
-                    // though typically it would return an empty list.
-                    _logger.LogWarning("GetOnlineUsersAsync from service returned null.");
-                    return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(new List<UserDto>(), "No online users found or service returned null."));
-                }
-
-                _logger.LogInformation("Successfully retrieved {Count} online users.", onlineUsers.Count());
-                return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(onlineUsers));
+                var users = await _userService.GetOnlineUsersAsync();
+                return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(users));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving online users: {Message}", ex.Message);
-                return StatusCode(500, ApiResponse<IEnumerable<UserDto>>.ErrorResponse("An error occurred while retrieving online users."));
+                return StatusCode(500, ApiResponse<IEnumerable<UserDto>>.ErrorResponse("An error occurred retrieving online users"));
+            }
+        }
+
+        [HttpGet("all")] // Route: api/users/all
+        [Authorize] // All authenticated users should be able to get this list for presence.
+        public async Task<ActionResult<ApiResponse<IEnumerable<UserDto>>>> GetAllUsersWithStatus()
+        {
+            try
+            {
+                var users = await _userService.GetAllUsersWithPresenceAsync(); 
+                return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(users));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all users with presence: {Message}", ex.Message);
+                return StatusCode(500, ApiResponse<IEnumerable<UserDto>>.ErrorResponse("An error occurred retrieving all users"));
             }
         }
     }

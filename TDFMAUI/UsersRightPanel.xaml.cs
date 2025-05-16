@@ -17,10 +17,10 @@ namespace TDFMAUI
     /// </summary>
     public partial class UsersRightPanel : ContentPage
     {
-        private readonly IUserPresenceService _userPresenceService;
-        private readonly ApiService _apiService; 
-        private readonly ILogger<UsersRightPanel> _logger;
-        private readonly IConnectivityService _connectivityService;
+        private IUserPresenceService _userPresenceService;
+        private ApiService _apiService; 
+        private ILogger<UsersRightPanel> _logger;
+        private IConnectivityService _connectivityService;
 
         private ObservableCollection<UserViewModel> _users = new ObservableCollection<UserViewModel>();
         public ObservableCollection<UserViewModel> Users => _users;
@@ -58,7 +58,36 @@ namespace TDFMAUI
         /// </summary>
         public ICommand RefreshUsersCommand { get; private set; }
 
-        // Constructor with dependency injection
+        // Parameterless constructor for XAML instantiation
+        public UsersRightPanel()
+        {
+            InitializeComponent();
+            try
+            {
+                // Resolve services from the global service provider
+                _userPresenceService = App.Services.GetService<IUserPresenceService>();
+                _apiService = App.Services.GetService<ApiService>();
+                _logger = App.Services.GetService<ILogger<UsersRightPanel>>();
+                _connectivityService = App.Services.GetService<IConnectivityService>();
+
+                if (_userPresenceService == null) _logger?.LogCritical("UsersRightPanel: IUserPresenceService could not be resolved.");
+                if (_apiService == null) _logger?.LogCritical("UsersRightPanel: ApiService could not be resolved.");
+                if (_logger == null) System.Diagnostics.Debug.WriteLine("[CRITICAL] UsersRightPanel: ILogger could not be resolved.");
+                if (_connectivityService == null) _logger?.LogCritical("UsersRightPanel: IConnectivityService could not be resolved.");
+            }
+            catch (Exception ex)
+            {
+                // Log critical failure if services can't be resolved
+                _logger?.LogCritical(ex, "UsersRightPanel: Critical failure resolving services in parameterless constructor.");
+                // Or use System.Diagnostics.Debug if logger itself failed
+                System.Diagnostics.Debug.WriteLine($"[CRITICAL] UsersRightPanel: Failed to resolve services: {ex.Message}");
+            }
+            
+            BindingContext = this;
+            RefreshUsersCommand = new Command(async () => await RefreshUsersAsync());
+        }
+
+        // Constructor with dependency injection (can be kept for testing or direct instantiation)
         public UsersRightPanel(
             IUserPresenceService userPresenceService, 
             ApiService apiService, 
@@ -233,20 +262,6 @@ namespace TDFMAUI
                 IsRefreshing = false;
                 IsLoading = false;
             }
-        }
-
-        private Color GetStatusColor(UserPresenceStatus status)
-        {
-            return status switch
-            {
-                UserPresenceStatus.Online => Colors.Green,
-                UserPresenceStatus.Away => Colors.Orange,
-                UserPresenceStatus.Busy => Colors.Red,
-                UserPresenceStatus.Offline => Colors.Gray,
-                UserPresenceStatus.DoNotDisturb => Colors.DarkRed,
-                // BeRightBack and AppearingOffline removed as they are not in the enum
-                _ => Colors.SlateGray, 
-            };
         }
 
         private void ClosePanel_Clicked(object sender, EventArgs e)

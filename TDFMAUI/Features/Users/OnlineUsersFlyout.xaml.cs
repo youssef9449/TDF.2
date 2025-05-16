@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 using Microsoft.Extensions.Logging;
-using TDFMAUI.Pages;
 using TDFMAUI.Services;
 using TDFShared.Enums;
 using TDFMAUI.Helpers;
+using TDFMAUI.ViewModels;
 
 namespace TDFMAUI.Features.Users
 {
@@ -121,8 +121,6 @@ namespace TDFMAUI.Features.Users
                             Status = user.Status,
                             StatusMessage = user.StatusMessage,
                             IsAvailableForChat = user.IsAvailableForChat,
-                            HasStatusMessage = !string.IsNullOrEmpty(user.StatusMessage),
-                            StatusColor = GetStatusColor(user.Status),
                             ProfilePictureData = user.ProfilePictureData
                         });
                     }
@@ -153,19 +151,6 @@ namespace TDFMAUI.Features.Users
             }
         }
 
-        private static Color GetStatusColor(UserPresenceStatus status)
-        {
-            return status switch
-            {
-                UserPresenceStatus.Online => Colors.LightGreen,
-                UserPresenceStatus.Away => Colors.Yellow,
-                UserPresenceStatus.Busy => Colors.Orange,
-                UserPresenceStatus.DoNotDisturb => Colors.Red,
-                UserPresenceStatus.Offline => Colors.Gray,
-                _ => Colors.Gray
-            };
-        }
-
         private void OnUserStatusChanged(object sender, UserStatusChangedEventArgs e)
         {
             // Update UI efficiently instead of full refresh
@@ -175,7 +160,6 @@ namespace TDFMAUI.Features.Users
                 if (userVM != null)
                 {
                     userVM.Status = e.Status;
-                    userVM.StatusColor = GetStatusColor(e.Status);
                     _logger?.LogDebug("Updated UI for user {UserId} status change to {Status}", e.UserId, e.Status);
                 }
                 else
@@ -239,19 +223,5 @@ namespace TDFMAUI.Features.Users
                 _isDisposed = true;
             }
         }
-    }
-
-    public class UserViewModel
-    {
-        public int UserId { get; set; }
-        public string Username { get; set; }
-        public string FullName { get; set; }
-        public string Department { get; set; }
-        public UserPresenceStatus Status { get; set; }
-        public string StatusMessage { get; set; }
-        public bool IsAvailableForChat { get; set; }
-        public bool HasStatusMessage { get; set; }
-        public Color StatusColor { get; set; }
-        public byte[] ProfilePictureData { get; set; }
     }
 }

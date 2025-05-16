@@ -6,6 +6,7 @@ using TDFShared.Enums;
 using TDFShared.DTOs;
 using TDFShared.DTOs.Users;
 using TDFShared.DTOs.Common;
+using TDFShared.Exceptions;
 
 
 namespace TDFMAUI.Services
@@ -80,14 +81,17 @@ namespace TDFMAUI.Services
         {
             try
             {
-                // Get online users from the API
-                var onlineUsersResponse = await _apiService.GetAsync<ApiResponse<IEnumerable<UserDto>>>("users/online");
-                if (onlineUsersResponse != null && onlineUsersResponse.Success && onlineUsersResponse.Data != null)
+                // Get all users from the API
+                // The GetAsync method in ApiService already unwraps ApiResponse<T> and returns T (the Data property)
+                var allUsersData = await _apiService.GetAsync<IEnumerable<UserDto>>("users/all");
+                
+                // Check if data was successfully retrieved
+                if (allUsersData != null)
                 {
-                    var onlineUsers = new List<UserPresenceInfo>();
+                    var allUsersDictionary = new Dictionary<int, UserPresenceInfo>();
 
                     // Map UserDto to UserPresenceInfo
-                    foreach (var userDto in onlineUsersResponse.Data)
+                    foreach (var userDto in allUsersData)
                     {
                         var userInfo = new UserPresenceInfo
                         {
@@ -102,19 +106,29 @@ namespace TDFMAUI.Services
                             ProfilePictureData = userDto.ProfilePictureData
                         };
 
-                        onlineUsers.Add(userInfo);
-                        _userStatuses[userInfo.UserId] = userInfo;
+                        allUsersDictionary[userInfo.UserId] = userInfo;
+                        _userStatuses[userInfo.UserId] = userInfo; // Update cache
                     }
 
-                    return onlineUsers.ToDictionary(u => u.UserId);
+                    return allUsersDictionary;
                 }
+                else
+                {
+                    _logger.LogWarning("GetOnlineUsersAsync: Received null data from API for users/all.");
+                }
+            }
+            catch (ApiException apiEx)
+            {
+                _logger.LogError(apiEx, "API Error fetching online users: {StatusCode} - {Message}", apiEx.StatusCode, apiEx.Message);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching online users");
             }
 
-            return _userStatuses.ToDictionary(kv => kv.Key, kv => kv.Value);
+            // Fallback to cached data or empty dictionary if API call fails or returns no data
+            _logger.LogWarning("GetOnlineUsersAsync: Falling back to cached user statuses or empty dictionary.");
+            return _userStatuses.Any() ? _userStatuses.ToDictionary(kv => kv.Key, kv => kv.Value) : new Dictionary<int, UserPresenceInfo>();
         }
 
         public async Task UpdateStatusAsync(UserPresenceStatus status, string statusMessage)

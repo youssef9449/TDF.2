@@ -20,5 +20,6 @@ namespace TDFAPI.Services
         Task<bool> UpdateProfilePictureAsync(int userId, Stream imageStream, string contentType);
         Task<IEnumerable<UserDto>> GetUsersByDepartmentAsync(string department);
         Task<IEnumerable<UserDto>> GetOnlineUsersAsync(); // New method for online users
+        Task<IEnumerable<UserDto>> GetAllUsersWithPresenceAsync(); // Method to get all users with their presence
     }
 }

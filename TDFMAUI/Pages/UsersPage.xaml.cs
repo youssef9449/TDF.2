@@ -100,7 +100,6 @@ namespace TDFMAUI.Pages
                             Status = user.Status,
                             StatusMessage = user.StatusMessage,
                             IsAvailableForChat = user.IsAvailableForChat,
-                            StatusColor = GetStatusColor(user.Status),
                             ProfilePictureData = user.ProfilePictureData
                         });
                     }
@@ -118,19 +117,6 @@ namespace TDFMAUI.Pages
             }
         }
         
-        private Color GetStatusColor(UserPresenceStatus status)
-        {
-            return status switch
-            {
-                UserPresenceStatus.Online => Colors.LightGreen,
-                UserPresenceStatus.Away => Colors.Yellow,
-                UserPresenceStatus.Busy => Colors.Orange,
-                UserPresenceStatus.DoNotDisturb => Colors.Red,
-                UserPresenceStatus.Offline => Colors.Gray,
-                _ => Colors.Gray
-            };
-        }
-        
         private void UpdateMyStatusDisplay()
         {
             if (App.CurrentUser == null)
@@ -139,7 +125,7 @@ namespace TDFMAUI.Pages
             }
             
             myStatusLabel.Text = _currentStatus.ToString();
-            myStatusIndicator.BackgroundColor = GetStatusColor(_currentStatus);
+            myStatusIndicator.BackgroundColor = UserViewModel.GetColorForStatus(_currentStatus);
             
             // Update availability checkbox
             var currentUserViewModel = _users.FirstOrDefault(u => u.UserId == App.CurrentUser.UserID);
@@ -158,7 +144,6 @@ namespace TDFMAUI.Pages
                 if (userVM != null)
                 {
                     userVM.Status = e.Status;
-                    userVM.StatusColor = GetStatusColor(e.Status);
                     _logger.LogDebug("Updated UI for user {UserId} status change to {Status}", e.UserId, e.Status);
 
                     // If the change is for the current user, update their specific UI

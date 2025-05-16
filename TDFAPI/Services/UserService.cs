@@ -248,7 +248,8 @@ namespace TDFAPI.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving users for department {Department}: {Message}", department, ex.Message);
-                throw;
+                // Depending on policy, might re-throw or return empty list
+                throw; // Re-throw for now to indicate failure
             }
         }
 
@@ -256,15 +257,26 @@ namespace TDFAPI.Services
         {
             try
             {
-                _logger.LogInformation("Fetching online users from repository.");
                 return await _userRepository.GetOnlineUsersAsync();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving online users: {Message}", ex.Message);
-                // Depending on policy, you might return empty list or rethrow
-                // For now, rethrowing to make it visible if repository layer fails.
+                _logger.LogError(ex, "Error retrieving online users");
                 throw;
+            }
+        }
+
+        public async Task<IEnumerable<UserDto>> GetAllUsersWithPresenceAsync()
+        {
+            try
+            {
+                // UserRepository.GetAllAsync() returns List<UserDto> with presence info correctly mapped
+                return await _userRepository.GetAllAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all users with presence");
+                throw; // Re-throw to allow controller to handle consistent error response
             }
         }
     }

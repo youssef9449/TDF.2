@@ -18,7 +18,6 @@ namespace TDFMAUI.ViewModels
         private UserPresenceStatus _status;
         private string _statusMessage;
         private bool _isAvailableForChat;
-        private Color _statusColor;
         private byte[] _profilePictureData;
 
         /// <summary>
@@ -103,26 +102,27 @@ namespace TDFMAUI.ViewModels
         public bool HasStatusMessage => !string.IsNullOrEmpty(StatusMessage);
 
         /// <summary>
+        /// Provides a color based on the user's presence status.
+        /// </summary>
+        /// <param name="status">The user's presence status.</param>
+        /// <returns>A <see cref="Color"/> representing the status.</returns>
+        public static Color GetColorForStatus(UserPresenceStatus status)
+        {
+            return status switch
+            {
+                UserPresenceStatus.Online => Colors.Green,
+                UserPresenceStatus.Away => Colors.Orange,
+                UserPresenceStatus.Busy => Colors.Red,
+                UserPresenceStatus.DoNotDisturb => Colors.DarkRed,
+                UserPresenceStatus.Offline => Colors.Gray,
+                _ => Colors.Gray
+            };
+        }
+
+        /// <summary>
         /// Color representation of the user's status for UI display
         /// </summary>
-        public Color StatusColor 
-        { 
-            get
-            {
-                return Status switch
-                {
-                    UserPresenceStatus.Online => Colors.Green,
-                    UserPresenceStatus.Away => Colors.Orange,
-                    UserPresenceStatus.Busy => Colors.Red,
-                    UserPresenceStatus.DoNotDisturb => Colors.DarkRed,
-                    UserPresenceStatus.BeRightBack => Colors.Yellow,
-                    UserPresenceStatus.AppearingOffline => Colors.SlateGray,
-                    UserPresenceStatus.Offline => Colors.Gray,
-                    _ => Colors.Gray
-                };
-            }
-            set => SetProperty(ref _statusColor, value);
-        }
+        public Color StatusColor => GetColorForStatus(this.Status);
 
         /// <summary>
         /// Friendly display name for the status
@@ -133,8 +133,6 @@ namespace TDFMAUI.ViewModels
             UserPresenceStatus.Away => "Away",
             UserPresenceStatus.Busy => "Busy",
             UserPresenceStatus.DoNotDisturb => "Do Not Disturb",
-            UserPresenceStatus.BeRightBack => "Be Right Back",
-            UserPresenceStatus.AppearingOffline => "Invisible",
             UserPresenceStatus.Offline => "Offline",
             _ => "Unknown"
         };

@@ -12,16 +12,23 @@ using TDFMAUI.Helpers; // For ByteArrayToImageSourceConverter & GetStatusColor, 
 
 namespace TDFMAUI
 {
+    /// <summary>
+    /// Right-side panel that displays online users with their status
+    /// </summary>
     public partial class UsersRightPanel : ContentPage
     {
         private readonly IUserPresenceService _userPresenceService;
         private readonly ApiService _apiService; 
         private readonly ILogger<UsersRightPanel> _logger;
+        private readonly IConnectivityService _connectivityService;
 
         private ObservableCollection<UserViewModel> _users = new ObservableCollection<UserViewModel>();
         public ObservableCollection<UserViewModel> Users => _users;
 
         private bool _isRefreshing;
+        /// <summary>
+        /// Indicates if the user list is currently refreshing
+        /// </summary>
         public bool IsRefreshing
         {
             get => _isRefreshing;
@@ -33,6 +40,9 @@ namespace TDFMAUI
         }
 
         private bool _isLoading;
+        /// <summary>
+        /// Indicates if the user list is currently loading
+        /// </summary>
         public bool IsLoading
         {
             get => _isLoading;
@@ -43,15 +53,23 @@ namespace TDFMAUI
             }
         }
 
+        /// <summary>
+        /// Command to refresh the user list
+        /// </summary>
         public ICommand RefreshUsersCommand { get; private set; }
 
-        // Constructor should be public for XAML instantiation with DI
-        public UsersRightPanel(IUserPresenceService userPresenceService, ApiService apiService, ILogger<UsersRightPanel> logger)
+        // Constructor with dependency injection
+        public UsersRightPanel(
+            IUserPresenceService userPresenceService, 
+            ApiService apiService, 
+            ILogger<UsersRightPanel> logger,
+            IConnectivityService connectivityService)
         {
             InitializeComponent();
             _userPresenceService = userPresenceService;
-            _apiService = apiService; // Keep for potential future use if presence doesn't have all data
+            _apiService = apiService;
             _logger = logger;
+            _connectivityService = connectivityService;
 
             BindingContext = this;
             RefreshUsersCommand = new Command(async () => await RefreshUsersAsync());
@@ -61,21 +79,68 @@ namespace TDFMAUI
         {
             base.OnAppearing();
             await RefreshUsersAsync();
-            // Assuming UserStatusChanged provides UserStatusChangedEventArgs
-            _userPresenceService.UserStatusChanged += OnUserPresenceServiceStatusChanged; 
+            
+            // Subscribe to presence events
+            _userPresenceService.UserStatusChanged += OnUserPresenceServiceStatusChanged;
+            _userPresenceService.UserAvailabilityChanged += OnUserAvailabilityChanged;
+            
+            // Device-specific behavior
+            ConfigureDeviceSpecificBehavior();
         }
 
         protected override void OnDisappearing()
         {
             base.OnDisappearing();
+            // Unsubscribe from events
             _userPresenceService.UserStatusChanged -= OnUserPresenceServiceStatusChanged;
+            _userPresenceService.UserAvailabilityChanged -= OnUserAvailabilityChanged;
         }
 
-        // Made sender nullable: object?
+        private void ConfigureDeviceSpecificBehavior()
+        {
+            // Apply platform-specific styling or behavior here
+            if (DeviceInfo.Platform == DevicePlatform.iOS || DeviceInfo.Platform == DevicePlatform.Android)
+            {
+                // Mobile-specific adjustments (already handled by swipe gesture in AppShell)
+            }
+            else
+            {
+                // Desktop-specific adjustments
+                // Note: The AppShell already handles swipe detection,
+                // this would be for additional desktop-specific customizations
+            }
+        }
+
         private void OnUserPresenceServiceStatusChanged(object? sender, UserStatusChangedEventArgs e)
         {
             _logger.LogInformation($"User status changed: UserID {e.UserId}, Status {e.Status}. Refreshing panel.");
-            MainThread.BeginInvokeOnMainThread(async () => await RefreshUsersAsync());
+            MainThread.BeginInvokeOnMainThread(async () => 
+            {
+                // Find and update the user in our collection if they exist
+                var existingUser = _users.FirstOrDefault(u => u.UserId == e.UserId);
+                if (existingUser != null)
+                {
+                    existingUser.Status = e.Status;
+                }
+                else
+                {
+                    // If user not in collection, refresh the full list
+                    await RefreshUsersAsync();
+                }
+            });
+        }
+
+        private void OnUserAvailabilityChanged(object? sender, UserAvailabilityChangedEventArgs e)
+        {
+            _logger.LogInformation($"User availability changed: UserID {e.UserId}, Available: {e.IsAvailableForChat}");
+            MainThread.BeginInvokeOnMainThread(() => 
+            {
+                var existingUser = _users.FirstOrDefault(u => u.UserId == e.UserId);
+                if (existingUser != null)
+                {
+                    existingUser.IsAvailableForChat = e.IsAvailableForChat;
+                }
+            });
         }
 
         private async Task RefreshUsersAsync()
@@ -90,7 +155,27 @@ namespace TDFMAUI
             try
             {
                 _logger.LogInformation("UsersRightPanel: Refreshing users...");
-                var onlineUsersDetails = await _userPresenceService.GetOnlineUsersAsync();
+                
+                // Check for connectivity
+                var isConnected = _connectivityService.IsConnected();
+                Dictionary<int, UserPresenceInfo> onlineUsersDetails;
+                
+                // Update offline indicator visibility
+                MainThread.BeginInvokeOnMainThread(() => {
+                    offlineIndicator.IsVisible = !isConnected;
+                });
+                
+                if (isConnected)
+                {
+                    // Get online users from service if connected
+                    onlineUsersDetails = await _userPresenceService.GetOnlineUsersAsync();
+                }
+                else
+                {
+                    // Use cached data when offline
+                    _logger.LogWarning("UsersRightPanel: Device is offline, using cached user data.");
+                    onlineUsersDetails = await Task.FromResult(_userPresenceService.GetCachedOnlineUsers());
+                }
                 
                 var currentAppUserId = App.CurrentUser?.UserID ?? 0;
 
@@ -99,45 +184,49 @@ namespace TDFMAUI
                     var currentUsers = new ObservableCollection<UserViewModel>();
                     if (onlineUsersDetails != null)
                     {
-                        foreach (var userDetail in onlineUsersDetails.Values.Where(u => u.Id != currentAppUserId)) // Exclude current user
+                        foreach (var userDetail in onlineUsersDetails.Values.Where(u => u.UserId != currentAppUserId)) // Exclude current user
                         {
-                            currentUsers.Add(new UserViewModel
+                            var userVm = new UserViewModel
                             {
-                                UserId = userDetail.Id,
+                                UserId = userDetail.UserId,
                                 Username = userDetail.Username,
                                 FullName = userDetail.FullName,
                                 Department = userDetail.Department,
                                 Status = userDetail.Status,
                                 StatusMessage = userDetail.StatusMessage,
                                 IsAvailableForChat = userDetail.IsAvailableForChat,
-                                HasStatusMessage = !string.IsNullOrEmpty(userDetail.StatusMessage),
-                                StatusColor = GetStatusColor(userDetail.Status),
-                                // UserPresenceInfo (userDetail) does not have ProfilePictureData.
-                                // UserViewModel.ProfilePictureData will be null by default.
-                                // The ByteArrayToImageSourceConverter in XAML should handle null.
-                                ProfilePictureData = null 
-                            });
+                                ProfilePictureData = userDetail.ProfilePictureData
+                            };
+                            
+                            currentUsers.Add(userVm);
                         }
                         int userCount = currentUsers?.Count ?? 0;
-                         _logger.LogInformation($"UsersRightPanel: Displaying {userCount} users.");
+                        _logger.LogInformation($"UsersRightPanel: Displaying {userCount} users.");
                     }
                     else
                     {
                         _logger.LogWarning("UsersRightPanel: GetOnlineUsersAsync returned null.");
                     }
-                    // Efficiently update the collection by replacing it
-                    // This handles adds, removes, and updates in one go after fetching all current online users.
+                    
+                    // Update the collection
                     Users.Clear();
                     foreach(var u in currentUsers) Users.Add(u);
-                    OnPropertyChanged(nameof(Users)); // Notify UI if necessary, though ObservableCollection should handle it
-
+                    OnPropertyChanged(nameof(Users));
                 });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "UsersRightPanel: Failed to load online users.");
-                // Avoid showing DisplayAlert if the panel is not visible or not primary focus.
-                // Consider a less intrusive way to report errors for a side panel.
+                // Show a non-intrusive error message for the side panel
+                MainThread.BeginInvokeOnMainThread(() => 
+                {
+                    if (_users.Count == 0)
+                    {
+                        // Only show error indicators if we don't have any existing data to display
+                        // This prevents disrupting the user experience for temporary issues
+                        // Consider adding a small indicator in the UI to show connectivity status
+                    }
+                });
             }
             finally
             {
@@ -169,7 +258,7 @@ namespace TDFMAUI
             }
             else
             {
-                 // Fallback: Navigate to the main route or a default page if not on the users route
+                // Fallback: Navigate to the main route or a default page if not on the users route
                 Shell.Current.GoToAsync("//main"); 
             }
         }

@@ -89,19 +89,19 @@ namespace TDFMAUI.Pages
                 {
                     _users.Clear();
                     
-                    foreach (var user in onlineUsers.Values.Where(u => u.Id != App.CurrentUser.UserID))
+                    foreach (var user in onlineUsers.Values.Where(u => u.UserId != App.CurrentUser.UserID))
                     {
                         _users.Add(new UserViewModel
                         {
-                            UserId = user.Id,
+                            UserId = user.UserId,
                             Username = user.Username,
                             FullName = user.FullName,
                             Department = user.Department,
                             Status = user.Status,
                             StatusMessage = user.StatusMessage,
                             IsAvailableForChat = user.IsAvailableForChat,
-                            HasStatusMessage = !string.IsNullOrEmpty(user.StatusMessage),
-                            StatusColor = GetStatusColor(user.Status)
+                            StatusColor = GetStatusColor(user.Status),
+                            ProfilePictureData = user.ProfilePictureData
                         });
                     }
                 });

@@ -2,19 +2,96 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build",
+            "label": "maui: Clean TDFMAUI",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "clean",
+                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+                "-f:net8.0-windows10.0.19041.0",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary;ForceNoAlign"
+            ],
+            "problemMatcher": "$msCompile",
+            "detail": "Clean TDFMAUI project for Windows target",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "maui: Build for Android",
             "command": "dotnet",
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/TDF.sln",
+                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+                "-f:net8.0-android",
+                "-c:Debug",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
-            "problemMatcher": "$msCompile"
+            "problemMatcher": "$msCompile",
+            "detail": "Build TDFMAUI for Android",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            }
         },
         {
-            "label": "build-tdfapi",
+            "label": "maui: Build for Windows",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+                "-f:net8.0-windows10.0.19041.0",
+                "-c:Debug",
+                "/p:BuildForWindowsDesktop=true",
+                "--no-restore"
+            ],
+            "problemMatcher": "$msCompile",
+            "detail": "Build TDFMAUI for Windows",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "maui: Basic Windows Build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+                "-f:net8.0-windows10.0.19041.0",
+                "-c:Debug",
+                "/p:UseWinUI=false",
+                "/p:WindowsPackageType=None",
+                "/p:EnableMsixTooling=false",
+                "/p:WindowsAppSDKSelfContained=false"
+            ],
+            "problemMatcher": "$msCompile",
+            "detail": "Basic build for Windows without WindowsAppSDK packaging",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "tdfapi: build",
             "command": "dotnet",
             "type": "process",
             "args": [
@@ -23,49 +100,8 @@
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "publish",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "publish",
-                "${workspaceFolder}/TDF.sln",
-                "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary;ForceNoAlign"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "watch",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "watch",
-                "run",
-                "--project",
-                "${workspaceFolder}/TDF.sln"
-            ],
-            "problemMatcher": "$msCompile"
-        },
-        {
-            "label": "maui: build",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
-                "/property:GenerateFullPaths=true",
-                "/verbosity:detailed"
-            ],
             "problemMatcher": "$msCompile",
-            "options": {
-                "shell": {
-                    "executable": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
-                    "args": [] // Can add shell-specific args here if needed, like -NoProfile
-                }
-            }
+            "detail": "Build TDFAPI project"
         }
     ]
 }

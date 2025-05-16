@@ -98,9 +98,6 @@
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" />
-		<!-- Explicitly include System.IO.Compression assemblies -->
-		<PackageReference Include="System.IO.Compression" Version="4.3.0" />
-		<PackageReference Include="System.IO.Compression.ZipFile" Version="4.3.0" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -149,12 +146,7 @@
 
 	<!-- Android-specific references -->
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
-	  <!-- Ensure System.IO.Compression assemblies are included -->
-	  <Reference Include="System.IO.Compression" />
-	  <Reference Include="System.IO.Compression.Brotli" />
-	  <Reference Include="System.IO.Compression.ZipFile" />
-
-	  <!-- Disable assembly trimming for these assemblies -->
+	  <!-- Rely on SDK to provide these assemblies. TrimmerRootAssembly ensures they are not linked out if used. -->
 	  <TrimmerRootAssembly Include="System.IO.Compression" />
 	  <TrimmerRootAssembly Include="System.IO.Compression.Brotli" />
 	  <TrimmerRootAssembly Include="System.IO.Compression.ZipFile" />

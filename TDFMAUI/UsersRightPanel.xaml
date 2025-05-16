@@ -4,67 +4,224 @@
              x:Class="TDFMAUI.UsersRightPanel"
              xmlns:viewModels="clr-namespace:TDFMAUI.ViewModels"
              xmlns:converters="clr-namespace:TDFMAUI.Converters"
-             BackgroundColor="LightSlateGray"
+             BackgroundColor="{AppThemeBinding Light=#F7F7F7, Dark=#2D2D2D}"
              Shell.NavBarIsVisible="False">
     <ContentPage.Resources>
         <ResourceDictionary>
             <converters:ByteArrayToImageSourceConverter x:Key="ByteArrayToImageSourceConverter" />
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            
+            <!-- Status dot style -->
+            <Style x:Key="StatusDotStyle" TargetType="Frame">
+                <Setter Property="WidthRequest" Value="12" />
+                <Setter Property="HeightRequest" Value="12" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="VerticalOptions" Value="Center" />
+                <Setter Property="HorizontalOptions" Value="End" />
+                <Setter Property="HasShadow" Value="False" />
+                <Setter Property="BorderColor" Value="Transparent" />
+            </Style>
+            
+            <!-- User card style -->
+            <Style x:Key="UserCardStyle" TargetType="Frame">
+                <Setter Property="Padding" Value="12" />
+                <Setter Property="Margin" Value="6,3" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="BorderColor" Value="{AppThemeBinding Light=#E0E0E0, Dark=#393939}" />
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=White, Dark=#343434}" />
+                <Setter Property="HasShadow" Value="{OnPlatform iOS=false, Android=true, WinUI=true, MacCatalyst=true}" />
+                <Setter Property="Opacity" Value="0.92" />
+            </Style>
+            
+            <!-- Profile image style -->
+            <Style x:Key="ProfileImageStyle" TargetType="Image">
+                <Setter Property="Aspect" Value="AspectFill" />
+                <Setter Property="HeightRequest" Value="50" />
+                <Setter Property="WidthRequest" Value="50" />
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#E0E0E0, Dark=#444444}" />
+            </Style>
+            
+            <!-- Name text style -->
+            <Style x:Key="NameTextStyle" TargetType="Label">
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="FontSize" Value="16" />
+                <Setter Property="LineBreakMode" Value="TailTruncation" />
+                <Setter Property="TextColor" Value="{AppThemeBinding Light=#212121, Dark=#E0E0E0}" />
+            </Style>
+            
+            <!-- Department text style -->
+            <Style x:Key="DepartmentTextStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="TextColor" Value="{AppThemeBinding Light=#757575, Dark=#B0B0B0}" />
+                <Setter Property="LineBreakMode" Value="TailTruncation" />
+            </Style>
+            
+            <!-- Status message style -->
+            <Style x:Key="StatusMessageStyle" TargetType="Label">
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontAttributes" Value="Italic" />
+                <Setter Property="TextColor" Value="{AppThemeBinding Light=#9E9E9E, Dark=#A0A0A0}" />
+                <Setter Property="LineBreakMode" Value="TailTruncation" />
+                <Setter Property="MaxLines" Value="1" />
+            </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto, *" ColumnDefinitions="*, Auto" Padding="10" BackgroundColor="#F0F0F0">
-        <Label Grid.Row="0" Grid.Column="0" Text="Users Online" FontSize="Title" FontAttributes="Bold" VerticalOptions="Center"/>
-        <Button Grid.Row="0" Grid.Column="1" Text="X" Clicked="ClosePanel_Clicked" HorizontalOptions="End" VerticalOptions="Center" BackgroundColor="Transparent" TextColor="Black" Padding="5" Margin="0" WidthRequest="40" HeightRequest="40" FontAttributes="Bold"/>
+    <!-- Main layout grid -->
+    <Grid RowDefinitions="Auto, *" ColumnDefinitions="*, Auto" 
+          Padding="{OnPlatform iOS='15,35,15,15', Default='15'}"
+          BackgroundColor="{AppThemeBinding Light=#F0F0F0, Dark=#1E1E1E}">
+          
+        <!-- Header with title and close button -->
+        <Grid Grid.Row="0" Grid.ColumnSpan="2" ColumnDefinitions="*, Auto" Margin="0,0,0,10">
+            <StackLayout Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalOptions="Center">
+                <Label Text="Users" FontSize="24" FontAttributes="Bold" 
+                       TextColor="{AppThemeBinding Light=#212121, Dark=#FFFFFF}"/>
+                <Label Text="Online" FontSize="24" 
+                       TextColor="{AppThemeBinding Light=#757575, Dark=#B0B0B0}"/>
+            </StackLayout>
+            
+            <Button Grid.Column="1" Text="✕" 
+                    Clicked="ClosePanel_Clicked" 
+                    BackgroundColor="Transparent"
+                    TextColor="{AppThemeBinding Light=#424242, Dark=#B0B0B0}"
+                    FontSize="18"
+                    WidthRequest="40" 
+                    HeightRequest="40" 
+                    Padding="0"
+                    VerticalOptions="Center" 
+                    HorizontalOptions="End" />
+        </Grid>
 
-        <RefreshView Grid.Row="1" Grid.ColumnSpan="2" x:Name="refreshView" IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshUsersCommand}">
-            <CollectionView x:Name="usersCollection" ItemsSource="{Binding Users}" SelectionMode="None">
+        <!-- User list with refresh capability -->
+        <RefreshView Grid.Row="1" Grid.ColumnSpan="2" 
+                     x:Name="refreshView" 
+                     IsRefreshing="{Binding IsRefreshing}" 
+                     Command="{Binding RefreshUsersCommand}">
+                     
+            <CollectionView x:Name="usersCollection" 
+                            ItemsSource="{Binding Users}" 
+                            SelectionMode="None"
+                            EmptyView="No users online at the moment">
+                            
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="viewModels:UserViewModel">
-                        <Frame Padding="10" Margin="5" CornerRadius="5" BorderColor="{StaticResource Gray300}" BackgroundColor="White">
-                            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="10">
-                                <Image Grid.Column="0"
-                                       Source="{Binding ProfilePictureData, Converter={StaticResource ByteArrayToImageSourceConverter}}"
-                                       Aspect="AspectFill"
-                                       HeightRequest="50"
-                                       WidthRequest="50">
-                                    <Image.Clip>
-                                        <EllipseGeometry Center="25,25" RadiusX="25" RadiusY="25" />
-                                    </Image.Clip>
-                                </Image>
+                        <Frame Style="{StaticResource UserCardStyle}">
+                            <Grid ColumnDefinitions="Auto, *, Auto" ColumnSpacing="12">
+                                <!-- Profile Image with circular clip -->
+                                <Border Grid.Column="0"
+                                        StrokeThickness="0"
+                                        WidthRequest="50" 
+                                        HeightRequest="50"
+                                        StrokeShape="Ellipse">
+                                    <Image Style="{StaticResource ProfileImageStyle}"
+                                           Source="{Binding ProfilePictureData, Converter={StaticResource ByteArrayToImageSourceConverter}}">
+                                    </Image>
+                                </Border>
 
-                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                                    <Label Text="{Binding FullName}" FontAttributes="Bold" FontSize="Medium"/>
-                                    <Label Text="{Binding Department}" FontSize="Small" TextColor="{StaticResource Gray600}"/>
-                                    <Label Text="{Binding StatusMessage}" FontSize="Small" TextColor="{StaticResource Gray500}" IsVisible="{Binding HasStatusMessage}"/>
+                                <!-- User information -->
+                                <VerticalStackLayout Grid.Column="1" 
+                                                     Spacing="2" 
+                                                     VerticalOptions="Center">
+                                    <Label Text="{Binding FullName}" 
+                                           Style="{StaticResource NameTextStyle}"/>
+                                    <Label Text="{Binding Department}" 
+                                           Style="{StaticResource DepartmentTextStyle}"/>
+                                    <Label Text="{Binding StatusMessage}" 
+                                           Style="{StaticResource StatusMessageStyle}"
+                                           IsVisible="{Binding HasStatusMessage}"/>
                                 </VerticalStackLayout>
 
+                                <!-- Status indicator dot -->
                                 <Frame Grid.Column="2" 
                                        BackgroundColor="{Binding StatusColor}" 
-                                       WidthRequest="12" 
-                                       HeightRequest="12" 
-                                       CornerRadius="6"
-                                       Padding="0"
-                                       VerticalOptions="Center"
-                                       HorizontalOptions="End" />
+                                       Style="{StaticResource StatusDotStyle}">
+                                    <Frame.Triggers>
+                                        <DataTrigger TargetType="Frame" 
+                                                     Binding="{Binding Status}" 
+                                                     Value="Online">
+                                            <Setter Property="BackgroundColor" Value="Green" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Frame" 
+                                                     Binding="{Binding Status}" 
+                                                     Value="Away">
+                                            <Setter Property="BackgroundColor" Value="Orange" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Frame" 
+                                                     Binding="{Binding Status}" 
+                                                     Value="Busy">
+                                            <Setter Property="BackgroundColor" Value="Red" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Frame" 
+                                                     Binding="{Binding Status}" 
+                                                     Value="DoNotDisturb">
+                                            <Setter Property="BackgroundColor" Value="DarkRed" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Frame" 
+                                                     Binding="{Binding Status}" 
+                                                     Value="Offline">
+                                            <Setter Property="BackgroundColor" Value="Gray" />
+                                        </DataTrigger>
+                                    </Frame.Triggers>
+                                </Frame>
                             </Grid>
                         </Frame>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
+                
+                <!-- Empty state when no users are online -->
                 <CollectionView.EmptyView>
-                    <StackLayout Padding="20" HorizontalOptions="Center" VerticalOptions="Center">
-                        <Label Text="No users online or an error occurred." HorizontalTextAlignment="Center" />
-                    </StackLayout>
+                    <Grid Padding="20" RowDefinitions="*, Auto, *">
+                        <VerticalStackLayout Grid.Row="1" 
+                                             HorizontalOptions="Center" 
+                                             VerticalOptions="Center" 
+                                             Spacing="12">
+                            <Image Source="no_users.png" 
+                                   WidthRequest="80" 
+                                   HeightRequest="80" 
+                                   IsVisible="False" />
+                            <Label Text="No users online" 
+                                   FontSize="18" 
+                                   HorizontalTextAlignment="Center" 
+                                   TextColor="{AppThemeBinding Light=#9E9E9E, Dark=#A0A0A0}" />
+                            <Label Text="Check back later or refresh to try again" 
+                                   FontSize="14" 
+                                   HorizontalTextAlignment="Center" 
+                                   TextColor="{AppThemeBinding Light=#BDBDBD, Dark=#707070}" />
+                        </VerticalStackLayout>
+                    </Grid>
                 </CollectionView.EmptyView>
             </CollectionView>
         </RefreshView>
         
-        <ActivityIndicator x:Name="loadingIndicator"
-                           Grid.Row="1" Grid.ColumnSpan="2"
+        <!-- Loading indicator -->
+        <ActivityIndicator Grid.Row="1" 
+                           Grid.ColumnSpan="2"
                            IsVisible="{Binding IsLoading}"
                            IsRunning="{Binding IsLoading}"
                            Color="{StaticResource Primary}"
                            HorizontalOptions="Center"
                            VerticalOptions="Center" />
+                           
+        <!-- Offline indicator (only shown when offline) -->
+        <Border Grid.Row="1" 
+                Grid.ColumnSpan="2"
+                VerticalOptions="Start"
+                Margin="0,5,0,0"
+                BackgroundColor="#222222"
+                Opacity="0.8"
+                StrokeShape="RoundRectangle 8,8,8,8"
+                HeightRequest="40"
+                StrokeThickness="0"
+                Padding="5"
+                x:Name="offlineIndicator"
+                IsVisible="False">
+            <Label Text="You're offline. Showing cached data." 
+                   TextColor="White"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   FontSize="13" />
+        </Border>
     </Grid>
-
 </ContentPage> 

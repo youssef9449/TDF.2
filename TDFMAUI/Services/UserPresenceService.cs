@@ -393,5 +393,15 @@ namespace TDFMAUI.Services
                 _logger.LogError(ex, "Error updating status for user {UserId} to {Status}", userId, status);
             }
         }
+
+        /// <summary>
+        /// Gets the currently cached online users information for offline usage
+        /// </summary>
+        /// <returns>Dictionary of user IDs mapped to their presence information</returns>
+        public Dictionary<int, UserPresenceInfo> GetCachedOnlineUsers()
+        {
+            _logger.LogInformation("Returning cached user statuses for offline mode");
+            return _userStatuses.ToDictionary(kv => kv.Key, kv => kv.Value);
+        }
     }
 }

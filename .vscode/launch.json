@@ -1,33 +1,18 @@
 {
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": ".NET MAUI Launch",
-            "type": "maui",
-            "request": "launch",
-            "project": "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
-            "preLaunchTask": "maui: build",
-            "targetFramework": "net8.0-android"
-            // should prompt you to select from available devices/emulators.
-        },
-        {
-            // Use IntelliSense to find out which attributes exist for C# debugging
-            // Use hover for the description of the existing attributes
-            // For further information visit https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md.
-            "name": ".NET Core Launch (web)",
+            "name": "TDFAPI: Launch (web)",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build-tdfapi",
-            // If you have changed target frameworks, make sure to update the program path.
+            "preLaunchTask": "tdfapi: build",
             "program": "${workspaceFolder}/TDFAPI/bin/Debug/net8.0/TDFAPI.dll",
             "args": [],
             "cwd": "${workspaceFolder}/TDFAPI",
             "stopAtEntry": false,
-            // Enable launching a web browser when ASP.NET Core starts. For more information: https://aka.ms/VSCode-CS-LaunchJson-WebBrowser
             "serverReadyAction": {
                 "action": "openExternally",
-                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)"
             },
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development"
@@ -40,49 +25,39 @@
             }
         },
         {
-            "name": ".NET Core Attach",
-            "type": "coreclr",
-            "request": "attach"
+            "name": "TDFMAUI: Android Emulator (Direct)",
+            "type": "xamarin",
+            "request": "launch",
+            "preLaunchTask": "maui: Build for Android",
+            "projectFile": "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+            "targetFramework": "net8.0-android"
         },
         {
-            // Configuration for debugging TDFMAUI on Android emulator
-            "name": "Debug Android Emulator",
-            "type": "coreclr",
+            "name": "TDFMAUI: Android Launch APK",
+            "type": "android",
             "request": "launch",
-            "preLaunchTask": "build",
-            "program": "dotnet",
-            "args": [
-                "build",
-                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
-                "-t:Run",
-                "-f:net8.0-android",
-                "--no-restore"
-            ],
-            "cwd": "${workspaceFolder}/TDFMAUI",
-            "stopAtEntry": false,
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
-            }
+            "preLaunchTask": "maui: Build for Android",
+            "appSrcRoot": "${workspaceFolder}/TDFMAUI",
+            "apkFile": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-android/com.companyname.tdfmaui-Signed.apk",
+            "adbPort": 5037
         },
         {
-            // Configuration for debugging TDFMAUI on Windows
-            "name": "Debug Windows",
+            "name": "TDFMAUI: Windows (Default)",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
-            "program": "dotnet",
-            "args": [
-                "build",
-                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
-                "-t:Run",
-                "-f:net8.0-windows10.0.19041.0",
-                "--no-restore"
-            ],
+            "preLaunchTask": "maui: Build for Windows",
+            "program": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-windows10.0.19041.0/win10-x64/TDFMAUI.exe",
             "cwd": "${workspaceFolder}/TDFMAUI",
-            "stopAtEntry": false,
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
-            }
+            "console": "internalConsole"
+        },
+        {
+            "name": "TDFMAUI: Windows (Basic)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "maui: Basic Windows Build",
+            "program": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-windows10.0.19041.0/TDFMAUI.dll",
+            "cwd": "${workspaceFolder}/TDFMAUI",
+            "console": "internalConsole"
         }
     ]
 }

@@ -273,6 +273,9 @@ namespace TDFMAUI
             // Register new HttpClientService
             builder.Services.AddSingleton<IHttpClientService, HttpClientService>();
 
+            // Register ConnectivityService
+            builder.Services.AddSingleton<IConnectivityService, ConnectivityService>();
+
             MauiApp app = null; // Declare app outside try block
             try // Wrap builder.Build() and subsequent initialization
             {

@@ -13,6 +13,7 @@ using TDFShared.DTOs.Users;
 using TDFShared.DTOs.Common;
 using TDFShared.Enums;
 using TDFMAUI.Config;
+using TDFMAUI.Helpers;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.ApplicationModel;
 
@@ -262,6 +263,21 @@ public class AuthService : IAuthService
     {
         try
         {
+            // Check if we should persist token based on platform
+            if (DeviceHelper.IsDesktop)
+            {
+                _logger.LogInformation("GetCurrentUserIdAsync: Desktop platform detected, checking token persistence");
+                // For desktop platforms, check if we should clear tokens
+                bool shouldPersist = _secureStorageService.ShouldPersistToken();
+                if (!shouldPersist)
+                {
+                    _logger.LogInformation("GetCurrentUserIdAsync: Token persistence disabled for desktop platform");
+                    // This will ensure we don't use any stored tokens on desktop platforms
+                    await _secureStorageService.HandleTokenPersistenceAsync();
+                    return 0;
+                }
+            }
+
             var (token, _) = await _secureStorageService.GetTokenAsync();
             if (string.IsNullOrEmpty(token))
             {
@@ -377,6 +393,21 @@ public class AuthService : IAuthService
     {
         try
         {
+            // Check if we should persist token based on platform
+            if (DeviceHelper.IsDesktop)
+            {
+                _logger.LogInformation("GetCurrentUserAsync: Desktop platform detected, checking token persistence");
+                // For desktop platforms, check if we should clear tokens
+                bool shouldPersist = _secureStorageService.ShouldPersistToken();
+                if (!shouldPersist)
+                {
+                    _logger.LogInformation("GetCurrentUserAsync: Token persistence disabled for desktop platform");
+                    // This will ensure we don't use any stored tokens on desktop platforms
+                    await _secureStorageService.HandleTokenPersistenceAsync();
+                    return null;
+                }
+            }
+
             var userId = await GetCurrentUserIdAsync();
             if (userId <= 0)
             {

@@ -25,6 +25,7 @@ using TDFShared.Models.User;
 using TDFShared.Models.Message;
 using System.Net.NetworkInformation;
 using TDFMAUI.Config; // Added
+using TDFMAUI.Helpers; // Added for DeviceHelper
 
 namespace TDFMAUI.Services
 {
@@ -38,7 +39,7 @@ namespace TDFMAUI.Services
 
     /// <summary>
     /// Service for communicating with the API.
-    /// 
+    ///
     /// Features:
     /// - Automatic token management for authentication
     /// - Retry logic with exponential backoff for transient errors
@@ -57,7 +58,7 @@ namespace TDFMAUI.Services
         private readonly Dictionary<string, Queue<PendingRequest>> _pendingRequests = new Dictionary<string, Queue<PendingRequest>>();
         private readonly ILogger<ApiService> _logger;
         private bool _initialized;
-        
+
         // Class to represent a pending API request
         private class PendingRequest
         {
@@ -66,7 +67,7 @@ namespace TDFMAUI.Services
             public string RequestType { get; set; } // GET, POST, PUT, DELETE
             public DateTime QueuedTime { get; set; }
             public TaskCompletionSource<object> CompletionSource { get; set; }
-            
+
             public PendingRequest(string endpoint, object data, string requestType)
             {
                 Endpoint = endpoint;
@@ -76,11 +77,11 @@ namespace TDFMAUI.Services
                 CompletionSource = new TaskCompletionSource<object>();
             }
         }
-        
+
         public ApiService(
-            IHttpClientService httpClientService, 
-            SecureStorageService secureStorage, 
-            ILogger<ApiService> logger, 
+            IHttpClientService httpClientService,
+            SecureStorageService secureStorage,
+            ILogger<ApiService> logger,
             NetworkMonitorService networkMonitor)
         {
             _httpClientService = httpClientService;
@@ -91,7 +92,7 @@ namespace TDFMAUI.Services
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
-            
+
             _logger?.LogInformation("ApiService: Initialized");
             InitializeAuthenticationAsync().ConfigureAwait(false);
             _networkMonitor = networkMonitor;
@@ -103,12 +104,12 @@ namespace TDFMAUI.Services
             }
             _initialized = false;
         }
-        
+
         private void OnNetworkStatusChanged(object sender, NetworkStatusChangedEventArgs e)
         {
             _isNetworkAvailable = e.IsConnected;
             _logger?.LogInformation("ApiService: Network status changed: {Status}", (_isNetworkAvailable ? "Connected" : "Disconnected"));
-            
+
             // If network was restored, we could trigger deferred requests here
             if (_isNetworkAvailable && _pendingRequests.Count > 0)
             {
@@ -116,24 +117,24 @@ namespace TDFMAUI.Services
                 Task.Run(async () => await ProcessPendingRequestsAsync());
             }
         }
-        
+
         // Method to process pending requests when network is restored
         private async Task ProcessPendingRequestsAsync()
         {
             if (!_isNetworkAvailable || _pendingRequests.Count == 0)
                 return;
-                
+
             _logger?.LogInformation("ApiService: Processing {PendingRequestCount} pending requests", _pendingRequests.Sum(p => p.Value.Count));
-            
+
             foreach (var endpointQueue in _pendingRequests.ToList())
             {
                 string endpoint = endpointQueue.Key;
                 var requests = endpointQueue.Value;
-                
+
                 while (requests.Count > 0 && _isNetworkAvailable)
                 {
                     var request = requests.Peek();
-                    
+
                     try
                     {
                         // Skip requests older than 1 hour
@@ -144,11 +145,11 @@ namespace TDFMAUI.Services
                             request.CompletionSource.SetException(new TimeoutException("Request expired"));
                             continue;
                         }
-                        
+
                         _logger?.LogInformation("ApiService: Executing queued {RequestType} request to {Endpoint}", request.RequestType, request.Endpoint);
-                        
+
                         object result = null;
-                        
+
                         switch (request.RequestType)
                         {
                             case "GET":
@@ -166,7 +167,7 @@ namespace TDFMAUI.Services
                                 result = response.IsSuccessStatusCode;
                                 break;
                         }
-                        
+
                         // Complete the task
                         requests.Dequeue();
                         request.CompletionSource.SetResult(result);
@@ -179,46 +180,46 @@ namespace TDFMAUI.Services
                             _logger?.LogWarning("ApiService: Network error while processing pending requests, will retry later");
                             break;
                         }
-                        
+
                         // For other errors, complete the task with an exception and move on
                         requests.Dequeue();
                         request.CompletionSource.SetException(ex);
                         _logger?.LogError(ex, "ApiService: Error processing queued request");
                     }
                 }
-                
+
                 // If queue is empty, remove it
                 if (requests.Count == 0)
                 {
                     _pendingRequests.Remove(endpoint);
                 }
             }
-            
+
             _logger?.LogInformation("ApiService: Finished processing pending requests. {PendingRequestCount} remaining", _pendingRequests.Sum(p => p.Value.Count));
         }
-        
+
         // Method to queue a request for later execution
         private Task<T> QueueRequestAsync<T>(string endpoint, object data, string requestType)
         {
             _logger?.LogInformation("ApiService: Queuing {RequestType} request to {Endpoint} for later execution", requestType, endpoint);
-            
+
             var request = new PendingRequest(endpoint, data, requestType);
-            
+
             if (!_pendingRequests.ContainsKey(endpoint))
             {
                 _pendingRequests[endpoint] = new Queue<PendingRequest>();
             }
-            
+
             _pendingRequests[endpoint].Enqueue(request);
-            
+
             // Return a task that will complete when the request is processed
-            return request.CompletionSource.Task.ContinueWith(t => 
+            return request.CompletionSource.Task.ContinueWith(t =>
             {
                 if (t.IsFaulted)
                 {
                     throw t.Exception.GetBaseException();
                 }
-                
+
                 try
                 {
                 return (T)t.Result;
@@ -230,26 +231,26 @@ namespace TDFMAUI.Services
                 }
             });
         }
-        
+
         // Method to check network before making requests
         private bool CheckNetworkBeforeRequest(string endpoint, bool queueIfUnavailable = false, object data = null, string requestType = null)
         {
             if (!_isNetworkAvailable)
             {
                 _logger?.LogWarning("ApiService: Network unavailable, cannot make request to {Endpoint}", endpoint);
-                
+
                 if (queueIfUnavailable && requestType != null)
                 {
                     // Queue the request for later
                     QueueRequestAsync<object>(endpoint, data, requestType);
                     _logger?.LogInformation("ApiService: Request to {Endpoint} queued for later execution", endpoint);
                 }
-                
+
                 return false;
             }
             return true;
         }
-        
+
         // Method to handle cleanup when ApiService is disposed
         public void Dispose()
         {
@@ -258,7 +259,7 @@ namespace TDFMAUI.Services
                 _networkMonitor.NetworkStatusChanged -= OnNetworkStatusChanged;
             }
         }
-        
+
         private async Task InitializeAuthenticationAsync()
         {
             var tokenInfo = await _secureStorage.GetTokenAsync();
@@ -283,17 +284,17 @@ namespace TDFMAUI.Services
             }
             _initialized = true;
         }
-        
+
         #region HTTP Methods
         // Helper method to determine if an exception is retryable
         private bool IsRetryableException(Exception ex)
         {
-            return ex is HttpRequestException || 
-                   ex is WebException || 
+            return ex is HttpRequestException ||
+                   ex is WebException ||
                    ex is TimeoutException ||
                    (ex is ApiException apiEx && IsRetryableStatusCode(apiEx.StatusCode));
         }
-        
+
         // Helper method to determine if a response has a retryable status code
         private bool IsRetryableStatusCode(HttpStatusCode statusCode)
         {
@@ -302,7 +303,7 @@ namespace TDFMAUI.Services
                    statusCode == HttpStatusCode.GatewayTimeout ||
                    (int)statusCode >= 500; // General server errors
         }
-        
+
         public async Task<string> GetRawResponseAsync(string endpoint)
         {
             _logger.LogDebug("Executing Raw GET request to {Endpoint}", endpoint);
@@ -318,21 +319,21 @@ namespace TDFMAUI.Services
                 return response;
             }
             catch (Exception ex)
-            {    
+            {
                 _logger?.LogError(ex, "ApiService: Error in GetRawResponseAsync for {Endpoint}: {Message}", endpoint, ex.Message);
                 throw new ApiException($"Error fetching raw data from {endpoint}", ex);
             }
         }
-        
+
         public async Task<T> GetAsync<T>(string endpoint, bool queueIfUnavailable = false)
         {
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable, null, "GET"))
             {
-                return queueIfUnavailable 
-                    ? await QueueRequestAsync<T>(endpoint, null, "GET") 
+                return queueIfUnavailable
+                    ? await QueueRequestAsync<T>(endpoint, null, "GET")
                     : default(T);
             }
-            
+
             try
             {
                 // Ensure relative path and pass directly to HttpClientService
@@ -347,7 +348,7 @@ namespace TDFMAUI.Services
             catch (HttpRequestException httpEx)
             {
                 _logger?.LogError(httpEx, "ApiService: HTTP error in GetAsync for {Endpoint}", endpoint);
-                _isNetworkAvailable = false; 
+                _isNetworkAvailable = false;
                 if (queueIfUnavailable) return await QueueRequestAsync<T>(endpoint, null, "GET");
                 throw new ApiException($"Connection error: {httpEx.Message}", httpEx);
             }
@@ -362,11 +363,11 @@ namespace TDFMAUI.Services
         {
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable, data, "POST"))
             {
-                return queueIfUnavailable 
-                    ? await QueueRequestAsync<TResponse>(endpoint, data, "POST") 
+                return queueIfUnavailable
+                    ? await QueueRequestAsync<TResponse>(endpoint, data, "POST")
                     : default(TResponse);
             }
-            
+
             try
             {
                 // Ensure relative path and pass directly to HttpClientService
@@ -381,7 +382,7 @@ namespace TDFMAUI.Services
             catch (HttpRequestException httpEx)
             {
                 _logger?.LogError(httpEx, "ApiService: HTTP error in PostAsync for {Endpoint}", endpoint);
-                _isNetworkAvailable = false; 
+                _isNetworkAvailable = false;
                 if (queueIfUnavailable) return await QueueRequestAsync<TResponse>(endpoint, data, "POST");
                 throw new ApiException($"Connection error: {httpEx.Message}", httpEx);
             }
@@ -401,8 +402,8 @@ namespace TDFMAUI.Services
                 else
                     throw new InvalidOperationException("Network unavailable");
             }
-            
-            try 
+
+            try
             {
                 // Ensure relative path and pass directly to HttpClientService
                 endpoint = endpoint.TrimStart('/');
@@ -416,7 +417,7 @@ namespace TDFMAUI.Services
             catch (HttpRequestException httpEx)
             {
                 _logger?.LogError(httpEx, "ApiService: HTTP error in PutAsync for {Endpoint}", endpoint);
-                _isNetworkAvailable = false; 
+                _isNetworkAvailable = false;
                 if (queueIfUnavailable) return await QueueRequestAsync<TResponse>(endpoint, data, "PUT");
                 throw new ApiException($"Connection error: {httpEx.Message}", httpEx);
             }
@@ -436,9 +437,9 @@ namespace TDFMAUI.Services
                     // Queue returns Task<object>, but Delete returns HttpResponseMessage, so we await and convert
                     var result = await QueueRequestAsync<object>(endpoint, null, "DELETE");
                     // Return a fake success response since the request is queued
-                    return new HttpResponseMessage(HttpStatusCode.Accepted) 
-                    { 
-                        ReasonPhrase = "Request queued for later execution" 
+                    return new HttpResponseMessage(HttpStatusCode.Accepted)
+                    {
+                        ReasonPhrase = "Request queued for later execution"
                     };
                 }
                 else
@@ -461,8 +462,8 @@ namespace TDFMAUI.Services
             catch (HttpRequestException httpEx)
             {
                 _logger?.LogError(httpEx, "ApiService: HTTP error in DeleteAsync for {Endpoint}", endpoint);
-                _isNetworkAvailable = false; 
-                if (queueIfUnavailable) 
+                _isNetworkAvailable = false;
+                if (queueIfUnavailable)
                 {
                     await QueueRequestAsync<object>(endpoint, null, "DELETE"); // Queue the delete
                      return new HttpResponseMessage(HttpStatusCode.Accepted) { ReasonPhrase = "Request queued for later execution" }; // Return Accepted
@@ -476,15 +477,15 @@ namespace TDFMAUI.Services
             }
         }
         #endregion
-        
+
         #region Authentication
         public async Task<UserDto> LoginAsync(string username, string password)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             var request = new AuthLoginRequest { Username = username, Password = password };
             string endpoint = "auth/login";
-            
-            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false)) 
+
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
                 throw new NetworkUnavailableException();
 
             try
@@ -495,14 +496,14 @@ namespace TDFMAUI.Services
                 {
                     throw new ApiException(HttpStatusCode.Unauthorized, tokenResponse?.ErrorMessage ?? "Login failed: Invalid response from server.");
                 }
-                
+
                 DateTime tokenExpiration = DateTime.UtcNow.AddHours(24);
-                
+
                 await _secureStorage.SaveTokenAsync(tokenResponse.Data.Token, tokenExpiration);
                 _httpClientService.SetAuthorizationHeader(tokenResponse.Data.Token);
-                
-                var userDto = new UserDto { 
-                    UserID = tokenResponse.Data.UserId, 
+
+                var userDto = new UserDto {
+                    UserID = tokenResponse.Data.UserId,
                     Username = tokenResponse.Data.Username,
                     FullName = tokenResponse.Data.FullName,
                     IsAdmin = tokenResponse.Data.IsAdmin
@@ -518,14 +519,14 @@ namespace TDFMAUI.Services
                 throw;
             }
             catch (Exception ex)
-            {    
+            {
                 _logger.LogError(ex, "Unexpected error during login for user {Username}", username);
                 await _secureStorage.ClearTokenAsync();
                 _httpClientService.ClearAuthorizationHeader();
                 throw new ApiException("An unexpected error occurred during login.", ex);
             }
         }
-        
+
         public async Task<bool> LogoutAsync()
         {
              if (!_initialized) await InitializeAuthenticationAsync();
@@ -549,7 +550,7 @@ namespace TDFMAUI.Services
         }
 
         public async Task<bool> RegisterUserAsync(CreateUserRequest registration)
-        {   
+        {
              if (!_initialized) await InitializeAuthenticationAsync();
              string endpoint = "auth/register";
               if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
@@ -559,7 +560,7 @@ namespace TDFMAUI.Services
             {
                 _logger?.LogInformation("ApiService: Registering new user {Username}", registration.Username);
                 var response = await PostAsync<CreateUserRequest, ApiResponse<UserDto>>(endpoint, registration);
-                
+
                 if (response == null || !response.Success)
                 {
                     HttpStatusCode statusCode = HttpStatusCode.BadRequest;
@@ -569,14 +570,14 @@ namespace TDFMAUI.Services
                     }
                     throw new ApiException(statusCode, response?.ErrorMessage ?? "Registration failed: Invalid response.");
                 }
-                
+
                 _logger?.LogInformation("ApiService: User {Username} registered successfully", registration.Username);
                 return true;
             }
             catch (ApiException ex)
             {
                  _logger?.LogError(ex, "ApiService: API error registering user {Username}", registration.Username);
-                 throw; 
+                 throw;
             }
             catch (Exception ex)
             {
@@ -593,7 +594,7 @@ namespace TDFMAUI.Services
              string endpoint = $"users/{userId}";
               if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  return await QueueRequestAsync<UserDto>(endpoint, null, "GET");
-            
+
              var response = await GetAsync<ApiResponse<UserDto>>(endpoint);
              if(response == null || !response.Success)
              {
@@ -606,22 +607,22 @@ namespace TDFMAUI.Services
              }
              return response.Data;
         }
-        
+
         public async Task<UserDto> GetUserAsync(int userId)
         {
             // This is an alias for GetUserByIdAsync for backward compatibility
             return await GetUserByIdAsync(userId);
         }
-        
+
         public async Task<UserProfileDto> GetUserProfileAsync(int userId)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             // Format the GetById route with the userId parameter
             string endpoint = $"users/{userId}/profile";
-            
+
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                 return await QueueRequestAsync<UserProfileDto>(endpoint, null, "GET");
-                
+
             var response = await GetAsync<ApiResponse<UserProfileDto>>(endpoint);
             if (response == null || !response.Success)
             {
@@ -641,7 +642,7 @@ namespace TDFMAUI.Services
              string endpoint = $"users?pageNumber={page}&pageSize={pageSize}";
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  return await QueueRequestAsync<PaginatedResult<UserDto>>(endpoint, null, "GET");
-                 
+
              var response = await GetAsync<ApiResponse<PaginatedResult<UserDto>>>(endpoint);
               if(response == null || !response.Success)
              {
@@ -654,7 +655,7 @@ namespace TDFMAUI.Services
              }
             return response.Data ?? new PaginatedResult<UserDto>();
         }
-        
+
         public async Task<List<UserDto>> GetUsersByDepartmentAsync(string department)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
@@ -680,18 +681,18 @@ namespace TDFMAUI.Services
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "ApiService: Failed to get users for department '{Department}': {ErrorMessage}", department, GetFriendlyErrorMessage(ex));
-                throw; 
+                throw;
             }
         }
-        
+
         public async Task<List<UserDto>> GetTeamMembersAsync()
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             string endpoint = "users/team-members";
-            
+
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                 return await QueueRequestAsync<List<UserDto>>(endpoint, null, "GET");
-                
+
             try
             {
                 var response = await GetAsync<ApiResponse<List<UserDto>>>(endpoint);
@@ -717,15 +718,15 @@ namespace TDFMAUI.Services
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             string endpoint = "users";
-            
+
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
                 throw new NetworkUnavailableException("Create user requires network.");
-                
+
             try
             {
                 _logger?.LogInformation("ApiService: Creating new user");
                 var response = await PostAsync<CreateUserRequest, ApiResponse<UserDto>>(endpoint, userRequest);
-                
+
                 if (response == null || !response.Success)
                 {
                     HttpStatusCode statusCode = HttpStatusCode.BadRequest;
@@ -735,7 +736,7 @@ namespace TDFMAUI.Services
                     }
                     throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to create user");
                 }
-                
+
                 return response.Data;
             }
             catch (Exception ex)
@@ -772,7 +773,7 @@ namespace TDFMAUI.Services
                  throw new ApiException($"Update failed: {GetFriendlyErrorMessage(ex)}", ex);
             }
         }
-        
+
         public async Task DeleteUserAsync(int userId)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
@@ -786,7 +787,7 @@ namespace TDFMAUI.Services
                 // Ensure successful response
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger?.LogWarning("ApiService: Delete user {UserId} returned status code {StatusCode}", 
+                    _logger?.LogWarning("ApiService: Delete user {UserId} returned status code {StatusCode}",
                         userId, response.StatusCode);
                     throw new ApiException(response.StatusCode, $"Failed to delete user: {response.ReasonPhrase}");
                 }
@@ -797,7 +798,7 @@ namespace TDFMAUI.Services
                  throw new ApiException($"Delete failed: {GetFriendlyErrorMessage(ex)}", ex);
             }
         }
-        
+
         public async Task<bool> ChangePasswordAsync(ChangePasswordDto changePasswordDto)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
@@ -822,7 +823,7 @@ namespace TDFMAUI.Services
             catch (ApiException ex)
             {
                 _logger.LogError(ex, "API error changing password: {Message}", ex.Message);
-                throw; 
+                throw;
             }
             catch (Exception ex)
             {
@@ -841,7 +842,7 @@ namespace TDFMAUI.Services
             try
             {
                 _logger?.LogInformation("ApiService: Uploading profile picture {FileName} ({ContentType})", fileName, contentType);
-                
+
                 using var content = new MultipartFormDataContent();
                 using var streamContent = new StreamContent(imageStream);
                 streamContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
@@ -856,7 +857,7 @@ namespace TDFMAUI.Services
                     _logger?.LogWarning("ApiService: Failed to upload profile picture. Message: {Message}", response?.Message);
                     throw new ApiException(response?.Message ?? "Failed to upload profile picture.");
                 }
-                
+
                  _logger?.LogInformation("ApiService: Profile picture uploaded successfully.");
                 return true;
             }
@@ -874,18 +875,18 @@ namespace TDFMAUI.Services
                 _logger?.LogInformation("ApiService: UpdateUserProfileAsync request queued due to network unavailability.");
                 return false;
             }
-            
+
             try
             {
                 _logger?.LogInformation("ApiService: Updating user profile.");
                 var response = await PutAsync<UpdateMyProfileRequest, ApiResponse<bool>>("users/update-profile", profileData);
-                    
+
                 if (response?.Success != true)
                 {
                     _logger?.LogWarning("ApiService: Failed to update user profile. Message: {Message}", response?.Message);
                     throw new ApiException(response?.Message ?? "Failed to update profile.");
                 }
-                
+
                 _logger?.LogInformation("ApiService: User profile updated successfully.");
                 return true;
             }
@@ -904,9 +905,9 @@ namespace TDFMAUI.Services
             string endpoint = $"messages?userId={userId}&{BuildPaginationQueryString(pagination)}";
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  return await QueueRequestAsync<PaginatedResult<ChatMessageDto>>(endpoint, pagination, "GET");
-                 
+
             var response = await GetAsync<ApiResponse<PaginatedResult<ChatMessageDto>>>(endpoint);
-             if(response == null || !response.Success) 
+             if(response == null || !response.Success)
                 throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to get user messages");
             return response.Data ?? new PaginatedResult<ChatMessageDto>();
         }
@@ -930,34 +931,34 @@ namespace TDFMAUI.Services
              }
             return response.Data ?? new PaginatedResult<ChatMessageDto>();
         }
-        
+
         public async Task<ChatMessageDto> CreateMessageAsync(MessageCreateDto createDto)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             string endpoint = "messages";
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  throw new NetworkUnavailableException("Create message requires network.");
-                 
+
              var response = await PostAsync<MessageCreateDto, ApiResponse<ChatMessageDto>>(endpoint, createDto);
-             if(response == null || !response.Success) 
+             if(response == null || !response.Success)
                 throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to create message");
              return response.Data;
         }
-        
+
         public async Task<ChatMessageDto> CreatePrivateMessageAsync(MessageCreateDto createDto)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             string endpoint = "messages/private";
-            
+
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                 throw new NetworkUnavailableException("Create private message requires network.");
-                
+
             var response = await PostAsync<MessageCreateDto, ApiResponse<ChatMessageDto>>(endpoint, createDto);
             if (response == null || !response.Success)
                 throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to create private message");
             return response.Data;
         }
-        
+
         public async Task<bool> MarkMessageAsReadAsync(int messageId)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
@@ -968,19 +969,19 @@ namespace TDFMAUI.Services
              var response = await PostAsync<object, ApiResponse<bool>>(endpoint, null);
             return response?.Success ?? false;
         }
-        
+
         public async Task<bool> MarkMessagesAsReadAsync(List<int> messageIds)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             string endpoint = "messages/mark-bulk-read";
-            
+
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                 throw new NetworkUnavailableException("Mark messages as read requires network.");
-                
+
             var response = await PostAsync<List<int>, ApiResponse<bool>>(endpoint, messageIds);
             return response?.Success ?? false;
         }
-        
+
         public async Task<List<ChatMessageDto>> GetRecentChatMessagesAsync(int count = 50)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
@@ -1005,14 +1006,14 @@ namespace TDFMAUI.Services
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             string endpoint = $"messages/private?userId={userId}&{BuildPaginationQueryString(pagination)}";
-            
+
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                 return await QueueRequestAsync<PaginatedResult<ChatMessageDto>>(endpoint, pagination, "GET");
-                
+
             var response = await GetAsync<ApiResponse<PaginatedResult<ChatMessageDto>>>(endpoint);
             if (response == null || !response.Success)
                 throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to get private messages");
-            
+
             return response.Data ?? new PaginatedResult<ChatMessageDto>();
         }
 
@@ -1022,18 +1023,18 @@ namespace TDFMAUI.Services
              string endpoint = $"notifications/{notificationId}/mark-seen";
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  throw new NetworkUnavailableException("Mark notification seen requires network.");
-                 
+
             var response = await PostAsync<object, ApiResponse<bool>>(endpoint, null);
             return response?.Success ?? false;
         }
-        
+
         public async Task<bool> BroadcastNotificationAsync(string message, string department = null)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
              string endpoint = "notifications/broadcast";
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  throw new NetworkUnavailableException("Broadcast notification requires network.");
-                 
+
              var payload = new { Message = message, Department = department };
              var response = await PostAsync<object, ApiResponse<bool>>(endpoint, payload);
              return response?.Success ?? false;
@@ -1047,7 +1048,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var result = await GetAsync<object>("HealthCheck"); 
+                var result = await GetAsync<object>("HealthCheck");
                 return result != null;
             }
             catch
@@ -1055,12 +1056,12 @@ namespace TDFMAUI.Services
                 return false;
             }
         }
-        
+
         public async Task<bool> TestConnectivityAsync()
         {
             try
             {
-                await GetAsync<object>("HealthCheck"); 
+                await GetAsync<object>("HealthCheck");
                 return true;
             }
             catch (Exception ex)
@@ -1087,7 +1088,7 @@ namespace TDFMAUI.Services
                 return "Received invalid data from the server.";
             if (ex is InvalidOperationException && ex.Message.Contains("Network unavailable"))
                  return "Network unavailable. Please check your connection.";
-                
+
             return "An unexpected error occurred. Please try again later.";
         }
         #endregion
@@ -1131,7 +1132,7 @@ namespace TDFMAUI.Services
 
             return queryParams.Any() ? "?" + string.Join("&", queryParams) : string.Empty;
         }
-        
+
         private string BuildPaginationQueryString(MessagePaginationDto pagination, int? userId = null)
         {
             var queryParams = new List<string>();
@@ -1141,10 +1142,10 @@ namespace TDFMAUI.Services
             if (userId.HasValue) queryParams.Add($"userId={userId.Value}");
             if (pagination.UnreadOnly) queryParams.Add("unreadOnly=true");
             if (pagination.FromUserId.HasValue) queryParams.Add($"fromUserId={pagination.FromUserId.Value}");
-            
+
             return queryParams.Any() ? $"?{string.Join("&", queryParams)}" : "";
         }
-        
+
         #endregion
 
         // Authentication methods
@@ -1153,14 +1154,14 @@ namespace TDFMAUI.Services
             try
             {
                 var response = await PostAsync<LoginRequestDto, LoginResponseDto>("api/auth/login", loginRequest);
-                
+
                 if (response != null && !string.IsNullOrEmpty(response.Token))
                 {
                     DateTime expiration = DateTime.UtcNow.AddHours(24);
                     await _secureStorage.SaveTokenAsync(response.Token, expiration);
                     _httpClientService.SetAuthorizationHeader(response.Token);
                 }
-                
+
                 return response;
             }
             catch (Exception ex)
@@ -1169,7 +1170,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<RegisterResponseDto> RegisterAsync(RegisterRequestDto registerRequest)
         {
             try
@@ -1187,7 +1188,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         // User methods
         public async Task<UserDto> GetCurrentUserAsync()
         {
@@ -1201,7 +1202,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<int> GetCurrentUserIdAsync()
         {
             try
@@ -1215,11 +1216,26 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<bool> IsAuthenticatedAsync()
         {
             try
             {
+                // Check if we should persist token based on platform
+                if (DeviceHelper.IsDesktop)
+                {
+                    _logger.LogInformation("IsAuthenticatedAsync: Desktop platform detected, checking token persistence");
+                    // For desktop platforms, check if we should clear tokens
+                    bool shouldPersist = _secureStorage.ShouldPersistToken();
+                    if (!shouldPersist)
+                    {
+                        _logger.LogInformation("IsAuthenticatedAsync: Token persistence disabled for desktop platform");
+                        // This will ensure we don't use any stored tokens on desktop platforms
+                        await _secureStorage.HandleTokenPersistenceAsync();
+                        return false;
+                    }
+                }
+
                 var tokenInfo = await _secureStorage.GetTokenAsync();
                 return !string.IsNullOrEmpty(tokenInfo.Token) && tokenInfo.Expiration > DateTime.UtcNow;
             }
@@ -1229,52 +1245,52 @@ namespace TDFMAUI.Services
                 return false;
             }
         }
-        
+
         // Request methods
         public async Task<PaginatedResult<RequestResponseDto>> GetRequestsAsync(RequestPaginationDto pagination, int? userId = null, string department = null, bool queueIfUnavailable = true)
         {
             try
             {
                 var queryParams = new List<string>();
-                
+
                 if (pagination != null)
                 {
                     queryParams.Add($"page={pagination.Page}");
                     queryParams.Add($"pageSize={pagination.PageSize}");
-                    
+
                     if (pagination.FromDate.HasValue)
                     {
                         queryParams.Add($"fromDate={pagination.FromDate.Value:yyyy-MM-dd}");
                     }
-                    
+
                     if (pagination.ToDate.HasValue)
                     {
                         queryParams.Add($"toDate={pagination.ToDate.Value:yyyy-MM-dd}");
                     }
-                    
+
                     if (!string.IsNullOrEmpty(pagination.FilterStatus) && pagination.FilterStatus != "All")
                     {
                         queryParams.Add($"status={pagination.FilterStatus}");
                     }
-                    
+
                     if (!string.IsNullOrEmpty(pagination.FilterType) && pagination.FilterType != "All")
                     {
                         queryParams.Add($"type={pagination.FilterType}");
                     }
                 }
-                
+
                 if (userId.HasValue)
                 {
                     queryParams.Add($"userId={userId.Value}");
                 }
-                
+
                 if (!string.IsNullOrEmpty(department) && department != "All")
                 {
                     queryParams.Add($"department={Uri.EscapeDataString(department)}");
                 }
-                
+
                 string url = $"requests{(queryParams.Any() ? $"?{string.Join("&", queryParams)}" : "")}";
-                
+
                 return await GetAsync<PaginatedResult<RequestResponseDto>>(url, queueIfUnavailable);
             }
             catch (Exception ex)
@@ -1283,7 +1299,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<RequestResponseDto> CreateRequestAsync(RequestCreateDto requestDto)
         {
             try
@@ -1298,7 +1314,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<RequestResponseDto> UpdateRequestAsync(Guid requestId, RequestUpdateDto requestDto)
         {
             try
@@ -1313,7 +1329,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<RequestResponseDto> GetRequestByIdAsync(Guid requestId, bool queueIfUnavailable = true)
         {
             try
@@ -1328,7 +1344,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<bool> DeleteRequestAsync(Guid requestId)
         {
             try
@@ -1343,7 +1359,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<bool> ApproveRequestAsync(Guid requestId, RequestApprovalDto approvalDto)
         {
             try
@@ -1358,7 +1374,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<bool> RejectRequestAsync(Guid requestId, RequestRejectDto rejectDto)
         {
             try
@@ -1390,7 +1406,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<List<LookupItem>> GetLeaveTypesAsync(bool queueIfUnavailable = true)
         {
             try
@@ -1403,7 +1419,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<Dictionary<string, int>> GetLeaveBalancesAsync(int userId, bool queueIfUnavailable = true)
         {
             try
@@ -1417,7 +1433,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<List<LookupItem>> GetLookupAsync(string lookupType, bool queueIfUnavailable = true)
         {
             try
@@ -1431,7 +1447,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         // Add SignupAsync method implementation
         public async Task<bool> SignupAsync(SignupModel signupModel)
         {

@@ -332,6 +332,7 @@ namespace TDFMAUI
                 {
                     // Get required services
                     var authService = Services.GetRequiredService<IAuthService>();
+                    var secureStorage = Services.GetRequiredService<SecureStorageService>();
                     var logger = Services.GetRequiredService<ILogger<App>>();
 
                     // In safe mode, skip authentication check and go straight to diagnostic page
@@ -342,8 +343,16 @@ namespace TDFMAUI
                         return;
                     }
 
-                    // Check authentication status asynchronously by trying to get the current user
-                    UserDto currentUser = await authService.GetCurrentUserAsync();
+                    // Check if we should persist token based on platform
+                    bool hasValidToken = await secureStorage.HandleTokenPersistenceAsync();
+
+                    // For desktop platforms, HandleTokenPersistenceAsync will always return false
+                    // and clear any existing tokens
+
+                    // For mobile platforms, it will check if a valid token exists
+
+                    // Only try to get the current user if we have a valid token
+                    UserDto currentUser = hasValidToken ? await authService.GetCurrentUserAsync() : null;
                     bool isAuthenticated = currentUser != null;
 
                     // Store the page we'll navigate to after diagnostics
@@ -822,8 +831,38 @@ namespace TDFMAUI
             // When app goes to background, reconnect socket when it comes back
             DebugService.LogInfo("App", "Application going to sleep");
 
-            // For non-mobile devices, update user status to Offline when app is closed
-            if (DeviceHelper.IsDesktop || (!DeviceHelper.IsMobile && DeviceHelper.IsLargeScreen))
+            // For desktop platforms, clear token and update user status to Offline
+            if (DeviceHelper.IsDesktop)
+            {
+                DebugService.LogInfo("App", "Desktop platform detected, clearing token and setting user offline");
+
+                // Clear token on desktop platforms when app is closed
+                if (Services != null)
+                {
+                    var secureStorage = Services.GetService<SecureStorageService>();
+                    if (secureStorage != null)
+                    {
+                        // Fire and forget - don't block the UI thread
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await secureStorage.ClearTokenAsync();
+                                DebugService.LogInfo("App", "Token cleared on desktop platform during sleep");
+                            }
+                            catch (Exception ex)
+                            {
+                                DebugService.LogError("App", $"Error clearing token: {ex.Message}");
+                            }
+                        });
+                    }
+                }
+
+                // Update user status to Offline
+                UpdateUserStatusToOffline();
+            }
+            // For non-mobile large screen devices, just update status to Offline
+            else if (!DeviceHelper.IsMobile && DeviceHelper.IsLargeScreen)
             {
                 UpdateUserStatusToOffline();
             }

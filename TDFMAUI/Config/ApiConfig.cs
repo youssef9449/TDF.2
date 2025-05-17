@@ -272,8 +272,8 @@ namespace TDFMAUI.Config
                 // Replace http/https protocol with ws/wss
                 url = url.Replace("http://", "ws://").Replace("https://", "wss://");
 
-                // Add /ws path
-                url = $"{url}/ws";
+                // Add WebSocket path from ApiRoutes
+                url = $"{url}{ApiRoutes.WebSocket.Connect}";
 
                 DebugService.LogInfo("ApiConfig", $"Derived WebSocket URL: {url} from Base URL: {baseUrl}");
                 return url;
@@ -281,7 +281,7 @@ namespace TDFMAUI.Config
             catch (Exception ex)
             {
                 DebugService.LogError("ApiConfig", $"Error constructing WebSocket URL: {ex.Message}");
-                return "wss://localhost:7079/ws"; // Fallback to default
+                return $"wss://localhost:7079{ApiRoutes.WebSocket.Connect}"; // Fallback to default
             }
         }
 

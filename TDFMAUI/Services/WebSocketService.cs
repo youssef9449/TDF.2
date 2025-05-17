@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using TDFMAUI.Config;
 using TDFMAUI.Helpers;
+using TDFShared.Constants;
 using TDFShared.DTOs.Messages;
 using TDFShared.Enums;
 using TDFShared.Helpers;
@@ -167,7 +168,7 @@ namespace TDFMAUI.Services
                     // Send a ping to verify connection
                     await SendMessageAsync(new
                     {
-                        type = "ping",
+                        type = ApiRoutes.WebSocket.MessageTypes.Ping,
                         timestamp = DateTime.UtcNow
                     });
 
@@ -374,21 +375,26 @@ namespace TDFMAUI.Services
                 switch (messageType.ToLower())
                 {
                     case "notification":
+                    case ApiRoutes.WebSocket.MessageTypes.Notification:
                         HandleNotification(root);
                         break;
                     case "chat_message":
+                    case ApiRoutes.WebSocket.MessageTypes.ChatMessage:
                         HandleChatMessage(root);
                         break;
                     case "pending_message": // Handle messages delivered while offline
                         HandlePendingMessage(root);
                         break;
                     case "messages_read":
+                    case "message_status":
+                    case ApiRoutes.WebSocket.MessageTypes.MessageStatus:
                         HandleMessagesRead(root);
                         break;
                     case "messages_delivered":
                         HandleMessagesDelivered(root);
                         break;
                     case "user_status": // Maybe legacy or different type?
+                    case ApiRoutes.WebSocket.MessageTypes.UserPresence:
                          HandleUserStatus(root); // Assuming this exists
                          break;
                     case "user_status_changed":
@@ -414,10 +420,12 @@ namespace TDFMAUI.Services
                         HandleStatusUpdated(root);
                         break;
                     case "error":
+                    case ApiRoutes.WebSocket.MessageTypes.Error:
                         HandleError(root);
                         break;
                     // Keep pong or other control messages if necessary
                     case "pong":
+                    case ApiRoutes.WebSocket.MessageTypes.Pong:
                          _logger.LogTrace("Pong received from server");
                          // Reset any watchdog timers if needed
                          break;
@@ -1110,7 +1118,7 @@ namespace TDFMAUI.Services
         {
             await SendMessageAsync(new
             {
-                type = "chat_message",
+                type = ApiRoutes.WebSocket.MessageTypes.ChatMessage,
                 receiverId = receiverId,
                 message = message,
                 timestamp = DateTime.UtcNow
@@ -1182,7 +1190,7 @@ namespace TDFMAUI.Services
         {
             await SendMessageAsync(new
             {
-                type = "update_status",
+                type = ApiRoutes.WebSocket.MessageTypes.UserPresence,
                 status = status ?? string.Empty,
                 statusMessage = statusMessage ?? string.Empty,
                 timestamp = DateTime.UtcNow
@@ -1204,7 +1212,7 @@ namespace TDFMAUI.Services
         {
             await SendMessageAsync(new
             {
-                type = "activity_ping",
+                type = ApiRoutes.WebSocket.MessageTypes.Ping,
                 timestamp = DateTime.UtcNow
             });
         }

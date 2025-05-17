@@ -49,9 +49,10 @@ namespace TDFMAUI.Services
                 }
 
                 var userId = App.CurrentUser.UserID;
-                var notificationDtos = await _apiService.GetAsync<List<NotificationDto>>($"api/notifications/unread/{userId}");
-                
-                return notificationDtos?.Select(dto => MapNotificationDtoToEntity(dto)).ToList() 
+                // Use the correct endpoint from the API controller
+                var notificationDtos = await _apiService.GetAsync<List<NotificationDto>>("notifications/unread");
+
+                return notificationDtos?.Select(dto => MapNotificationDtoToEntity(dto)).ToList()
                        ?? Enumerable.Empty<NotificationEntity>();
             }
             catch (Exception ex)
@@ -72,9 +73,9 @@ namespace TDFMAUI.Services
                 }
 
                 var userId = App.CurrentUser.UserID;
-                var result = await _apiService.PostAsync<object, bool>($"notifications/{notificationId}/seen", 
+                var result = await _apiService.PostAsync<object, bool>($"notifications/{notificationId}/seen",
                     new { userId });
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -100,9 +101,9 @@ namespace TDFMAUI.Services
                 }
 
                 var userId = App.CurrentUser.UserID;
-                var result = await _apiService.PostAsync<object, bool>("notifications/seen", 
+                var result = await _apiService.PostAsync<object, bool>("notifications/seen",
                     new { userId, notificationIds });
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -122,9 +123,9 @@ namespace TDFMAUI.Services
                     senderId = App.CurrentUser.UserID;
                 }
 
-                var result = await _apiService.PostAsync<object, bool>("notifications", 
+                var result = await _apiService.PostAsync<object, bool>("notifications",
                     new { receiverId, message, senderId });
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -145,9 +146,9 @@ namespace TDFMAUI.Services
                 }
 
                 var senderId = App.CurrentUser.UserID;
-                var result = await _apiService.PostAsync<object, bool>("notifications/broadcast", 
+                var result = await _apiService.PostAsync<object, bool>("notifications/broadcast",
                     new { message, senderId, department });
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -168,9 +169,9 @@ namespace TDFMAUI.Services
                 }
 
                 var senderId = App.CurrentUser.UserID;
-                var result = await _apiService.PostAsync<object, bool>("messages/chat", 
+                var result = await _apiService.PostAsync<object, bool>("messages/chat",
                     new { receiverId, senderId, message, queueIfOffline });
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -191,9 +192,9 @@ namespace TDFMAUI.Services
                 }
 
                 var receiverId = App.CurrentUser.UserID;
-                var result = await _apiService.PostAsync<object, bool>("messages/read", 
+                var result = await _apiService.PostAsync<object, bool>("messages/read",
                     new { senderId, receiverId });
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -214,9 +215,10 @@ namespace TDFMAUI.Services
                 }
 
                 var receiverId = App.CurrentUser.UserID;
-                var result = await _apiService.PostAsync<object, bool>("api/messages/delivered/from-sender", 
+                // Remove the "api/" prefix as ApiService handles this
+                var result = await _apiService.PostAsync<object, bool>("messages/delivered/from-sender",
                     new { senderId });
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -242,9 +244,10 @@ namespace TDFMAUI.Services
                     return false;
                 }
 
-                var result = await _apiService.PostAsync<object, bool>("api/messages/delivered/bulk", 
+                // Remove the "api/" prefix as ApiService handles this
+                var result = await _apiService.PostAsync<object, bool>("messages/delivered/bulk",
                     new { messageIds = messageIds.ToList() });
-                
+
                 return result;
             }
             catch (Exception ex)
@@ -265,8 +268,9 @@ namespace TDFMAUI.Services
                 }
 
                 var userId = App.CurrentUser.UserID;
-                var count = await _apiService.GetAsync<int>($"api/messages/unread/count/{userId}");
-                
+                // Remove the "api/" prefix as ApiService handles this
+                var count = await _apiService.GetAsync<int>($"messages/unread/count/{userId}");
+
                 return count;
             }
             catch (Exception ex)
@@ -289,7 +293,7 @@ namespace TDFMAUI.Services
                 Timestamp = dto.Timestamp,
             };
         }
-        
+
         #region Interface Implementation for Show Methods
         // Use NotificationHelper for platform-aware display
 
@@ -394,7 +398,7 @@ namespace TDFMAUI.Services
             {
                 var scheduledNotifications = await GetScheduledNotificationsAsync();
                 var updatedNotifications = scheduledNotifications.Where(n => n.Id != id).ToList();
-                
+
                 if (scheduledNotifications.Count == updatedNotifications.Count)
                 {
                     return false; // Nothing was removed
@@ -451,14 +455,14 @@ namespace TDFMAUI.Services
                 return new List<Helpers.NotificationRecord>();
             }
         }
-        
+
         // This method implements the interface
         async Task<List<TDFShared.DTOs.Messages.NotificationRecord>> IExtendedNotificationService.GetNotificationHistoryAsync()
         {
             try
             {
                 var helperRecords = await GetNotificationHistoryInternalAsync();
-                
+
                 // Convert from helper records to shared DTO records
                 return helperRecords.Select(hr => new TDFShared.DTOs.Messages.NotificationRecord
                 {
@@ -546,7 +550,7 @@ namespace TDFMAUI.Services
                 NotificationReceived?.Invoke(this, notificationDto);
             }
         }
-        
+
         private NotificationDto MapNotificationEventArgsToNotificationDto(NotificationEventArgs e)
         {
             return new NotificationDto
@@ -571,9 +575,9 @@ namespace TDFMAUI.Services
                 case NotificationType.Error: return NotificationLevel.High;
                 case NotificationType.Warning: return NotificationLevel.High;
                 case NotificationType.Success: return NotificationLevel.Medium;
-                case NotificationType.Info: 
+                case NotificationType.Info:
                 default: return NotificationLevel.Low;
             }
         }
     }
-} 
+}

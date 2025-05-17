@@ -33,21 +33,18 @@ public class RequestService : IRequestService
 
     public async Task<RequestResponseDto> CreateRequestAsync(RequestCreateDto requestDto)
     {
-        // Fix: Use "api/requests" instead of ApiRoutes.Requests.Base
-        var uri = $"{_baseApiUrl}api/requests";
+        // Use ApiRoutes.Requests.Base from TDFShared
+        var uri = $"{_baseApiUrl}{ApiRoutes.Requests.Base}";
         _logger.LogInformation("Sending POST request to {Uri}", uri);
-        // Add Authentication Header if needed
-        // _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "YOUR_TOKEN");
         var response = await _httpClient.PostAsJsonAsync(uri, requestDto, _serializerOptions);
         return await HandleApiResponse<RequestResponseDto>(response, "CreateRequestAsync");
     }
 
     public async Task<RequestResponseDto> UpdateRequestAsync(Guid requestId, RequestUpdateDto requestDto)
     {
-        // Fix: Use "api/requests/{id}" instead of ApiRoutes.Requests.GetById
-        var uri = $"{_baseApiUrl}api/requests/{requestId}";
+        // Use ApiRoutes.Requests.GetById with string.Format
+        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetById, requestId)}";
         _logger.LogInformation("Sending PUT request to {Uri}", uri);
-        // Add Authentication Header if needed
         var response = await _httpClient.PutAsJsonAsync(uri, requestDto, _serializerOptions);
         return await HandleApiResponse<RequestResponseDto>(response, "UpdateRequestAsync");
     }
@@ -57,8 +54,8 @@ public class RequestService : IRequestService
     public async Task<PaginatedResult<RequestResponseDto>> GetMyRequestsAsync(RequestPaginationDto pagination)
     {
         var queryString = BuildQueryString(pagination);
-        // Fix: Use "api/requests/my" instead of ApiRoutes.Requests.GetMy
-        var uri = $"{_baseApiUrl}api/requests/my{queryString}";
+        // Use ApiRoutes.Requests.GetMy
+        var uri = $"{_baseApiUrl}{ApiRoutes.Requests.GetMy}{queryString}";
         _logger.LogInformation("Sending GET request to {Uri}", uri);
         var response = await _httpClient.GetAsync(uri);
         return await HandleApiResponse<PaginatedResult<RequestResponseDto>>(response, "GetMyRequestsAsync");
@@ -67,7 +64,7 @@ public class RequestService : IRequestService
     public async Task<PaginatedResult<RequestResponseDto>> GetAllRequestsAsync(RequestPaginationDto pagination)
     {
         var queryString = BuildQueryString(pagination);
-        // Fix: Use "requests" instead of "request" to match the server-side route
+        // Use ApiRoutes.Requests.Base but with "s" at the end to match the controller route
         var uri = $"{_baseApiUrl}api/requests{queryString}";
         _logger.LogInformation("Sending GET request to {Uri}", uri);
         var response = await _httpClient.GetAsync(uri);
@@ -77,8 +74,8 @@ public class RequestService : IRequestService
     public async Task<PaginatedResult<RequestResponseDto>> GetRequestsByDepartmentAsync(string department, RequestPaginationDto pagination)
     {
         var queryString = BuildQueryString(pagination);
-        // Fix: Use "api/requests/department/{department}" instead of ApiRoutes.Requests.GetByDepartment
-        var uri = $"{_baseApiUrl}api/requests/department/{Uri.EscapeDataString(department)}{queryString}";
+        // Use ApiRoutes.Requests.GetByDepartment with string.Format
+        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetByDepartment, Uri.EscapeDataString(department))}{queryString}";
         _logger.LogInformation("Sending GET request to {Uri}", uri);
         var response = await _httpClient.GetAsync(uri);
         return await HandleApiResponse<PaginatedResult<RequestResponseDto>>(response, "GetRequestsByDepartmentAsync");
@@ -86,47 +83,40 @@ public class RequestService : IRequestService
 
     public async Task<RequestResponseDto> GetRequestByIdAsync(Guid requestId)
     {
-        // Fix: Use "api/requests/{id}" instead of ApiRoutes.Requests.GetById
-        var uri = $"{_baseApiUrl}api/requests/{requestId}";
+        // Use ApiRoutes.Requests.GetById with string.Format
+        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetById, requestId)}";
         _logger.LogInformation("Sending GET request to {Uri}", uri);
-        // Add Authentication Header if needed
         var response = await _httpClient.GetAsync(uri);
         return await HandleApiResponse<RequestResponseDto>(response, "GetRequestByIdAsync");
     }
 
     public async Task<bool> DeleteRequestAsync(Guid requestId)
     {
-        // Fix: Use "api/requests/{id}" instead of ApiRoutes.Requests.GetById
-        var uri = $"{_baseApiUrl}api/requests/{requestId}";
+        // Use ApiRoutes.Requests.GetById with string.Format
+        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetById, requestId)}";
         _logger.LogInformation("Sending DELETE request to {Uri}", uri);
-        // Add Authentication Header if needed
         var response = await _httpClient.DeleteAsync(uri);
-        // HandleApiResponse might need adjustment for bool return, or just check status code
         _logger.LogInformation("DeleteRequestAsync: Received response status {StatusCode}", response.StatusCode);
         return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> ApproveRequestAsync(Guid requestId, RequestApprovalDto approvalDto)
     {
-        // Fix: Use "api/requests/{id}/approve" instead of ApiRoutes.Requests.Approve
-        var uri = $"{_baseApiUrl}api/requests/{requestId}/approve";
+        // Use ApiRoutes.Requests.Approve with string.Format
+        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.Approve, requestId)}";
         _logger.LogInformation("Sending POST request to {Uri}", uri);
-        // Add Authentication Header if needed
         var response = await _httpClient.PostAsJsonAsync(uri, approvalDto, _serializerOptions);
         _logger.LogInformation("ApproveRequestAsync: Received response status {StatusCode}", response.StatusCode);
-        // Assuming success is indicated by 2xx status code
         return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> RejectRequestAsync(Guid requestId, RequestRejectDto rejectDto)
     {
-        // Fix: Use "api/requests/{id}/reject" instead of ApiRoutes.Requests.Reject
-        var uri = $"{_baseApiUrl}api/requests/{requestId}/reject";
+        // Use ApiRoutes.Requests.Reject with string.Format
+        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.Reject, requestId)}";
         _logger.LogInformation("Sending POST request to {Uri}", uri);
-        // Add Authentication Header if needed
         var response = await _httpClient.PostAsJsonAsync(uri, rejectDto, _serializerOptions);
         _logger.LogInformation("RejectRequestAsync: Received response status {StatusCode}", response.StatusCode);
-        // Assuming success is indicated by 2xx status code
         return response.IsSuccessStatusCode;
     }
 

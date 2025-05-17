@@ -59,7 +59,7 @@ namespace TDFAPI.Messaging
             
             // Store directly in memory without using cache service for now
             // This avoids ambiguous method call issues
-            _cacheService.GetOrCreateAsync<WebSocketMessage>(cacheKey, () => Task.FromResult(message), absoluteExpirationMinutes: expiryMinutes);
+            _cacheService.GetOrCreateAsync(cacheKey, () => Task.FromResult(message), absoluteExpirationMinutes: expiryMinutes);
 
             _logger.LogDebug("Stored message {MessageId} for delivery to {Recipient}, expires in {ExpiryMinutes} minutes", 
                 message.Id, message.To, expiryMinutes);

@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
-using TDFShared.Models.Request; // For navigation property
+using TDFShared.Models.Request;
 
-namespace TDFAPI.Models
+namespace TDFShared.Models.User
 {
     // Represents the User entity corresponding to the dbo.Users table
     public class User
@@ -15,7 +14,7 @@ namespace TDFAPI.Models
 
         [Required]
         [StringLength(50)]
-        public string Username { get; set; } // Mapped from UserName in SQL
+        public string UserName { get; set; } // Mapped from UserName in SQL
 
         [Required]
         [StringLength(256)]
@@ -34,9 +33,6 @@ namespace TDFAPI.Models
         [Required]
         [StringLength(255)]
         public string Department { get; set; }
-
-        // Ignored in DbContext configuration - legacy column - RE-ENABLING
-        public string? Role { get; set; }
  
         public byte[]? Picture { get; set; }
 

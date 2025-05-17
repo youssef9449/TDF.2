@@ -14,17 +14,20 @@ namespace TDFAPI.Services
         private readonly INotificationService _notificationService;
         private readonly IUserRepository _userRepository;
         private readonly ILogger<MessageService> _logger;
+        private readonly IUnitOfWork _unitOfWork;
 
         public MessageService(
             IMessageRepository messageRepository,
             INotificationService notificationService,
             IUserRepository userRepository,
-            ILogger<MessageService> logger)
+            ILogger<MessageService> logger,
+            IUnitOfWork unitOfWork)
         {
             _messageRepository = messageRepository;
             _notificationService = notificationService;
             _userRepository = userRepository;
             _logger = logger;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<IEnumerable<MessageDto>> GetAllAsync()
@@ -62,13 +65,13 @@ namespace TDFAPI.Services
                 // Validate users exist
                 await ValidateUserExistsAsync(userId1);
                 await ValidateUserExistsAsync(userId2);
-                
+
                 var messages = await _messageRepository.GetConversationAsync(userId1, userId2);
                 return messages.Select(m => MapToMessageDto(m));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving conversation between users {UserId1} and {UserId2}", 
+                _logger.LogError(ex, "Error retrieving conversation between users {UserId1} and {UserId2}",
                     userId1, userId2);
                 throw;
             }
@@ -81,7 +84,7 @@ namespace TDFAPI.Services
             {
                 // Validate user exists
                 await ValidateUserExistsAsync(userId);
-                
+
                 // Use pagination if provided, otherwise default
                 if (pagination != null)
                 {
@@ -121,39 +124,39 @@ namespace TDFAPI.Services
             {
                 // Verify receiver exists
                 await ValidateUserExistsAsync(messageDto.ReceiverID);
-                
-                // Add transaction handling for consistency with CreateChatMessageAsync
-                using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+
+                // Use UnitOfWork for transaction management
+                await _unitOfWork.BeginTransactionAsync();
+
+                var message = new MessageEntity
                 {
-                    var message = new MessageEntity
-                    {
-                        SenderID = senderId,
-                        ReceiverID = messageDto.ReceiverID,
-                        MessageText = messageDto.MessageText,
-                        Timestamp = DateTime.UtcNow,
-                        IsRead = false,
-                        IsDelivered = false,
-                        MessageType = messageDto.MessageType,
-                        IdempotencyKey = ComputeIdempotencyKey(senderId, messageDto.ReceiverID, messageDto.MessageText)
-                    };
+                    SenderID = senderId,
+                    ReceiverID = messageDto.ReceiverID,
+                    MessageText = messageDto.MessageText,
+                    Timestamp = DateTime.UtcNow,
+                    IsRead = false,
+                    IsDelivered = false,
+                    MessageType = messageDto.MessageType,
+                    IdempotencyKey = ComputeIdempotencyKey(senderId, messageDto.ReceiverID, messageDto.MessageText)
+                };
 
-                    // Create the message and get its ID
-                    var messageId = await _messageRepository.CreateAsync(message);
-                    message.MessageID = messageId;
+                // Create the message and get its ID
+                var messageId = await _messageRepository.CreateAsync(message);
+                message.MessageID = messageId;
 
-                    // Create notification for the receiver
-                    await _notificationService.CreateNotificationAsync(
-                        messageDto.ReceiverID,
-                        $"New message from {senderName}: {TruncateWithEllipsis(messageDto.MessageText, 50)}");
-                        
-                    scope.Complete();
-                    return MapToMessageDto(message);
-                }
+                // Create notification for the receiver
+                await _notificationService.CreateNotificationAsync(
+                    messageDto.ReceiverID,
+                    $"New message from {senderName}: {TruncateWithEllipsis(messageDto.MessageText, 50)}");
+
+                await _unitOfWork.CommitAsync();
+                return MapToMessageDto(message);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating message from {SenderId} to {ReceiverId}", 
+                _logger.LogError(ex, "Error creating message from {SenderId} to {ReceiverId}",
                     senderId, messageDto.ReceiverID);
+                await _unitOfWork.RollbackAsync();
                 throw;
             }
         }
@@ -166,7 +169,7 @@ namespace TDFAPI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error marking message {MessageId} as read for user {UserId}", 
+                _logger.LogError(ex, "Error marking message {MessageId} as read for user {UserId}",
                     messageId, userId);
                 throw;
             }
@@ -180,7 +183,7 @@ namespace TDFAPI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error marking message {MessageId} as delivered for user {UserId}", 
+                _logger.LogError(ex, "Error marking message {MessageId} as delivered for user {UserId}",
                     messageId, userId);
                 throw;
             }
@@ -190,18 +193,40 @@ namespace TDFAPI.Services
         {
             try
             {
-                // Verify message exists and belongs to user
-                var message = await _messageRepository.GetByIdAsync(messageId);
-                if (message == null || (message.SenderID != userId && message.ReceiverID != userId))
-                {
-                    return false;
-                }
+                await _unitOfWork.BeginTransactionAsync();
 
-                return await _messageRepository.DeleteAsync(messageId);
+                try
+                {
+                    // Verify message exists and belongs to user
+                    var message = await _messageRepository.GetByIdAsync(messageId);
+                    if (message == null || (message.SenderID != userId && message.ReceiverID != userId))
+                    {
+                        await _unitOfWork.RollbackAsync();
+                        return false;
+                    }
+
+                    bool result = await _messageRepository.DeleteAsync(messageId);
+
+                    if (result)
+                    {
+                        await _unitOfWork.CommitAsync();
+                    }
+                    else
+                    {
+                        await _unitOfWork.RollbackAsync();
+                    }
+
+                    return result;
+                }
+                catch (Exception)
+                {
+                    await _unitOfWork.RollbackAsync();
+                    throw;
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting message {MessageId} for user {UserId}", 
+                _logger.LogError(ex, "Error deleting message {MessageId} for user {UserId}",
                     messageId, userId);
                 throw;
             }
@@ -219,12 +244,12 @@ namespace TDFAPI.Services
 
                 // Get all messages between these users
                 var conversation = await _messageRepository.GetConversationAsync(senderId, receiverId);
-                
+
                 // Filter to get only undelivered messages from sender to receiver
                 var undeliveredMessages = conversation
                     .Where(m => m.SenderID == senderId && m.ReceiverID == receiverId && !m.IsDelivered)
                     .ToList();
-                
+
                 return undeliveredMessages.Select(MapToMessageDto);
             }
             catch (Exception ex)
@@ -239,7 +264,7 @@ namespace TDFAPI.Services
             try
             {
                 var messages = await _messageRepository.GetRecentMessagesAsync(count);
-                
+
                 // Map to DTOs
                 return messages.Select(m => MapToChatMessageDto(m)).ToList();
             }
@@ -255,9 +280,9 @@ namespace TDFAPI.Services
             try
             {
                 // Generate idempotency key if not provided
-                string idempotencyKey = messageDto.IdempotencyKey ?? 
+                string idempotencyKey = messageDto.IdempotencyKey ??
                     ComputeIdempotencyKey(senderId, messageDto.ReceiverID, messageDto.Content);
-                
+
                 // Check for existing message with same idempotency key
                 var existingMessage = await GetByIdempotencyKeyAsync(idempotencyKey, senderId);
                 if (existingMessage != null)
@@ -265,13 +290,15 @@ namespace TDFAPI.Services
                     _logger.LogInformation("Returning existing message with idempotency key {Key}", idempotencyKey);
                     return existingMessage;
                 }
-                
-                // Use a transaction scope to ensure both operations succeed or fail together
-                using (var scope = new TransactionScope(TransactionScopeAsyncFlowOption.Enabled))
+
+                // Use UnitOfWork for transaction management
+                await _unitOfWork.BeginTransactionAsync();
+
+                try
                 {
                     // Determine if message is global or direct
                     bool isGlobalMessage = messageDto.ReceiverID == 0;
-                    
+
                     // Create the message entity
                     var message = new MessageEntity
                     {
@@ -286,11 +313,11 @@ namespace TDFAPI.Services
                         Department = messageDto.Department,
                         IdempotencyKey = idempotencyKey
                     };
-                    
+
                     // Save to database and get the ID
                     var messageId = await _messageRepository.CreateAsync(message);
                     message.MessageID = messageId;
-                    
+
                     // Create a notification for the receiver if it's a direct message
                     if (!isGlobalMessage)
                     {
@@ -298,16 +325,21 @@ namespace TDFAPI.Services
                             messageDto.ReceiverID,
                             $"Chat message from {senderName}: {TruncateWithEllipsis(messageDto.Content, 50)}");
                     }
-                    
-                    scope.Complete();
-                    
+
+                    await _unitOfWork.CommitAsync();
+
                     // Convert to DTO for response
                     return MapToChatMessageDto(message, senderName);
+                }
+                catch (Exception)
+                {
+                    await _unitOfWork.RollbackAsync();
+                    throw;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating chat message from {SenderId} to {ReceiverId}", 
+                _logger.LogError(ex, "Error creating chat message from {SenderId} to {ReceiverId}",
                     senderId, messageDto.ReceiverID);
                 throw;
             }
@@ -321,22 +353,22 @@ namespace TDFAPI.Services
                 {
                     return null;
                 }
-                
+
                 var message = await _messageRepository.GetByIdempotencyKeyAsync(idempotencyKey, userId);
                 if (message == null)
                 {
                     return null;
                 }
-                
+
                 // Get sender name for mapping
                 var sender = await _userRepository.GetByIdAsync(message.SenderID);
                 string senderName = sender?.FullName ?? "Unknown";
-                
+
                 return MapToChatMessageDto(message, senderName);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving message by idempotency key {Key} for user {UserId}", 
+                _logger.LogError(ex, "Error retrieving message by idempotency key {Key} for user {UserId}",
                     idempotencyKey, userId);
                 return null;
             }
@@ -354,7 +386,7 @@ namespace TDFAPI.Services
         {
             // If sender name not provided, use placeholder
             senderName ??= "Unknown";
-            
+
             return new ChatMessageDto
             {
                 Id = message.MessageID,
@@ -370,7 +402,7 @@ namespace TDFAPI.Services
                 IsGlobal = message.IsGlobal
             };
         }
-        
+
         private MessageDto MapToMessageDto(MessageEntity message)
         {
             return new MessageDto
@@ -392,7 +424,7 @@ namespace TDFAPI.Services
             {
                 return Guid.NewGuid().ToString();
             }
-            
+
             // Combine sender, receiver, message Message and timestamp to create a unique key
             string input = $"{senderId}:{receiverId}:{message}:{DateTime.UtcNow.Ticks}";
             return System.Convert.ToBase64String(

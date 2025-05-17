@@ -31,15 +31,15 @@ namespace TDFAPI.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 _logger.LogDebug("Checking for inactive users");
-                
+
                 try
                 {
                     // Create a new scope for the service
                     using (var scope = _serviceProvider.CreateScope())
                     {
-                        // Get the user presence service
+                        // Get the user presence service using the interface
                         var userPresenceService = scope.ServiceProvider.GetRequiredService<IUserPresenceService>();
-                        
+
                         // Check for inactive users and update their status
                         await userPresenceService.CheckInactiveUsersAsync();
                     }

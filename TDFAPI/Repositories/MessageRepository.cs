@@ -14,35 +14,53 @@ using TDFShared.Models.Message;
 using TDFShared.DTOs.Messages;
 using TDFShared.DTOs.Common;
 using TDFShared.Enums;
+using TDFAPI.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace TDFAPI.Repositories
 {
     public class MessageRepository : IMessageRepository
     {
         private readonly SqlConnectionFactory _connectionFactory;
+        private readonly ApplicationDbContext _dbContext;
         private readonly ILogger<MessageRepository> _logger;
 
-        public MessageRepository(SqlConnectionFactory connectionFactory, ILogger<MessageRepository> logger)
+        public MessageRepository(
+            SqlConnectionFactory connectionFactory,
+            ApplicationDbContext dbContext,
+            ILogger<MessageRepository> logger)
         {
             _connectionFactory = connectionFactory;
+            _dbContext = dbContext;
             _logger = logger;
         }
 
         public async Task<MessageEntity?> GetByIdAsync(int messageId)
         {
-            const string sql = "SELECT * FROM Messages WHERE MessageID = @MessageID";
-
-            using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
-            using var command = new SqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@MessageID", messageId);
-
-            using var reader = await command.ExecuteReaderAsync();
-            if (await reader.ReadAsync())
+            try
             {
-                return MapReaderToMessageEntity(reader);
+                return await _dbContext.Messages
+                    .FirstOrDefaultAsync(m => m.MessageID == messageId);
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving message with ID {MessageId} using EF Core. Falling back to direct SQL.", messageId);
 
-            return null;
+                // Fallback to direct SQL if EF Core fails
+                const string sql = "SELECT * FROM Messages WHERE MessageID = @MessageID";
+
+                using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@MessageID", messageId);
+
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    return MapReaderToMessageEntity(reader);
+                }
+
+                return null;
+            }
         }
 
         public async Task<IEnumerable<MessageEntity>> GetAllAsync()
@@ -53,7 +71,7 @@ namespace TDFAPI.Repositories
             using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
             using var command = new SqlCommand(sql, connection);
             using var reader = await command.ExecuteReaderAsync();
-            
+
             while (await reader.ReadAsync())
             {
                 messages.Add(MapReaderToMessageEntity(reader));
@@ -65,7 +83,7 @@ namespace TDFAPI.Repositories
         public async Task<IEnumerable<MessageEntity>> GetByUserIdAsync(int userId)
         {
             const string sql = @"
-                SELECT * FROM Messages 
+                SELECT * FROM Messages
                 WHERE SenderID = @UserID OR ReceiverID = @UserID
                 ORDER BY Timestamp DESC";
 
@@ -87,7 +105,7 @@ namespace TDFAPI.Repositories
         public async Task<IEnumerable<MessageEntity>> GetConversationAsync(int userId1, int userId2)
         {
             const string sql = @"
-                SELECT * FROM Messages 
+                SELECT * FROM Messages
                 WHERE (SenderID = @UserID1 AND ReceiverID = @UserID2)
                    OR (SenderID = @UserID2 AND ReceiverID = @UserID1)
                 ORDER BY Timestamp DESC";
@@ -116,69 +134,69 @@ namespace TDFAPI.Repositories
                 using var command = connection.CreateCommand();
 
                 var whereClause = "WHERE (m.SenderID = @UserId OR m.ReceiverID = @UserId)";
-                
+
                 if (pagination.UnreadOnly)
                 {
                     whereClause += " AND m.IsRead = 0 AND m.ReceiverID = @UserId";
                 }
-                
+
                 if (pagination.FromUserId.HasValue)
                 {
                     whereClause += " AND ((m.SenderID = @FromUserId AND m.ReceiverID = @UserId) OR (m.SenderID = @UserId AND m.ReceiverID = @FromUserId))";
                 }
-                
+
                 if (pagination.StartDate.HasValue)
                 {
                     whereClause += " AND m.Timestamp >= @StartDate";
                 }
-                
+
                 if (pagination.EndDate.HasValue)
                 {
                     whereClause += " AND m.Timestamp <= @EndDate";
                 }
-                
+
                 // Get total count first
                 command.CommandText = $"SELECT COUNT(*) FROM Messages m {whereClause}";
                 command.Parameters.AddWithValue("@UserId", userId);
-                
+
                 if (pagination.FromUserId.HasValue)
                 {
                     command.Parameters.AddWithValue("@FromUserId", pagination.FromUserId.Value);
                 }
-                
+
                 if (pagination.StartDate.HasValue)
                 {
                     command.Parameters.AddWithValue("@StartDate", pagination.StartDate.Value);
                 }
-                
+
                 if (pagination.EndDate.HasValue)
                 {
                     command.Parameters.AddWithValue("@EndDate", pagination.EndDate.Value);
                 }
-                
+
                 var totalCount = (int)await command.ExecuteScalarAsync();
-                
+
                 // Now get paged data
                 command.CommandText = $@"
-                    SELECT m.* 
-                    FROM Messages m 
+                    SELECT m.*
+                    FROM Messages m
                     {whereClause}
                     ORDER BY m.Timestamp DESC
-                    OFFSET @Offset ROWS 
+                    OFFSET @Offset ROWS
                     FETCH NEXT @PageSize ROWS ONLY";
-                    
+
                 int offset = (pagination.PageNumber - 1) * pagination.PageSize;
                 command.Parameters.AddWithValue("@Offset", offset);
                 command.Parameters.AddWithValue("@PageSize", pagination.PageSize);
-                
+
                 var reader = await command.ExecuteReaderAsync();
                 var messages = new List<MessageEntity>();
-                
+
                 while (await reader.ReadAsync())
                 {
                     messages.Add(MapReaderToMessageEntity(reader));
                 }
-                
+
                 return new PaginatedResult<MessageEntity>
                 {
                     Items = messages,
@@ -196,40 +214,70 @@ namespace TDFAPI.Repositories
 
         public async Task<int> CreateAsync(MessageEntity message)
         {
-            const string sql = @"
-                INSERT INTO Messages (SenderID, ReceiverID, MessageText, Timestamp, IsRead, IsDelivered, 
-                                    Department, MessageType, Status, IsGlobal, IdempotencyKey)
-                VALUES (@SenderID, @ReceiverID, @MessageText, @Timestamp, @IsRead, @IsDelivered,
-                       @Department, @MessageType, @Status, @IsGlobal, @IdempotencyKey);
-                SELECT SCOPE_IDENTITY();";
+            try
+            {
+                _dbContext.Messages.Add(message);
+                await _dbContext.SaveChangesAsync();
+                return message.MessageID;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating message using EF Core. Falling back to direct SQL.");
 
-            using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
-            using var command = new SqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@SenderID", message.SenderID);
-            command.Parameters.AddWithValue("@ReceiverID", message.ReceiverID);
-            command.Parameters.AddWithValue("@MessageText", message.MessageText);
-            command.Parameters.AddWithValue("@Timestamp", message.Timestamp);
-            command.Parameters.AddWithValue("@IsRead", message.IsRead);
-            command.Parameters.AddWithValue("@IsDelivered", message.IsDelivered);
-            command.Parameters.AddWithValue("@Department", message.Department ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("@MessageType", (int)message.MessageType);
-            command.Parameters.AddWithValue("@Status", (int)message.Status);
-            command.Parameters.AddWithValue("@IsGlobal", message.IsGlobal);
-            command.Parameters.AddWithValue("@IdempotencyKey", message.IdempotencyKey ?? (object)DBNull.Value);
+                // Fallback to direct SQL if EF Core fails
+                const string sql = @"
+                    INSERT INTO Messages (SenderID, ReceiverID, MessageText, Timestamp, IsRead, IsDelivered,
+                                        Department, MessageType, Status, IsGlobal, IdempotencyKey)
+                    VALUES (@SenderID, @ReceiverID, @MessageText, @Timestamp, @IsRead, @IsDelivered,
+                           @Department, @MessageType, @Status, @IsGlobal, @IdempotencyKey);
+                    SELECT SCOPE_IDENTITY();";
 
-            var result = await command.ExecuteScalarAsync();
-            return Convert.ToInt32(result);
+                using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@SenderID", message.SenderID);
+                command.Parameters.AddWithValue("@ReceiverID", message.ReceiverID);
+                command.Parameters.AddWithValue("@MessageText", message.MessageText);
+                command.Parameters.AddWithValue("@Timestamp", message.Timestamp);
+                command.Parameters.AddWithValue("@IsRead", message.IsRead);
+                command.Parameters.AddWithValue("@IsDelivered", message.IsDelivered);
+                command.Parameters.AddWithValue("@Department", message.Department ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("@MessageType", (int)message.MessageType);
+                command.Parameters.AddWithValue("@Status", (int)message.Status);
+                command.Parameters.AddWithValue("@IsGlobal", message.IsGlobal);
+                command.Parameters.AddWithValue("@IdempotencyKey", message.IdempotencyKey ?? (object)DBNull.Value);
+
+                var result = await command.ExecuteScalarAsync();
+                return Convert.ToInt32(result);
+            }
         }
 
         public async Task<bool> MarkAsReadAsync(int messageId)
         {
-            const string sql = "UPDATE Messages SET IsRead = 1 WHERE MessageID = @MessageID";
+            try
+            {
+                var message = await _dbContext.Messages.FindAsync(messageId);
+                if (message == null)
+                    return false;
 
-            using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
-            using var command = new SqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@MessageID", messageId);
+                message.IsRead = true;
+                message.Status = MessageStatus.Read;
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error marking message as read using EF Core. Falling back to direct SQL.");
 
-            return await command.ExecuteNonQueryAsync() > 0;
+                // Fallback to direct SQL if EF Core fails
+                const string sql = "UPDATE Messages SET IsRead = 1, Status = @Status WHERE MessageID = @MessageID";
+
+                using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@MessageID", messageId);
+                command.Parameters.AddWithValue("@Status", (int)MessageStatus.Read);
+
+                return await command.ExecuteNonQueryAsync() > 0;
+            }
         }
 
         public async Task<bool> UpdateReadStatusAsync(int messageId, bool isRead)
@@ -246,73 +294,126 @@ namespace TDFAPI.Repositories
 
         public async Task<bool> DeleteAsync(int messageId)
         {
-            const string sql = "DELETE FROM Messages WHERE MessageID = @MessageID";
+            try
+            {
+                var message = await _dbContext.Messages.FindAsync(messageId);
+                if (message == null)
+                    return false;
 
-            using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
-            using var command = new SqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@MessageID", messageId);
+                _dbContext.Messages.Remove(message);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting message using EF Core. Falling back to direct SQL.");
 
-            return await command.ExecuteNonQueryAsync() > 0;
+                // Fallback to direct SQL if EF Core fails
+                const string sql = "DELETE FROM Messages WHERE MessageID = @MessageID";
+
+                using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@MessageID", messageId);
+
+                return await command.ExecuteNonQueryAsync() > 0;
+            }
         }
 
         public async Task<int> GetUnreadCountAsync(int userId)
         {
-            const string sql = "SELECT COUNT(*) FROM Messages WHERE ReceiverID = @UserID AND IsRead = 0";
+            try
+            {
+                return await _dbContext.Messages
+                    .CountAsync(m => m.ReceiverID == userId && !m.IsRead);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting unread count using EF Core. Falling back to direct SQL.");
 
-            using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
-            using var command = new SqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@UserID", userId);
+                // Fallback to direct SQL if EF Core fails
+                const string sql = "SELECT COUNT(*) FROM Messages WHERE ReceiverID = @UserID AND IsRead = 0";
 
-            return Convert.ToInt32(await command.ExecuteScalarAsync());
+                using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@UserID", userId);
+
+                return Convert.ToInt32(await command.ExecuteScalarAsync());
+            }
         }
 
         public async Task<List<MessageEntity>> GetRecentMessagesAsync(int count = 50)
         {
-            const string sql = @"
-                SELECT TOP (@Count) * FROM Messages 
-                ORDER BY Timestamp DESC";
-
-            var messages = new List<MessageEntity>();
-
-            using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
-            using var command = new SqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@Count", count);
-
-            using var reader = await command.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            try
             {
-                messages.Add(MapReaderToMessageEntity(reader));
+                return await _dbContext.Messages
+                    .OrderByDescending(m => m.Timestamp)
+                    .Take(count)
+                    .ToListAsync();
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting recent messages using EF Core. Falling back to direct SQL.");
 
-            return messages;
+                // Fallback to direct SQL if EF Core fails
+                const string sql = @"
+                    SELECT TOP (@Count) * FROM Messages
+                    ORDER BY Timestamp DESC";
+
+                var messages = new List<MessageEntity>();
+
+                using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@Count", count);
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    messages.Add(MapReaderToMessageEntity(reader));
+                }
+
+                return messages;
+            }
         }
 
         public async Task<IEnumerable<MessageEntity>> GetPendingMessagesAsync(int userId)
         {
-            const string sql = @"
-                SELECT * FROM Messages 
-                WHERE ReceiverID = @ReceiverID AND IsDelivered = 0
-                ORDER BY Timestamp";
-
-            var messages = new List<MessageEntity>();
-
-            using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
-            using var command = new SqlCommand(sql, connection);
-            command.Parameters.AddWithValue("@ReceiverID", userId);
-
-            using var reader = await command.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
+            try
             {
-                messages.Add(MapReaderToMessageEntity(reader));
+                return await _dbContext.Messages
+                    .Where(m => m.ReceiverID == userId && !m.IsDelivered)
+                    .OrderBy(m => m.Timestamp)
+                    .ToListAsync();
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting pending messages using EF Core. Falling back to direct SQL.");
 
-            return messages;
+                // Fallback to direct SQL if EF Core fails
+                const string sql = @"
+                    SELECT * FROM Messages
+                    WHERE ReceiverID = @ReceiverID AND IsDelivered = 0
+                    ORDER BY Timestamp";
+
+                var messages = new List<MessageEntity>();
+
+                using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@ReceiverID", userId);
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    messages.Add(MapReaderToMessageEntity(reader));
+                }
+
+                return messages;
+            }
         }
 
         public async Task<bool> MarkMessageAsReadAsync(int messageId, int userId)
         {
             const string sql = @"
-                UPDATE Messages 
+                UPDATE Messages
                 SET IsRead = 1
                 WHERE MessageID = @MessageID AND ReceiverID = @UserID";
 
@@ -327,7 +428,7 @@ namespace TDFAPI.Repositories
         public async Task<bool> MarkMessageAsDeliveredAsync(int messageId, int userId)
         {
             const string sql = @"
-                UPDATE Messages 
+                UPDATE Messages
                 SET IsDelivered = 1
                 WHERE MessageID = @MessageID AND ReceiverID = @UserID";
 
@@ -386,8 +487,8 @@ namespace TDFAPI.Repositories
         public async Task<bool> UpdateUserConnectionStatusAsync(int userId, bool isConnected, string? machineName = null)
         {
             const string sql = @"
-                UPDATE Users 
-                SET isConnected = @IsConnected, 
+                UPDATE Users
+                SET isConnected = @IsConnected,
                     MachineName = @MachineName,
                     LastLoginDate = CASE WHEN @IsConnected = 1 THEN GETUTCDATE() ELSE LastLoginDate END
                 WHERE UserID = @UserID";
@@ -554,21 +655,21 @@ namespace TDFAPI.Repositories
         {
             if (string.IsNullOrEmpty(idempotencyKey))
                 return null;
-        
+
             try
             {
                 using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
-                
+
                 const string sql = @"
-                    SELECT TOP 1 * 
+                    SELECT TOP 1 *
                     FROM Messages
-                    WHERE IdempotencyKey = @IdempotencyKey 
+                    WHERE IdempotencyKey = @IdempotencyKey
                     AND SenderID = @UserId";
-                
+
                 var message = await connection.QueryFirstOrDefaultAsync<MessageEntity>(
-                    sql, 
+                    sql,
                     new { IdempotencyKey = idempotencyKey, UserId = userId });
-                
+
                 return message;
             }
             catch (Exception ex)
@@ -584,15 +685,15 @@ namespace TDFAPI.Repositories
             {
                 using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
                 using var command = connection.CreateCommand();
-                
+
                 // Check if the message already exists
                 command.CommandText = @"
-                    SELECT MessageID FROM Messages 
+                    SELECT MessageID FROM Messages
                     WHERE IdempotencyKey = @IdempotencyKey";
                 command.Parameters.AddWithValue("@IdempotencyKey", message.IdempotencyKey ?? string.Empty);
-                
+
                 var existingId = await command.ExecuteScalarAsync();
-                
+
                 if (existingId != null && existingId != DBNull.Value)
                 {
                     // Update existing message
@@ -608,7 +709,7 @@ namespace TDFAPI.Repositories
                             Status = @Status,
                             IsGlobal = @IsGlobal
                         WHERE MessageID = @MessageID";
-                        
+
                     command.Parameters.AddWithValue("@MessageID", messageId);
                     command.Parameters.AddWithValue("@MessageText", message.MessageText);
                     command.Parameters.AddWithValue("@IsRead", message.IsRead);
@@ -617,7 +718,7 @@ namespace TDFAPI.Repositories
                     command.Parameters.AddWithValue("@MessageType", message.MessageType.ToString());
                     command.Parameters.AddWithValue("@Status", (int)message.Status);
                     command.Parameters.AddWithValue("@IsGlobal", message.IsGlobal);
-                    
+
                     await command.ExecuteNonQueryAsync();
                     return messageId;
                 }
@@ -627,14 +728,14 @@ namespace TDFAPI.Repositories
                     command.Parameters.Clear();
                     command.CommandText = @"
                         INSERT INTO Messages (
-                            SenderID, ReceiverID, MessageText, Timestamp, 
+                            SenderID, ReceiverID, MessageText, Timestamp,
                             IsRead, IsDelivered, Department, MessageType, Status, IsGlobal, IdempotencyKey
                         ) VALUES (
-                            @SenderID, @ReceiverID, @MessageText, @Timestamp, 
+                            @SenderID, @ReceiverID, @MessageText, @Timestamp,
                             @IsRead, @IsDelivered, @Department, @MessageType, @Status, @IsGlobal, @IdempotencyKey
                         );
                         SELECT SCOPE_IDENTITY();";
-                        
+
                     command.Parameters.AddWithValue("@SenderID", message.SenderID);
                     command.Parameters.AddWithValue("@ReceiverID", message.ReceiverID);
                     command.Parameters.AddWithValue("@MessageText", message.MessageText);
@@ -646,7 +747,7 @@ namespace TDFAPI.Repositories
                     command.Parameters.AddWithValue("@Status", (int)message.Status);
                     command.Parameters.AddWithValue("@IsGlobal", message.IsGlobal);
                     command.Parameters.AddWithValue("@IdempotencyKey", message.IdempotencyKey ?? (object)DBNull.Value);
-                    
+
                     var result = await command.ExecuteScalarAsync();
                     return Convert.ToInt32(result);
                 }
@@ -667,25 +768,25 @@ namespace TDFAPI.Repositories
 
                 using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
                 using var command = connection.CreateCommand();
-                
+
                 command.CommandText = @"
                     UPDATE Messages
                     SET IsRead = 1, IsDelivered = 1, Status = @Status
                     WHERE MessageID IN @MessageIds AND ReceiverID = @UserId";
-                    
+
                 // Convert the IEnumerable to a comma-separated string for SQL
                 string messageIdsStr = string.Join(",", messageIds);
-                
+
                 command.Parameters.AddWithValue("@MessageIds", messageIdsStr);
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@Status", (int)MessageStatus.Read);
-                
+
                 int rowsAffected = await command.ExecuteNonQueryAsync();
                 return rowsAffected > 0;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error marking messages as read in bulk for user {UserId}: {Message}", 
+                _logger.LogError(ex, "Error marking messages as read in bulk for user {UserId}: {Message}",
                     userId, ex.Message);
                 return false;
             }
@@ -700,26 +801,26 @@ namespace TDFAPI.Repositories
 
                 using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
                 using var command = connection.CreateCommand();
-                
+
                 command.CommandText = @"
                     UPDATE Messages
                     SET IsDelivered = 1, Status = CASE WHEN IsRead = 1 THEN @ReadStatus ELSE @DeliveredStatus END
                     WHERE MessageID IN @MessageIds AND ReceiverID = @UserId AND IsDelivered = 0";
-                    
+
                 // Convert the IEnumerable to a comma-separated string for SQL
                 string messageIdsStr = string.Join(",", messageIds);
-                
+
                 command.Parameters.AddWithValue("@MessageIds", messageIdsStr);
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@DeliveredStatus", (int)MessageStatus.Delivered);
                 command.Parameters.AddWithValue("@ReadStatus", (int)MessageStatus.Read);
-                
+
                 int rowsAffected = await command.ExecuteNonQueryAsync();
                 return rowsAffected > 0;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error marking messages as delivered in bulk for user {UserId}: {Message}", 
+                _logger.LogError(ex, "Error marking messages as delivered in bulk for user {UserId}: {Message}",
                     userId, ex.Message);
                 return false;
             }
@@ -737,26 +838,26 @@ namespace TDFAPI.Repositories
                 IsRead = reader.GetBoolean(reader.GetOrdinal("IsRead")),
                 IsDelivered = reader.GetBoolean(reader.GetOrdinal("IsDelivered"))
             };
-            
+
             // Check for optional/nullable columns
             if (HasColumn(reader, "Department") && !reader.IsDBNull(reader.GetOrdinal("Department")))
                 entity.Department = reader.GetString(reader.GetOrdinal("Department"));
-                
+
             if (HasColumn(reader, "MessageType"))
                 entity.MessageType = (MessageType)reader.GetInt32(reader.GetOrdinal("MessageType"));
-                
+
             if (HasColumn(reader, "Status"))
                 entity.Status = (MessageStatus)reader.GetInt32(reader.GetOrdinal("Status"));
-                
+
             if (HasColumn(reader, "IsGlobal"))
                 entity.IsGlobal = reader.GetBoolean(reader.GetOrdinal("IsGlobal"));
-                
+
             if (HasColumn(reader, "IdempotencyKey") && !reader.IsDBNull(reader.GetOrdinal("IdempotencyKey")))
                 entity.IdempotencyKey = reader.GetString(reader.GetOrdinal("IdempotencyKey"));
-                
+
             return entity;
         }
-        
+
         private bool HasColumn(SqlDataReader reader, string columnName)
         {
             for (int i = 0; i < reader.FieldCount; i++)

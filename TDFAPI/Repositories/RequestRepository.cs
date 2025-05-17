@@ -4,12 +4,8 @@ using TDFAPI.Data;
 using TDFShared.Models.Request;
 using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Requests;
-using TDFAPI.Models; // Required for dynamic sorting
+using TDFShared.Models.User; // Required for dynamic sortin
 using TDFShared.DTOs.Users;
-using System.Linq;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using TDFShared.Enums;
 
 namespace TDFAPI.Repositories
@@ -30,19 +26,15 @@ namespace TDFAPI.Repositories
             try
             {
                 var request = await _context.Requests
-#if DEBUG
-                    .Include(r => r.User)
-#else
                     .Include(r => r.User)
                     .ThenInclude(u => u.AnnualLeave)
-#endif
                     .FirstOrDefaultAsync(r => r.Id == requestId);
-                    
+
                 if (request?.User != null)
                 {
                     request.UserDto = MapUserToDto(request.User);
                 }
-                
+
                 return request;
             }
             catch (Exception ex)
@@ -55,33 +47,25 @@ namespace TDFAPI.Repositories
         public async Task<IEnumerable<RequestEntity>> GetAllAsync()
         {
             var requests = await _context.Requests
-#if DEBUG
-                .Include(r => r.User)
-#else
                 .Include(r => r.User)
                 .ThenInclude(u => u.AnnualLeave)
-#endif
                 .OrderByDescending(r => r.RequestFromDay)
                 .ToListAsync();
-                
+
             // Map User entities to UserDto for responses
             foreach (var request in requests.Where(r => r.User != null))
             {
                 request.UserDto = MapUserToDto(request.User);
             }
-            
+
             return requests;
         }
 
         public async Task<PaginatedResult<RequestEntity>> GetAllAsync(RequestPaginationDto pagination)
         {
             var baseQuery = _context.Requests
-#if DEBUG
-                .Include(r => r.User)
-#else
                 .Include(r => r.User)
                 .ThenInclude(u => u.AnnualLeave)
-#endif
                 .AsQueryable();
             return await ExecutePaginatedQueryAsync(baseQuery, pagination);
         }
@@ -90,21 +74,17 @@ namespace TDFAPI.Repositories
         {
             var requests = await _context.Requests
                 .Where(r => r.RequestUserID == userId)
-#if DEBUG
-                .Include(r => r.User)
-#else
                 .Include(r => r.User)
                 .ThenInclude(u => u.AnnualLeave)
-#endif
                 .OrderByDescending(r => r.RequestFromDay)
                 .ToListAsync();
-                
+
             // Map User entities to UserDto for responses
             foreach (var request in requests.Where(r => r.User != null))
             {
                 request.UserDto = MapUserToDto(request.User);
             }
-            
+
             return requests;
         }
 
@@ -112,12 +92,8 @@ namespace TDFAPI.Repositories
         {
             var baseQuery = _context.Requests
                 .Where(r => r.RequestUserID == userId)
-#if DEBUG
-                .Include(r => r.User)
-#else
                 .Include(r => r.User)
                 .ThenInclude(u => u.AnnualLeave)
-#endif
                 .AsQueryable();
 
             return await ExecutePaginatedQueryAsync(baseQuery, pagination);
@@ -127,21 +103,17 @@ namespace TDFAPI.Repositories
         {
             var requests = await _context.Requests
                 .Where(r => r.RequestDepartment == department)
-#if DEBUG
-                .Include(r => r.User)
-#else
                 .Include(r => r.User)
                 .ThenInclude(u => u.AnnualLeave)
-#endif
                 .OrderByDescending(r => r.RequestFromDay)
                 .ToListAsync();
-                
+
             // Map User entities to UserDto for responses
             foreach (var request in requests.Where(r => r.User != null))
             {
                 request.UserDto = MapUserToDto(request.User);
             }
-            
+
             return requests;
         }
 
@@ -149,12 +121,8 @@ namespace TDFAPI.Repositories
         {
             var baseQuery = _context.Requests
                 .Where(r => r.RequestDepartment == department)
-#if DEBUG
-                .Include(r => r.User)
-#else
                 .Include(r => r.User)
                 .ThenInclude(u => u.AnnualLeave)
-#endif
                 .AsQueryable();
 
             return await ExecutePaginatedQueryAsync(baseQuery, pagination);
@@ -242,7 +210,7 @@ namespace TDFAPI.Repositories
                 var user = await _context.Users
                     .Include(u => u.AnnualLeave)
                     .FirstOrDefaultAsync(u => u.UserID == userId);
-                    
+
                 if (user == null)
                 {
                     _logger.LogWarning("Leave balance requested for non-existent user {UserId}", userId);
@@ -279,14 +247,14 @@ namespace TDFAPI.Repositories
                 // Get the existing AnnualLeave record for user
                 var leaveRecord = await _context.AnnualLeaves
                     .FirstOrDefaultAsync(al => al.UserID == userId);
-                
+
                 if (leaveRecord == null)
                 {
                     // No AnnualLeave record found - this shouldn't happen as records are created at registration
                     _logger.LogWarning("No AnnualLeave record found for user {UserId}. Records should be created at registration.", userId);
                     throw new KeyNotFoundException($"Leave record for user with ID {userId} not found.");
                 }
-                
+
                 // Update the appropriate balance column based on leave type
                 switch (leaveType.ToLowerInvariant())
                 {
@@ -320,9 +288,9 @@ namespace TDFAPI.Repositories
                     int annualBalance = leaveRecord.Annual - leaveRecord.AnnualUsed;
                     int casualBalance = leaveRecord.CasualLeave - leaveRecord.CasualUsed;
                     int permissionsBalance = leaveRecord.Permissions - leaveRecord.PermissionsUsed;
-                    
+
                     bool hasInsufficientBalance = false;
-                    
+
                     switch (leaveType.ToLowerInvariant())
                     {
                         case "annual":
@@ -337,7 +305,7 @@ namespace TDFAPI.Repositories
                             hasInsufficientBalance = permissionsBalance < 0;
                             break;
                     }
-                    
+
                     if (hasInsufficientBalance)
                     {
                         _logger.LogWarning("Insufficient balance for user {UserId}, leave type {LeaveType}", userId, leaveType);
@@ -364,11 +332,11 @@ namespace TDFAPI.Repositories
                 DateTime endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
 
                 int permissionsUsed = await _context.Requests
-                    .CountAsync(r => 
-                        r.RequestUserID == userId && 
-                        r.RequestType == "Permission" && 
-                        r.RequestFromDay >= startOfMonth && 
-                        r.RequestFromDay <= endOfMonth && 
+                    .CountAsync(r =>
+                        r.RequestUserID == userId &&
+                        r.RequestType == "Permission" &&
+                        r.RequestFromDay >= startOfMonth &&
+                        r.RequestFromDay <= endOfMonth &&
                         (r.RequestStatus == "Approved" || r.RequestStatus == "Pending") &&
                         (r.RequestHRStatus == "Approved" || r.RequestHRStatus == "Pending"));
 
@@ -387,10 +355,10 @@ namespace TDFAPI.Repositories
             {
                 // Calculate total days for pending requests of specified type
                 var pendingRequests = await _context.Requests
-                    .Where(r => 
-                        r.RequestUserID == userId && 
-                        r.RequestType == requestType && 
-                        r.RequestStatus == "Pending" && 
+                    .Where(r =>
+                        r.RequestUserID == userId &&
+                        r.RequestType == requestType &&
+                        r.RequestStatus == "Pending" &&
                         r.RequestHRStatus == "Pending")
                     .ToListAsync();
 
@@ -399,7 +367,7 @@ namespace TDFAPI.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting pending days count for user {UserId} and type {RequestType}", 
+                _logger.LogError(ex, "Error getting pending days count for user {UserId} and type {RequestType}",
                     userId, requestType);
                 throw;
             }
@@ -411,10 +379,10 @@ namespace TDFAPI.Repositories
             {
                 // Check for overlapping date ranges for same user, excluding the current request if it has an ID
                 var conflictingRequestsCount = await _context.Requests
-                    .CountAsync(r => 
+                    .CountAsync(r =>
                         r.RequestUserID == userId &&
                         r.Id != requestId && // Exclude current request when updating
-                        (r.RequestType == "Annual" || r.RequestType == "Work From Home" || 
+                        (r.RequestType == "Annual" || r.RequestType == "Work From Home" ||
                          r.RequestType == "Unpaid" || r.RequestType == "Emergency") &&
                         r.RequestStatus != "Rejected" && r.RequestHRStatus != "Rejected" && // Ignore rejected requests
                         ((r.RequestFromDay <= endDate && r.RequestToDay >= startDate) || // Overlapping date ranges
@@ -430,7 +398,7 @@ namespace TDFAPI.Repositories
         }
 
         #region Query Builder Methods
-        
+
         // Executes a paginated query with filtering and sorting
         private async Task<PaginatedResult<RequestEntity>> ExecutePaginatedQueryAsync(
             IQueryable<RequestEntity> baseQuery,
@@ -440,25 +408,25 @@ namespace TDFAPI.Repositories
             {
                 // Apply filters
                 var filteredQuery = ApplyFilters(baseQuery, pagination);
-                
+
                 // Count total items before pagination (for total count)
                 var totalCount = await filteredQuery.CountAsync();
-                
+
                 // Apply sorting
                 var sortedQuery = ApplySorting(filteredQuery, pagination);
-                
+
                 // Apply pagination
                 var items = await sortedQuery
                     .Skip((pagination.Page - 1) * pagination.PageSize)
                     .Take(pagination.PageSize)
                     .ToListAsync();
-                    
+
                 // Map User entities to UserDto for responses
                 foreach (var request in items.Where(r => r.User != null))
                 {
                     request.UserDto = MapUserToDto(request.User);
                 }
-                    
+
                 return new PaginatedResult<RequestEntity>
                 {
                     Items = items,
@@ -469,38 +437,38 @@ namespace TDFAPI.Repositories
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error executing paginated query with pagination {Page}/{PageSize}", 
+                _logger.LogError(ex, "Error executing paginated query with pagination {Page}/{PageSize}",
                     pagination.Page, pagination.PageSize);
                 throw;
             }
         }
-        
+
         // Applies filters based on pagination parameters
         private IQueryable<RequestEntity> ApplyFilters(
-            IQueryable<RequestEntity> query, 
+            IQueryable<RequestEntity> query,
             RequestPaginationDto pagination)
         {
             // Filter by status if specified
             if (!string.IsNullOrEmpty(pagination.FilterStatus))
             {
-                query = query.Where(r => 
-                    r.RequestStatus == pagination.FilterStatus || 
+                query = query.Where(r =>
+                    r.RequestStatus == pagination.FilterStatus ||
                     r.RequestHRStatus == pagination.FilterStatus);
             }
-            
+
             // Filter by type if specified
             if (!string.IsNullOrEmpty(pagination.FilterType))
             {
                 query = query.Where(r => r.RequestType == pagination.FilterType);
             }
-            
+
             // Filter by date range if specified
             if (pagination.FromDate.HasValue)
             {
                 var startDate = pagination.FromDate.Value.Date;
                 query = query.Where(r => (r.RequestToDay ?? r.RequestFromDay).Date >= startDate);
             }
-            
+
             if (pagination.ToDate.HasValue)
             {
                 var endDate = pagination.ToDate.Value.Date.AddDays(1).AddSeconds(-1); // End of the day
@@ -512,24 +480,24 @@ namespace TDFAPI.Repositories
 
         // Applies sorting based on pagination parameters
         private IQueryable<RequestEntity> ApplySorting(
-            IQueryable<RequestEntity> query, 
+            IQueryable<RequestEntity> query,
             RequestPaginationDto pagination)
         {
             // Use reflection to get the property to sort by
             var property = typeof(RequestEntity).GetProperty(
                 GetRequestPropertyName(pagination.SortBy) ?? "CreatedAt");
-                
+
             if (property == null)
             {
                 // Default to CreatedAt if property not found
                 return pagination.Ascending ? query.OrderBy(r => r.CreatedAt) : query.OrderByDescending(r => r.CreatedAt);
             }
-            
+
             // Create a dynamic expression for sorting
             var parameter = System.Linq.Expressions.Expression.Parameter(typeof(RequestEntity), "r");
             var propertyAccess = System.Linq.Expressions.Expression.MakeMemberAccess(parameter, property);
             var lambdaExp = System.Linq.Expressions.Expression.Lambda(propertyAccess, parameter);
-            
+
             // Apply the sorting
             var methodName = pagination.Ascending ? "OrderBy" : "OrderByDescending";
             var orderByExp = System.Linq.Expressions.Expression.Call(
@@ -538,10 +506,10 @@ namespace TDFAPI.Repositories
                 new Type[] { typeof(RequestEntity), property.PropertyType },
                 query.Expression,
                 System.Linq.Expressions.Expression.Quote(lambdaExp));
-                
+
             return query.Provider.CreateQuery<RequestEntity>(orderByExp);
         }
-        
+
         // Maps DTO property names to entity property names
         private string GetRequestPropertyName(string dtoPropertyName)
         {
@@ -556,21 +524,21 @@ namespace TDFAPI.Repositories
                 { "CreatedAt", "CreatedAt" },
                 { "UpdatedAt", "UpdatedAt" }
             };
-            
+
             if (propertyMap.TryGetValue(dtoPropertyName, out var entityProperty))
             {
                 return entityProperty;
             }
-            
+
             // Check if the property exists on the entity directly
             if (typeof(RequestEntity).GetProperty(dtoPropertyName) != null)
             {
                 return dtoPropertyName;
             }
-            
+
             return null;
         }
-        
+
         #endregion
 
         #region Helper Methods
@@ -582,12 +550,12 @@ namespace TDFAPI.Repositories
             DateTime endOfYear = new DateTime(DateTime.Now.Year, 12, 31);
 
             var approvedRequests = await _context.Requests
-                .Where(r => 
-                    r.RequestUserID == userId && 
-                    r.RequestType == leaveType && 
-                    r.RequestFromDay >= startOfYear && 
+                .Where(r =>
+                    r.RequestUserID == userId &&
+                    r.RequestType == leaveType &&
+                    r.RequestFromDay >= startOfYear &&
                     r.RequestFromDay <= endOfYear &&
-                    r.RequestStatus == "Approved" && 
+                    r.RequestStatus == "Approved" &&
                     r.RequestHRStatus == "Approved")
                 .ToListAsync();
 
@@ -598,17 +566,14 @@ namespace TDFAPI.Repositories
         /// <summary>
         /// Maps a User entity to UserDto
         /// </summary>
-        private UserDto MapUserToDto(object userObject)
+        private UserDto MapUserToDto(User user)
         {
-#if DEBUG
-            // For DEBUG mode, manually cast and map the User object
-            dynamic user = userObject;
             if (user == null) return null;
-            
+
             var dto = new UserDto
             {
                 UserID = user.UserID,
-                Username = user.Username,
+                Username = user.UserName,
                 FullName = user.FullName ?? string.Empty,
                 Department = user.Department,
                 Title = user.Title ?? string.Empty,
@@ -630,79 +595,30 @@ namespace TDFAPI.Repositories
                 Roles = new List<string>(),
                 CurrentDevice = user.CurrentDevice
             };
-            
+
             // Map leave balances if AnnualLeave is available
             if (user.AnnualLeave != null)
             {
-                dto.AnnualLeaveBalance = user.AnnualLeave.AnnualBalance;
-                dto.CasualLeaveBalance = user.AnnualLeave.CasualBalance;
-                dto.PermissionsBalance = user.AnnualLeave.PermissionsBalance;
-                dto.UnpaidLeaveUsed = user.AnnualLeave.UnpaidLeaveUsed;
-                
-                // Legacy properties (for compatibility)
-                dto.AnnualBalance = user.AnnualLeave.AnnualBalance;
-                dto.CasualBalance = user.AnnualLeave.CasualBalance;
+                // Calculate balances by calling methods on the entity
+                int annualBalance = user.AnnualLeave.GetAnnualBalance();
+                int casualBalance = user.AnnualLeave.GetCasualBalance();
+                int permissionsBalance = user.AnnualLeave.GetPermissionsBalance();
+
+                dto.AnnualBalance = annualBalance; // Legacy property
+                dto.CasualBalance = casualBalance; // Legacy property
+                dto.AnnualLeaveBalance = annualBalance;
+                dto.CasualLeaveBalance = casualBalance;
+                dto.PermissionsBalance = permissionsBalance;
+                dto.UnpaidLeaveUsed = user.AnnualLeave.UnpaidUsed; // Directly mapped
             }
-            
+
             // Determine roles based on flags
             if (user.IsAdmin == true) dto.Roles.Add("Admin");
             if (user.IsManager == true) dto.Roles.Add("Manager");
             if (user.IsHR == true) dto.Roles.Add("HR");
             if (!dto.Roles.Any()) dto.Roles.Add("Employee");
-            
+
             return dto;
-#else
-            // For RELEASE mode, directly use the User type
-            User user = (User)userObject;
-            if (user == null) return null;
-            
-            var dto = new UserDto
-            {
-                UserID = user.UserID,
-                Username = user.Username,
-                FullName = user.FullName ?? string.Empty,
-                Department = user.Department,
-                Title = user.Title ?? string.Empty,
-                IsAdmin = user.IsAdmin ?? false,
-                IsManager = user.IsManager ?? false,
-                IsHR = user.IsHR ?? false,
-                IsActive = user.IsActive ?? true,
-                PresenceStatus = (UserPresenceStatus)(user.PresenceStatus ?? (int)UserPresenceStatus.Offline),
-                StatusMessage = user.StatusMessage,
-                IsAvailableForChat = user.IsAvailableForChat ?? true,
-                LastActivityTime = user.LastActivityTime,
-                ProfilePictureData = user.Picture,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt,
-                isConnected = user.isConnected,
-                FailedLoginAttempts = user.FailedLoginAttempts ?? 0,
-                IsLocked = user.IsLocked ?? false,
-                LockoutEndTime = user.LockoutEndTime,
-                Roles = new List<string>(),
-                CurrentDevice = user.CurrentDevice
-            };
-            
-            // Map leave balances if AnnualLeave is available
-            if (user.AnnualLeave != null)
-            {
-                dto.AnnualLeaveBalance = user.AnnualLeave.AnnualBalance;
-                dto.CasualLeaveBalance = user.AnnualLeave.CasualBalance;
-                dto.PermissionsBalance = user.AnnualLeave.PermissionsBalance;
-                dto.UnpaidLeaveUsed = user.AnnualLeave.UnpaidLeaveUsed;
-                
-                // Legacy properties (for compatibility)
-                dto.AnnualBalance = user.AnnualLeave.AnnualBalance;
-                dto.CasualBalance = user.AnnualLeave.CasualBalance;
-            }
-            
-            // Determine roles based on flags
-            if (user.IsAdmin == true) dto.Roles.Add("Admin");
-            if (user.IsManager == true) dto.Roles.Add("Manager");
-            if (user.IsHR == true) dto.Roles.Add("HR");
-            if (!dto.Roles.Any()) dto.Roles.Add("Employee");
-            
-            return dto;
-#endif
         }
 
         #endregion

@@ -16,8 +16,6 @@ using TDFAPI.Middleware;
 using TDFAPI.Repositories;
 using TDFAPI.Services;
 using TDFAPI.Messaging;
-using Microsoft.Extensions.Logging.Console;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using System;
 using TDFAPI.Data;
@@ -83,13 +81,13 @@ AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
         ex?.Message ?? "Unknown error",
         args.IsTerminating
     );
-    
+
     // Log to file as well since the process may terminate
     try
     {
         var logsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
         logger.LogInformation("Creating logs directory at: {LogsPath}", logsPath);
-        
+
         if (!Directory.Exists(logsPath))
         {
             Directory.CreateDirectory(logsPath);
@@ -99,41 +97,41 @@ AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
         {
             logger.LogInformation("Logs directory already exists at: {LogsPath}", logsPath);
         }
-        
+
         // Implement log rotation - keep only last 10 crash logs
         var existingCrashLogs = Directory.GetFiles(logsPath, "crash_*.txt")
             .OrderByDescending(f => f)
             .Skip(9) // Keep 10 most recent files (including the one we're about to create)
             .ToList();
-        
+
         foreach (var oldLog in existingCrashLogs)
         {
             try { File.Delete(oldLog); } catch { /* Best effort deletion */ }
         }
-        
+
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         var crashLogPath = Path.Combine(logsPath, $"crash_{timestamp}.txt");
-        
+
         // Keep it simple with just the essential crash details
-        var crashDetails = 
+        var crashDetails =
             $"Application Crash: {DateTime.Now}\n\n" +
             $"Exception: {ex?.GetType().FullName}\n" +
             $"Message: {ex?.Message}\n\n" +
             $"Stack Trace:\n{ex?.StackTrace}\n\n";
-        
+
         if (ex?.InnerException != null)
         {
-            crashDetails += 
+            crashDetails +=
                 $"Inner Exception: {ex.InnerException.GetType().FullName}\n" +
                 $"Inner Message: {ex.InnerException.Message}\n\n";
         }
-        
+
         // Limit crash log size to 500KB
         if (crashDetails.Length > 500 * 1024)
         {
             crashDetails = crashDetails.Substring(0, 500 * 1024) + "\n...[truncated]";
         }
-        
+
         File.WriteAllText(crashLogPath, crashDetails);
     }
     catch
@@ -151,53 +149,53 @@ TaskScheduler.UnobservedTaskException += (sender, args) =>
         "UNOBSERVED TASK EXCEPTION: {Message}",
         exception.Message
     );
-    
+
     // Log unobserved task exceptions to file too
     try
     {
         var logsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
         Directory.CreateDirectory(logsPath);
-        
+
         // Implement log rotation - keep only last 10 task exception logs
         var existingTaskLogs = Directory.GetFiles(logsPath, "task_exception_*.txt")
             .OrderByDescending(f => f)
             .Skip(9) // Keep 10 most recent files
             .ToList();
-        
+
         foreach (var oldLog in existingTaskLogs)
         {
             try { File.Delete(oldLog); } catch { /* Best effort deletion */ }
         }
-        
+
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         var crashLogPath = Path.Combine(logsPath, $"task_exception_{timestamp}.txt");
-        
-        var crashDetails = 
+
+        var crashDetails =
             $"Unobserved Task Exception: {DateTime.Now}\n\n" +
             $"Exception: {exception.GetType().FullName}\n" +
             $"Message: {exception.Message}\n\n" +
             $"Stack Trace:\n{exception.StackTrace}\n\n";
-        
+
         if (exception.InnerException != null)
         {
-            crashDetails += 
+            crashDetails +=
                 $"Inner Exception: {exception.InnerException.GetType().FullName}\n" +
                 $"Inner Message: {exception.InnerException.Message}\n\n";
         }
-        
+
         // Limit log size
         if (crashDetails.Length > 500 * 1024)
         {
             crashDetails = crashDetails.Substring(0, 500 * 1024) + "\n...[truncated]";
         }
-        
+
         File.WriteAllText(crashLogPath, crashDetails);
     }
     catch
     {
         // Can't do much if we can't write to file
     }
-    
+
     // Mark as observed to prevent application crash
     args.SetObserved();
 };
@@ -207,7 +205,7 @@ try
 {
     var logsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
     logger.LogInformation("Creating logs directory at: {LogsPath}", logsPath);
-    
+
     if (!Directory.Exists(logsPath))
     {
         Directory.CreateDirectory(logsPath);
@@ -221,7 +219,7 @@ try
 catch (Exception ex)
 {
     logger.LogError(ex, "Failed to create logs directory: {ErrorMessage}", ex.Message);
-    
+
     // Try creating in a different location
     try {
         var altLogsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "TDFAPI", "logs");
@@ -239,7 +237,7 @@ try {
     logger.LogInformation("Initializing configuration from INI file");
     IniConfiguration.Initialize();
     logger.LogInformation("Successfully initialized configuration from INI file");
-    
+
     // Update INI file with new sections if needed
     IniConfiguration.UpdateConfigFile();
     logger.LogInformation("Successfully updated INI configuration file");
@@ -271,7 +269,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
-        
+
         // This helps with cyclic references which can occur in Entity Framework relationships
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     });
@@ -280,7 +278,7 @@ builder.Services.AddControllers()
 builder.Services.AddHttpContextAccessor();
 
 // Configure security services and options
-builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options => 
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
     // Limit form size to prevent DoS attacks
     options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10 MB
@@ -313,7 +311,7 @@ builder.Services.AddHealthChecks()
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    
+
     // Add general rate limiter for all endpoints using IniConfiguration
     var globalLimit = IniConfiguration.GetRateLimitSetting("GlobalLimitPerMinute", 100);
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
@@ -327,7 +325,7 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(1)
             });
     });
-    
+
     // Add specific limit for auth endpoints
     var authLimit = IniConfiguration.GetRateLimitSetting("AuthLimitPerMinute", 10);
     options.AddPolicy("auth", httpContext =>
@@ -339,7 +337,7 @@ builder.Services.AddRateLimiter(options =>
                 PermitLimit = authLimit,
                 Window = TimeSpan.FromMinutes(1)
             }));
-    
+
     // Add policy for API endpoints
     var apiLimit = IniConfiguration.GetRateLimitSetting("ApiLimitPerMinute", 60);
     options.AddPolicy("api", httpContext =>
@@ -370,11 +368,11 @@ if (builder.Environment.IsDevelopment())
 {
     // In development, load allowed origins from INI configuration
     var developmentOrigins = IniConfiguration.DevelopmentAllowedOrigins;
-    
+
     // Default development origins if none configured
     if (developmentOrigins.Count == 0)
     {
-        developmentOrigins.AddRange(new[] 
+        developmentOrigins.AddRange(new[]
         {
             "http://localhost:3000",       // React development server
             "http://localhost:8080",       // Vue development server
@@ -386,7 +384,7 @@ if (builder.Environment.IsDevelopment())
             "http://localhost:8000"        // Django/Python development server
         });
     }
-    
+
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("CorsPolicy", policy =>
@@ -397,14 +395,14 @@ if (builder.Environment.IsDevelopment())
                   .AllowCredentials();
         });
     });
-    
+
     logger.LogWarning("CORS is configured for development environment with origins: {Origins}", string.Join(", ", developmentOrigins));
 }
 else
 {
     // In production, use allowed origins from INI configuration
     var allowedOrigins = IniConfiguration.AllowedOrigins;
-        
+
     if (allowedOrigins.Count == 0)
     {
         throw new InvalidOperationException("No allowed origins configured for CORS in production environment. Please configure AllowedOrigins in config.ini.");
@@ -421,8 +419,8 @@ else
                   .SetIsOriginAllowedToAllowWildcardSubdomains(); // Allow wildcards in domain like *.example.com
         });
     });
-    
-    logger.LogInformation("CORS configured with the following origins: {Origins}", 
+
+    logger.LogInformation("CORS configured with the following origins: {Origins}",
         string.Join(", ", allowedOrigins));
 }
 
@@ -438,16 +436,16 @@ builder.Services.AddWebSockets(options =>
 builder.Services.AddSingleton<WebSocketConnectionManager>();
 
 // Register MessageStore
-builder.Services.AddSingleton<TDFAPI.Messaging.MessageStore>();
+builder.Services.AddSingleton<MessageStore>();
 
 // Configure authentication
 var key = Encoding.ASCII.GetBytes(IniConfiguration.JwtSecretKey);
-builder.Services.AddAuthentication(options => 
+builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options => 
+.AddJwtBearer(options =>
 {
     options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
     options.SaveToken = true;
@@ -469,7 +467,7 @@ builder.Services.AddAuthentication(options =>
         // Ensure tokens aren't expired
         RequireExpirationTime = true
     };
-    
+
     // Configure challenge events
     options.Events = new JwtBearerEvents
     {
@@ -495,7 +493,7 @@ builder.Services.AddAuthentication(options =>
             {
                 var authService = context.HttpContext.RequestServices.GetRequiredService<IAuthService>();
                 // Note: Ideally, this check should be async, but JwtBearerEvents are sync.
-                // A common workaround is to use .Result or .GetAwaiter().GetResult(), 
+                // A common workaround is to use .Result or .GetAwaiter().GetResult(),
                 // but be mindful of potential deadlocks in some contexts.
                 // For simplicity here, using .Result. Consider a custom middleware approach for fully async validation if needed.
                 if (authService.IsTokenRevokedAsync(jti).Result)
@@ -509,7 +507,7 @@ builder.Services.AddAuthentication(options =>
             {
                  logger.LogWarning("Token validation warning: JTI claim missing, cannot check revocation status.");
                  // Decide if missing JTI should fail validation based on security requirements
-                 // context.Fail("Invalid token: Missing JTI claim."); 
+                 // context.Fail("Invalid token: Missing JTI claim.");
                  // return Task.CompletedTask;
             }
 
@@ -547,38 +545,35 @@ builder.Services.AddSingleton<MessageStore>();
 builder.Services.AddSingleton<WebSocketConnectionManager>();
 
 // Add EventMediator as a singleton
-builder.Services.AddSingleton<TDFAPI.Messaging.Interfaces.IEventMediator, TDFAPI.Messaging.EventMediator>();
-
-// Add UnitOfWork pattern support
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddSingleton<TDFAPI.Messaging.Interfaces.IEventMediator, EventMediator>();
 
 // Register repositories with connection retry policy
-builder.Services.AddScoped(provider => 
+builder.Services.AddScoped(provider =>
     new SqlConnectionFactory(IniConfiguration.ConnectionString));
 
+// Register UnitOfWork
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Register repositories
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IMessageRepository, MessageRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<IRequestRepository, RequestRepository>();
 builder.Services.AddScoped<IRevokedTokenRepository, RevokedTokenRepository>();
 
-// Register services
+// Register all services as scoped for consistent lifetime management
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<IRequestService, RequestService>();
-
-// Add user presence service using event mediator pattern
 builder.Services.AddScoped<IUserPresenceService, UserPresenceService>();
-    
-// Add notification service using event mediator pattern
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Add background services
 builder.Services.AddHostedService<UserInactivityBackgroundService>();
 
-// Add API versioning 
+// Add API versioning
 builder.Services.AddApiVersioning(options =>
 {
     options.DefaultApiVersion = new Microsoft.AspNetCore.Mvc.ApiVersion(1, 0);
@@ -641,11 +636,11 @@ app.UseForwardedHeaders();
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
-    
+
     // Add manual API documentation endpoint
-    app.MapGet("/api/docs", () => 
+    app.MapGet("/api/docs", () =>
     {
-        var apiDocs = new 
+        var apiDocs = new
         {
             Title = "TDF API Documentation",
             Version = "v1.0",
@@ -659,7 +654,7 @@ if (app.Environment.IsDevelopment())
             },
             Authentication = "JWT Bearer Token"
         };
-        
+
         return Results.Json(apiDocs);
     });
 }
@@ -713,19 +708,19 @@ if (app.Environment.IsDevelopment())
 {
     app.MapGet("/debug/config", (HttpContext context) => {
         // Only allow local requests for security
-        if (context.Connection.RemoteIpAddress == null || 
+        if (context.Connection.RemoteIpAddress == null ||
             context.Connection.LocalIpAddress == null ||
             (!context.Connection.RemoteIpAddress.Equals(context.Connection.LocalIpAddress) &&
             !IPAddress.IsLoopback(context.Connection.RemoteIpAddress)))
         {
             return Results.Forbid();
         }
-        
+
         return Results.Json(new {
             Environment = app.Environment.EnvironmentName,
             ServerUrls = urls.ToList(),
             DatabaseConfigured = !string.IsNullOrEmpty(IniConfiguration.ConnectionString),
-            JwtConfigured = !string.IsNullOrEmpty(IniConfiguration.JwtIssuer) && 
+            JwtConfigured = !string.IsNullOrEmpty(IniConfiguration.JwtIssuer) &&
                            !string.IsNullOrEmpty(IniConfiguration.JwtAudience),
             WebSocketsEnabled = true,
             RateLimits = new {
@@ -745,33 +740,33 @@ if (app.Environment.IsDevelopment())
             // Add database connection test
             Database = new {
                 ConnectionString = IniConfiguration.ConnectionString.Replace(
-                    IniConfiguration.ConnectionString.Contains("Password=") 
-                        ? "Password=" + new string('*', 8) 
-                        : "", 
+                    IniConfiguration.ConnectionString.Contains("Password=")
+                        ? "Password=" + new string('*', 8)
+                        : "",
                     "Password=********"),
                 Status = "Testing..."
             }
         });
     });
-    
+
     // Add a debug endpoint to test database connection
     app.MapGet("/debug/database", async (HttpContext context) => {
         // Only allow local requests for security
-        if (context.Connection.RemoteIpAddress == null || 
+        if (context.Connection.RemoteIpAddress == null ||
             context.Connection.LocalIpAddress == null ||
             (!context.Connection.RemoteIpAddress.Equals(context.Connection.LocalIpAddress) &&
             !IPAddress.IsLoopback(context.Connection.RemoteIpAddress)))
         {
             return Results.Forbid();
         }
-        
+
         try {
             using (var connection = new SqlConnection(IniConfiguration.ConnectionString))
             {
                 await connection.OpenAsync();
                 var serverVersion = connection.ServerVersion;
                 var database = connection.Database;
-                
+
                 return Results.Json(new {
                     Status = "Connected",
                     ServerVersion = serverVersion,
@@ -802,7 +797,7 @@ app.Map("/ws", async context =>
     }
 
     // Create WebSocket auth helper
-    var wsAuthHelper = new TDFAPI.Middleware.WebSocketAuthenticationHelper(
+    var wsAuthHelper = new WebSocketAuthenticationHelper(
         logger,
         key,
         IniConfiguration.JwtIssuer,
@@ -817,21 +812,21 @@ app.Map("/ws", async context =>
     if (string.IsNullOrEmpty(authToken))
     {
         await wsAuthHelper.WriteErrorResponse(
-            context, 
-            HttpStatusCode.Unauthorized, 
+            context,
+            HttpStatusCode.Unauthorized,
             "Authentication token must be provided via Authorization header"
         );
         return;
     }
 
-    try 
+    try
     {
         // Validate token and get user info
         var validationResult = wsAuthHelper.ValidateToken(authToken);
         bool isValid = validationResult.isValid;
         ClaimsPrincipal? principal = validationResult.principal;
         string errorReason = validationResult.errorReason;
-        
+
         if (!isValid || principal == null)
         {
             await wsAuthHelper.WriteErrorResponse(context, HttpStatusCode.Unauthorized, errorReason);
@@ -841,30 +836,30 @@ app.Map("/ws", async context =>
         // Token is valid, get user info
         var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         var username = principal.FindFirst(ClaimTypes.Name)?.Value;
-        
+
         if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(username))
         {
             await wsAuthHelper.WriteErrorResponse(
-                context, 
-                HttpStatusCode.Unauthorized, 
+                context,
+                HttpStatusCode.Unauthorized,
                 "Invalid user information in token"
             );
             return;
         }
 
         // Log successful WebSocket connection
-        logger.LogInformation("WebSocket connection authenticated for user {Username} (ID: {UserId})", 
+        logger.LogInformation("WebSocket connection authenticated for user {Username} (ID: {UserId})",
             username, userId);
 
         // Accept the WebSocket connection
         using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-        
+
         // Get required services
         var wsManager = app.Services.GetRequiredService<WebSocketConnectionManager>();
         var notificationService = app.Services.GetRequiredService<INotificationService>();
-        
+
         // Create a connection object
-        var connection = new WebSocketConnectionEntity 
+        var connection = new WebSocketConnectionEntity
         {
             ConnectionId = Guid.NewGuid().ToString(),
             UserId = int.Parse(userId),
@@ -873,7 +868,7 @@ app.Map("/ws", async context =>
             ConnectedAt = DateTime.UtcNow,
             MachineName = Environment.MachineName
         };
-        
+
         try
         {
             // Let the notification service handle the WebSocket connection
@@ -881,9 +876,9 @@ app.Map("/ws", async context =>
         }
         catch (Exception wsEx)
         {
-            logger.LogError(wsEx, "Error in WebSocket connection handling for user {Username}: {Message}", 
+            logger.LogError(wsEx, "Error in WebSocket connection handling for user {Username}: {Message}",
                 username, wsEx.Message);
-            
+
             if (webSocket.State == WebSocketState.Open)
             {
                 try
@@ -923,7 +918,7 @@ app.MapHealthChecks("/health", new HealthCheckOptions
     ResponseWriter = async (context, report) =>
     {
         context.Response.ContentType = "application/json";
-        
+
         // Enhanced health check response with more details
         var response = new
         {
@@ -941,8 +936,8 @@ app.MapHealthChecks("/health", new HealthCheckOptions
                 Data = e.Value.Data
             })
         };
-        
-        await context.Response.WriteAsync(JsonSerializer.Serialize(response, 
+
+        await context.Response.WriteAsync(JsonSerializer.Serialize(response,
             new JsonSerializerOptions { WriteIndented = true }));
     }
 });

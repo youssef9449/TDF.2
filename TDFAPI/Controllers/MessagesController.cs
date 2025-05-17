@@ -18,11 +18,11 @@ namespace TDFAPI.Controllers
     [EnableRateLimiting("api")]
     public class MessagesController : ControllerBase
     {
-        private readonly IMessageService _messageService;
+        private readonly MessageService _messageService;
         private readonly ILogger<MessagesController> _logger;
         private readonly IAntiforgery _antiforgery;
 
-        public MessagesController(IMessageService messageService, ILogger<MessagesController> logger, IAntiforgery antiforgery)
+        public MessagesController(MessageService messageService, ILogger<MessagesController> logger, IAntiforgery antiforgery)
         {
             _messageService = messageService;
             _logger = logger;
@@ -43,7 +43,7 @@ namespace TDFAPI.Controllers
                     return BadRequest(ApiResponse<PaginatedResult<MessageDto>>.ErrorResponse(
                         "Invalid request parameters: " + string.Join("; ", errors)));
                 }
-                
+
                 var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
                 var messages = await _messageService.GetByUserIdAsync(userId, pagination);
                 return Ok(ApiResponse<PaginatedResult<MessageDto>>.SuccessResponse(messages));
@@ -67,7 +67,7 @@ namespace TDFAPI.Controllers
             {
                 var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
                 var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
-                
+
                 var message = await _messageService.CreateAsync(messageDto, userId, userName);
                 return Ok(ApiResponse<MessageDto>.SuccessResponse(message));
             }
@@ -97,10 +97,10 @@ namespace TDFAPI.Controllers
                     return BadRequest(ApiResponse<PaginatedResult<MessageDto>>.ErrorResponse(
                         "Invalid request parameters: " + string.Join("; ", errors)));
                 }
-                
+
                 var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
                 var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
-                
+
                 // Check for existing message with the same idempotency key if provided
                 if (!string.IsNullOrEmpty(messageDto.IdempotencyKey))
                 {
@@ -108,13 +108,13 @@ namespace TDFAPI.Controllers
                     if (existingMessage != null)
                     {
                         // Return existing message to avoid duplication
-                        _logger.LogInformation("Duplicate message detected with key {Key} from user {UserId}", 
+                        _logger.LogInformation("Duplicate message detected with key {Key} from user {UserId}",
                             messageDto.IdempotencyKey, userId);
-                            
+
                         return Ok(ApiResponse<ChatMessageDto>.SuccessResponse(existingMessage));
                     }
                 }
-                
+
                 var message = await _messageService.CreateChatMessageAsync(messageDto, userId, userName);
                 return Ok(ApiResponse<ChatMessageDto>.SuccessResponse(message));
             }
@@ -221,11 +221,11 @@ namespace TDFAPI.Controllers
                 }
 
                 var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-                
+
                 // GetUndeliveredMessages and mark them as delivered
                 var undeliveredMessages = await _messageService.GetUndeliveredMessagesAsync(request.SenderId, userId);
                 var messageIds = undeliveredMessages.Select(m => m.Id).ToList();
-                
+
                 if (!messageIds.Any())
                 {
                     return Ok(ApiResponse<bool>.SuccessResponse(true)); // No messages to mark

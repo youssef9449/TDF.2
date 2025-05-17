@@ -128,9 +128,7 @@ namespace TDFShared.Models.Request
         /// <summary>
         /// Reference to the associated user entity (not DTO)
         /// </summary>
-        [JsonIgnore]
-        [ForeignKey("RequestUserID")]
-        public virtual object? User { get; set; }
+        public virtual User.User? User { get; set; }
 
         /// <summary>
         /// User DTO for API responses (not mapped to database)

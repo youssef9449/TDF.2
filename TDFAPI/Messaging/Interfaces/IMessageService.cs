@@ -22,14 +22,14 @@ namespace TDFAPI.Messaging.Interfaces
         /// <param name="messageType">Message type (chat, system, or notification)</param>
         /// <returns>Success status</returns>
         Task<bool> SendMessageAsync(int senderId, int receiverId, string content, MessageType messageType = MessageType.Chat);
-        
+
         /// <summary>
         /// Retrieves unread messages for a user
         /// </summary>
         /// <param name="userId">User ID</param>
         /// <returns>Collection of unread messages</returns>
         Task<IEnumerable<MessageEntity>> GetUnreadMessagesAsync(int userId);
-        
+
         /// <summary>
         /// Marks a message as read
         /// </summary>
@@ -37,7 +37,7 @@ namespace TDFAPI.Messaging.Interfaces
         /// <param name="userId">User ID of the reader</param>
         /// <returns>Success status</returns>
         Task<bool> MarkAsReadAsync(int messageId, int userId);
-        
+
         /// <summary>
         /// Marks a message as delivered
         /// </summary>
@@ -45,7 +45,7 @@ namespace TDFAPI.Messaging.Interfaces
         /// <param name="userId">User ID of the recipient</param>
         /// <returns>Success status</returns>
         Task<bool> MarkAsDeliveredAsync(int messageId, int userId);
-        
+
         /// <summary>
         /// Gets all messages between two users
         /// </summary>
@@ -53,14 +53,14 @@ namespace TDFAPI.Messaging.Interfaces
         /// <param name="userId2">Second user ID</param>
         /// <returns>Collection of messages</returns>
         Task<IEnumerable<MessageEntity>> GetConversationAsync(int userId1, int userId2);
-        
+
         /// <summary>
         /// Gets messages for a user (sent and received)
         /// </summary>
         /// <param name="userId">User ID</param>
         /// <returns>Collection of messages</returns>
         Task<IEnumerable<MessageEntity>> GetUserMessagesAsync(int userId);
-        
+
         /// <summary>
         /// Deletes a message if the user has permissions
         /// </summary>
@@ -68,7 +68,7 @@ namespace TDFAPI.Messaging.Interfaces
         /// <param name="userId">User ID requesting deletion</param>
         /// <returns>Success status</returns>
         Task<bool> DeleteMessageAsync(int messageId, int userId);
-        
+
         /// <summary>
         /// Broadcasts a message to multiple users
         /// </summary>
@@ -76,7 +76,7 @@ namespace TDFAPI.Messaging.Interfaces
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>The list of created messages</returns>
         Task<IReadOnlyList<MessageEntity>> BroadcastMessageAsync(BroadcastMessageCommand command, CancellationToken cancellationToken = default);
-        
+
         /// <summary>
         /// Marks messages as delivered
         /// </summary>
@@ -84,7 +84,7 @@ namespace TDFAPI.Messaging.Interfaces
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>The number of messages marked as delivered</returns>
         Task<int> MarkMessagesAsDeliveredAsync(MarkMessagesAsDeliveredCommand command, CancellationToken cancellationToken = default);
-        
+
         /// <summary>
         /// Marks messages as read
         /// </summary>
@@ -92,7 +92,7 @@ namespace TDFAPI.Messaging.Interfaces
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>The number of messages marked as read</returns>
         Task<int> MarkMessagesAsReadAsync(MarkMessagesAsReadCommand command, CancellationToken cancellationToken = default);
-        
+
         /// <summary>
         /// Retrieves undelivered messages for a user
         /// </summary>
@@ -101,7 +101,7 @@ namespace TDFAPI.Messaging.Interfaces
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Undelivered messages</returns>
         Task<IReadOnlyList<MessageEntity>> GetUndeliveredMessagesAsync(int userId, int limit = 100, CancellationToken cancellationToken = default);
-        
+
         /// <summary>
         /// Gets message thread between two users
         /// </summary>
@@ -113,4 +113,4 @@ namespace TDFAPI.Messaging.Interfaces
         /// <returns>List of messages between the users</returns>
         Task<IReadOnlyList<MessageEntity>> GetMessageThreadAsync(int user1Id, int user2Id, int limit = 50, DateTime? before = null, CancellationToken cancellationToken = default);
     }
-} 
+}

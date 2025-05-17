@@ -201,7 +201,7 @@ namespace TDFAPI.Middleware
             try
             {
                 using var scope = _serviceProvider.CreateScope();
-                var userRepository = scope.ServiceProvider.GetRequiredService<TDFAPI.Repositories.IUserRepository>();
+                var userRepository = scope.ServiceProvider.GetRequiredService<Repositories.IUserRepository>();
                 
                 // Check if this IP has been used by this user recently
                 return await userRepository.IsKnownIpAddressAsync(userId, ipAddress);
@@ -221,7 +221,7 @@ namespace TDFAPI.Middleware
             {
                 using (var scope = _serviceProvider.CreateScope())
                 {
-                    var userRepository = scope.ServiceProvider.GetRequiredService<TDFAPI.Repositories.IUserRepository>();
+                    var userRepository = scope.ServiceProvider.GetRequiredService<Repositories.IUserRepository>();
                     var user = await userRepository.GetByIdAsync(userId);
                     return user?.Username ?? "Unknown";
                 }

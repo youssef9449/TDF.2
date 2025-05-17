@@ -26,7 +26,8 @@ namespace TDFAPI.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly IEventMediator _eventMediator;
         private readonly MessageStore _messageStore;
-        private readonly ConcurrentDictionary<int, (DateTime LastMessage, int MessageCount)> _messageRateLimits = 
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly ConcurrentDictionary<int, (DateTime LastMessage, int MessageCount)> _messageRateLimits =
             new ConcurrentDictionary<int, (DateTime LastMessage, int MessageCount)>();
         private readonly ConcurrentDictionary<string, DateTime> _lastMessageTime = new ConcurrentDictionary<string, DateTime>();
 
@@ -51,7 +52,8 @@ namespace TDFAPI.Services
             MessageStore messageStore,
             ILogger<NotificationService> logger,
             IServiceProvider serviceProvider,
-            IEventMediator eventMediator)
+            IEventMediator eventMediator,
+            IUnitOfWork unitOfWork)
         {
             _notificationRepository = notificationRepository;
             _userRepository = userRepository;
@@ -61,21 +63,22 @@ namespace TDFAPI.Services
             _logger = logger;
             _serviceProvider = serviceProvider;
             _eventMediator = eventMediator;
-            
+            _unitOfWork = unitOfWork;
+
             // Initialize the dictionary cleanup timer
-            _dictionaryCleanupTimer = new Timer(CleanupDictionaries, null, 
-                TimeSpan.FromMinutes(DictionaryCleanupIntervalMinutes), 
+            _dictionaryCleanupTimer = new Timer(CleanupDictionaries, null,
+                TimeSpan.FromMinutes(DictionaryCleanupIntervalMinutes),
                 TimeSpan.FromMinutes(DictionaryCleanupIntervalMinutes));
 
             // Subscribe to user status and availability events
-            _eventMediator.Subscribe<Messaging.UserStatusChangedEvent>(HandleUserStatusChanged);
-            _eventMediator.Subscribe<Messaging.UserAvailabilityChangedEvent>(HandleUserAvailabilityChanged);
+            _eventMediator.Subscribe<UserStatusChangedEvent>(HandleUserStatusChanged);
+            _eventMediator.Subscribe<UserAvailabilityChangedEvent>(HandleUserAvailabilityChanged);
         }
 
         /// <summary>
         /// Handles the user status changed event
         /// </summary>
-        private void HandleUserStatusChanged(Messaging.UserStatusChangedEvent eventData)
+        private void HandleUserStatusChanged(UserStatusChangedEvent eventData)
         {
             try
             {
@@ -90,8 +93,8 @@ namespace TDFAPI.Services
                     statusMessage = eventData.StatusMessage,
                     timestamp = eventData.Timestamp
                 });
-                
-                _logger.LogInformation("Broadcasting status change for user {UserId} to {Status}", 
+
+                _logger.LogInformation("Broadcasting status change for user {UserId} to {Status}",
                     eventData.UserId, eventData.Status);
             }
             catch (Exception ex)
@@ -99,11 +102,11 @@ namespace TDFAPI.Services
                 _logger.LogError(ex, "Error handling user status changed event");
             }
         }
-        
+
         /// <summary>
         /// Handles the user availability changed event
         /// </summary>
-        private void HandleUserAvailabilityChanged(Messaging.UserAvailabilityChangedEvent eventData)
+        private void HandleUserAvailabilityChanged(UserAvailabilityChangedEvent eventData)
         {
             try
             {
@@ -117,8 +120,8 @@ namespace TDFAPI.Services
                     isAvailableForChat = eventData.IsAvailableForChat,
                     timestamp = eventData.Timestamp
                 });
-                
-                _logger.LogInformation("Broadcasting availability change for user {UserId} to {IsAvailable}", 
+
+                _logger.LogInformation("Broadcasting availability change for user {UserId} to {IsAvailable}",
                     eventData.UserId, eventData.IsAvailableForChat);
             }
             catch (Exception ex)
@@ -133,30 +136,30 @@ namespace TDFAPI.Services
             try
             {
                 var cutoffTime = DateTime.UtcNow.AddHours(-1); // Remove entries older than 1 hour
-                
+
                 // Clean up rate limiting dictionary
                 foreach (var userId in _messageRateLimits.Keys)
                 {
-                    if (_messageRateLimits.TryGetValue(userId, out var info) && 
+                    if (_messageRateLimits.TryGetValue(userId, out var info) &&
                         info.LastMessage < cutoffTime)
                     {
                         _messageRateLimits.TryRemove(userId, out _);
                         _logger.LogDebug("Removed stale rate limit entry for user {UserId}", userId);
                     }
                 }
-                
+
                 // Clean up message time dictionary
                 foreach (var connectionId in _lastMessageTime.Keys)
                 {
-                    if (_lastMessageTime.TryGetValue(connectionId, out var time) && 
+                    if (_lastMessageTime.TryGetValue(connectionId, out var time) &&
                         time < cutoffTime)
                     {
                         _lastMessageTime.TryRemove(connectionId, out _);
                         _logger.LogDebug("Removed stale message time entry for connection {ConnectionId}", connectionId);
                     }
                 }
-                
-                _logger.LogDebug("Dictionary cleanup completed. Rate limits: {RateLimitCount}, Message times: {MessageTimeCount}", 
+
+                _logger.LogDebug("Dictionary cleanup completed. Rate limits: {RateLimitCount}, Message times: {MessageTimeCount}",
                     _messageRateLimits.Count, _lastMessageTime.Count);
             }
             catch (Exception ex)
@@ -175,7 +178,7 @@ namespace TDFAPI.Services
         {
             // Fetch entities from repository
             var notificationEntities = await _notificationRepository.GetUnreadNotificationsAsync(userId);
-            
+
             // Map entities to DTOs
             return notificationEntities.Select(entity => new NotificationDto
             {
@@ -196,8 +199,8 @@ namespace TDFAPI.Services
                 var result = await _notificationRepository.MarkNotificationAsSeenAsync(notificationId, userId);
                 if (result)
                 {
-                    await SendToUserAsync(userId, new 
-                    { 
+                    await SendToUserAsync(userId, new
+                    {
                         type = "notification_seen",
                         notificationId = notificationId,
                         timestamp = DateTime.UtcNow
@@ -207,7 +210,7 @@ namespace TDFAPI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error marking notification {NotificationId} as seen for user {UserId}", 
+                _logger.LogError(ex, "Error marking notification {NotificationId} as seen for user {UserId}",
                     notificationId, userId);
                 return false;
             }
@@ -221,28 +224,28 @@ namespace TDFAPI.Services
                 {
                     return true;
                 }
-                
+
                 // Create a list of tasks to mark each notification as seen
-                var tasks = notificationIds.Select(id => 
+                var tasks = notificationIds.Select(id =>
                     _notificationRepository.MarkNotificationAsSeenAsync(id, userId)).ToList();
-                
+
                 // Wait for all operations to complete
                 var results = await Task.WhenAll(tasks);
-                
+
                 // Check if all operations were successful
                 bool allSuccessful = results.All(r => r);
-                
+
                 if (allSuccessful)
                 {
                     // Send a single notification for all the IDs that were marked as seen
-                    await SendToUserAsync(userId, new 
-                    { 
+                    await SendToUserAsync(userId, new
+                    {
                         type = "notifications_seen",
                         notificationIds = notificationIds.ToList(),
                         timestamp = DateTime.UtcNow
                     });
                 }
-                
+
                 return allSuccessful;
             }
             catch (Exception ex)
@@ -254,87 +257,114 @@ namespace TDFAPI.Services
 
         public async Task<bool> CreateNotificationAsync(int receiverId, string message)
         {
-            var notification = new NotificationEntity
+            try
             {
-                ReceiverID = receiverId,
-                MessageText = message,
-                Timestamp = DateTime.UtcNow,
-                IsSeen = false
-            };
+                await _unitOfWork.BeginTransactionAsync();
 
-            var id = await _notificationRepository.CreateNotificationAsync(notification);
-            if (id > 0)
-            {
-                notification.NotificationID = id;
-                
-                // Send real-time notification via WebSocket if user is online
-                if (await _messageRepository.IsUserOnlineAsync(receiverId))
+                var notification = new NotificationEntity
                 {
-                    await SendToUserAsync(receiverId, new 
-                    { 
-                        type = "new_notification",
-                        notification = notification,
-                    });
-                }
-                
-                // Track delivery status
-                var userDevices = await _messageRepository.GetUserDevicesAsync(receiverId);
-                if (!userDevices.Any())
+                    ReceiverID = receiverId,
+                    Message = message,
+                    Timestamp = DateTime.UtcNow,
+                    IsSeen = false
+                };
+
+                var id = await _notificationRepository.CreateNotificationAsync(notification);
+                if (id > 0)
                 {
-                    // Store for delivery when user connects
-                    await _messageRepository.AddNotificationAsync(receiverId, message);
+                    notification.NotificationID = id;
+
+                    // Send real-time notification via WebSocket if user is online
+                    bool isUserOnline = await _messageRepository.IsUserOnlineAsync(receiverId);
+                    if (isUserOnline)
+                    {
+                        await SendToUserAsync(receiverId, new
+                        {
+                            type = "new_notification",
+                            notification = notification,
+                        });
+                    }
+
+                    // Track delivery status
+                    var userDevices = await _messageRepository.GetUserDevicesAsync(receiverId);
+                    if (!userDevices.Any() && !isUserOnline)
+                    {
+                        // Store for delivery when user connects
+                        await _messageRepository.AddNotificationAsync(receiverId, message);
+                    }
+
+                    await _unitOfWork.CommitAsync();
+                    return true;
                 }
 
-                return true;
+                await _unitOfWork.RollbackAsync();
+                return false;
             }
-
-            return false;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating notification for user {UserId}", receiverId);
+                await _unitOfWork.RollbackAsync();
+                return false;
+            }
         }
 
         public async Task<bool> BroadcastNotificationAsync(string message, int senderId, string? department = null)
         {
             try
             {
+                await _unitOfWork.BeginTransactionAsync();
+
                 // Get all users in a single database call
                 var allUsers = await _userRepository.GetAllAsync();
                 var sender = allUsers.FirstOrDefault(u => u.UserID == senderId);
-                
+
                 if (sender == null)
                 {
                     _logger.LogWarning("Cannot broadcast notification: Sender with ID {SenderId} not found", senderId);
+                    await _unitOfWork.RollbackAsync();
                     return false;
                 }
-                
+
                 // Filter users based on department and exclude sender
                 var targetUsers = allUsers
-                    .Where(u => u.UserID != senderId && 
-                               (string.IsNullOrEmpty(department) || 
+                    .Where(u => u.UserID != senderId &&
+                               (string.IsNullOrEmpty(department) ||
                                 u.Department?.Equals(department, StringComparison.OrdinalIgnoreCase) == true))
                     .ToList();
-                
+
                 if (!targetUsers.Any())
                 {
-                    _logger.LogInformation("No recipients found for broadcast notification from user {SenderId} to department {Department}", 
+                    _logger.LogInformation("No recipients found for broadcast notification from user {SenderId} to department {Department}",
                         senderId, department ?? "all");
+                    await _unitOfWork.CommitAsync();
                     return true; // No error, just no recipients
                 }
-                
+
                 // Get online users in a single call
                 var onlineUsers = await _messageRepository.GetOnlineUsersAsync();
                 var onlineTargetUsers = targetUsers.Where(u => onlineUsers.Contains(u.UserID)).ToList();
-                
+
                 // Process notifications in batches if needed
                 var tasks = new List<Task>();
-                
+
                 // Create persistent notifications for all recipients
                 foreach (var user in targetUsers)
                 {
-                    tasks.Add(CreateNotificationAsync(user.UserID, message));
+                    var notification = new NotificationEntity
+                    {
+                        ReceiverID = user.UserID,
+                        SenderID = senderId,
+                        Message = message,
+                        Timestamp = DateTime.UtcNow,
+                        IsSeen = false
+                    };
+
+                    await _notificationRepository.CreateNotificationAsync(notification);
                 }
-                
+
                 // Prepare real-time message once
-                var broadcastMessage = new 
-                { 
+                var broadcastMessage = new
+                {
                     type = "broadcast_notification",
                     message = message,
                     sender = new {
@@ -346,12 +376,12 @@ namespace TDFAPI.Services
                     department = department,
                     timestamp = DateTime.UtcNow
                 };
-                
+
                 // Group users by department for more efficient group messaging
                 var departmentGroups = onlineTargetUsers
                     .Where(u => !string.IsNullOrEmpty(u.Department))
                     .GroupBy(u => u.Department);
-                
+
                 foreach (var deptGroup in departmentGroups)
                 {
                     if (!string.IsNullOrEmpty(deptGroup.Key))
@@ -359,16 +389,23 @@ namespace TDFAPI.Services
                         tasks.Add(SendToGroupAsync(deptGroup.Key, broadcastMessage));
                     }
                 }
-                
-                // Wait for all tasks to complete
-                await Task.WhenAll(tasks);
-                
+
+                // Commit the transaction before sending WebSocket messages
+                await _unitOfWork.CommitAsync();
+
+                // Wait for all WebSocket tasks to complete
+                if (tasks.Any())
+                {
+                    await Task.WhenAll(tasks);
+                }
+
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error broadcasting notification from user {SenderId} to department {Department}", 
+                _logger.LogError(ex, "Error broadcasting notification from user {SenderId} to department {Department}",
                     senderId, department ?? "all");
+                await _unitOfWork.RollbackAsync();
                 return false;
             }
         }
@@ -382,7 +419,7 @@ namespace TDFAPI.Services
                     _logger.LogWarning("Invalid userId: {UserId}", userId);
                     return false;
                 }
-                
+
                 // Get user info first to validate user exists
                 var user = await _userRepository.GetByIdAsync(userId);
                 if (user == null)
@@ -390,7 +427,7 @@ namespace TDFAPI.Services
                     _logger.LogWarning("Cannot handle connection: User with ID {UserId} not found", userId);
                     return false;
                 }
-                
+
                 // Update user connection status after validating user exists
                 bool updateResult = await _messageRepository.UpdateUserConnectionStatusAsync(userId, isConnected, machineName);
                 if (!updateResult)
@@ -398,12 +435,12 @@ namespace TDFAPI.Services
                     _logger.LogWarning("Failed to update connection status for user {UserId}", userId);
                     return false;
                 }
-                
+
                 // Tasks to run in parallel
                 var tasks = new List<Task>();
-                
+
                 // Prepare status message
-                var statusMessage = new 
+                var statusMessage = new
                 {
                     type = "user_connection_status",
                     userId = userId,
@@ -412,23 +449,23 @@ namespace TDFAPI.Services
                     department = user.Department,
                     timestamp = DateTime.UtcNow
                 };
-                
+
                 // Send to department if specified
                 if (!string.IsNullOrEmpty(user.Department))
                 {
                     tasks.Add(SendToGroupAsync(user.Department, statusMessage));
                 }
-                
+
                 // If user is connecting, deliver any pending notifications
                 if (isConnected)
                 {
                     tasks.Add(DeliverPendingNotificationsAsync(userId));
                 }
-                
+
                 // Wait for all notification tasks to complete with timeout protection
                 if (tasks.Any())
                 {
-                    try 
+                    try
                     {
                         await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(10));
                     }
@@ -438,7 +475,7 @@ namespace TDFAPI.Services
                         // Continue anyway since the core connection update was successful
                     }
                 }
-                
+
                 return true;
             }
             catch (Exception ex)
@@ -447,7 +484,7 @@ namespace TDFAPI.Services
                 return false;
             }
         }
-        
+
         // Helper method to deliver pending notifications
         private async Task DeliverPendingNotificationsAsync(int userId)
         {
@@ -455,28 +492,28 @@ namespace TDFAPI.Services
             {
                 var pendingMessages = await _messageRepository.GetPendingMessagesAsync(userId);
                 if (!pendingMessages.Any()) return;
-                
+
                 var batchSize = 10; // Process in small batches to avoid overwhelming the client
-                
+
                 for (int i = 0; i < pendingMessages.Count(); i += batchSize)
                 {
                     var batch = pendingMessages.Skip(i).Take(batchSize);
-                    var batchTasks = batch.Select(message => 
-                        SendToUserAsync(userId, new 
+                    var batchTasks = batch.Select(message =>
+                        SendToUserAsync(userId, new
                         {
                             type = "pending_notification",
                             message = message,
                             timestamp = DateTime.UtcNow
                         }));
-                    
+
                     await Task.WhenAll(batchTasks);
-                    
+
                     // Small delay between batches
                     if (i + batchSize < pendingMessages.Count())
                         await Task.Delay(100);
                 }
-                
-                _logger.LogInformation("Delivered {Count} pending notifications to user {UserId}", 
+
+                _logger.LogInformation("Delivered {Count} pending notifications to user {UserId}",
                     pendingMessages.Count(), userId);
             }
             catch (Exception ex)
@@ -490,7 +527,7 @@ namespace TDFAPI.Services
         {
             // Get all connections for this user
             var userConnections = _webSocketManager.GetUserConnections(userId).ToList();
-            
+
             if (userConnections.Any())
             {
                 // If there are managed connections, send to each
@@ -528,7 +565,7 @@ namespace TDFAPI.Services
         {
             // Track last activity time for timeout detection
             var lastActivity = DateTime.UtcNow;
-            
+
             // Get buffer size from configuration or use default
             int bufferSize = DefaultBufferSize;
             try
@@ -536,8 +573,8 @@ namespace TDFAPI.Services
                 // Try to get buffer size from configuration
                 if (_serviceProvider.GetService<IConfiguration>() is IConfiguration config)
                 {
-                    bufferSize = config.GetValue<int>("WebSockets:BufferSize", DefaultBufferSize);
-                    
+                    bufferSize = config.GetValue("WebSockets:BufferSize", DefaultBufferSize);
+
                     // Ensure buffer size doesn't exceed maximum
                     bufferSize = Math.Min(bufferSize, MaxBufferSize);
                 }
@@ -546,7 +583,7 @@ namespace TDFAPI.Services
             {
                 _logger.LogWarning(ex, "Failed to get WebSocket buffer size from configuration. Using default.");
             }
-            
+
             await _webSocketManager.AddConnectionAsync(connection, socket);
 
             // Update the user's device information in the database
@@ -554,40 +591,40 @@ namespace TDFAPI.Services
             {
                 var userRepo = _serviceProvider.GetRequiredService<IUserRepository>();
                 string deviceInfo = $"WebSocket Client";
-                
+
                 try
                 {
                     // Update the user's device information
                     await userRepo.UpdateCurrentDeviceAsync(
-                        connection.UserId, 
-                        deviceInfo, 
+                        connection.UserId,
+                        deviceInfo,
                         connection.MachineName ?? "Unknown"
                     );
-                    
-                    _logger.LogInformation("Updated device info for user {UserId}: {Device} on {Machine}", 
+
+                    _logger.LogInformation("Updated device info for user {UserId}: {Device} on {Machine}",
                         connection.UserId, deviceInfo, connection.MachineName);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to update device info for user {UserId}", connection.UserId);
                 }
-                
+
                 // Start heartbeat for this connection
                 _ = StartHeartbeatAsync(connection, socket);
             }
 
             var buffer = new byte[bufferSize];
             var cancellationTokenSource = new CancellationTokenSource();
-            
+
             // Start a background task to monitor connection timeout
             _ = MonitorConnectionTimeoutAsync(connection, socket, cancellationTokenSource, lastActivity);
-            
+
             try
             {
                 while (socket.State == WebSocketState.Open)
                 {
                     var result = await socket.ReceiveAsync(
-                        new ArraySegment<byte>(buffer), 
+                        new ArraySegment<byte>(buffer),
                         cancellationTokenSource.Token);
 
                     // Update last activity timestamp
@@ -610,14 +647,14 @@ namespace TDFAPI.Services
             catch (OperationCanceledException)
             {
                 // Connection timed out, close it
-                _logger.LogWarning("WebSocket connection {ConnectionId} for user {UserId} timed out", 
+                _logger.LogWarning("WebSocket connection {ConnectionId} for user {UserId} timed out",
                     connection.ConnectionId, connection.UserId);
                 await HandleDisconnectionAsync(connection.ConnectionId);
             }
             catch (WebSocketException wsEx)
             {
                 // WebSocket connection error
-                _logger.LogWarning(wsEx, "WebSocket error for user {UserId}: {Error}", 
+                _logger.LogWarning(wsEx, "WebSocket error for user {UserId}: {Error}",
                     connection.UserId, wsEx.Message);
                 await HandleDisconnectionAsync(connection.ConnectionId);
             }
@@ -643,7 +680,7 @@ namespace TDFAPI.Services
                 {
                     // Update database status
                     HandleUserConnectionAsync(connection.UserId, false),
-                    
+
                     // Notify others about disconnection
                     SendToAllAsync(new
                     {
@@ -653,14 +690,14 @@ namespace TDFAPI.Services
                         timestamp = DateTime.UtcNow
                     }, new[] { connectionId })
                 };
-                
+
                 // Execute all tasks first, before removing the connection
                 await Task.WhenAll(disconnectionTasks);
-                
+
                 // Finally remove the connection
                 await _webSocketManager.RemoveConnectionAsync(connectionId);
-                
-                _logger.LogInformation("WebSocket connection {ConnectionId} for user {UserId} disconnected successfully", 
+
+                _logger.LogInformation("WebSocket connection {ConnectionId} for user {UserId} disconnected successfully",
                     connectionId, connection.UserId);
             }
         }
@@ -675,10 +712,10 @@ namespace TDFAPI.Services
                     // Rate limit exceeded, message processing skipped
                     return;
                 }
-                
+
                 // Try parsing the message as a WebSocketMessage first (for delivery guarantees)
                 WebSocketMessage webSocketMessage = null;
-                try 
+                try
                 {
                     webSocketMessage = JsonSerializer.Deserialize<WebSocketMessage>(messageJson);
                 }
@@ -687,19 +724,19 @@ namespace TDFAPI.Services
                     _logger.LogDebug("Not a WebSocketMessage format: {Error}", ex.Message);
                     // Not a WebSocketMessage, continue with normal processing
                 }
-                
+
                 // Enhanced handling for message acknowledgments and receipts
                 if (webSocketMessage != null)
                 {
                     string msgType = webSocketMessage.Type?.ToLower();
-                    
+
                     // Handle message acknowledgments (delivery confirmation)
                     if (msgType == "ack" || msgType == "message_ack")
                     {
                         // This is an acknowledgment for a message
                         var acknowledgedMessageId = webSocketMessage.Content;
                         _messageStore.MarkAsDelivered(acknowledgedMessageId);
-                        
+
                         // Check if we have a JSON array or a single ID
                         if (acknowledgedMessageId.StartsWith("[") && acknowledgedMessageId.EndsWith("]"))
                         {
@@ -714,8 +751,8 @@ namespace TDFAPI.Services
                                     {
                                         await _messageRepository.MarkMessageAsDeliveredAsync(msgId, connection.UserId);
                                     }
-                                    
-                                    _logger.LogInformation("Updated status of {Count} messages to Delivered for user {UserId}", 
+
+                                    _logger.LogInformation("Updated status of {Count} messages to Delivered for user {UserId}",
                                         messageIds.Count, connection.UserId);
                                 }
                             }
@@ -728,14 +765,14 @@ namespace TDFAPI.Services
                         {
                             // Single message ID
                             await _messageRepository.MarkMessageAsDeliveredAsync(messageId, connection.UserId);
-                            _logger.LogDebug("Marked message {MessageId} as delivered from user {UserId}", 
+                            _logger.LogDebug("Marked message {MessageId} as delivered from user {UserId}",
                                 messageId, connection.UserId);
                         }
-                        
+
                         // No further processing needed for acknowledgments
                         return;
                     }
-                    
+
                     // Handle message receipts (read confirmations)
                     if (msgType == "receipt" || msgType == "message_receipt")
                     {
@@ -753,8 +790,8 @@ namespace TDFAPI.Services
                                     {
                                         await _messageRepository.MarkMessageAsReadAsync(msgId, connection.UserId);
                                     }
-                                    
-                                    _logger.LogInformation("Updated status of {Count} messages to Read for user {UserId}", 
+
+                                    _logger.LogInformation("Updated status of {Count} messages to Read for user {UserId}",
                                         messageIds.Count, connection.UserId);
                                 }
                             }
@@ -771,13 +808,13 @@ namespace TDFAPI.Services
                             {
                                 var statusStr = parts[0]; // delivered, read, etc.
                                 var messageIdStr = parts[1];
-                                
-                                if (Enum.TryParse<MessageStatus>(statusStr, true, out var status) && 
+
+                                if (Enum.TryParse<MessageStatus>(statusStr, true, out var status) &&
                                     int.TryParse(messageIdStr, out int parsedMessageId))
                                 {
-                                    _logger.LogDebug("Received receipt ({Status}) for message {MessageId} from user {UserId}", 
+                                    _logger.LogDebug("Received receipt ({Status}) for message {MessageId} from user {UserId}",
                                         status, parsedMessageId, connection.UserId);
-                                    
+
                                     // Update message status in the database
                                     switch (status)
                                     {
@@ -795,15 +832,15 @@ namespace TDFAPI.Services
                         else if (int.TryParse(webSocketMessage.Content, out int messageId))
                         {
                             await _messageRepository.MarkMessageAsReadAsync(messageId, connection.UserId);
-                            _logger.LogDebug("Marked message {MessageId} as read from user {UserId}", 
+                            _logger.LogDebug("Marked message {MessageId} as read from user {UserId}",
                                 messageId, connection.UserId);
                         }
-                        
+
                         // No further processing needed for receipts
                         return;
                     }
                 }
-                
+
                 // Continue with existing message processing...
                 var message = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(messageJson);
                 if (message == null)
@@ -811,25 +848,25 @@ namespace TDFAPI.Services
                     _logger.LogWarning("Received invalid JSON message from user {UserId}", connection.UserId);
                     return;
                 }
-                
+
                 if (!message.TryGetValue("type", out var typeElement) || typeElement.GetString() is not string messageType)
                 {
-                    await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new ErrorMessageDTO 
-                    { 
+                    await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new ErrorMessageDTO
+                    {
                         Message = "Invalid message format: 'type' field is required",
                     });
                     return;
                 }
-                
+
                 // Log incoming message type for auditing and debugging
-                _logger.LogDebug("WebSocket message of type '{MessageType}' received from user {UserId}", 
+                _logger.LogDebug("WebSocket message of type '{MessageType}' received from user {UserId}",
                     messageType, connection.UserId);
-                
+
                 switch (messageType.ToLower())
                 {
                     case "ping":
                         // Simple ping-pong for connection testing
-                        await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
+                        await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
                             type = "pong",
                             timestamp = DateTime.UtcNow
                         });
@@ -839,21 +876,21 @@ namespace TDFAPI.Services
                         if (message.TryGetValue("group", out var groupElement) && groupElement.GetString() is string group)
                         {
                             await _webSocketManager.AddToGroupAsync(connection.ConnectionId, group);
-                            
+
                             // Log join event
                             _logger.LogInformation("User {UserId} joined group {Group}", connection.UserId, group);
-                            
+
                             // Acknowledge the join
-                            await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
-                                type = "group_joined", 
+                            await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
+                                type = "group_joined",
                                 group = group,
                                 timestamp = DateTime.UtcNow
                             });
                         }
                         else
                         {
-                            await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
-                                type = "error", 
+                            await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
+                                type = "error",
                                 message = "Missing 'group' field in join_group request",
                                 timestamp = DateTime.UtcNow
                             });
@@ -864,27 +901,27 @@ namespace TDFAPI.Services
                         if (message.TryGetValue("group", out var leaveGroupElement) && leaveGroupElement.GetString() is string leaveGroup)
                         {
                             await _webSocketManager.RemoveFromGroupAsync(connection.ConnectionId, leaveGroup);
-                            
+
                             // Log leave event
                             _logger.LogInformation("User {UserId} left group {Group}", connection.UserId, leaveGroup);
-                            
+
                             // Acknowledge the leave
-                            await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
-                                type = "group_left", 
+                            await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
+                                type = "group_left",
                                 group = leaveGroup,
                                 timestamp = DateTime.UtcNow
                             });
                         }
                         else
                         {
-                            await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
-                                type = "error", 
+                            await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
+                                type = "error",
                                 message = "Missing 'group' field in leave_group request",
                                 timestamp = DateTime.UtcNow
                             });
                         }
                         break;
-                    
+
                     case "update_presence":
                         // Update presence status
                         var presenceStatus = UserPresenceStatus.Online;
@@ -911,42 +948,42 @@ namespace TDFAPI.Services
                         }
 
                         // Update user status
-                        await _eventMediator.PublishAsync(new Messaging.UserStatusChangedEvent(connection.UserId, presenceStatus, statusMessage));
+                        await _eventMediator.PublishAsync(new UserStatusChangedEvent(connection.UserId, presenceStatus, statusMessage));
                         break;
-                        
+
                     case "set_chat_availability":
-                        if (message.TryGetValue("isAvailable", out var availableElement) && 
-                            (availableElement.ValueKind == JsonValueKind.True || 
+                        if (message.TryGetValue("isAvailable", out var availableElement) &&
+                            (availableElement.ValueKind == JsonValueKind.True ||
                              availableElement.ValueKind == JsonValueKind.False))
                         {
                             bool isAvailable = availableElement.GetBoolean();
-                            await _eventMediator.PublishAsync(new Messaging.UserAvailabilityChangedEvent(connection.UserId, isAvailable));
-                            
-                            await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
-                                type = "chat_availability_updated", 
+                            await _eventMediator.PublishAsync(new UserAvailabilityChangedEvent(connection.UserId, isAvailable));
+
+                            await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
+                                type = "chat_availability_updated",
                                 isAvailable = isAvailable,
                                 timestamp = DateTime.UtcNow
                             });
                         }
                         break;
-                        
+
                     case "activity_ping":
-                        await _eventMediator.PublishAsync(new Messaging.UserActivityPingEvent(connection.UserId));
+                        await _eventMediator.PublishAsync(new UserActivityPingEvent(connection.UserId));
                         break;
-                    
+
                     case "update_status":
                         await HandleUpdateStatusAsync(connection, message);
                         break;
                     case "set_availability":
                         await HandleSetAvailabilityAsync(connection, message);
                         break;
-                    
+
                     // Handle unknown message types
                     default:
-                        _logger.LogWarning("Received unknown message type '{MessageType}' from user {UserId}", 
+                        _logger.LogWarning("Received unknown message type '{MessageType}' from user {UserId}",
                             messageType, connection.UserId);
-                        await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
-                            type = "error", 
+                        await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
+                            type = "error",
                             message = $"Unknown message type: {messageType}",
                             timestamp = DateTime.UtcNow
                         });
@@ -955,18 +992,18 @@ namespace TDFAPI.Services
             }
             catch (JsonException jsonEx)
             {
-                _logger.LogWarning(jsonEx, "Error parsing WebSocket message from user {UserId}: {Message}", 
+                _logger.LogWarning(jsonEx, "Error parsing WebSocket message from user {UserId}: {Message}",
                     connection.UserId, jsonEx.Message);
-                
-                await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
-                    type = "error", 
-                    message = "Invalid JSON format", 
+
+                await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
+                    type = "error",
+                    message = "Invalid JSON format",
                     timestamp = DateTime.UtcNow
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error handling WebSocket message from user {UserId}: {Message}", 
+                _logger.LogError(ex, "Error handling WebSocket message from user {UserId}: {Message}",
                     connection.UserId, ex.Message);
             }
         }
@@ -980,12 +1017,12 @@ namespace TDFAPI.Services
 
                 if (message.TryGetValue("status", out var statusElement) && statusElement.ValueKind == JsonValueKind.String)
                 {
-                    if (!Enum.TryParse<UserPresenceStatus>(statusElement.GetString(), true, out presenceStatus))
+                    if (!Enum.TryParse(statusElement.GetString(), true, out presenceStatus))
                     {
                         _logger.LogWarning("Invalid presence status received from user {UserId}: {Status}", connection.UserId, statusElement.GetString());
                         // Optionally send an error back to the client
-                        await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
-                            type = "error", 
+                        await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
+                            type = "error",
                             message = $"Invalid status value: {statusElement.GetString()}",
                             timestamp = DateTime.UtcNow
                         });
@@ -1006,7 +1043,7 @@ namespace TDFAPI.Services
                 }
 
                 // Call the presence service to update the status
-                await _eventMediator.PublishAsync(new Messaging.UserStatusChangedEvent(connection.UserId, presenceStatus, statusMessage));
+                await _eventMediator.PublishAsync(new UserStatusChangedEvent(connection.UserId, presenceStatus, statusMessage));
                 _logger.LogDebug("Handled update_status for user {UserId} to {Status} ({StatusMessage})", connection.UserId, presenceStatus, statusMessage ?? "null");
 
                 // Optionally send confirmation back
@@ -1034,8 +1071,8 @@ namespace TDFAPI.Services
                 else
                 {
                     _logger.LogWarning("Missing or invalid 'isAvailable' field in set_availability message from user {UserId}", connection.UserId);
-                    await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
-                        type = "error", 
+                    await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
+                        type = "error",
                         message = "Missing or invalid 'isAvailable' boolean field.",
                         timestamp = DateTime.UtcNow
                     });
@@ -1043,13 +1080,13 @@ namespace TDFAPI.Services
                 }
 
                 // Call the presence service
-                await _eventMediator.PublishAsync(new Messaging.UserAvailabilityChangedEvent(connection.UserId, isAvailable));
+                await _eventMediator.PublishAsync(new UserAvailabilityChangedEvent(connection.UserId, isAvailable));
                  _logger.LogDebug("Handled set_availability for user {UserId} to {IsAvailable}", connection.UserId, isAvailable);
 
 
                 // Send confirmation back to the user
-                await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new { 
-                    type = "availability_set", 
+                await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new {
+                    type = "availability_set",
                     isAvailable = isAvailable,
                     timestamp = DateTime.UtcNow
                 });
@@ -1063,7 +1100,7 @@ namespace TDFAPI.Services
         }
 
         // Monitor connection for timeout
-        private async Task MonitorConnectionTimeoutAsync(WebSocketConnectionEntity connection, WebSocket socket, 
+        private async Task MonitorConnectionTimeoutAsync(WebSocketConnectionEntity connection, WebSocket socket,
                                         CancellationTokenSource cancellationTokenSource, DateTime lastActivity)
         {
             try
@@ -1074,14 +1111,14 @@ namespace TDFAPI.Services
                     var inactiveTime = DateTime.UtcNow - lastActivity;
                     if (inactiveTime.TotalSeconds > ConnectionTimeoutSeconds)
                     {
-                        _logger.LogWarning("WebSocket connection {ConnectionId} for user {UserId} inactive for {Seconds}s, timing out", 
+                        _logger.LogWarning("WebSocket connection {ConnectionId} for user {UserId} inactive for {Seconds}s, timing out",
                             connection.ConnectionId, connection.UserId, inactiveTime.TotalSeconds);
-                        
+
                         // Cancel any pending receive operations
                         cancellationTokenSource.Cancel();
                         return;
                     }
-                    
+
                     // Sleep and check again
                     await Task.Delay(TimeSpan.FromSeconds(HeartbeatIntervalSeconds / 2));
                 }
@@ -1091,7 +1128,7 @@ namespace TDFAPI.Services
                 _logger.LogError(ex, "Error monitoring connection timeout for user {UserId}", connection.UserId);
             }
         }
-        
+
         // Send periodic heartbeats to keep the connection alive
         private async Task StartHeartbeatAsync(WebSocketConnectionEntity connection, WebSocket socket)
         {
@@ -1101,14 +1138,14 @@ namespace TDFAPI.Services
                 while (socket.State == WebSocketState.Open)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(HeartbeatIntervalSeconds));
-                    
+
                     // Skip heartbeat if connection is already closed
                     if (socket.State != WebSocketState.Open) break;
-                    
+
                     try
                     {
                         await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new HeartbeatDTO());
-                        
+
                         _logger.LogTrace("Sent heartbeat to user {UserId}", connection.UserId);
                     }
                     catch (Exception ex)
@@ -1140,7 +1177,7 @@ namespace TDFAPI.Services
                     _logger.LogWarning("Empty message from {SenderId} to {ReceiverId}", senderId, receiverId);
                     return false;
                 }
-                
+
                 // Validate message size to prevent abuse
                 const int maxMessageLength = 4000; // 4KB limit
                 if (message.Length > maxMessageLength)
@@ -1148,10 +1185,10 @@ namespace TDFAPI.Services
                     _logger.LogWarning("Message too large ({Length} chars) from {SenderId}", message.Length, senderId);
                     return false;
                 }
-                
+
                 // Sanitize message content to prevent XSS attacks
                 message = SanitizeMessage(message);
-                
+
                 // Validate that receiver exists
                 var receiver = await _userRepository.GetByIdAsync(receiverId);
                 if (receiver == null)
@@ -1159,10 +1196,10 @@ namespace TDFAPI.Services
                     _logger.LogWarning("Cannot send chat message: Receiver with ID {ReceiverId} not found", receiverId);
                     return false;
                 }
-                
+
                 // Try to send message in real-time if receiver is online
                 var isReceiverOnline = await _messageRepository.IsUserOnlineAsync(receiverId);
-                
+
                 // Get sender info for notification display
                 var sender = await _userRepository.GetByIdAsync(senderId);
                 if (sender == null)
@@ -1170,7 +1207,7 @@ namespace TDFAPI.Services
                     _logger.LogWarning("Cannot send chat message: Sender with ID {SenderId} not found", senderId);
                     return false;
                 }
-                
+
                 // Create the chat message data
                 var messageEntity = MessageEntity.CreateChatMessage(
                     senderId,
@@ -1179,9 +1216,9 @@ namespace TDFAPI.Services
                     isReceiverOnline,
                     null
                 );
-                
+
                 int messageId = 0;
-                
+
                 // Use a transaction scope to ensure both operations succeed or fail together
                 using (var scope = new System.Transactions.TransactionScope(
                     System.Transactions.TransactionScopeAsyncFlowOption.Enabled))
@@ -1191,40 +1228,40 @@ namespace TDFAPI.Services
                         // Store the message in the database
                         messageId = await _messageRepository.CreateAsync(messageEntity);
                         messageEntity.MessageID = messageId;
-                        
+
                         // Create notification if user is offline
                         if (!isReceiverOnline && queueIfOffline)
                         {
                             // Create a notification for offline user
                             var notification = new NotificationEntity
-                            { 
-                                SenderID = senderId, 
-                                ReceiverID = receiverId, 
+                            {
+                                SenderID = senderId,
+                                ReceiverID = receiverId,
                                 Message = message,
                                 Timestamp = DateTime.UtcNow,
                                 IsSeen = false,
                                 MessageID = messageId
                             };
-                            
+
                             // Store in notification repository
                             await _notificationRepository.CreateNotificationAsync(notification);
-                            
-                            _logger.LogInformation("Queued chat message for offline user {ReceiverId} from {SenderId}", 
+
+                            _logger.LogInformation("Queued chat message for offline user {ReceiverId} from {SenderId}",
                                 receiverId, senderId);
                         }
-                        
+
                         // Complete the transaction
                         scope.Complete();
                     }
                     catch (Exception ex)
                     {
                         // Transaction will automatically be aborted
-                        _logger.LogError(ex, "Database transaction failed for chat message from {SenderId} to {ReceiverId}", 
+                        _logger.LogError(ex, "Database transaction failed for chat message from {SenderId} to {ReceiverId}",
                             senderId, receiverId);
                         return false;
                     }
                 }
-                
+
                 // If user is online, send real-time notification after transaction is completed
                 if (isReceiverOnline && messageId > 0)
                 {
@@ -1236,15 +1273,15 @@ namespace TDFAPI.Services
                         MessageText = message,
                         SentAt = DateTime.UtcNow
                     };
-                    
+
                     await SendToUserAsync(receiverId, chatMessageDto);
                 }
-                
+
                 return messageId > 0;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending chat message from user {SenderId} to {ReceiverId}", 
+                _logger.LogError(ex, "Error sending chat message from user {SenderId} to {ReceiverId}",
                     senderId, receiverId);
                 return false;
             }
@@ -1254,24 +1291,24 @@ namespace TDFAPI.Services
         private string SanitizeMessage(string message)
         {
             if (string.IsNullOrEmpty(message)) return message;
-            
+
             // Basic HTML encoding to prevent script injection
             message = System.Web.HttpUtility.HtmlEncode(message);
-            
+
             // Additional custom sanitization if needed
             // e.g., limiting special characters, removing suspicious patterns
-            
+
             return message;
         }
-        
+
         // Add rate limiting for WebSocket messages
         private async Task<bool> CheckRateLimitAsync(WebSocketConnectionEntity connection)
         {
             var userId = connection.UserId;
             var now = DateTime.UtcNow;
-            
+
             const int rateLimitWindowSeconds = 60;  // Rate limit window in seconds
-            
+
             if (_messageRateLimits.TryGetValue(userId, out var rateInfo))
             {
                 // Check if the window has reset
@@ -1281,37 +1318,37 @@ namespace TDFAPI.Services
                     _messageRateLimits[userId] = (now, 1);
                     return true;
                 }
-                
+
                 // Check if the user has exceeded the rate limit
                 if (rateInfo.MessageCount >= MaxMessagesPerMinute)
                 {
                     // Rate limit exceeded
-                    _logger.LogWarning("Rate limit exceeded for user {UserId}: {Count} messages in {Seconds}s", 
+                    _logger.LogWarning("Rate limit exceeded for user {UserId}: {Count} messages in {Seconds}s",
                         userId, rateInfo.MessageCount, rateLimitWindowSeconds);
-                    
+
                     // Notify user about rate limiting with backoff suggestion
                     await _webSocketManager.SendToConnectionAsync(connection.ConnectionId, new ErrorMessageDTO
                     {
                         Message = $"Message rate limit exceeded. Please wait {Math.Max(5, rateInfo.MessageCount / 10)} seconds before sending more messages.",
                         Code = "RATE_LIMIT_EXCEEDED"
                     });
-                    
+
                     // Add progressive backoff for repeated offenders
                     if (rateInfo.MessageCount > MaxMessagesPerMinute * 2)
                     {
                         // Consider temporary blocking for extreme cases
-                        _logger.LogWarning("User {UserId} has sent {Count} messages, considering temporary block", 
+                        _logger.LogWarning("User {UserId} has sent {Count} messages, considering temporary block",
                             userId, rateInfo.MessageCount);
                     }
-                    
+
                     return false;
                 }
-                
+
                 // Increment counter
                 _messageRateLimits[userId] = (rateInfo.LastMessage, rateInfo.MessageCount + 1);
                 return true;
             }
-            
+
             // First message from this user
             _messageRateLimits[userId] = (now, 1);
             return true;
@@ -1323,7 +1360,7 @@ namespace TDFAPI.Services
             {
                 var result = new Dictionary<int, PendingMessageInfo>();
                 var pendingMessages = await _messageRepository.GetPendingMessagesAsync(receiverId);
-                
+
                 // Group messages by sender
                 var groupedMessages = pendingMessages
                     .GroupBy(m => m.SenderID)
@@ -1335,7 +1372,7 @@ namespace TDFAPI.Services
                             Messages = g.Select(m => m.MessageText).ToList(),
                             MessageIds = g.Select(m => m.MessageID).ToList()
                         });
-                
+
                 return groupedMessages;
             }
             catch (Exception ex)
@@ -1351,62 +1388,62 @@ namespace TDFAPI.Services
             {
                 if (senderId <= 0 || receiverId <= 0)
                 {
-                    _logger.LogWarning("Invalid parameters: senderId={SenderId}, receiverId={ReceiverId}", 
+                    _logger.LogWarning("Invalid parameters: senderId={SenderId}, receiverId={ReceiverId}",
                         senderId, receiverId);
                     return false;
                 }
-                
+
                 // Get unread messages between these users
                 var conversation = await _messageRepository.GetConversationAsync(senderId, receiverId);
                 var unreadMessageIds = conversation
                     .Where(m => m.SenderID == senderId && m.ReceiverID == receiverId && !m.IsRead)
                     .Select(m => m.MessageID)
                     .ToList();
-                
+
                 if (!unreadMessageIds.Any())
                 {
                     // No unread messages, nothing to do
                     _logger.LogDebug("No unread messages from {SenderId} to {ReceiverId}", senderId, receiverId);
                     return true;
                 }
-                
+
                 // Use bulk update instead of individual updates (if supported by the repository)
                 bool success = await _messageRepository.MarkMessagesAsReadBulkAsync(unreadMessageIds, receiverId);
                 if (!success)
                 {
                     // Fall back to individual updates
-                    _logger.LogDebug("Bulk update failed, falling back to individual updates for {Count} messages", 
+                    _logger.LogDebug("Bulk update failed, falling back to individual updates for {Count} messages",
                         unreadMessageIds.Count);
-                    
+
                     // Split into smaller batches for better performance
                     const int batchSize = 25;
                     var allSuccess = true;
-                    
+
                     for (int i = 0; i < unreadMessageIds.Count; i += batchSize)
                     {
                         var batch = unreadMessageIds.Skip(i).Take(batchSize).ToList();
                         var tasks = batch.Select(id => _messageRepository.MarkMessageAsReadAsync(id, receiverId));
                         var results = await Task.WhenAll(tasks);
-                        
+
                         if (results.Any(r => !r))
                         {
                             allSuccess = false;
                             _logger.LogWarning("Failed to mark some messages as read in batch {BatchIndex}", i / batchSize);
                         }
                     }
-                    
+
                     if (!allSuccess)
                     {
                         _logger.LogWarning("Not all messages were successfully marked as read");
                         return false;
                     }
                 }
-                
+
                 // Notify sender that messages have been read
                 try
                 {
-                    await SendToUserAsync(senderId, new 
-                    { 
+                    await SendToUserAsync(senderId, new
+                    {
                         type = "messages_read",
                         receiverId = receiverId,
                         messageIds = unreadMessageIds,
@@ -1418,12 +1455,12 @@ namespace TDFAPI.Services
                     // Log but don't fail the operation
                     _logger.LogWarning(ex, "Failed to notify sender {SenderId} about read messages", senderId);
                 }
-                
+
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error marking messages as read from {SenderId} to {ReceiverId}", 
+                _logger.LogError(ex, "Error marking messages as read from {SenderId} to {ReceiverId}",
                     senderId, receiverId);
                 return false;
             }
@@ -1435,62 +1472,62 @@ namespace TDFAPI.Services
             {
                 if (senderId <= 0 || receiverId <= 0)
                 {
-                    _logger.LogWarning("Invalid parameters: senderId={SenderId}, receiverId={ReceiverId}", 
+                    _logger.LogWarning("Invalid parameters: senderId={SenderId}, receiverId={ReceiverId}",
                         senderId, receiverId);
                     return false;
                 }
-                
+
                 // Get undelivered messages between these users
                 var conversation = await _messageRepository.GetConversationAsync(senderId, receiverId);
                 var undeliveredMessageIds = conversation
                     .Where(m => m.SenderID == senderId && m.ReceiverID == receiverId && !m.IsDelivered)
                     .Select(m => m.MessageID)
                     .ToList();
-                
+
                 if (!undeliveredMessageIds.Any())
                 {
                     // No undelivered messages, nothing to do
                     _logger.LogDebug("No undelivered messages from {SenderId} to {ReceiverId}", senderId, receiverId);
                     return true;
                 }
-                
+
                 // Try to use bulk operation first for better performance
                 bool success = await _messageRepository.MarkMessagesAsDeliveredBulkAsync(undeliveredMessageIds, receiverId);
                 if (!success)
                 {
                     // Fall back to individual updates
-                    _logger.LogDebug("Bulk update failed, falling back to individual updates for {Count} messages", 
+                    _logger.LogDebug("Bulk update failed, falling back to individual updates for {Count} messages",
                         undeliveredMessageIds.Count);
-                    
+
                     // Process in batches for better performance
                     const int batchSize = 25;
                     var allSuccess = true;
-                    
+
                     for (int i = 0; i < undeliveredMessageIds.Count; i += batchSize)
                     {
                         var batch = undeliveredMessageIds.Skip(i).Take(batchSize).ToList();
                         var tasks = batch.Select(id => _messageRepository.MarkMessageAsDeliveredAsync(id, receiverId));
                         var results = await Task.WhenAll(tasks);
-                        
+
                         if (results.Any(r => !r))
                         {
                             allSuccess = false;
                             _logger.LogWarning("Failed to mark some messages as delivered in batch {BatchIndex}", i / batchSize);
                         }
                     }
-                    
+
                     if (!allSuccess)
                     {
                         _logger.LogWarning("Not all messages were successfully marked as delivered");
                         return false;
                     }
                 }
-                
+
                 // Notify sender that messages have been delivered
                 try
                 {
-                    await SendToUserAsync(senderId, new 
-                    { 
+                    await SendToUserAsync(senderId, new
+                    {
                         type = "messages_delivered",
                         receiverId = receiverId,
                         messageIds = undeliveredMessageIds,
@@ -1502,12 +1539,12 @@ namespace TDFAPI.Services
                     // Log but don't fail the operation
                     _logger.LogWarning(ex, "Failed to notify sender {SenderId} about delivered messages", senderId);
                 }
-                
+
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error marking messages as delivered from {SenderId} to {ReceiverId}", 
+                _logger.LogError(ex, "Error marking messages as delivered from {SenderId} to {ReceiverId}",
                     senderId, receiverId);
                 return false;
             }

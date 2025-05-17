@@ -41,8 +41,8 @@ namespace TDFAPI.Services
             _httpContextAccessor = httpContextAccessor;
             
             // Load lockout settings from configuration
-            _maxFailedAttempts = _configuration.GetValue<int>("Security:MaxFailedLoginAttempts", 5);
-            var lockoutMinutes = _configuration.GetValue<int>("Security:LockoutDurationMinutes", 15);
+            _maxFailedAttempts = _configuration.GetValue("Security:MaxFailedLoginAttempts", 5);
+            var lockoutMinutes = _configuration.GetValue("Security:LockoutDurationMinutes", 15);
             _lockoutDuration = TimeSpan.FromMinutes(lockoutMinutes);
         }
         

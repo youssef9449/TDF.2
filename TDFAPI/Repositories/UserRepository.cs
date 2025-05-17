@@ -7,7 +7,7 @@ using System.Linq;
 using TDFShared.Enums;
 using Microsoft.EntityFrameworkCore;
 using TDFAPI.Data;
-using TDFAPI.Models;
+using TDFShared.Models.User;
 using TDFShared.Models.Request;
 using TDFAPI.Services;
 
@@ -48,7 +48,7 @@ namespace TDFAPI.Repositories
                 var user = await _context.Users
                                        .Include(u => u.AnnualLeave)
                                        .AsNoTracking()
-                                       .FirstOrDefaultAsync(u => u.Username == username);
+                                       .FirstOrDefaultAsync(u => u.UserName == username);
                 return user != null ? MapUserDtoFromEntity(user) : null;
             }
             catch (Exception ex)
@@ -65,7 +65,7 @@ namespace TDFAPI.Repositories
                 var users = await _context.Users
                                         .Include(u => u.AnnualLeave)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.Username)
+                                        .OrderBy(u => u.UserName)
                                         .ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
@@ -84,7 +84,7 @@ namespace TDFAPI.Repositories
                 var users = await _context.Users
                                         .Include(u => u.AnnualLeave)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.Username)
+                                        .OrderBy(u => u.UserName)
                                         .Skip((page - 1) * pageSize)
                                         .Take(pageSize)
                                         .ToListAsync();
@@ -102,7 +102,7 @@ namespace TDFAPI.Repositories
         {
             var newUser = new User
             {
-                Username = userDto.Username,
+                UserName = userDto.Username,
                 FullName = userDto.FullName,
                 Department = userDto.Department,
                 Title = userDto.Title,
@@ -111,7 +111,6 @@ namespace TDFAPI.Repositories
                 IsAdmin = userDto.IsAdmin,
                 IsManager = userDto.IsManager,
                 IsHR = false,
-                Role = "User", // Set default role
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true,
                 isConnected = false,
@@ -481,7 +480,7 @@ namespace TDFAPI.Repositories
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.Department == department)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.Username)
+                                        .OrderBy(u => u.UserName)
                                         .ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
@@ -520,7 +519,7 @@ namespace TDFAPI.Repositories
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.isConnected == true)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.Username)
+                                        .OrderBy(u => u.UserName)
                                         .ToListAsync();
 
                 return users.Select(MapUserDtoFromEntity).ToList();
@@ -540,7 +539,7 @@ namespace TDFAPI.Repositories
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.Department == department && (u.IsAdmin == true || u.IsManager == true || u.IsHR == true))
                                         .AsNoTracking()
-                                        .OrderBy(u => u.Username)
+                                        .OrderBy(u => u.UserName)
                                         .ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
@@ -566,7 +565,7 @@ namespace TDFAPI.Repositories
                 else
                     query = query.Where(u => u.IsAdmin != true && u.IsManager != true && u.IsHR != true);
 
-                var users = await query.OrderBy(u => u.Username).ToListAsync();
+                var users = await query.OrderBy(u => u.UserName).ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
             catch (Exception ex)
@@ -652,7 +651,7 @@ namespace TDFAPI.Repositories
             var dto = new UserDto
             {
                 UserID = user.UserID,
-                Username = user.Username,
+                Username = user.UserName,
                 FullName = user.FullName ?? string.Empty,
                 Department = user.Department,
                 Title = user.Title ?? string.Empty,

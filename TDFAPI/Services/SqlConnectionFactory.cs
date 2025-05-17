@@ -10,7 +10,7 @@ namespace TDFAPI.Services
     public class SqlConnectionFactory
     {
         private readonly string _connectionString;
-        private readonly Polly.Retry.AsyncRetryPolicy _retryPolicy;
+        private readonly AsyncRetryPolicy _retryPolicy;
         private static int _totalConnections = 0;
         private static int _activeConnections = 0;
         private static readonly object _connectionLock = new object();

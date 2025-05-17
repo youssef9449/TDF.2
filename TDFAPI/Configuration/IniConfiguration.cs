@@ -369,7 +369,7 @@ namespace TDFAPI.Configuration
         public static T GetRedisSetting<T>(string key, T defaultValue)
         {
             EnsureInitialized();
-            return GetConfigurationValue<T>("Redis", key, defaultValue);
+            return GetConfigurationValue("Redis", key, defaultValue);
         }
         
         private static T GetConfigurationValue<T>(string section, string key, T defaultValue)

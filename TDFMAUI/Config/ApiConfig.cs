@@ -384,7 +384,15 @@ namespace TDFMAUI.Config
                     // Add headers to help with debugging
                     client.DefaultRequestHeaders.Add("User-Agent", $"TDFMAUI-Android-DiagnosticTest/{AppInfo.VersionString}");
                     client.DefaultRequestHeaders.Add("X-Diagnostic-Mode", "true");
-                    client.DefaultRequestHeaders.Add("X-Device-Platform", DeviceInfo.Platform.ToString());
+
+                    // Use DeviceHelper to determine platform
+                    string platform = "Unknown";
+                    if (DeviceHelper.IsWindows) platform = "Windows";
+                    else if (DeviceHelper.IsMacOS) platform = "MacOS";
+                    else if (DeviceHelper.IsIOS) platform = "iOS";
+                    else if (DeviceHelper.IsAndroid) platform = "Android";
+
+                    client.DefaultRequestHeaders.Add("X-Device-Platform", platform);
                     client.DefaultRequestHeaders.Add("X-Device-Model", DeviceInfo.Model);
 
                     // Log the request details

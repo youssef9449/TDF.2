@@ -128,7 +128,7 @@ namespace TDFMAUI
         private void ConfigureDeviceSpecificBehavior()
         {
             // Apply platform-specific styling or behavior here
-            if (DeviceInfo.Platform == DevicePlatform.iOS || DeviceInfo.Platform == DevicePlatform.Android)
+            if (DeviceHelper.IsMobile)
             {
                 // Mobile-specific adjustments (already handled by swipe gesture in AppShell)
             }

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using TDFMAUI.Features.Requests;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Devices;
+using TDFMAUI.Helpers;
 
 namespace TDFMAUI
 {
@@ -28,7 +29,7 @@ namespace TDFMAUI
         public bool IsManager => App.CurrentUser?.Roles?.Contains("Manager", StringComparer.OrdinalIgnoreCase) ?? false;
 
         public bool IsDevelopmentMode => ApiConfig.DevelopmentMode;
-        public bool IsDesktopUser => DeviceInfo.Current.Platform == DevicePlatform.WinUI || DeviceInfo.Current.Platform == DevicePlatform.macOS;
+        public bool IsDesktopUser => DeviceHelper.IsDesktop;
 
         public AppShell(IAuthService authService, ILogger<AppShell> logger, IUserPresenceService userPresenceService)
         {

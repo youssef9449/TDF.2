@@ -1,14 +1,11 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TDFMAUI.Services;
 using TDFMAUI.ViewModels;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Messages;
-using TDFShared.Models.Notification;
 using Microsoft.Extensions.Logging;
 
 namespace TDFMAUI.Features.Dashboard

@@ -1210,7 +1210,7 @@ namespace TDFMAUI.Services
         }
 
         // IDisposable Implementation
-        private bool _disposed = false;
+        // Note: _disposed field is already declared at the class level
 
         public void Dispose()
         {

@@ -64,6 +64,14 @@ namespace TDFMAUI.ViewModels
         public async Task InitializeAsync()
         {
             await LoadUserRolesAsync();
+
+            // Get and store the current user ID to avoid repeated async calls
+            _currentUserId = await _authService.GetCurrentUserIdAsync();
+            _logger.LogInformation("Current user ID loaded: {UserId}", _currentUserId);
+
+            // Notify commands that their CanExecute status might have changed
+            NotifyCommandsCanExecuteChanged();
+
             await LoadRequestsAsync(); // Load requests after roles are known
         }
 
@@ -110,8 +118,8 @@ namespace TDFMAUI.ViewModels
             Requests.Clear(); // Clear immediately for responsiveness
             try
             {
-                int userId = await _authService.GetCurrentUserIdAsync();
-                if (userId == 0 && !(IsAdmin || IsHR || IsManager)) 
+                // Use the stored current user ID instead of making another async call
+                if (_currentUserId == 0 && !(IsAdmin || IsHR || IsManager))
                 {
                     _logger.LogWarning("Cannot load requests: User not authenticated.");
                     await Shell.Current.DisplayAlert("Auth Error", "Could not verify user.", "OK");
@@ -119,13 +127,13 @@ namespace TDFMAUI.ViewModels
                     return;
                 }
 
-                var pagination = new RequestPaginationDto 
-                { 
-                    Page = 1, 
-                    PageSize = 50, 
+                var pagination = new RequestPaginationDto
+                {
+                    Page = 1,
+                    PageSize = 50,
                     FilterStatus = ShowPendingOnly ? "Pending" : "Closed"
                 };
-                
+
                 PaginatedResult<RequestResponseDto>? result = null;
 
                 if (IsAdmin || IsHR)
@@ -134,7 +142,7 @@ namespace TDFMAUI.ViewModels
                     result = await _requestService.GetAllRequestsAsync(pagination);
                 }
                 else if (IsManager)
-                {                    
+                {
                     string? department = await _authService.GetCurrentUserDepartmentAsync();
                     if (!string.IsNullOrEmpty(department))
                     {
@@ -151,8 +159,8 @@ namespace TDFMAUI.ViewModels
                     }
                 }
                 else // Regular user
-                {                    
-                    _logger.LogInformation("Loading requests for user {UserId} with filter: {Filter}", userId, pagination.FilterStatus);
+                {
+                    _logger.LogInformation("Loading requests for user {UserId} with filter: {Filter}", _currentUserId, pagination.FilterStatus);
                     result = await _requestService.GetMyRequestsAsync(pagination);
                 }
 
@@ -202,7 +210,7 @@ namespace TDFMAUI.ViewModels
             _logger.LogInformation("Navigating to details for request {RequestId}", request.Id);
             // Navigate to the Details Page, passing the Request Guid ID
             await Shell.Current.GoToAsync($"{nameof(RequestDetailsPage)}", new Dictionary<string, object>
-            {                 {"RequestId", request.Id} 
+            {                 {"RequestId", request.Id}
             });
         }
 
@@ -211,37 +219,46 @@ namespace TDFMAUI.ViewModels
         private async Task RefreshRequestsAsync()
         {
             // Optional: Reload roles if they might change dynamically during app session
-            // await LoadUserRolesAsync(); 
+            // await LoadUserRolesAsync();
+
+            // Refresh the current user ID
+            _currentUserId = await _authService.GetCurrentUserIdAsync();
+            _logger.LogInformation("Current user ID refreshed: {UserId}", _currentUserId);
+
+            // Notify commands that their CanExecute status might have changed
+            NotifyCommandsCanExecuteChanged();
+
             await LoadRequestsAsync();
         }
 
         // --- Action Commands Implementation ---
 
+        // Store the current user ID to avoid repeated async calls
+        private int _currentUserId;
+
         // Helper to check if current user can edit/delete a specific request
         private bool CanEditDeleteRequest(RequestResponseDto? request)
         {
             if (request == null) return false;
-            int currentUserId = _authService.GetCurrentUserIdAsync().Result; // Blocking call, consider making async
             // Admin can always edit/delete. User can edit/delete their own if pending.
-            return IsAdmin || (request.RequestUserID == currentUserId && request.Status == "Pending");
+            return IsAdmin || (request.RequestUserID == _currentUserId && request.Status == "Pending");
         }
 
         // Helper to check if current user can approve/reject a specific request
         private bool CanApproveRejectRequest(RequestResponseDto? request)
         {
             if (request == null) return false;
-             int currentUserId = _authService.GetCurrentUserIdAsync().Result; // Blocking call, consider making async
             // Admin/Manager/HR can approve/reject requests *not* their own.
             // TODO: Add logic for Manager only approving their department? Requires department info on request DTO.
             // TODO: Add logic for HR only approving after manager? Requires checking both statuses.
-            return CanManageRequests && request.RequestUserID != currentUserId && request.Status == "Pending"; // Simplified check for now
+            return CanManageRequests && request.RequestUserID != _currentUserId && request.Status == "Pending"; // Simplified check for now
         }
 
-        [RelayCommand(CanExecute = nameof(CanApproveRejectRequest))] 
+        [RelayCommand(CanExecute = nameof(CanApproveRejectRequest))]
         private async Task ApproveRequestAsync(RequestResponseDto? request)
         {
             if (request == null) return;
-            
+
             bool confirmed = await Shell.Current.DisplayAlert("Confirm Approval", $"Approve request from {request.UserName} for {request.LeaveType} starting {request.RequestStartDate:d}?", "Approve", "Cancel");
             if (!confirmed) return;
 
@@ -258,7 +275,7 @@ namespace TDFMAUI.ViewModels
                     request.Status = "Approved"; // Simplistic update
                     OnPropertyChanged(nameof(Requests)); // Notify collection might need refresh visually if status changes look
                     // Or reload the whole list:
-                    // await LoadRequestsAsync(); 
+                    // await LoadRequestsAsync();
                     await Shell.Current.DisplayAlert("Success", "Request approved.", "OK");
                 }
                 else
@@ -300,10 +317,10 @@ namespace TDFMAUI.ViewModels
                 if (success)
                 {
                     _logger.LogInformation("Successfully rejected request {RequestId}", request.Id);
-                    request.Status = "Rejected"; 
+                    request.Status = "Rejected";
                     request.Remarks = reason; // Update remarks locally?
                      OnPropertyChanged(nameof(Requests));
-                    // await LoadRequestsAsync(); 
+                    // await LoadRequestsAsync();
                     await Shell.Current.DisplayAlert("Success", "Request rejected.", "OK");
                 }
                 else
@@ -326,7 +343,7 @@ namespace TDFMAUI.ViewModels
              if (request == null) return;
              _logger.LogInformation("Navigating to edit request {RequestId}", request.Id);
              await Shell.Current.GoToAsync($"{nameof(AddRequestPage)}", new Dictionary<string, object>
-             {                  {"ExistingRequest", request} 
+             {                  {"ExistingRequest", request}
              });
         }
 
@@ -362,11 +379,22 @@ namespace TDFMAUI.ViewModels
             }
             finally { IsBusy = false; }
         }
-        
+
         partial void OnShowPendingOnlyChanged(bool value)
         {
             _logger.LogInformation("Filter changed: ShowPendingOnly = {Value}. Reloading requests.", value);
             _ = LoadRequestsAsync(); // Trigger background reload
         }
+
+        /// <summary>
+        /// Notifies all commands that their CanExecute status might have changed
+        /// </summary>
+        private void NotifyCommandsCanExecuteChanged()
+        {
+            ApproveRequestCommand.NotifyCanExecuteChanged();
+            RejectRequestCommand.NotifyCanExecuteChanged();
+            EditRequestCommand.NotifyCanExecuteChanged();
+            DeleteRequestCommand.NotifyCanExecuteChanged();
+        }
     }
-} 
+}

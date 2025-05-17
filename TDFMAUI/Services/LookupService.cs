@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System;
 using Microsoft.Maui.ApplicationModel;
+using TDFShared.Constants;
 using TDFShared.DTOs.Common;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +15,7 @@ namespace TDFMAUI.Services
         private List<LookupItem> _departments;
         private bool _isDataLoaded = false;
         private bool _disposed = false;
-        
+
         public LookupService(ApiService apiService, ILogger<LookupService> logger)
         {
             _logger?.LogInformation("LookupService constructor started.");
@@ -23,7 +24,7 @@ namespace TDFMAUI.Services
             _departments = new List<LookupItem>();
             _logger?.LogInformation("LookupService constructor finished.");
         }
-        
+
         public async Task<List<LookupItem>> GetDepartmentsAsync()
         {
             try
@@ -32,14 +33,14 @@ namespace TDFMAUI.Services
                 {
                     await LoadDataAsync();
                 }
-                
+
                 string debugInfo = $"Returning {_departments?.Count ?? 0} departments";
                 if (_departments != null && _departments.Any())
                 {
                     debugInfo += $"\nFirst department: {_departments[0].Id}";
                 }
                 System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE] Departments Result: {debugInfo}");
-                
+
                 return _departments ?? new List<LookupItem>();
             }
             catch (Exception ex)
@@ -48,7 +49,7 @@ namespace TDFMAUI.Services
                 throw;
             }
         }
-        
+
         public async Task<List<string>> GetTitlesForDepartmentAsync(string departmentId)
         {
             if (string.IsNullOrEmpty(departmentId))
@@ -60,17 +61,17 @@ namespace TDFMAUI.Services
             try
             {
                 _logger.LogInformation("DIAGNOSTIC: Fetching titles for department {DepartmentId} on demand.", departmentId);
-                var titlesResponse = await _apiService.GetAsync<ApiResponse<List<string>>>($"lookups/titles/{departmentId}");
-                
+                var titlesResponse = await _apiService.GetAsync<ApiResponse<List<string>>>(string.Format(ApiRoutes.Lookups.GetTitlesByDepartment, departmentId));
+
                 if (titlesResponse != null && titlesResponse.Success && titlesResponse.Data != null)
                 {
-                    _logger.LogInformation("DIAGNOSTIC: Loaded {Count} titles for department {DepartmentId}", 
+                    _logger.LogInformation("DIAGNOSTIC: Loaded {Count} titles for department {DepartmentId}",
                                         titlesResponse.Data.Count, departmentId);
                     return titlesResponse.Data;
                 }
                 else
                 {
-                    _logger.LogWarning("DIAGNOSTIC: No titles found or API error for department {DepartmentId}. Message: {ApiMessage}", 
+                    _logger.LogWarning("DIAGNOSTIC: No titles found or API error for department {DepartmentId}. Message: {ApiMessage}",
                                         departmentId, titlesResponse?.ErrorMessage ?? "N/A");
                     return new List<string>();
                 }
@@ -81,11 +82,11 @@ namespace TDFMAUI.Services
             return new List<string>();
             }
         }
-        
+
         public async Task LoadDataAsync()
         {
             if (_disposed) return;
-                
+
             try
             {
                 System.Diagnostics.Debug.WriteLine("[LookupService CONSOLE] LoadDataAsync: Simplified - Loading only departments.");
@@ -115,7 +116,7 @@ namespace TDFMAUI.Services
                         _logger.LogInformation("DIAGNOSTIC: Successfully processed departments list (Count: {Count})", departments.Count);
                         _departments = departments;
                         _isDataLoaded = true;
-                        
+
                     System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE] Final State: Departments loaded: {_departments?.Count ?? 0}");
                     _logger.LogInformation("DIAGNOSTIC: Final loaded state - Departments: {DeptCount}", _departments?.Count ?? 0);
                 }
@@ -135,19 +136,19 @@ namespace TDFMAUI.Services
                 throw new Exception($"Failed to load lookup data from API. Please check logs or network connection. Original error: {ex.Message}", ex);
             }
         }
-        
+
         public async Task<IEnumerable<TitleDTO>> GetTitlesAsync()
         {
             _logger.LogWarning("GetTitlesAsync called, but titles are loaded on demand. This method may not function as expected.");
                 return new List<TitleDTO>();
         }
-        
+
         public void Dispose()
         {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-        
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposed)
@@ -159,10 +160,10 @@ namespace TDFMAUI.Services
                 _disposed = true;
             }
         }
-        
+
         ~LookupService()
         {
             Dispose(false);
         }
     }
-} 
+}

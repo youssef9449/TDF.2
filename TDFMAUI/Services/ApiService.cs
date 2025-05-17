@@ -483,7 +483,7 @@ namespace TDFMAUI.Services
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             var request = new AuthLoginRequest { Username = username, Password = password };
-            string endpoint = "auth/login";
+            string endpoint = ApiRoutes.Auth.Login;
 
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
                 throw new NetworkUnavailableException();
@@ -530,7 +530,7 @@ namespace TDFMAUI.Services
         public async Task<bool> LogoutAsync()
         {
              if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = "auth/logout";
+             string endpoint = ApiRoutes.Auth.Logout;
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
                  throw new NetworkUnavailableException();
 
@@ -552,7 +552,7 @@ namespace TDFMAUI.Services
         public async Task<bool> RegisterUserAsync(CreateUserRequest registration)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = "auth/register";
+             string endpoint = ApiRoutes.Auth.Register;
               if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
                  throw new NetworkUnavailableException();
 
@@ -591,7 +591,7 @@ namespace TDFMAUI.Services
          public async Task<UserDto> GetUserByIdAsync(int userId)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = $"users/{userId}";
+             string endpoint = string.Format(ApiRoutes.Users.GetById, userId);
               if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  return await QueueRequestAsync<UserDto>(endpoint, null, "GET");
 
@@ -639,7 +639,7 @@ namespace TDFMAUI.Services
         public async Task<PaginatedResult<UserDto>> GetAllUsersAsync(int page = 1, int pageSize = 10)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = $"users?pageNumber={page}&pageSize={pageSize}";
+             string endpoint = $"{ApiRoutes.Users.Base}?pageNumber={page}&pageSize={pageSize}";
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  return await QueueRequestAsync<PaginatedResult<UserDto>>(endpoint, null, "GET");
 
@@ -660,7 +660,7 @@ namespace TDFMAUI.Services
         {
              if (!_initialized) await InitializeAuthenticationAsync();
              if (string.IsNullOrWhiteSpace(department)) return new List<UserDto>();
-             string endpoint = $"users?department={Uri.EscapeDataString(department)}";
+             string endpoint = string.Format(ApiRoutes.Users.GetByDepartment, Uri.EscapeDataString(department));
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  return await QueueRequestAsync<List<UserDto>>(endpoint, null, "GET");
 
@@ -688,7 +688,7 @@ namespace TDFMAUI.Services
         public async Task<List<UserDto>> GetTeamMembersAsync()
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            string endpoint = "users/team-members";
+            string endpoint = ApiRoutes.Users.GetTeamMembers;
 
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                 return await QueueRequestAsync<List<UserDto>>(endpoint, null, "GET");
@@ -717,7 +717,7 @@ namespace TDFMAUI.Services
         public async Task<UserDto> CreateUserAsync(CreateUserRequest userRequest)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            string endpoint = "users";
+            string endpoint = ApiRoutes.Users.Base;
 
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
                 throw new NetworkUnavailableException("Create user requires network.");
@@ -749,7 +749,7 @@ namespace TDFMAUI.Services
         public async Task<UserDto> UpdateUserAsync(int userId, UpdateUserRequest userDto)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = $"users/{userId}";
+             string endpoint = string.Format(ApiRoutes.Users.GetById, userId);
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  throw new NetworkUnavailableException("Update user requires network.");
 
@@ -777,7 +777,7 @@ namespace TDFMAUI.Services
         public async Task DeleteUserAsync(int userId)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = $"users/{userId}";
+             string endpoint = string.Format(ApiRoutes.Users.GetById, userId);
               if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  throw new NetworkUnavailableException("Delete user requires network.");
 
@@ -802,7 +802,7 @@ namespace TDFMAUI.Services
         public async Task<bool> ChangePasswordAsync(ChangePasswordDto changePasswordDto)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = "users/change-password";
+             string endpoint = ApiRoutes.Users.ChangePassword;
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
                  throw new NetworkUnavailableException();
 
@@ -870,7 +870,7 @@ namespace TDFMAUI.Services
 
         public async Task<bool> UpdateUserProfileAsync(UpdateMyProfileRequest profileData)
         {
-             if (!CheckNetworkBeforeRequest("users/update-profile", queueIfUnavailable: true, profileData, "PUT"))
+             if (!CheckNetworkBeforeRequest(ApiRoutes.Users.UpdateMyProfile, queueIfUnavailable: true, profileData, "PUT"))
             {
                 _logger?.LogInformation("ApiService: UpdateUserProfileAsync request queued due to network unavailability.");
                 return false;
@@ -879,7 +879,7 @@ namespace TDFMAUI.Services
             try
             {
                 _logger?.LogInformation("ApiService: Updating user profile.");
-                var response = await PutAsync<UpdateMyProfileRequest, ApiResponse<bool>>("users/update-profile", profileData);
+                var response = await PutAsync<UpdateMyProfileRequest, ApiResponse<bool>>(ApiRoutes.Users.UpdateMyProfile, profileData);
 
                 if (response?.Success != true)
                 {
@@ -902,7 +902,7 @@ namespace TDFMAUI.Services
         public async Task<PaginatedResult<ChatMessageDto>> GetUserMessagesAsync(int userId, MessagePaginationDto pagination)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            string endpoint = $"messages?userId={userId}&{BuildPaginationQueryString(pagination)}";
+            string endpoint = $"{ApiRoutes.Messages.Base}?userId={userId}&{BuildPaginationQueryString(pagination)}";
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  return await QueueRequestAsync<PaginatedResult<ChatMessageDto>>(endpoint, pagination, "GET");
 
@@ -915,7 +915,7 @@ namespace TDFMAUI.Services
         public async Task<PaginatedResult<ChatMessageDto>> GetAllMessagesAsync(MessagePaginationDto pagination)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            string endpoint = $"messages{BuildPaginationQueryString(pagination)}";
+            string endpoint = $"{ApiRoutes.Messages.Base}{BuildPaginationQueryString(pagination)}";
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  return await QueueRequestAsync<PaginatedResult<ChatMessageDto>>(endpoint, pagination, "GET");
 
@@ -935,7 +935,7 @@ namespace TDFMAUI.Services
         public async Task<ChatMessageDto> CreateMessageAsync(MessageCreateDto createDto)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            string endpoint = "messages";
+            string endpoint = ApiRoutes.Messages.Base;
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  throw new NetworkUnavailableException("Create message requires network.");
 
@@ -948,7 +948,7 @@ namespace TDFMAUI.Services
         public async Task<ChatMessageDto> CreatePrivateMessageAsync(MessageCreateDto createDto)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            string endpoint = "messages/private";
+            string endpoint = ApiRoutes.Messages.Private;
 
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                 throw new NetworkUnavailableException("Create private message requires network.");
@@ -962,7 +962,7 @@ namespace TDFMAUI.Services
         public async Task<bool> MarkMessageAsReadAsync(int messageId)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = $"messages/{messageId}/mark-read";
+             string endpoint = string.Format(ApiRoutes.Messages.MarkRead, messageId);
               if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  throw new NetworkUnavailableException("Mark message read requires network.");
 
@@ -973,7 +973,7 @@ namespace TDFMAUI.Services
         public async Task<bool> MarkMessagesAsReadAsync(List<int> messageIds)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            string endpoint = "messages/mark-bulk-read";
+            string endpoint = ApiRoutes.Messages.MarkBulkRead;
 
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                 throw new NetworkUnavailableException("Mark messages as read requires network.");
@@ -985,7 +985,7 @@ namespace TDFMAUI.Services
         public async Task<List<ChatMessageDto>> GetRecentChatMessagesAsync(int count = 50)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = $"messages/recent-chat?count={count}";
+             string endpoint = $"{ApiRoutes.Messages.RecentChat}?count={count}";
              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  return await QueueRequestAsync<List<ChatMessageDto>>(endpoint, null, "GET");
 
@@ -1005,7 +1005,7 @@ namespace TDFMAUI.Services
         public async Task<PaginatedResult<ChatMessageDto>> GetPrivateMessagesAsync(int userId, MessagePaginationDto pagination)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            string endpoint = $"messages/private?userId={userId}&{BuildPaginationQueryString(pagination)}";
+            string endpoint = $"{ApiRoutes.Messages.Private}?userId={userId}&{BuildPaginationQueryString(pagination)}";
 
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                 return await QueueRequestAsync<PaginatedResult<ChatMessageDto>>(endpoint, pagination, "GET");

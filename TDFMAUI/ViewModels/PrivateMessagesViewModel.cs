@@ -31,17 +31,17 @@ namespace TDFMAUI.ViewModels
         public PrivateMessagesViewModel(ApiService apiService)
         {
             _apiService = apiService;
-            LoadMessagesAsync();
+            Task.Run(async () => await LoadMessagesAsync());
         }
 
         public async Task LoadMessagesAsync()
         {
             if (PartnerId <= 0) return;
-            
+
             try
             {
                 Messages.Clear();
-                
+
                 var pagination = new MessagePaginationDto
                 {
                     PageNumber = 1,
@@ -49,9 +49,9 @@ namespace TDFMAUI.ViewModels
                     SortDescending = true,
                     FromUserId = PartnerId
                 };
-                
+
                 var messagesResult = await _apiService.GetPrivateMessagesAsync(App.CurrentUser?.UserID ?? 0, pagination);
-                
+
                 if (messagesResult?.Items != null)
                 {
                     foreach (var dto in messagesResult.Items)
@@ -67,7 +67,7 @@ namespace TDFMAUI.ViewModels
                         };
                         Messages.Add(messageModel);
                     }
-                    
+
                     // Mark incoming messages as read
                     await MarkMessagesAsRead(PartnerId);
                 }
@@ -83,9 +83,9 @@ namespace TDFMAUI.ViewModels
         {
             var messageContent = NewMessageText?.Trim();
             if (string.IsNullOrEmpty(messageContent) || PartnerId <= 0) return;
-            
+
             NewMessageText = string.Empty;
-            
+
             var newMessage = new MessageCreateDto
             {
                 MessageText = messageContent,
@@ -98,7 +98,7 @@ namespace TDFMAUI.ViewModels
             try
             {
                 var sentMessageDto = await _apiService.CreatePrivateMessageAsync(newMessage);
-                
+
                 var messageModel = new MessageModel
                 {
                     MessageId = sentMessageDto.MessageId,
@@ -108,7 +108,7 @@ namespace TDFMAUI.ViewModels
                     Timestamp = sentMessageDto.SentAt,
                     MessageType = sentMessageDto.MessageType
                 };
-                
+
                 Messages.Add(messageModel);
             }
             catch (Exception ex)
@@ -127,17 +127,17 @@ namespace TDFMAUI.ViewModels
             try
             {
                 if (App.CurrentUser == null) return;
-                
+
                 // Get all unread message IDs from this partner
                 var unreadMessageIds = Messages
                     .Where(m => m.SenderId == partnerId && !m.IsRead)
                     .Select(m => m.MessageId)
                     .ToList();
-                    
+
                 if (unreadMessageIds.Any())
                 {
                     await _apiService.MarkMessagesAsReadAsync(unreadMessageIds);
-                    
+
                     // Update the local messages as read
                     foreach (var message in Messages.Where(m => unreadMessageIds.Contains(m.MessageId)))
                     {
@@ -155,7 +155,7 @@ namespace TDFMAUI.ViewModels
             }
         }
     }
-    
+
     // Interface to safely update read status if available
     public interface IReadStatusAware
     {

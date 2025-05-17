@@ -14,7 +14,7 @@ namespace TDFMAUI.ViewModels
     {
         [ObservableProperty]
         private string _senderName;
-    
+
         private readonly ApiService _apiService;
         private readonly WebSocketService _webSocketService;
 
@@ -32,8 +32,8 @@ namespace TDFMAUI.ViewModels
         {
             _apiService = apiService;
             _webSocketService = webSocketService;
-            
-            LoadMessagesAsync();
+
+            Task.Run(async () => await LoadMessagesAsync());
             RefreshCommand = new RelayCommand(async () => await LoadMessagesAsync());
         }
 
@@ -64,7 +64,7 @@ namespace TDFMAUI.ViewModels
 
             var messageContent = NewMessageText;
             NewMessageText = string.Empty;
-            
+
             try
             {
                 var newMessage = new ChatMessageModel

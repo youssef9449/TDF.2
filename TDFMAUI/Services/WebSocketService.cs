@@ -374,11 +374,9 @@ namespace TDFMAUI.Services
 
                 switch (messageType.ToLower())
                 {
-                    case "notification":
                     case ApiRoutes.WebSocket.MessageTypes.Notification:
                         HandleNotification(root);
                         break;
-                    case "chat_message":
                     case ApiRoutes.WebSocket.MessageTypes.ChatMessage:
                         HandleChatMessage(root);
                         break;
@@ -386,14 +384,12 @@ namespace TDFMAUI.Services
                         HandlePendingMessage(root);
                         break;
                     case "messages_read":
-                    case "message_status":
                     case ApiRoutes.WebSocket.MessageTypes.MessageStatus:
                         HandleMessagesRead(root);
                         break;
                     case "messages_delivered":
                         HandleMessagesDelivered(root);
                         break;
-                    case "user_status": // Maybe legacy or different type?
                     case ApiRoutes.WebSocket.MessageTypes.UserPresence:
                          HandleUserStatus(root); // Assuming this exists
                          break;
@@ -419,12 +415,10 @@ namespace TDFMAUI.Services
                     case "status_updated": // Handle confirmation if API sends it
                         HandleStatusUpdated(root);
                         break;
-                    case "error":
                     case ApiRoutes.WebSocket.MessageTypes.Error:
                         HandleError(root);
                         break;
                     // Keep pong or other control messages if necessary
-                    case "pong":
                     case ApiRoutes.WebSocket.MessageTypes.Pong:
                          _logger.LogTrace("Pong received from server");
                          // Reset any watchdog timers if needed

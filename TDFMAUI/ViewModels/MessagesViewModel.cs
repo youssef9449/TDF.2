@@ -6,10 +6,12 @@ using CommunityToolkit.Mvvm.Input;
 using System.Threading.Tasks;
 using System.Net.Http;
 using System;
-using TDFShared.Models.Message;
+using TDFShared.DTOs.Messages;
 using TDFMAUI.Helpers;
 using System.Drawing;
 using Color = System.Drawing.Color;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TDFMAUI.ViewModels
 {
@@ -17,8 +19,8 @@ namespace TDFMAUI.ViewModels
     {
         [ObservableProperty]
         private bool _isLoading;
-    
-        private readonly MessageService _messageService;
+
+        private readonly ApiService _apiService;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
@@ -34,15 +36,29 @@ namespace TDFMAUI.ViewModels
         private string senderName;
 
         [ObservableProperty]
-        ObservableCollection<MessageModel> messages;
+        ObservableCollection<ChatMessageDto> messages;
 
         [ObservableProperty]
-        MessageModel selectedMessage;
+        ChatMessageDto selectedMessage;
 
-        public MessagesViewModel()
+        public MessagesViewModel(ApiService apiService = null, ILogger<MessagesViewModel> logger = null)
         {
-            _messageService = new MessageService(new HttpClient());
-            LoadMessagesAsync();
+            if (apiService == null)
+            {
+                // Use App.Current.Services to get the ApiService
+                _apiService = App.Current.Handler.MauiContext.Services.GetService<ApiService>();
+                if (_apiService == null)
+                {
+                    throw new InvalidOperationException("ApiService could not be resolved from dependency injection.");
+                }
+            }
+            else
+            {
+                _apiService = apiService;
+            }
+
+            Messages = new ObservableCollection<ChatMessageDto>();
+            Task.Run(async () => await LoadMessagesAsync());
             LoadMessagesCommand = new RelayCommand(async () => await LoadMessagesAsync());
         }
 
@@ -50,11 +66,26 @@ namespace TDFMAUI.ViewModels
 
         private async Task LoadMessagesAsync()
         {
-            Messages.Clear();
-            var loadedMessages = await _messageService.GetAllMessagesAsync();
-            foreach (var message in loadedMessages)
+            try
             {
-                Messages.Add(message);
+                IsLoading = true;
+                Messages.Clear();
+                var result = await _apiService.GetRecentChatMessagesAsync(50);
+                if (result != null)
+                {
+                    foreach (var message in result)
+                    {
+                        Messages.Add(message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading messages: {ex.Message}");
+            }
+            finally
+            {
+                IsLoading = false;
             }
         }
 
@@ -66,17 +97,20 @@ namespace TDFMAUI.ViewModels
             var messageContent = NewMessageText;
             NewMessageText = string.Empty;
 
-            var newMessage = new MessageModel
+            var newMessage = new MessageCreateDto
             {
-                FromUserName = "Me",
-                Content = messageContent,
-                SentAt = DateTime.Now
+                MessageText = messageContent,
+                ReceiverID = 0, // For global chat
+                MessageType = TDFShared.Enums.MessageType.Chat
             };
 
             try
             {
-                await _messageService.CreateMessageAsync(newMessage);
-                Messages.Add(newMessage);
+                var createdMessage = await _apiService.CreateMessageAsync(newMessage);
+                if (createdMessage != null)
+                {
+                    Messages.Add(createdMessage);
+                }
             }
             catch (Exception ex)
             {

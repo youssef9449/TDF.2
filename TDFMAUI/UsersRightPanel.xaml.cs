@@ -324,17 +324,30 @@ namespace TDFMAUI
             }
         }
 
-        private void ClosePanel_Clicked(object sender, EventArgs e)
+        private async void ClosePanel_Clicked(object sender, EventArgs e)
         {
-            // Check if the current route is the users panel itself
-            if (Shell.Current.CurrentState.Location.OriginalString.EndsWith("//users"))
+            _logger.LogInformation("Close panel button clicked");
+
+            if (Shell.Current is AppShell appShell)
             {
-                Shell.Current.GoToAsync(".."); // Navigate back
+                // Use the AppShell's method to close the panel
+                await appShell.CloseUsersRightPanelAsync();
             }
             else
             {
-                // Fallback: Navigate to the main route or a default page if not on the users route
-                Shell.Current.GoToAsync("//main");
+                // Fallback if AppShell is not available
+                _logger.LogWarning("AppShell not available, using fallback navigation");
+
+                // Try to navigate back if possible
+                if (Shell.Current.Navigation.NavigationStack.Count > 1)
+                {
+                    await Shell.Current.GoToAsync("..", true);
+                }
+                else
+                {
+                    // Navigate to the root as a last resort
+                    await Shell.Current.GoToAsync("//", true);
+                }
             }
         }
     }

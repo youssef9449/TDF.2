@@ -22,6 +22,7 @@ namespace TDFMAUI.Services
         private Timer _reconnectTimer;
         private int _reconnectAttempts = 0;
         private const int MaxReconnectAttempts = 5;
+        private bool _disposed = false;
 
         // Events for different types of messages
         public event EventHandler<NotificationEventArgs> NotificationReceived;
@@ -146,11 +147,18 @@ namespace TDFMAUI.Services
 
                     // Raise connection status event on the UI thread
                     MainThread.BeginInvokeOnMainThread(() => {
-                        ConnectionStatusChanged?.Invoke(this, new ConnectionStatusEventArgs
+                        try
                         {
-                            IsConnected = true,
-                            Timestamp = DateTime.UtcNow
-                        });
+                            ConnectionStatusChanged?.Invoke(this, new ConnectionStatusEventArgs
+                            {
+                                IsConnected = true,
+                                Timestamp = DateTime.UtcNow
+                            });
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error invoking ConnectionStatusChanged event");
+                        }
                     });
 
                     // Start receiving messages
@@ -264,12 +272,19 @@ namespace TDFMAUI.Services
 
             try
             {
-                while (_webSocket.State == WebSocketState.Open)
+                while (_webSocket != null && _webSocket.State == WebSocketState.Open)
                 {
                     WebSocketReceiveResult receiveResult = null;
 
                     try
                     {
+                        // Check if the cancellation token source is still valid
+                        if (_cancellationTokenSource == null || _cancellationTokenSource.IsCancellationRequested)
+                        {
+                            _logger.LogInformation("WebSocket receive loop stopping due to cancellation");
+                            break;
+                        }
+
                         receiveResult = await _webSocket.ReceiveAsync(receiveBuffer, _cancellationTokenSource.Token);
                     }
                     catch (ObjectDisposedException ode)
@@ -1210,13 +1225,39 @@ namespace TDFMAUI.Services
 
             if (disposing)
             {
-                // Dispose managed resources
-                _connectionLock?.Dispose();
-                _reconnectTimer?.Dispose();
-                DisconnectAsync(true).ConfigureAwait(false).GetAwaiter().GetResult();
-                _cancellationTokenSource?.Cancel();
-                _cancellationTokenSource?.Dispose();
-                _webSocket?.Dispose();
+                try
+                {
+                    // Dispose managed resources
+                    _connectionLock?.Dispose();
+                    _reconnectTimer?.Dispose();
+
+                    // Use a timeout to prevent hanging on disposal
+                    var disconnectTask = DisconnectAsync(false);
+                    if (!disconnectTask.Wait(TimeSpan.FromSeconds(2)))
+                    {
+                        _logger.LogWarning("WebSocketService disconnect timed out during disposal");
+                    }
+
+                    // Cancel any ongoing operations
+                    if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
+                    {
+                        _cancellationTokenSource.Cancel();
+                        _cancellationTokenSource.Dispose();
+                        _cancellationTokenSource = null;
+                    }
+
+                    // Dispose the WebSocket
+                    if (_webSocket != null)
+                    {
+                        _webSocket.Dispose();
+                        _webSocket = null;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't throw from Dispose
+                    _logger.LogError(ex, "Error during WebSocketService disposal");
+                }
             }
 
             // Dispose unmanaged resources

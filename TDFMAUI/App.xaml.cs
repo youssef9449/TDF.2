@@ -841,13 +841,25 @@ namespace TDFMAUI
                     var userPresenceService = Services.GetService<IUserPresenceService>();
                     if (userPresenceService != null)
                     {
+                        // Use a timeout to prevent hanging during shutdown
+                        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
                         // Run this in a fire-and-forget manner since we're shutting down
                         Task.Run(async () =>
                         {
                             try
                             {
                                 DebugService.LogInfo("App", "Setting user status to Offline on app closing");
-                                await userPresenceService.UpdateStatusAsync(TDFShared.Enums.UserPresenceStatus.Offline, "");
+
+                                // Use the cancellation token to prevent hanging
+                                await userPresenceService.UpdateStatusAsync(
+                                    TDFShared.Enums.UserPresenceStatus.Offline,
+                                    "",
+                                    cts.Token);
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                DebugService.LogWarning("App", "Setting user status to Offline was cancelled due to timeout");
                             }
                             catch (Exception ex)
                             {

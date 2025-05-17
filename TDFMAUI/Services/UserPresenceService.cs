@@ -84,7 +84,7 @@ namespace TDFMAUI.Services
                 // Get all users from the API
                 // The GetAsync method in ApiService already unwraps ApiResponse<T> and returns T (the Data property)
                 var allUsersData = await _apiService.GetAsync<IEnumerable<UserDto>>("users/all");
-                
+
                 // Check if data was successfully retrieved
                 if (allUsersData != null)
                 {
@@ -131,7 +131,7 @@ namespace TDFMAUI.Services
             return _userStatuses.Any() ? _userStatuses.ToDictionary(kv => kv.Key, kv => kv.Value) : new Dictionary<int, UserPresenceInfo>();
         }
 
-        public async Task UpdateStatusAsync(UserPresenceStatus status, string statusMessage)
+        public async Task UpdateStatusAsync(UserPresenceStatus status, string statusMessage, CancellationToken cancellationToken = default)
         {
             if (App.CurrentUser == null)
             {
@@ -141,6 +141,21 @@ namespace TDFMAUI.Services
 
             try
             {
+                // Check for cancellation before making the call
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Use a timeout if none is provided
+                var timeoutToken = CancellationToken.None;
+                if (cancellationToken == CancellationToken.None)
+                {
+                    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    timeoutToken = cts.Token;
+                }
+
+                // Use the provided token or the timeout token
+                var effectiveToken = cancellationToken != CancellationToken.None ? cancellationToken : timeoutToken;
+
+                // Send the status update via WebSocket
                 await _webSocketService.UpdatePresenceStatusAsync(status.ToString(), statusMessage);
 
                 // Update local cache
@@ -162,10 +177,18 @@ namespace TDFMAUI.Services
                         LastActivityTime = DateTime.UtcNow
                     };
                 }
+
+                _logger.LogInformation("Successfully updated user status to {Status}", status);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Status update operation was cancelled");
+                throw; // Rethrow to allow caller to handle cancellation
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating presence status to {Status}", status);
+                throw; // Rethrow to allow caller to handle the error
             }
         }
 

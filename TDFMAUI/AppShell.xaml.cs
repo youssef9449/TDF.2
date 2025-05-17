@@ -18,6 +18,11 @@ namespace TDFMAUI
         private readonly IUserPresenceService _userPresenceService;
         private string _previousRoute = "//"; // To store the route before opening the flyout
 
+        /// <summary>
+        /// Gets the previous route that was navigated from before the current route
+        /// </summary>
+        public string PreviousRoute => _previousRoute;
+
         public bool IsAdmin => App.CurrentUser?.Roles?.Contains("Admin", StringComparer.OrdinalIgnoreCase) ?? false;
         public bool IsHR => App.CurrentUser?.Roles?.Contains("HR", StringComparer.OrdinalIgnoreCase) ?? false;
         public bool IsManager => App.CurrentUser?.Roles?.Contains("Manager", StringComparer.OrdinalIgnoreCase) ?? false;
@@ -197,9 +202,12 @@ namespace TDFMAUI
             await Shell.Current.GoToAsync("//users", true); // Animate
         }
 
-        private async void OnCloseRightFlyout_Swiped(object sender, SwipedEventArgs e)
+        /// <summary>
+        /// Closes the UsersRightPanel and navigates back to the previous route
+        /// </summary>
+        public async Task CloseUsersRightPanelAsync()
         {
-            _logger?.LogInformation("Close right flyout (users panel) swiped.");
+            _logger?.LogInformation("Closing users right panel.");
             if (!string.IsNullOrEmpty(_previousRoute) && _previousRoute != "//users")
             {
                 _logger?.LogInformation($"Returning to previous route: {_previousRoute}");
@@ -226,6 +234,12 @@ namespace TDFMAUI
                     }
                 }
             }
+        }
+
+        private async void OnCloseRightFlyout_Swiped(object sender, SwipedEventArgs e)
+        {
+            _logger?.LogInformation("Close right flyout (users panel) swiped.");
+            await CloseUsersRightPanelAsync();
         }
 
         private async void OpenUsersFlyout_Tapped(object sender, EventArgs e)

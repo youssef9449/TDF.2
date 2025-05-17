@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using TDFShared.Constants;
 using TDFShared.DTOs.Common;
 using System.Reflection;
 using System.Text.Json;
@@ -8,7 +9,7 @@ using System.Text.Json;
 
 namespace TDFAPI.Controllers
 {
-    [Route("api/[controller]")]
+    [Route(ApiRoutes.Health.Base)]
     [ApiController]
     public class HealthCheckController : ControllerBase
     {
@@ -31,7 +32,7 @@ namespace TDFAPI.Controllers
         public IActionResult Get()
         {
             _logger.LogInformation("Health check requested");
-            
+
             return Ok(new ApiResponse<object>
             {
                 Success = true,
@@ -44,19 +45,20 @@ namespace TDFAPI.Controllers
                 }
             });
         }
-        
+
         /// <summary>
         /// Detailed health check that requires authentication
         /// </summary>
         [HttpGet("detailed")]
+        [Route(ApiRoutes.Health.Detailed)]
         [Authorize]
         public IActionResult GetDetailed()
         {
             _logger.LogInformation("Detailed health check requested");
-            
+
             var assembly = Assembly.GetExecutingAssembly();
             var version = assembly.GetName().Version.ToString();
-            
+
             var healthInfo = new
             {
                 Status = "Healthy",
@@ -74,7 +76,7 @@ namespace TDFAPI.Controllers
                     DotNetVersion = Environment.Version.ToString()
                 }
             };
-            
+
             return Ok(new ApiResponse<object>
             {
                 Success = true,
@@ -82,16 +84,17 @@ namespace TDFAPI.Controllers
                 Data = healthInfo
             });
         }
-        
+
         /// <summary>
         /// Echo endpoint for testing request/response
         /// </summary>
         [HttpPost("echo")]
+        [Route(ApiRoutes.Health.Echo)]
         [AllowAnonymous]
         public IActionResult Echo([FromBody] object data)
         {
             _logger.LogInformation("Echo request received");
-            
+
             return Ok(new ApiResponse<object>
             {
                 Success = true,
@@ -104,7 +107,7 @@ namespace TDFAPI.Controllers
                 }
             });
         }
-        
+
         private string GetMemoryUsage()
         {
             // Get memory usage in MB
@@ -112,7 +115,7 @@ namespace TDFAPI.Controllers
             double memoryMB = Math.Round(memoryBytes / 1024.0 / 1024.0, 2);
             return $"{memoryMB} MB";
         }
-        
+
         private string GetProcessUptime()
         {
             // Get process uptime
@@ -121,4 +124,4 @@ namespace TDFAPI.Controllers
             return $"{uptime.Days}d {uptime.Hours}h {uptime.Minutes}m {uptime.Seconds}s";
         }
     }
-} 
+}

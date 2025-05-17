@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TDFAPI.Services;
+using TDFShared.Constants;
 using TDFShared.DTOs.Users;
 using TDFShared.DTOs.Common;
 using Microsoft.Extensions.Logging;
@@ -18,17 +19,17 @@ namespace TDFAPI.Controllers
     {
         private readonly IUserService _userService;
         private readonly ILogger<UsersController> _logger;
-        
+
         public UsersController(IUserService userService, ILogger<UsersController> logger)
         {
             _userService = userService;
             _logger = logger;
         }
-        
+
         [HttpGet]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<ApiResponse<PaginatedResult<UserDto>>>> GetUsers(
-            [FromQuery] int page = 1, 
+            [FromQuery] int page = 1,
             [FromQuery] int pageSize = 10)
         {
             // Validate input
@@ -37,7 +38,7 @@ namespace TDFAPI.Controllers
                 return BadRequest(ApiResponse<PaginatedResult<UserDto>>.ErrorResponse(
                     "Invalid pagination parameters. Page must be >= 1 and pageSize must be between 1 and 100."));
             }
-            
+
             try
             {
                 var users = await _userService.GetPaginatedAsync(page, pageSize);
@@ -49,7 +50,7 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<PaginatedResult<UserDto>>.ErrorResponse("An error occurred retrieving users"));
             }
         }
-        
+
         [HttpGet("{id}")]
         public async Task<ActionResult<ApiResponse<UserDto>>> GetUser(int id)
         {
@@ -59,24 +60,24 @@ namespace TDFAPI.Controllers
                 {
                     return BadRequest(ApiResponse<UserDto>.ErrorResponse("Invalid user ID"));
                 }
-                
+
                 // Check if the user is requesting their own info or is an admin
                 var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
                 var isAdmin = User.IsInRole("Admin");
-                
+
                 if (id != currentUserId && !isAdmin)
                 {
-                    _logger.LogWarning("User {CurrentUserId} attempted to access details for user {RequestedId}", 
+                    _logger.LogWarning("User {CurrentUserId} attempted to access details for user {RequestedId}",
                         currentUserId, id);
                     return Forbid();
                 }
-                
+
                 var user = await _userService.GetUserDtoByIdAsync(id);
                 if (user == null)
                 {
                     return NotFound(ApiResponse<UserDto>.ErrorResponse("User not found"));
                 }
-                
+
                 return Ok(ApiResponse<UserDto>.SuccessResponse(user));
             }
             catch (Exception ex)
@@ -85,7 +86,7 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("An error occurred retrieving user details"));
             }
         }
-        
+
         [HttpGet("department/{department}")]
         [Authorize(Roles = "Admin,HR,Manager")] // Or adjust roles as needed
         public async Task<ActionResult<ApiResponse<IEnumerable<UserDto>>>> GetUsersByDepartment(string department)
@@ -94,7 +95,7 @@ namespace TDFAPI.Controllers
             {
                 return BadRequest(ApiResponse<IEnumerable<UserDto>>.ErrorResponse("Department name cannot be empty."));
             }
-            
+
             // Optional: Check if the requesting user (Manager) is in the requested department
             var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
             var currentUserDept = User.FindFirst(ClaimTypes.GroupSid)?.Value; // Assuming Department is stored in a claim like GroupSid
@@ -104,24 +105,24 @@ namespace TDFAPI.Controllers
             // Allow Admins/HR to see any department. Managers can only see their own.
             if (isManager && !isAdminOrHR && !string.Equals(currentUserDept, department, StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogWarning("Manager {UserId} in department {UserDept} attempted to access users for department {TargetDept}", 
+                _logger.LogWarning("Manager {UserId} in department {UserDept} attempted to access users for department {TargetDept}",
                     currentUserId, currentUserDept, department);
                 return Forbid(); // Or return empty list depending on policy
             }
-            
+
             try
             {
                 _logger.LogInformation("Getting users for department: {Department}", department);
                 // Assuming IUserService has a method to get users by department
                 var users = await _userService.GetUsersByDepartmentAsync(department);
-                
+
                 if (users == null || !users.Any())
                 {
                     _logger.LogInformation("No users found for department: {Department}", department);
                     // Return empty list instead of NotFound for potentially valid but empty departments
                     return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(new List<UserDto>()));
                 }
-                
+
                 return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(users));
             }
             catch (Exception ex)
@@ -130,7 +131,7 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<IEnumerable<UserDto>>.ErrorResponse("An error occurred retrieving users by department"));
             }
         }
-        
+
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<ApiResponse<bool>>> UpdateUser(int id, [FromBody] UpdateUserRequest userDto)
@@ -141,25 +142,25 @@ namespace TDFAPI.Controllers
                 {
                     return BadRequest(ApiResponse<bool>.ErrorResponse("Invalid user ID"));
                 }
-                
+
                 if (userDto == null)
                 {
                     return BadRequest(ApiResponse<bool>.ErrorResponse("User data is required"));
                 }
-                
+
                 // Validate input
                 if (string.IsNullOrWhiteSpace(userDto.FullName))
                 {
                     return BadRequest(ApiResponse<bool>.ErrorResponse("Full name is required"));
                 }
-                
+
                 var success = await _userService.UpdateAsync(id, userDto);
                 if (!success)
                 {
                     return NotFound(ApiResponse<bool>.ErrorResponse("User not found or update failed"));
                 }
-                
-                _logger.LogInformation("User {UserId} updated successfully by admin {AdminId}", 
+
+                _logger.LogInformation("User {UserId} updated successfully by admin {AdminId}",
                     id, User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
                 return Ok(ApiResponse<bool>.SuccessResponse(true, "User updated successfully"));
             }
@@ -169,7 +170,7 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred updating the user"));
             }
         }
-        
+
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(int id)
@@ -180,21 +181,21 @@ namespace TDFAPI.Controllers
                 {
                     return BadRequest(ApiResponse<bool>.ErrorResponse("Invalid user ID"));
                 }
-                
+
                 // Prevent deleting yourself
                 var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
                 if (id == currentUserId)
                 {
                     return BadRequest(ApiResponse<bool>.ErrorResponse("You cannot delete your own account"));
                 }
-                
+
                 var success = await _userService.DeleteAsync(id);
                 if (!success)
                 {
                     return NotFound(ApiResponse<bool>.ErrorResponse("User not found or delete failed"));
                 }
-                
-                _logger.LogInformation("User {UserId} deleted by admin {AdminId}", 
+
+                _logger.LogInformation("User {UserId} deleted by admin {AdminId}",
                     id, currentUserId);
                 return Ok(ApiResponse<bool>.SuccessResponse(true, "User deleted successfully"));
             }
@@ -204,7 +205,7 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred deleting the user"));
             }
         }
-        
+
         [HttpPost("change-password")]
         [EnableRateLimiting("auth")]
         public async Task<ActionResult<ApiResponse<bool>>> ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
@@ -215,25 +216,25 @@ namespace TDFAPI.Controllers
                 {
                     return BadRequest(ApiResponse<bool>.ErrorResponse("Password data is required"));
                 }
-                
+
                 // Validate password criteria
                 if (string.IsNullOrEmpty(changePasswordDto.NewPassword) || changePasswordDto.NewPassword.Length < 8)
                 {
                     return BadRequest(ApiResponse<bool>.ErrorResponse("New password must be at least 8 characters long"));
                 }
-                
+
                 var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
                 var success = await _userService.ChangePasswordAsync(
-                    currentUserId, 
-                    changePasswordDto.CurrentPassword, 
+                    currentUserId,
+                    changePasswordDto.CurrentPassword,
                     changePasswordDto.NewPassword);
-                
+
                 if (!success)
                 {
                     _logger.LogWarning("Failed password change attempt for user {UserId}", currentUserId);
                     return BadRequest(ApiResponse<bool>.ErrorResponse("Password change failed. Current password may be incorrect."));
                 }
-                
+
                 _logger.LogInformation("Password changed successfully for user {UserId}", currentUserId);
                 return Ok(ApiResponse<bool>.SuccessResponse(true, "Password changed successfully"));
             }
@@ -276,13 +277,13 @@ namespace TDFAPI.Controllers
             }
             catch (ValidationException vex)
             {
-                _logger.LogWarning("Validation error updating profile for user {UserId}: {Message}", 
+                _logger.LogWarning("Validation error updating profile for user {UserId}: {Message}",
                     User.FindFirst(ClaimTypes.NameIdentifier)?.Value, vex.Message);
                 return BadRequest(ApiResponse<bool>.ErrorResponse(vex.Message));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating profile for user {UserId}: {Message}", 
+                _logger.LogError(ex, "Error updating profile for user {UserId}: {Message}",
                     User.FindFirst(ClaimTypes.NameIdentifier)?.Value, ex.Message);
                 return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred updating the profile"));
             }
@@ -327,21 +328,21 @@ namespace TDFAPI.Controllers
                     return NotFound(ApiResponse<bool>.ErrorResponse("User not found or failed to update picture."));
                 }
 
-                _logger.LogInformation("User {UserId} uploaded a new profile picture ({FileName}, {ContentType}, {Size} bytes)", 
+                _logger.LogInformation("User {UserId} uploaded a new profile picture ({FileName}, {ContentType}, {Size} bytes)",
                     currentUserId, file.FileName, file.ContentType, file.Length);
-                
+
                 // Return success. Client might need to re-fetch profile to see the change.
                 return Ok(ApiResponse<bool>.SuccessResponse(true, "Profile picture updated successfully."));
             }
             catch (ValidationException vex)
             {
-                 _logger.LogWarning("Validation error uploading profile picture for user {UserId}: {Message}", 
+                 _logger.LogWarning("Validation error uploading profile picture for user {UserId}: {Message}",
                     User.FindFirst(ClaimTypes.NameIdentifier)?.Value, vex.Message);
                 return BadRequest(ApiResponse<bool>.ErrorResponse(vex.Message)); // e.g., file too large
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error uploading profile picture for user {UserId}: {Message}", 
+                _logger.LogError(ex, "Error uploading profile picture for user {UserId}: {Message}",
                     User.FindFirst(ClaimTypes.NameIdentifier)?.Value, ex.Message);
                 return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred uploading the profile picture."));
             }
@@ -364,12 +365,13 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet("all")] // Route: api/users/all
+        [Route(ApiRoutes.Users.GetAllWithStatus)]
         [Authorize] // All authenticated users should be able to get this list for presence.
         public async Task<ActionResult<ApiResponse<IEnumerable<UserDto>>>> GetAllUsersWithStatus()
         {
             try
             {
-                var users = await _userService.GetAllUsersWithPresenceAsync(); 
+                var users = await _userService.GetAllUsersWithPresenceAsync();
                 return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(users));
             }
             catch (Exception ex)

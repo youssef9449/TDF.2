@@ -116,6 +116,11 @@ namespace TDFShared.Constants
             /// </summary>
             public const string UploadProfilePicture = Base + "/profile/image";
 
+            /// <summary>
+            /// Get all users with presence status
+            /// </summary>
+            public const string GetAllWithStatus = Base + "/all";
+
             public static string UsersBase => $"{Base}/users";
         }
 
@@ -327,12 +332,22 @@ namespace TDFShared.Constants
             /// <summary>
             /// Base health route
             /// </summary>
-            public const string Base = ApiRoutes.Base + "/health";
+            public const string Base = ApiRoutes.Base + "/healthcheck";
 
             /// <summary>
             /// Ping route to check API health
             /// </summary>
             public const string Ping = Base + "/ping";
+
+            /// <summary>
+            /// Detailed health check route
+            /// </summary>
+            public const string Detailed = Base + "/detailed";
+
+            /// <summary>
+            /// Echo route for testing request/response
+            /// </summary>
+            public const string Echo = Base + "/echo";
         }
 
         /// <summary>

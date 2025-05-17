@@ -11,7 +11,7 @@
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            
+
             <!-- Converters -->
             <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
             <converters:BoolToThicknessConverter x:Key="BoolToThicknessConverter" />
@@ -19,6 +19,7 @@
             <helpers:BoolToStringConverter x:Key="BoolToStringConverter" />
             <converters:BooleanInverter x:Key="BooleanInverter" />
             <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
+            <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

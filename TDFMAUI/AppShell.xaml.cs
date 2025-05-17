@@ -80,6 +80,7 @@ namespace TDFMAUI
             Routing.RegisterRoute(nameof(MessagesPage), typeof(MessagesPage));
             Routing.RegisterRoute(nameof(DiagnosticsPage), typeof(DiagnosticsPage));
             Routing.RegisterRoute(nameof(UsersPage), typeof(UsersPage));
+            Routing.RegisterRoute("DashboardPage", typeof(Features.Dashboard.DashboardPage));
             Routing.RegisterRoute(nameof(UserDetailsPage), typeof(UserDetailsPage));
         }
 
@@ -125,7 +126,7 @@ namespace TDFMAUI
         private void OnShellNavigated(object sender, ShellNavigatedEventArgs e)
         {
             _logger?.LogInformation($"Navigated to: {e.Current?.Location?.OriginalString}, Previous: {e.Previous?.Location?.OriginalString}, Source: {e.Source}");
-            
+
             // Store the previous route if we are not coming from the users flyout itself
             if (e.Previous?.Location?.OriginalString != null && !e.Previous.Location.OriginalString.EndsWith("//users"))
             {
@@ -213,8 +214,8 @@ namespace TDFMAUI
                 }
                 else
                 {
-                    var mainPageRoute = "//" + nameof(MainPage); 
-                    try 
+                    var mainPageRoute = "//" + nameof(MainPage);
+                    try
                     { // Attempt to navigate to main page, if route is not valid GoToAsync will throw
                         await Shell.Current.GoToAsync(mainPageRoute, true);
                     }

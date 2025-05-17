@@ -19,14 +19,14 @@ namespace TDFMAUI.Features.Auth
         public LoginPage(LoginPageViewModel viewModel)
         {
             InitializeComponent();
-            
+
             _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             BindingContext = _viewModel;
-            
+
             // Apply platform-specific styling using DeviceHelper
             ApplyPlatformSpecificStyles();
         }
-        
+
         private void ApplyPlatformSpecificStyles()
         {
             if (DeviceHelper.IsIOS || DeviceHelper.IsMacOS)
@@ -40,7 +40,7 @@ namespace TDFMAUI.Features.Auth
                 });
 #endif
             }
-            
+
             // Apply responsive design based on screen size
             if (DeviceHelper.IsSmallScreen)
             {
@@ -51,12 +51,12 @@ namespace TDFMAUI.Features.Auth
                     mainContentStack.Padding = new Thickness(SMALL_SCREEN_PADDING, SMALL_SCREEN_PADDING);
                     mainContentStack.Spacing = 16;
                 }
-                
-                // Scale down logo size for small screens
+
+                // Scale down logo size for small screens, but still keep it larger than before
                 var logoImage = FindLogoImage();
                 if (logoImage != null)
                 {
-                    logoImage.HeightRequest = 60;
+                    logoImage.HeightRequest = 100;
                 }
             }
             else if (DeviceHelper.IsLargeScreen || DeviceHelper.IsDesktop)
@@ -68,7 +68,14 @@ namespace TDFMAUI.Features.Auth
                     mainContentStack.Padding = new Thickness(LARGE_SCREEN_PADDING, LARGE_SCREEN_PADDING);
                     mainContentStack.Spacing = 32;
                 }
-                
+
+                // Increase logo size for large screens
+                var logoImage = FindLogoImage();
+                if (logoImage != null)
+                {
+                    logoImage.HeightRequest = 150;
+                }
+
                 // Increase main title font size
                 var titleLabel = FindTitleLabel();
                 if (titleLabel != null)
@@ -77,16 +84,16 @@ namespace TDFMAUI.Features.Auth
                 }
             }
         }
-        
+
         // Helper methods to find UI elements
         private VerticalStackLayout FindMainContentStack()
         {
             try
             {
-                var scrollView = this.Content is Grid grid && grid.Children.Count > 1 
-                    ? grid.Children[1] as ScrollView 
+                var scrollView = this.Content is Grid grid && grid.Children.Count > 1
+                    ? grid.Children[1] as ScrollView
                     : null;
-                
+
                 return scrollView?.Content as VerticalStackLayout;
             }
             catch
@@ -94,7 +101,7 @@ namespace TDFMAUI.Features.Auth
                 return null;
             }
         }
-        
+
         private Image FindLogoImage()
         {
             try
@@ -111,7 +118,7 @@ namespace TDFMAUI.Features.Auth
                 return null;
             }
         }
-        
+
         private Label FindTitleLabel()
         {
             try
@@ -132,10 +139,10 @@ namespace TDFMAUI.Features.Auth
         protected override void OnAppearing()
         {
             base.OnAppearing();
-            
+
             // Clear any previous login data when returning to this page
             _viewModel?.ClearLoginData();
-            
+
             System.Diagnostics.Debug.WriteLine("[LoginPage] OnAppearing");
         }
 
@@ -192,38 +199,38 @@ namespace TDFMAUI.Features.Auth
             try
             {
                 System.Diagnostics.Debug.WriteLine("[LoginPage] Handling Forgot Password");
-                
+
                 // Check if username was entered to pre-fill it in the recovery form
-                string username = !string.IsNullOrEmpty(_viewModel?.Username) 
-                    ? _viewModel.Username 
+                string username = !string.IsNullOrEmpty(_viewModel?.Username)
+                    ? _viewModel.Username
                     : string.Empty;
-                
+
                 // Show an input prompt for email
                 string email = await DisplayPromptAsync(
-                    "Password Recovery", 
-                    "Enter your email address to receive a password reset link", 
+                    "Password Recovery",
+                    "Enter your email address to receive a password reset link",
                     initialValue: username,
                     keyboard: Keyboard.Email);
-                
+
                 if (!string.IsNullOrWhiteSpace(email))
                 {
                     // Show loading indicator
                     IsBusy = true;
-                    
+
                     try
                     {
                         // Simulate API call
                         await Task.Delay(1500);
-                        
+
                         // In a real implementation, you would call an API service
                         // var result = await _authService.RequestPasswordResetAsync(email);
-                        
+
                         // Show success message
                         await DisplayAlert(
-                            "Recovery Email Sent", 
-                            "If an account exists with this email, you will receive instructions to reset your password.", 
+                            "Recovery Email Sent",
+                            "If an account exists with this email, you will receive instructions to reset your password.",
                             "OK");
-                            
+
                         // Set the entered email as the username for convenience
                         if (_viewModel != null)
                         {

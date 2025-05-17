@@ -19,4 +19,9 @@
     <Color x:Key="Gray900">#373737</Color>
     <Color x:Key="Black">#000000</Color>
     <Color x:Key="White">#FFFFFF</Color>
-</ResourceDictionary> 
+
+    <!-- Dashboard Colors -->
+    <Color x:Key="Yellow100">#FFF8E1</Color>
+    <Color x:Key="Blue100">#E3F2FD</Color>
+    <Color x:Key="Green100">#E8F5E9</Color>
+</ResourceDictionary>

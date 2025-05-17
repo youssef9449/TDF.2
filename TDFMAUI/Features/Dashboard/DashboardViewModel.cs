@@ -45,16 +45,8 @@ namespace TDFMAUI.Features.Dashboard
         [ObservableProperty]
         private bool hasRecentRequests;
 
+        [ObservableProperty]
         private bool _isDataLoaded;
-        private bool IsDataLoaded 
-        {
-            get => _isDataLoaded;
-            set
-            {
-                _isDataLoaded = value;
-                OnPropertyChanged(nameof(IsDataLoaded));
-            }
-        }
 
         [ObservableProperty]
         private bool isRefreshing;
@@ -145,7 +137,7 @@ namespace TDFMAUI.Features.Dashboard
                 // Update UI state flags
                 HasRecentRequests = RecentRequests.Count > 0;
                 HasRecentNotifications = RecentNotifications.Count > 0;
-                IsDataLoaded = true;
+                _isDataLoaded = true;
                 
                 _logger.LogInformation("Dashboard refresh completed successfully");
             }

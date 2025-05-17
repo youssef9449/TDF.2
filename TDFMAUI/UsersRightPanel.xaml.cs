@@ -18,7 +18,7 @@ namespace TDFMAUI
     public partial class UsersRightPanel : ContentPage
     {
         private IUserPresenceService _userPresenceService;
-        private ApiService _apiService; 
+        private ApiService _apiService;
         private ILogger<UsersRightPanel> _logger;
         private IConnectivityService _connectivityService;
 
@@ -82,15 +82,15 @@ namespace TDFMAUI
                 // Or use System.Diagnostics.Debug if logger itself failed
                 System.Diagnostics.Debug.WriteLine($"[CRITICAL] UsersRightPanel: Failed to resolve services: {ex.Message}");
             }
-            
+
             BindingContext = this;
             RefreshUsersCommand = new Command(async () => await RefreshUsersAsync());
         }
 
         // Constructor with dependency injection (can be kept for testing or direct instantiation)
         public UsersRightPanel(
-            IUserPresenceService userPresenceService, 
-            ApiService apiService, 
+            IUserPresenceService userPresenceService,
+            ApiService apiService,
             ILogger<UsersRightPanel> logger,
             IConnectivityService connectivityService)
         {
@@ -108,11 +108,11 @@ namespace TDFMAUI
         {
             base.OnAppearing();
             await RefreshUsersAsync();
-            
+
             // Subscribe to presence events
             _userPresenceService.UserStatusChanged += OnUserPresenceServiceStatusChanged;
             _userPresenceService.UserAvailabilityChanged += OnUserAvailabilityChanged;
-            
+
             // Device-specific behavior
             ConfigureDeviceSpecificBehavior();
         }
@@ -142,32 +142,75 @@ namespace TDFMAUI
 
         private void OnUserPresenceServiceStatusChanged(object? sender, UserStatusChangedEventArgs e)
         {
-            _logger.LogInformation($"User status changed: UserID {e.UserId}, Status {e.Status}. Refreshing panel.");
-            MainThread.BeginInvokeOnMainThread(async () => 
+            // Skip updates for the current user - they should not be displayed in the panel
+            if (App.CurrentUser != null && e.UserId == App.CurrentUser.UserID)
             {
-                // Find and update the user in our collection if they exist
-                var existingUser = _users.FirstOrDefault(u => u.UserId == e.UserId);
-                if (existingUser != null)
+                _logger.LogInformation($"Ignoring status change for current user (ID: {e.UserId})");
+                return;
+            }
+
+            _logger.LogInformation($"User status changed: UserID {e.UserId}, Status {e.Status}. Updating panel.");
+
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                try
                 {
-                    existingUser.Status = e.Status;
+                    // Find and update the user in our collection if they exist
+                    var existingUser = _users.FirstOrDefault(u => u.UserId == e.UserId);
+                    if (existingUser != null)
+                    {
+                        // Update the user's status
+                        existingUser.Status = e.Status;
+                        _logger.LogInformation($"Updated user {e.Username} (ID: {e.UserId}) status to {e.Status} in UsersRightPanel");
+                    }
+                    else
+                    {
+                        // If user not in collection and they're not offline, refresh the full list
+                        // This handles cases where a user comes online that wasn't in our list before
+                        if (e.Status != UserPresenceStatus.Offline)
+                        {
+                            _logger.LogInformation($"User {e.Username} (ID: {e.UserId}) not found in collection, refreshing panel");
+                            await RefreshUsersAsync();
+                        }
+                        else
+                        {
+                            _logger.LogInformation($"Ignoring offline status for user not in collection: {e.Username} (ID: {e.UserId})");
+                        }
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    // If user not in collection, refresh the full list
-                    await RefreshUsersAsync();
+                    _logger.LogError(ex, $"Error updating user status in UsersRightPanel: {ex.Message}");
                 }
             });
         }
 
         private void OnUserAvailabilityChanged(object? sender, UserAvailabilityChangedEventArgs e)
         {
-            _logger.LogInformation($"User availability changed: UserID {e.UserId}, Available: {e.IsAvailableForChat}");
-            MainThread.BeginInvokeOnMainThread(() => 
+            // Skip updates for the current user - they should not be displayed in the panel
+            if (App.CurrentUser != null && e.UserId == App.CurrentUser.UserID)
             {
-                var existingUser = _users.FirstOrDefault(u => u.UserId == e.UserId);
-                if (existingUser != null)
+                _logger.LogInformation($"Ignoring availability change for current user (ID: {e.UserId})");
+                return;
+            }
+
+            _logger.LogInformation($"User availability changed: UserID {e.UserId}, Available: {e.IsAvailableForChat}");
+
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                try
                 {
-                    existingUser.IsAvailableForChat = e.IsAvailableForChat;
+                    var existingUser = _users.FirstOrDefault(u => u.UserId == e.UserId);
+                    if (existingUser != null)
+                    {
+                        existingUser.IsAvailableForChat = e.IsAvailableForChat;
+                        _logger.LogInformation($"Updated user {e.Username} (ID: {e.UserId}) availability to {e.IsAvailableForChat} in UsersRightPanel");
+                    }
+                    // No need to refresh the full list for availability changes
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error updating user availability in UsersRightPanel: {ex.Message}");
                 }
             });
         }
@@ -184,16 +227,16 @@ namespace TDFMAUI
             try
             {
                 _logger.LogInformation("UsersRightPanel: Refreshing users...");
-                
+
                 // Check for connectivity
                 var isConnected = _connectivityService.IsConnected();
                 Dictionary<int, UserPresenceInfo> onlineUsersDetails;
-                
+
                 // Update offline indicator visibility
                 MainThread.BeginInvokeOnMainThread(() => {
                     offlineIndicator.IsVisible = !isConnected;
                 });
-                
+
                 if (isConnected)
                 {
                     // Get online users from service if connected
@@ -205,15 +248,30 @@ namespace TDFMAUI
                     _logger.LogWarning("UsersRightPanel: Device is offline, using cached user data.");
                     onlineUsersDetails = await Task.FromResult(_userPresenceService.GetCachedOnlineUsers());
                 }
-                
+
+                // Get the current user ID to exclude from the list
                 var currentAppUserId = App.CurrentUser?.UserID ?? 0;
+
+                if (currentAppUserId <= 0)
+                {
+                    _logger.LogWarning("UsersRightPanel: Current user ID is invalid or not set");
+                }
+                else
+                {
+                    _logger.LogInformation($"UsersRightPanel: Will exclude current user ID: {currentAppUserId}");
+                }
 
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
                     var currentUsers = new ObservableCollection<UserViewModel>();
                     if (onlineUsersDetails != null)
                     {
-                        foreach (var userDetail in onlineUsersDetails.Values.Where(u => u.UserId != currentAppUserId)) // Exclude current user
+                        // Filter out the current user and create view models for other users
+                        var filteredUsers = onlineUsersDetails.Values
+                            .Where(u => u.UserId != currentAppUserId && u.UserId > 0) // Exclude current user and ensure valid IDs
+                            .ToList();
+
+                        foreach (var userDetail in filteredUsers)
                         {
                             var userVm = new UserViewModel
                             {
@@ -226,17 +284,19 @@ namespace TDFMAUI
                                 IsAvailableForChat = userDetail.IsAvailableForChat,
                                 ProfilePictureData = userDetail.ProfilePictureData
                             };
-                            
+
                             currentUsers.Add(userVm);
                         }
-                        int userCount = currentUsers?.Count ?? 0;
-                        _logger.LogInformation($"UsersRightPanel: Displaying {userCount} users.");
+
+                        int userCount = currentUsers.Count;
+                        int totalUsers = onlineUsersDetails.Count;
+                        _logger.LogInformation($"UsersRightPanel: Displaying {userCount} users (filtered from {totalUsers} total users).");
                     }
                     else
                     {
                         _logger.LogWarning("UsersRightPanel: GetOnlineUsersAsync returned null.");
                     }
-                    
+
                     // Update the collection
                     Users.Clear();
                     foreach(var u in currentUsers) Users.Add(u);
@@ -247,7 +307,7 @@ namespace TDFMAUI
             {
                 _logger.LogError(ex, "UsersRightPanel: Failed to load online users.");
                 // Show a non-intrusive error message for the side panel
-                MainThread.BeginInvokeOnMainThread(() => 
+                MainThread.BeginInvokeOnMainThread(() =>
                 {
                     if (_users.Count == 0)
                     {
@@ -274,8 +334,8 @@ namespace TDFMAUI
             else
             {
                 // Fallback: Navigate to the main route or a default page if not on the users route
-                Shell.Current.GoToAsync("//main"); 
+                Shell.Current.GoToAsync("//main");
             }
         }
     }
-} 
+}

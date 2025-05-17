@@ -11,6 +11,9 @@ using TDFMAUI.Features.Admin;
 using TDFMAUI.ViewModels;
 using Microsoft.Extensions.Logging;
 using TDFShared.Enums;
+using System.Linq;
+using System.Reflection;
+using TDFMAUI.Features.Dashboard;
 
 namespace TDFMAUI
 {
@@ -216,6 +219,7 @@ namespace TDFMAUI
             // Register ViewModels
             services.AddTransient<LoginPageViewModel>();
             services.AddTransient<SignupViewModel>();
+            services.AddTransient<DashboardViewModel>();
 
             // Register pages
             services.AddTransient<LoginPage>();
@@ -226,6 +230,7 @@ namespace TDFMAUI
             services.AddTransient<RequestsPage>(); // Commented out missing page
             services.AddTransient<GlobalChatPage>();
             services.AddTransient<AdminPage>();
+            services.AddTransient<DashboardPage>(); // Add DashboardPage
         }
 
         protected override async void OnStart()
@@ -361,6 +366,12 @@ namespace TDFMAUI
                     diagnosticPage.NextPage = nextPage;
 
                     logger.LogInformation($"Next page prepared: {nextPage.GetType().Name}");
+
+                    // Register for WebSocketService events
+                    if (isAuthenticated)
+                    {
+                        RegisterWebSocketEventHandlers();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -379,22 +390,387 @@ namespace TDFMAUI
 
         private void OnNotificationReceived(object sender, NotificationEventArgs e)
         {
-            // Notification handling code
+            try
+            {
+                // Log the notification
+                DebugService.LogInfo("App", $"Notification received: {e.Title} - {e.Message}");
+
+                // Show a local notification to the user
+                ShowLocalNotification(e.Title, e.Message);
+
+                // Add to the app's notification collection for display in the UI
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    // Create a NotificationDto from the event args
+                    var notification = new NotificationDto
+                    {
+                        NotificationId = e.NotificationId,
+                        Title = e.Title,
+                        Message = e.Message,
+                        Timestamp = e.Timestamp,
+                        SenderId = e.SenderId,
+                        SenderName = e.SenderName,
+                        Type = e.Type.ToString()
+                    };
+
+                    // Add to the collection (at the beginning to show newest first)
+                    Notifications.Insert(0, notification);
+
+                    // Limit the collection size to prevent memory issues
+                    if (Notifications.Count > 100)
+                    {
+                        Notifications.RemoveAt(Notifications.Count - 1);
+                    }
+                });
+
+                // If we have a notification service, mark as seen if appropriate
+                if (Services != null && e.NotificationId > 0)
+                {
+                    var notificationService = Services.GetService<INotificationService>();
+                    if (notificationService != null && CurrentUser != null)
+                    {
+                        // Fire and forget - don't block the UI
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await notificationService.MarkAsSeenAsync(e.NotificationId);
+                            }
+                            catch (Exception ex)
+                            {
+                                DebugService.LogError("App", $"Error marking notification as seen: {ex.Message}");
+                            }
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugService.LogError("App", $"Error handling notification: {ex.Message}");
+            }
         }
 
         private void OnChatMessageReceived(object sender, ChatMessageEventArgs e)
         {
-            // Chat message handling code
+            try
+            {
+                // Log the chat message
+                DebugService.LogInfo("App", $"Chat message received from {e.SenderName}: {e.Message}");
+
+                // Show a local notification for the chat message
+                ShowLocalNotification($"Message from {e.SenderName}", e.Message);
+
+                // If we have a chat service, update the UI or mark as delivered
+                if (Services != null)
+                {
+                    var webSocketService = Services.GetService<IWebSocketService>();
+                    if (webSocketService != null)
+                    {
+                        // Mark the message as delivered
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                // Mark the message as delivered to the sender
+                                await webSocketService.MarkMessagesAsDeliveredAsync(e.SenderId);
+                            }
+                            catch (Exception ex)
+                            {
+                                DebugService.LogError("App", $"Error marking message as delivered: {ex.Message}");
+                            }
+                        });
+                    }
+                }
+
+                // If the app is in the background, we've already shown a notification
+                // If the app is in the foreground, the active chat view should handle displaying the message
+            }
+            catch (Exception ex)
+            {
+                DebugService.LogError("App", $"Error handling chat message: {ex.Message}");
+            }
         }
 
         private void OnConnectionStatusChanged(object sender, ConnectionStatusEventArgs e)
         {
-            // Connection status handling code
+            try
+            {
+                // Log the connection status change
+                DebugService.LogInfo("App", $"Connection status changed: {(e.IsConnected ? "Connected" : "Disconnected")}");
+
+                // Update UI or show notification based on connection status
+                if (e.IsConnected)
+                {
+                    // Connection established
+                    DebugService.LogInfo("App", "WebSocket connection established");
+
+                    // If we were previously disconnected, show a notification
+                    if (Services != null)
+                    {
+                        var webSocketService = Services.GetService<IWebSocketService>();
+                        if (webSocketService != null)
+                        {
+                            // Update user status to Online if we're reconnecting
+                            if (CurrentUser != null)
+                            {
+                                var userPresenceService = Services.GetService<IUserPresenceService>();
+                                if (userPresenceService != null)
+                                {
+                                    // Update status to Online
+                                    Task.Run(async () =>
+                                    {
+                                        try
+                                        {
+                                            await userPresenceService.UpdateStatusAsync(UserPresenceStatus.Online, "");
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            DebugService.LogError("App", $"Error updating user status to Online: {ex.Message}");
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // Connection lost
+                    string message = e.WasClean ?
+                        "Connection closed normally" :
+                        "Connection lost unexpectedly";
+
+                    DebugService.LogWarning("App", message);
+
+                    // Show a notification if the disconnection was unexpected
+                    if (!e.WasClean)
+                    {
+                        ShowLocalNotification("Connection Lost", "The connection to the server was lost. Attempting to reconnect...");
+
+                        // If reconnection failed after multiple attempts, show a more serious notification
+                        if (e.ReconnectionFailed)
+                        {
+                            ShowLocalNotification("Connection Error", "Failed to reconnect to the server. Please check your internet connection and try again later.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugService.LogError("App", $"Error handling connection status change: {ex.Message}");
+            }
         }
 
         private void OnUserStatusChanged(object sender, UserStatusEventArgs e)
         {
-            // User status handling code
+            try
+            {
+                // Log the user status change
+                DebugService.LogInfo("App", $"User status changed: {e.Username} is now {e.PresenceStatus}");
+
+                // Parse the presence status string to enum
+                UserPresenceStatus presenceStatus = UserPresenceStatus.Offline;
+                if (!string.IsNullOrEmpty(e.PresenceStatus) &&
+                    Enum.TryParse<UserPresenceStatus>(e.PresenceStatus, true, out var parsedStatus))
+                {
+                    presenceStatus = parsedStatus;
+                }
+
+                // If this is the current user, update the UI
+                if (CurrentUser != null && e.UserId == CurrentUser.UserID)
+                {
+                    DebugService.LogInfo("App", $"Current user status changed to {e.PresenceStatus}");
+                    // No need to update our own status as we initiated the change
+                }
+                else
+                {
+                    // This is another user's status change
+
+                    // Show a notification for important status changes (e.g., user coming online)
+                    if (e.IsConnected && e.PresenceStatus == "Online")
+                    {
+                        // Only show notifications for users coming online if they were previously offline
+                        ShowLocalNotification("User Online", $"{e.Username} is now online", true);
+                    }
+
+                    // Update the UsersRightPanel if it's loaded
+                    UpdateUsersRightPanel(e.UserId, e.Username, presenceStatus, e.StatusMessage);
+                }
+
+                // Directly notify the UserPresenceService about the status change
+                // This will propagate the change to all parts of the application that are subscribed to the event
+                if (Services != null)
+                {
+                    var userPresenceService = Services.GetService<IUserPresenceService>();
+                    if (userPresenceService != null)
+                    {
+                        // Create event args for the service
+                        var args = new UserStatusChangedEventArgs
+                        {
+                            UserId = e.UserId,
+                            Username = e.Username,
+                            Status = presenceStatus
+                        };
+
+                        // Update the user status directly
+                        // This will trigger the UserStatusChanged event on the service
+                        // which will notify all subscribers, including the UsersRightPanel
+                        MainThread.BeginInvokeOnMainThread(async () =>
+                        {
+                            try
+                            {
+                                await userPresenceService.UpdateUserStatusAsync(e.UserId, presenceStatus);
+                                DebugService.LogInfo("App", $"Updated user {e.Username} status to {presenceStatus} via UserPresenceService");
+                            }
+                            catch (Exception ex)
+                            {
+                                DebugService.LogError("App", $"Error updating user status via UserPresenceService: {ex.Message}");
+                            }
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugService.LogError("App", $"Error handling user status change: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Updates the user status in the UsersRightPanel if it's currently loaded
+        /// </summary>
+        private void UpdateUsersRightPanel(int userId, string username, UserPresenceStatus status, string statusMessage)
+        {
+            try
+            {
+                // Run on the UI thread
+                MainThread.BeginInvokeOnMainThread(async () =>
+                {
+                    try
+                    {
+                        // Check if Shell is available
+                        if (Shell.Current == null)
+                        {
+                            DebugService.LogWarning("App", "Cannot update UsersRightPanel: Shell.Current is null");
+                            return;
+                        }
+
+                        // Try to find the UsersRightPanel
+                        var usersRightPanel = FindUsersRightPanel();
+
+                        if (usersRightPanel != null)
+                        {
+                            DebugService.LogInfo("App", $"Updating user {username} status to {status} in UsersRightPanel");
+
+                            // Get the Users collection from the panel
+                            var usersProperty = usersRightPanel.GetType().GetProperty("Users");
+                            if (usersProperty != null)
+                            {
+                                var users = usersProperty.GetValue(usersRightPanel) as ObservableCollection<UserViewModel>;
+                                if (users != null)
+                                {
+                                    // Find the user in the collection
+                                    var user = users.FirstOrDefault(u => u.UserId == userId);
+                                    if (user != null)
+                                    {
+                                        // Update the user's status
+                                        user.Status = status;
+                                        if (!string.IsNullOrEmpty(statusMessage))
+                                        {
+                                            user.StatusMessage = statusMessage;
+                                        }
+
+                                        DebugService.LogInfo("App", $"Updated user {username} status in UsersRightPanel");
+                                    }
+                                    else
+                                    {
+                                        DebugService.LogInfo("App", $"User {username} not found in UsersRightPanel, refreshing panel");
+
+                                        // User not found in the collection, try to refresh the panel
+                                        var refreshMethod = usersRightPanel.GetType().GetMethod("RefreshUsersAsync",
+                                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                                        if (refreshMethod != null)
+                                        {
+                                            // Invoke the refresh method
+                                            var task = refreshMethod.Invoke(usersRightPanel, null) as Task;
+                                            if (task != null)
+                                            {
+                                                await task;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            DebugService.LogInfo("App", "UsersRightPanel not currently loaded");
+                            // No need to do anything - the panel will load the latest data when it appears
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugService.LogError("App", $"Error updating UsersRightPanel: {ex.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                DebugService.LogError("App", $"Error in UpdateUsersRightPanel: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Finds the UsersRightPanel instance if it's currently loaded
+        /// </summary>
+        private UsersRightPanel FindUsersRightPanel()
+        {
+            try
+            {
+                // Check if we're currently on the users route
+                bool isOnUsersRoute = Shell.Current.CurrentState.Location?.OriginalString?.EndsWith("//users") ?? false;
+
+                if (isOnUsersRoute)
+                {
+                    // If we're on the users route, the current page should be the UsersRightPanel
+                    if (Shell.Current.CurrentPage is UsersRightPanel panel)
+                    {
+                        return panel;
+                    }
+                }
+
+                // Try to find the UsersRightPanel in the Shell items
+                foreach (var item in Shell.Current.Items)
+                {
+                    if (item is ShellItem shellItem && shellItem.Route == "users")
+                    {
+                        foreach (var section in shellItem.Items)
+                        {
+                            if (section is ShellSection shellSection)
+                            {
+                                foreach (var content in shellSection.Items)
+                                {
+                                    if (content is ShellContent shellContent)
+                                    {
+                                        if (shellContent.Content is UsersRightPanel panel)
+                                        {
+                                            return panel;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                DebugService.LogError("App", $"Error finding UsersRightPanel: {ex.Message}");
+                return null;
+            }
         }
 
         private void ShowLocalNotification(string title, string message, bool silent = false)
@@ -451,6 +827,9 @@ namespace TDFMAUI
             {
                 UpdateUserStatusToOffline();
             }
+
+            // Unregister WebSocketService event handlers to prevent memory leaks
+            UnregisterWebSocketEventHandlers();
         }
 
         private void UpdateUserStatusToOffline()
@@ -484,37 +863,113 @@ namespace TDFMAUI
             }
         }
 
+        /// <summary>
+        /// Registers event handlers for the WebSocketService
+        /// </summary>
+        public void RegisterWebSocketEventHandlers()
+        {
+            try
+            {
+                if (Services != null)
+                {
+                    var webSocketService = Services.GetService<IWebSocketService>();
+                    if (webSocketService != null)
+                    {
+                        DebugService.LogInfo("App", "Registering WebSocketService event handlers");
+
+                        // Unregister first to avoid duplicate handlers
+                        UnregisterWebSocketEventHandlers();
+
+                        // Register event handlers
+                        webSocketService.NotificationReceived += OnNotificationReceived;
+                        webSocketService.ChatMessageReceived += OnChatMessageReceived;
+                        webSocketService.ConnectionStatusChanged += OnConnectionStatusChanged;
+                        webSocketService.UserStatusChanged += OnUserStatusChanged;
+
+                        DebugService.LogInfo("App", "WebSocketService event handlers registered successfully");
+                    }
+                    else
+                    {
+                        DebugService.LogWarning("App", "WebSocketService not available, cannot register event handlers");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugService.LogError("App", $"Error registering WebSocketService event handlers: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Unregisters event handlers for the WebSocketService
+        /// </summary>
+        public void UnregisterWebSocketEventHandlers()
+        {
+            try
+            {
+                if (Services != null)
+                {
+                    var webSocketService = Services.GetService<IWebSocketService>();
+                    if (webSocketService != null)
+                    {
+                        DebugService.LogInfo("App", "Unregistering WebSocketService event handlers");
+
+                        // Unregister event handlers
+                        webSocketService.NotificationReceived -= OnNotificationReceived;
+                        webSocketService.ChatMessageReceived -= OnChatMessageReceived;
+                        webSocketService.ConnectionStatusChanged -= OnConnectionStatusChanged;
+                        webSocketService.UserStatusChanged -= OnUserStatusChanged;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugService.LogError("App", $"Error unregistering WebSocketService event handlers: {ex.Message}");
+            }
+        }
+
         protected override void OnResume()
         {
             base.OnResume();
 
             DebugService.LogInfo("App", "Application resuming");
 
-            // Reconnect WebSocket if it's not connected - DEFER THIS
-            /*
-            if (_webSocketService != null && !_webSocketService.IsConnected)
+            // Re-register WebSocketService event handlers if the user is logged in
+            if (CurrentUser != null)
             {
-                Task.Run(async () =>
+                RegisterWebSocketEventHandlers();
+
+                // Check if WebSocket is connected and reconnect if needed
+                if (Services != null)
                 {
-                    try
+                    var webSocketService = Services.GetService<IWebSocketService>();
+                    if (webSocketService != null && !webSocketService.IsConnected)
                     {
-                        var secureStorage = Services.GetService<SecureStorageService>();
-                        if (secureStorage != null)
+                        DebugService.LogInfo("App", "WebSocket not connected, attempting to reconnect");
+
+                        // Reconnect in a background task
+                        Task.Run(async () =>
                         {
-                            var (token, _) = await secureStorage.GetTokenAsync();
-                            if (!string.IsNullOrEmpty(token))
+                            try
                             {
-                                await _webSocketService.ConnectAsync(token);
+                                var secureStorage = Services.GetService<SecureStorageService>();
+                                if (secureStorage != null)
+                                {
+                                    var (token, _) = await secureStorage.GetTokenAsync();
+                                    if (!string.IsNullOrEmpty(token))
+                                    {
+                                        await webSocketService.ConnectAsync(token);
+                                    }
+                                }
                             }
-                        }
+                            catch (Exception ex)
+                            {
+                                DebugService.LogError("App", $"Error reconnecting WebSocket: {ex.Message}");
+                            }
+                        });
                     }
-                    catch (Exception ex)
-                    {
-                        DebugService.LogError("App", $"Error reconnecting WebSocket: {ex.Message}");
-                    }
-                });
+                }
             }
-            */
         }
 
         private void DisplayFatalErrorPage(string message, Exception ex)

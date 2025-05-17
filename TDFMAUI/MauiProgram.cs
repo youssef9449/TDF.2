@@ -243,6 +243,7 @@ namespace TDFMAUI
             builder.Services.AddSingleton<BooleanToVisibilityConverter>();
             builder.Services.AddSingleton<LeaveTypeToTimePickersVisibilityConverter>();
             builder.Services.AddSingleton<ValidationStateToColorConverter>();  // Added for AddRequestPage.xaml
+            builder.Services.AddSingleton<StatusToColorConverter>();  // Added for DashboardPage.xaml
 
             // Register pages with dependencies
             builder.Services.AddTransient<MessagesPage>();
@@ -258,6 +259,7 @@ namespace TDFMAUI
             builder.Services.AddTransient<SignupPage>();
             builder.Services.AddTransient<RequestDetailsPage>();
             builder.Services.AddTransient<LoginPage>();
+            builder.Services.AddTransient<DashboardPage>(); // Add DashboardPage
 
             // Add missing pages used in AppShell.xaml
             builder.Services.AddTransient<MainPage>();

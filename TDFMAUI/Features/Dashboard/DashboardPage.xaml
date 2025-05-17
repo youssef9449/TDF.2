@@ -6,12 +6,10 @@
              xmlns:dto="clr-namespace:TDFShared.DTOs.Requests;assembly=TDFShared"
              xmlns:messages="clr-namespace:TDFShared.DTOs.Messages;assembly=TDFShared"
              xmlns:models="clr-namespace:TDFShared.Models.Notification;assembly=TDFShared"
-             x:Class="TDFMAUI.Features.Dashboard.DashboardPage" 
+             x:Class="TDFMAUI.Features.Dashboard.DashboardPage"
              Title="Dashboard">
 
-    <ContentPage.BindingContext>
-        <vm:DashboardViewModel />
-    </ContentPage.BindingContext>
+    <!-- BindingContext is set in code-behind -->
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -47,165 +45,168 @@
 
     <RefreshView Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsRefreshing}">
         <ScrollView>
-            <!-- DESKTOP LAYOUT -->
-             <Grid IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}" Padding="20" RowDefinitions="Auto,Auto,*" RowSpacing="20">
-                <!-- Welcome Section -->
-                <VerticalStackLayout Grid.Row="0" Spacing="4">
-                    <Label Text="{Binding WelcomeMessage}" FontSize="24" FontAttributes="Bold" />
-                    <Label Text="{Binding CurrentDate, StringFormat='{0:dddd, MMMM d, yyyy}'}" FontSize="16" TextColor="{StaticResource Gray700}" />
-                </VerticalStackLayout>
-                <!-- Statistics Overview -->
-                 <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="16">
-                     <!-- Cards -->
-                     <Border Grid.Column="0" Style="{StaticResource DesktopCardStyle}" BackgroundColor="{StaticResource Yellow100}">
-                         <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
-                            <Label Grid.Row="0" Text="Pending Requests" FontSize="14" TextColor="{StaticResource Gray700}" />
-                            <Label Grid.Row="1" Text="{Binding PendingRequestsCount}" FontSize="32" FontAttributes="Bold" />
-                        </Grid>
-                     </Border>
-                     <Border Grid.Column="1" Style="{StaticResource DesktopCardStyle}" BackgroundColor="{StaticResource Blue100}">
-                        <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
-                            <Label Grid.Row="0" Text="Unread Notifications" FontSize="14" TextColor="{StaticResource Gray700}" />
-                            <Label Grid.Row="1" Text="{Binding UnreadNotificationsCount}" FontSize="32" FontAttributes="Bold" />
-                        </Grid>
-                     </Border>
-                     <Border Grid.Column="2" Style="{StaticResource DesktopCardStyle}" BackgroundColor="{StaticResource Green100}">
-                        <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
-                            <Label Grid.Row="0" Text="Unread Messages" FontSize="14" TextColor="{StaticResource Gray700}" />
-                            <Label Grid.Row="1" Text="{Binding UnreadMessagesCount}" FontSize="32" FontAttributes="Bold" />
-                        </Grid>
-                    </Border>
-                 </Grid>
-                <!-- Two Column Layout -->
-                 <Grid Grid.Row="2" ColumnDefinitions="1*,1*" ColumnSpacing="20">
-                     <!-- Recent Requests -->
-                     <Border Grid.Column="0" Style="{StaticResource DesktopCardStyle}">
-                         <VerticalStackLayout>
-                             <Grid ColumnDefinitions="*,Auto">
-                                <Label Text="Recent Requests" FontSize="18" FontAttributes="Bold" />
+            <!-- Main container grid to hold both layouts -->
+            <Grid>
+                <!-- DESKTOP LAYOUT -->
+                <Grid IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}" Padding="20" RowDefinitions="Auto,Auto,*" RowSpacing="20">
+                    <!-- Welcome Section -->
+                    <VerticalStackLayout Grid.Row="0" Spacing="4">
+                        <Label Text="{Binding WelcomeMessage}" FontSize="24" FontAttributes="Bold" />
+                        <Label Text="{Binding CurrentDate, StringFormat='{0:dddd, MMMM d, yyyy}'}" FontSize="16" TextColor="{StaticResource Gray700}" />
+                    </VerticalStackLayout>
+                    <!-- Statistics Overview -->
+                    <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="16">
+                        <!-- Cards -->
+                        <Border Grid.Column="0" Style="{StaticResource DesktopCardStyle}" BackgroundColor="{StaticResource Yellow100}">
+                            <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+                                <Label Grid.Row="0" Text="Pending Requests" FontSize="14" TextColor="{StaticResource Gray700}" />
+                                <Label Grid.Row="1" Text="{Binding PendingRequestsCount}" FontSize="32" FontAttributes="Bold" />
+                            </Grid>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource DesktopCardStyle}" BackgroundColor="{StaticResource Blue100}">
+                            <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+                                <Label Grid.Row="0" Text="Unread Notifications" FontSize="14" TextColor="{StaticResource Gray700}" />
+                                <Label Grid.Row="1" Text="{Binding UnreadNotificationsCount}" FontSize="32" FontAttributes="Bold" />
+                            </Grid>
+                        </Border>
+                        <Border Grid.Column="2" Style="{StaticResource DesktopCardStyle}" BackgroundColor="{StaticResource Green100}">
+                            <Grid RowDefinitions="Auto,Auto" RowSpacing="8">
+                                <Label Grid.Row="0" Text="Unread Messages" FontSize="14" TextColor="{StaticResource Gray700}" />
+                                <Label Grid.Row="1" Text="{Binding UnreadMessagesCount}" FontSize="32" FontAttributes="Bold" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <!-- Two Column Layout -->
+                    <Grid Grid.Row="2" ColumnDefinitions="1*,1*" ColumnSpacing="20">
+                        <!-- Recent Requests -->
+                        <Border Grid.Column="0" Style="{StaticResource DesktopCardStyle}">
+                            <VerticalStackLayout>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Label Text="Recent Requests" FontSize="18" FontAttributes="Bold" />
+                                    <Button Grid.Column="1" Text="View All" Command="{Binding ViewAllRequestsCommand}" FontSize="12" HeightRequest="30" WidthRequest="80" Padding="0" />
+                                </Grid>
+                                <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,10" />
+                                <CollectionView ItemsSource="{Binding RecentRequests}" HeightRequest="300" EmptyView="No recent requests">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="dto:LeaveRequestDto">
+                                            <Grid Padding="5" ColumnDefinitions="*,Auto">
+                                                <VerticalStackLayout Spacing="4">
+                                                    <Label Text="{Binding Type}" FontAttributes="Bold" />
+                                                    <Label Text="{Binding DateRange}" FontSize="12" />
+                                                    <Label Text="{Binding Status}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}" FontSize="12" />
+                                                </VerticalStackLayout>
+                                                <Button Grid.Column="1" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DashboardViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding Id}" FontSize="12" HeightRequest="30" WidthRequest="60" VerticalOptions="Center" Padding="0" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </VerticalStackLayout>
+                        </Border>
+                        <!-- Recent Notifications -->
+                        <Border Grid.Column="1" Style="{StaticResource DesktopCardStyle}">
+                            <VerticalStackLayout>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Label Text="Recent Notifications" FontSize="18" FontAttributes="Bold" />
+                                    <Button Grid.Column="1" Text="View All" Command="{Binding ViewAllNotificationsCommand}" FontSize="12" HeightRequest="30" WidthRequest="80" Padding="0" />
+                                </Grid>
+                                <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,10" />
+                                <CollectionView ItemsSource="{Binding RecentNotifications}" HeightRequest="300" EmptyView="No notifications">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="messages:NotificationDto">
+                                            <Grid Padding="5" RowDefinitions="Auto,Auto" RowSpacing="4">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <Label Text="{Binding Title}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                                    <Label Grid.Column="1" Text="{Binding Timestamp, StringFormat='{0:g}'}" FontSize="10" />
+                                                </Grid>
+                                                <Label Grid.Row="1" Text="{Binding Message}" FontSize="12" LineBreakMode="TailTruncation" MaxLines="2" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </VerticalStackLayout>
+                        </Border>
+                    </Grid>
+                </Grid>
+
+                <!-- MOBILE LAYOUT -->
+                <VerticalStackLayout IsVisible="{x:Static helpers:DeviceHelper.IsMobile}" Padding="16" Spacing="16">
+                    <!-- Welcome Section -->
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="{Binding WelcomeMessage}" FontSize="20" FontAttributes="Bold" />
+                        <Label Text="{Binding CurrentDate, StringFormat='{0:dddd, MMMM d}'}" FontSize="14" TextColor="{StaticResource Gray700}" />
+                    </VerticalStackLayout>
+                    <!-- Stats Cards -->
+                    <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                        <HorizontalStackLayout Spacing="12">
+                            <Border Style="{StaticResource MobileCardStyle}" BackgroundColor="{StaticResource Yellow100}" WidthRequest="140">
+                                <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+                                    <Label Grid.Row="0" Text="Pending" FontSize="12" TextColor="{StaticResource Gray700}" />
+                                    <Label Grid.Row="1" Text="{Binding PendingRequestsCount}" FontSize="24" FontAttributes="Bold" />
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource MobileCardStyle}" BackgroundColor="{StaticResource Blue100}" WidthRequest="140">
+                                <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+                                    <Label Grid.Row="0" Text="Notifications" FontSize="12" TextColor="{StaticResource Gray700}" />
+                                    <Label Grid.Row="1" Text="{Binding UnreadNotificationsCount}" FontSize="24" FontAttributes="Bold" />
+                                </Grid>
+                            </Border>
+                            <Border Style="{StaticResource MobileCardStyle}" BackgroundColor="{StaticResource Green100}" WidthRequest="140">
+                                <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+                                    <Label Grid.Row="0" Text="Messages" FontSize="12" TextColor="{StaticResource Gray700}" />
+                                    <Label Grid.Row="1" Text="{Binding UnreadMessagesCount}" FontSize="24" FontAttributes="Bold" />
+                                </Grid>
+                            </Border>
+                        </HorizontalStackLayout>
+                    </ScrollView>
+                    <!-- Recent Requests -->
+                    <Border Style="{StaticResource MobileCardStyle}">
+                        <VerticalStackLayout>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="Recent Requests" FontSize="16" FontAttributes="Bold" />
                                 <Button Grid.Column="1" Text="View All" Command="{Binding ViewAllRequestsCommand}" FontSize="12" HeightRequest="30" WidthRequest="80" Padding="0" />
                             </Grid>
-                            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,10" />
-                            <CollectionView ItemsSource="{Binding RecentRequests}" HeightRequest="300" EmptyView="No recent requests">
-                                 <CollectionView.ItemTemplate>
-                                     <DataTemplate x:DataType="dto:LeaveRequestDto">
+                            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,8" />
+                            <CollectionView ItemsSource="{Binding RecentRequests}" HeightRequest="200" EmptyView="No recent requests">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="dto:LeaveRequestDto">
                                         <Grid Padding="5" ColumnDefinitions="*,Auto">
-                                            <VerticalStackLayout Spacing="4">
-                                                <Label Text="{Binding Type}" FontAttributes="Bold" />
-                                                <Label Text="{Binding DateRange}" FontSize="12" />
-                                                <Label Text="{Binding Status}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}" FontSize="12" />
+                                            <VerticalStackLayout Spacing="2">
+                                                <Label Text="{Binding Type}" FontAttributes="Bold" FontSize="14"/>
+                                                <Label Text="{Binding DateRange}" FontSize="11" />
+                                                <Label Text="{Binding Status}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}" FontSize="11" />
                                             </VerticalStackLayout>
                                             <Button Grid.Column="1" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DashboardViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding Id}" FontSize="12" HeightRequest="30" WidthRequest="60" VerticalOptions="Center" Padding="0" />
                                         </Grid>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
-                             </CollectionView>
-                         </VerticalStackLayout>
-                     </Border>
+                            </CollectionView>
+                        </VerticalStackLayout>
+                    </Border>
                     <!-- Recent Notifications -->
-                     <Border Grid.Column="1" Style="{StaticResource DesktopCardStyle}">
+                    <Border Style="{StaticResource MobileCardStyle}">
                         <VerticalStackLayout>
-                             <Grid ColumnDefinitions="*,Auto">
-                                <Label Text="Recent Notifications" FontSize="18" FontAttributes="Bold" />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="Recent Notifications" FontSize="16" FontAttributes="Bold" />
                                 <Button Grid.Column="1" Text="View All" Command="{Binding ViewAllNotificationsCommand}" FontSize="12" HeightRequest="30" WidthRequest="80" Padding="0" />
                             </Grid>
-                            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,10" />
-                            <CollectionView ItemsSource="{Binding RecentNotifications}" HeightRequest="300" EmptyView="No notifications">
-                                 <CollectionView.ItemTemplate>
+                            <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,8" />
+                            <CollectionView ItemsSource="{Binding RecentNotifications}" HeightRequest="200" EmptyView="No notifications">
+                                <CollectionView.ItemTemplate>
                                     <DataTemplate x:DataType="messages:NotificationDto">
-                                        <Grid Padding="5" RowDefinitions="Auto,Auto" RowSpacing="4">
-                                             <Grid ColumnDefinitions="*,Auto">
-                                                <Label Text="{Binding Title}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                        <Grid Padding="5" RowDefinitions="Auto,Auto" RowSpacing="2">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <Label Text="{Binding Title}" FontAttributes="Bold" LineBreakMode="TailTruncation" FontSize="14"/>
                                                 <Label Grid.Column="1" Text="{Binding Timestamp, StringFormat='{0:g}'}" FontSize="10" />
                                             </Grid>
-                                            <Label Grid.Row="1" Text="{Binding Message}" FontSize="12" LineBreakMode="TailTruncation" MaxLines="2" />
+                                            <Label Grid.Row="1" Text="{Binding Message}" FontSize="11" LineBreakMode="TailTruncation" MaxLines="2" />
                                         </Grid>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>
-                             </CollectionView>
+                            </CollectionView>
                         </VerticalStackLayout>
-                     </Border>
-                </Grid>
-            </Grid>
-            
-            <!-- MOBILE LAYOUT -->
-            <VerticalStackLayout IsVisible="{x:Static helpers:DeviceHelper.IsMobile}" Padding="16" Spacing="16">
-                 <!-- Welcome Section -->
-                <VerticalStackLayout Spacing="4">
-                    <Label Text="{Binding WelcomeMessage}" FontSize="20" FontAttributes="Bold" />
-                    <Label Text="{Binding CurrentDate, StringFormat='{0:dddd, MMMM d}'}" FontSize="14" TextColor="{StaticResource Gray700}" />
+                    </Border>
                 </VerticalStackLayout>
-                <!-- Stats Cards -->
-                 <ScrollView Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
-                     <HorizontalStackLayout Spacing="12">
-                        <Border Style="{StaticResource MobileCardStyle}" BackgroundColor="{StaticResource Yellow100}" WidthRequest="140">
-                            <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
-                                <Label Grid.Row="0" Text="Pending" FontSize="12" TextColor="{StaticResource Gray700}" />
-                                <Label Grid.Row="1" Text="{Binding PendingRequestsCount}" FontSize="24" FontAttributes="Bold" />
-                            </Grid>
-                        </Border>
-                         <Border Style="{StaticResource MobileCardStyle}" BackgroundColor="{StaticResource Blue100}" WidthRequest="140">
-                            <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
-                                <Label Grid.Row="0" Text="Notifications" FontSize="12" TextColor="{StaticResource Gray700}" />
-                                <Label Grid.Row="1" Text="{Binding UnreadNotificationsCount}" FontSize="24" FontAttributes="Bold" />
-                            </Grid>
-                        </Border>
-                         <Border Style="{StaticResource MobileCardStyle}" BackgroundColor="{StaticResource Green100}" WidthRequest="140">
-                             <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
-                                <Label Grid.Row="0" Text="Messages" FontSize="12" TextColor="{StaticResource Gray700}" />
-                                <Label Grid.Row="1" Text="{Binding UnreadMessagesCount}" FontSize="24" FontAttributes="Bold" />
-                            </Grid>
-                        </Border>
-                    </HorizontalStackLayout>
-                </ScrollView>
-                <!-- Recent Requests -->
-                <Border Style="{StaticResource MobileCardStyle}">
-                     <VerticalStackLayout>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Text="Recent Requests" FontSize="16" FontAttributes="Bold" />
-                            <Button Grid.Column="1" Text="View All" Command="{Binding ViewAllRequestsCommand}" FontSize="12" HeightRequest="30" WidthRequest="80" Padding="0" />
-                        </Grid>
-                        <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,8" />
-                        <CollectionView ItemsSource="{Binding RecentRequests}" HeightRequest="200" EmptyView="No recent requests">
-                             <CollectionView.ItemTemplate>
-                                 <DataTemplate x:DataType="dto:LeaveRequestDto">
-                                    <Grid Padding="5" ColumnDefinitions="*,Auto">
-                                         <VerticalStackLayout Spacing="2">
-                                            <Label Text="{Binding Type}" FontAttributes="Bold" FontSize="14"/>
-                                            <Label Text="{Binding DateRange}" FontSize="11" />
-                                            <Label Text="{Binding Status}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}" FontSize="11" />
-                                        </VerticalStackLayout>
-                                        <Button Grid.Column="1" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DashboardViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding Id}" FontSize="12" HeightRequest="30" WidthRequest="60" VerticalOptions="Center" Padding="0" />
-                                    </Grid>
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-                    </VerticalStackLayout>
-                 </Border>
-                 <!-- Recent Notifications -->
-                 <Border Style="{StaticResource MobileCardStyle}">
-                     <VerticalStackLayout>
-                        <Grid ColumnDefinitions="*,Auto">
-                            <Label Text="Recent Notifications" FontSize="16" FontAttributes="Bold" />
-                             <Button Grid.Column="1" Text="View All" Command="{Binding ViewAllNotificationsCommand}" FontSize="12" HeightRequest="30" WidthRequest="80" Padding="0" />
-                        </Grid>
-                         <BoxView HeightRequest="1" Color="{StaticResource Gray300}" Margin="0,8" />
-                         <CollectionView ItemsSource="{Binding RecentNotifications}" HeightRequest="200" EmptyView="No notifications">
-                            <CollectionView.ItemTemplate>
-                                 <DataTemplate x:DataType="messages:NotificationDto">
-                                    <Grid Padding="5" RowDefinitions="Auto,Auto" RowSpacing="2">
-                                         <Grid ColumnDefinitions="*,Auto">
-                                            <Label Text="{Binding Title}" FontAttributes="Bold" LineBreakMode="TailTruncation" FontSize="14"/>
-                                            <Label Grid.Column="1" Text="{Binding Timestamp, StringFormat='{0:g}'}" FontSize="10" />
-                                        </Grid>
-                                        <Label Grid.Row="1" Text="{Binding Message}" FontSize="11" LineBreakMode="TailTruncation" MaxLines="2" />
-                                    </Grid>
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-                    </VerticalStackLayout>
-                 </Border>
-            </VerticalStackLayout>
+            </Grid>
         </ScrollView>
     </RefreshView>
-</ContentPage> 
+</ContentPage>

@@ -6,8 +6,8 @@
     xmlns:local="clr-namespace:TDFMAUI"
     xmlns:pages="clr-namespace:TDFMAUI.Pages"
     xmlns:admin="clr-namespace:TDFMAUI.Features.Admin"
-    xmlns:messaging="clr-namespace:TDFMAUI.Features.Messaging"
     xmlns:requests="clr-namespace:TDFMAUI.Features.Requests"
+    xmlns:dashboard="clr-namespace:TDFMAUI.Features.Dashboard"
     Shell.FlyoutBehavior="Flyout"
     FlyoutBackgroundColor="#512BD4">
 
@@ -15,8 +15,8 @@
         <Grid ColumnDefinitions="*,Auto">
             <!-- Existing Title or leave empty for page titles to show -->
             <ImageButton Grid.Column="1"
-                         Source="users_panel_icon.png" 
-                         Clicked="OpenUsersFlyout_Tapped" 
+                         Source="users_panel_icon.png"
+                         Clicked="OpenUsersFlyout_Tapped"
                          IsVisible="{Binding Source={RelativeSource AncestorType={x:Type local:AppShell}}, Path=IsDesktopUser}"
                          HeightRequest="30"
                          WidthRequest="30"
@@ -38,7 +38,7 @@
 
     <TabBar>
         <Tab Title="Home" Icon="home.png">
-            <ShellContent ContentTemplate="{DataTemplate local:MainPage}" />
+            <ShellContent ContentTemplate="{DataTemplate dashboard:DashboardPage}" />
         </Tab>
 
         <Tab Title="Messages" Icon="messages.png">

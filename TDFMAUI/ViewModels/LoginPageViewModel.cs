@@ -109,8 +109,9 @@ namespace TDFMAUI.ViewModels
                                 // Now try to navigate if Shell.Current is available
                                 if (Shell.Current != null)
                                 {
-                                    _logger.LogInformation("Shell.Current is now available, navigating to MainPage");
-                                    await Shell.Current.GoToAsync($"//{nameof(MainPage)}");
+                                    _logger.LogInformation("Shell.Current is now available, navigating to Home tab");
+                                    // Navigate to the first tab (Home) which now contains DashboardPage
+                                    await Shell.Current.GoToAsync("//");
                                 }
                             }
                             else
@@ -147,8 +148,9 @@ namespace TDFMAUI.ViewModels
                                 // Now try to navigate if Shell.Current is available
                                 if (Shell.Current != null)
                                 {
-                                    _logger.LogInformation("Shell.Current is now available, navigating to MainPage (secondary navigation)");
-                                    await Shell.Current.GoToAsync($"//{nameof(MainPage)}");
+                                    _logger.LogInformation("Shell.Current is now available, navigating to Home tab (secondary navigation)");
+                                    // Navigate to the first tab (Home) which now contains DashboardPage
+                                    await Shell.Current.GoToAsync("//");
                                 }
                             }
                             else

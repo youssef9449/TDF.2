@@ -89,6 +89,14 @@ namespace TDFMAUI.Services
                         _logger.LogWarning("Cannot connect WebSocket: No authentication token available");
                         return false;
                     }
+                    else
+                    {
+                        _logger.LogInformation("Retrieved token from secure storage for WebSocket connection. Token length: {Length}", token.Length);
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("Using provided token for WebSocket connection. Token length: {Length}", token.Length);
                 }
 
                 // Create new WebSocket and cancellation token
@@ -99,7 +107,15 @@ namespace TDFMAUI.Services
                 _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
 
                 // Log token length for debugging (don't log the actual token)
-                _logger.LogDebug("WebSocket using token of length {TokenLength}", token?.Length ?? 0);
+                _logger.LogInformation("WebSocket using token of length {TokenLength}", token?.Length ?? 0);
+
+                // Log the first and last 5 characters of the token for debugging (but not the whole token)
+                if (token?.Length > 10)
+                {
+                    string tokenPrefix = token.Substring(0, 5);
+                    string tokenSuffix = token.Substring(token.Length - 5);
+                    _logger.LogInformation("WebSocket token prefix: {Prefix}..., suffix: ...{Suffix}", tokenPrefix, tokenSuffix);
+                }
 
                 // Add explicit certificate validation for development mode
                 if (ApiConfig.DevelopmentMode)

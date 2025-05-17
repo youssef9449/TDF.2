@@ -33,7 +33,8 @@ public class RequestService : IRequestService
 
     public async Task<RequestResponseDto> CreateRequestAsync(RequestCreateDto requestDto)
     {
-        var uri = $"{_baseApiUrl}{ApiRoutes.Requests.Base}";
+        // Fix: Use "api/requests" instead of ApiRoutes.Requests.Base
+        var uri = $"{_baseApiUrl}api/requests";
         _logger.LogInformation("Sending POST request to {Uri}", uri);
         // Add Authentication Header if needed
         // _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "YOUR_TOKEN");
@@ -43,19 +44,21 @@ public class RequestService : IRequestService
 
     public async Task<RequestResponseDto> UpdateRequestAsync(Guid requestId, RequestUpdateDto requestDto)
     {
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetById, requestId)}";
+        // Fix: Use "api/requests/{id}" instead of ApiRoutes.Requests.GetById
+        var uri = $"{_baseApiUrl}api/requests/{requestId}";
         _logger.LogInformation("Sending PUT request to {Uri}", uri);
         // Add Authentication Header if needed
         var response = await _httpClient.PutAsJsonAsync(uri, requestDto, _serializerOptions);
         return await HandleApiResponse<RequestResponseDto>(response, "UpdateRequestAsync");
     }
 
-    // --- New Method Implementations --- 
+    // --- New Method Implementations ---
 
     public async Task<PaginatedResult<RequestResponseDto>> GetMyRequestsAsync(RequestPaginationDto pagination)
     {
         var queryString = BuildQueryString(pagination);
-        var uri = $"{_baseApiUrl}{ApiRoutes.Requests.GetMy}{queryString}";
+        // Fix: Use "api/requests/my" instead of ApiRoutes.Requests.GetMy
+        var uri = $"{_baseApiUrl}api/requests/my{queryString}";
         _logger.LogInformation("Sending GET request to {Uri}", uri);
         var response = await _httpClient.GetAsync(uri);
         return await HandleApiResponse<PaginatedResult<RequestResponseDto>>(response, "GetMyRequestsAsync");
@@ -64,7 +67,8 @@ public class RequestService : IRequestService
     public async Task<PaginatedResult<RequestResponseDto>> GetAllRequestsAsync(RequestPaginationDto pagination)
     {
         var queryString = BuildQueryString(pagination);
-        var uri = $"{_baseApiUrl}{ApiRoutes.Requests.Base}{queryString}";
+        // Fix: Use "requests" instead of "request" to match the server-side route
+        var uri = $"{_baseApiUrl}api/requests{queryString}";
         _logger.LogInformation("Sending GET request to {Uri}", uri);
         var response = await _httpClient.GetAsync(uri);
         return await HandleApiResponse<PaginatedResult<RequestResponseDto>>(response, "GetAllRequestsAsync");
@@ -73,7 +77,8 @@ public class RequestService : IRequestService
     public async Task<PaginatedResult<RequestResponseDto>> GetRequestsByDepartmentAsync(string department, RequestPaginationDto pagination)
     {
         var queryString = BuildQueryString(pagination);
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetByDepartment, Uri.EscapeDataString(department))}{queryString}";
+        // Fix: Use "api/requests/department/{department}" instead of ApiRoutes.Requests.GetByDepartment
+        var uri = $"{_baseApiUrl}api/requests/department/{Uri.EscapeDataString(department)}{queryString}";
         _logger.LogInformation("Sending GET request to {Uri}", uri);
         var response = await _httpClient.GetAsync(uri);
         return await HandleApiResponse<PaginatedResult<RequestResponseDto>>(response, "GetRequestsByDepartmentAsync");
@@ -81,7 +86,8 @@ public class RequestService : IRequestService
 
     public async Task<RequestResponseDto> GetRequestByIdAsync(Guid requestId)
     {
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetById, requestId)}";
+        // Fix: Use "api/requests/{id}" instead of ApiRoutes.Requests.GetById
+        var uri = $"{_baseApiUrl}api/requests/{requestId}";
         _logger.LogInformation("Sending GET request to {Uri}", uri);
         // Add Authentication Header if needed
         var response = await _httpClient.GetAsync(uri);
@@ -90,7 +96,8 @@ public class RequestService : IRequestService
 
     public async Task<bool> DeleteRequestAsync(Guid requestId)
     {
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetById, requestId)}";
+        // Fix: Use "api/requests/{id}" instead of ApiRoutes.Requests.GetById
+        var uri = $"{_baseApiUrl}api/requests/{requestId}";
         _logger.LogInformation("Sending DELETE request to {Uri}", uri);
         // Add Authentication Header if needed
         var response = await _httpClient.DeleteAsync(uri);
@@ -101,7 +108,8 @@ public class RequestService : IRequestService
 
     public async Task<bool> ApproveRequestAsync(Guid requestId, RequestApprovalDto approvalDto)
     {
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.Approve, requestId)}";
+        // Fix: Use "api/requests/{id}/approve" instead of ApiRoutes.Requests.Approve
+        var uri = $"{_baseApiUrl}api/requests/{requestId}/approve";
         _logger.LogInformation("Sending POST request to {Uri}", uri);
         // Add Authentication Header if needed
         var response = await _httpClient.PostAsJsonAsync(uri, approvalDto, _serializerOptions);
@@ -112,7 +120,8 @@ public class RequestService : IRequestService
 
     public async Task<bool> RejectRequestAsync(Guid requestId, RequestRejectDto rejectDto)
     {
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.Reject, requestId)}";
+        // Fix: Use "api/requests/{id}/reject" instead of ApiRoutes.Requests.Reject
+        var uri = $"{_baseApiUrl}api/requests/{requestId}/reject";
         _logger.LogInformation("Sending POST request to {Uri}", uri);
         // Add Authentication Header if needed
         var response = await _httpClient.PostAsJsonAsync(uri, rejectDto, _serializerOptions);
@@ -190,4 +199,4 @@ public class RequestService : IRequestService
 //{
 //    public ApiException(string message) : base(message) { }
 //    public ApiException(string message, Exception innerException) : base(message, innerException) { }
-//} 
+//}

@@ -167,6 +167,8 @@
 		<AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
 		<PackageCertificateKeyFile>TDFMAUI_TemporaryKey.pfx</PackageCertificateKeyFile>
 		<AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+		<!-- Set OutputType to WinExe for Windows to hide console window -->
+		<OutputType>WinExe</OutputType>
 		<AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
 		<AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
 		<GenerateTestArtifacts>False</GenerateTestArtifacts>

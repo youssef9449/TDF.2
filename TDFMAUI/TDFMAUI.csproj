@@ -2,8 +2,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net8.0-ios;net8.0-maccatalyst;net8.0-android</TargetFrameworks>
-		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net8.0-windows10.0.19041.0</TargetFrameworks>
+		<!-- Temporarily disable non-Windows targets to focus on fixing Windows build -->
+		<!-- <TargetFrameworks>net8.0-ios;net8.0-maccatalyst;net8.0-android</TargetFrameworks> -->
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">net8.0-windows10.0.19041.0</TargetFrameworks>
 
 		<!-- Disable AOT compilation for all platforms -->
 		<RunAOTCompilation>false</RunAOTCompilation>
@@ -21,9 +22,10 @@
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>disable</Nullable>
-		<WarningsNotAsErrors>NU1605</WarningsNotAsErrors>
-		<NoWarn>$(NoWarn);CS1998;CS8632;CS0067;NU1100</NoWarn> <!-- Suppress specific C# warnings and NuGet warnings -->
+		<WarningsNotAsErrors>NU1605;NU1608;NU1603</WarningsNotAsErrors>
+		<NoWarn>$(NoWarn);CS1998;CS8632;CS0067;NU1100;NU1605;NU1608;NU1603</NoWarn> <!-- Suppress specific C# warnings and NuGet warnings -->
 		<NullabilityInfoContextSupport>true</NullabilityInfoContextSupport>
+		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
 
 		<!-- Windows Specific -->
 		<WindowsPackageType>None</WindowsPackageType>
@@ -42,21 +44,22 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">11.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
-		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.19041.0</TargetPlatformMinVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
 
 		<!-- Fix missing AppManifest error -->
 		<GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
 		<CreateAppxPackageOnBuild>false</CreateAppxPackageOnBuild>
-		<EnableMsixTooling>false</EnableMsixTooling>
 		<DisableMsixProjectCapabilityAddedByProject>true</DisableMsixProjectCapabilityAddedByProject>
-		<WindowsPackageType>None</WindowsPackageType>
 
 		<!-- Settings for standalone execution -->
 		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
 		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+
+		<!-- Make sure WindowsAppSDK has consistent version -->
+		<WindowsAppSDKVersion>1.7.250310001</WindowsAppSDKVersion>
 	</PropertyGroup>
 
 	<!-- Android specific JAVAC options -->
@@ -92,8 +95,8 @@
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.1" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="8.0.40" />
+		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.40" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
@@ -138,10 +141,10 @@
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
 	  <PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop">
-	    <Version>8.0.100</Version>
+	    <Version>8.0.40</Version>
 	  </PackageReference>
-	  <!-- Add direct reference to Microsoft.WindowsAppSDK to control the version -->
-	  <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240802000" />
+	  <!-- Keep only the essential WindowsAppSDK package -->
+	  <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250310001" />
 	</ItemGroup>
 
 	<!-- Android-specific references -->
@@ -162,7 +165,7 @@
 		<WindowsPackageType>None</WindowsPackageType>
 		<WindowsPackageTargetPlatform>x64</WindowsPackageTargetPlatform>
 		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-		<EnableMsixTooling>false</EnableMsixTooling>
+		<EnableMsixTooling>true</EnableMsixTooling>
 		<GenerateAppInstallerFile>False</GenerateAppInstallerFile>
 		<AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>
 		<PackageCertificateKeyFile>TDFMAUI_TemporaryKey.pfx</PackageCertificateKeyFile>
@@ -183,7 +186,6 @@
 		<DisableMsixProjectCapabilityAddedByProject>true</DisableMsixProjectCapabilityAddedByProject>
 		<DisableXbfLineInfo>true</DisableXbfLineInfo>
 		<GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
-		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 
 		<!-- Settings for standalone execution -->
 		<SelfContained>true</SelfContained>
@@ -299,13 +301,6 @@
 			<MsixSkipResourceGeneration>true</MsixSkipResourceGeneration>
 		</PropertyGroup>
 	</Target>
-
-	<!-- Disable all Windows App SDK packaging -->
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
-		<EnableMsixTooling>false</EnableMsixTooling>
-		<WindowsPackageType>None</WindowsPackageType>
-		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-	</PropertyGroup>
 
 	<!-- Copy all required files for standalone execution -->
 	<Target Name="CopyFilesForStandaloneExecution" AfterTargets="Build" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">

@@ -49,16 +49,16 @@ namespace TDFMAUI.Features.Dashboard
         private bool isRefreshing;
 
         public DashboardViewModel(
-            ApiService apiService, 
+            ApiService apiService,
             INotificationService notificationService,
-            ILogger<DashboardViewModel> logger) 
+            ILogger<DashboardViewModel> logger)
         {
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
             _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             Title = "Dashboard";
-            
+
             // Set personalized welcome message if user is available
             if (App.CurrentUser != null)
             {
@@ -66,10 +66,10 @@ namespace TDFMAUI.Features.Dashboard
                 string firstName = App.CurrentUser.FullName?.Split(' ').FirstOrDefault() ?? "User";
                 WelcomeMessage = $"Welcome back, {firstName}!";
             }
-            
+
             // Subscribe to user changed event to update welcome message
             App.UserChanged += OnUserChanged;
-            
+
             // Initialize with a refresh
         }
 
@@ -120,22 +120,22 @@ namespace TDFMAUI.Features.Dashboard
             try
             {
                 _logger.LogInformation("Refreshing dashboard data");
-                
+
                 // Update current date
                 CurrentDate = DateTime.Now;
-                
+
                 // Fetch all data in parallel for better performance
                 var statsTask = LoadStatsAsync();
                 var requestsTask = LoadRecentRequestsAsync();
                 var notificationsTask = LoadRecentNotificationsAsync();
 
                 await Task.WhenAll(statsTask, requestsTask, notificationsTask);
-                
+
                 // Update UI state flags
                 HasRecentRequests = RecentRequests.Count > 0;
                 HasRecentNotifications = RecentNotifications.Count > 0;
-                _isDataLoaded = true;
-                
+                IsDataLoaded = true;
+
                 _logger.LogInformation("Dashboard refresh completed successfully");
             }
             catch (Exception ex)
@@ -159,25 +159,25 @@ namespace TDFMAUI.Features.Dashboard
                     _logger.LogWarning("Cannot load stats: Current user is null");
                     return;
                 }
-                
+
                 // Get pending requests count
-                var pendingPagination = new RequestPaginationDto 
-                { 
+                var pendingPagination = new RequestPaginationDto
+                {
                     PageSize = 1,
                     FilterStatus = "Pending", // Corrected property name
                     CountOnly = true
                 };
                 var pendingResult = await _apiService.GetRequestsAsync(pendingPagination, App.CurrentUser.UserID);
                 PendingRequestsCount = pendingResult?.TotalCount ?? 0;
-                
+
                 // Get unread notifications count
                 var notifications = await _notificationService.GetUnreadNotificationsAsync();
                 UnreadNotificationsCount = notifications?.Count() ?? 0;
-                
+
                 // Get unread messages count
                 UnreadMessagesCount = await _notificationService.GetUnreadMessagesCountAsync();
-                
-                _logger.LogInformation("Stats loaded: {PendingRequests} pending requests, {UnreadNotifications} unread notifications, {UnreadMessages} unread messages", 
+
+                _logger.LogInformation("Stats loaded: {PendingRequests} pending requests, {UnreadNotifications} unread notifications, {UnreadMessages} unread messages",
                     PendingRequestsCount, UnreadNotificationsCount, UnreadMessagesCount);
             }
             catch (Exception ex)
@@ -200,16 +200,16 @@ namespace TDFMAUI.Features.Dashboard
                     RecentRequests.Clear();
                     return;
                 }
-                
-                var pagination = new RequestPaginationDto 
-                { 
+
+                var pagination = new RequestPaginationDto
+                {
                     PageSize = 5,
                     SortBy = "CreatedDate",
                     Ascending = false // Corrected property name and value type
                 };
-                
+
                 var result = await _apiService.GetRequestsAsync(pagination, App.CurrentUser.UserID);
-                
+
                 RecentRequests.Clear();
                 if (result?.Items != null)
                 {
@@ -241,9 +241,9 @@ namespace TDFMAUI.Features.Dashboard
                     RecentNotifications.Clear();
                     return;
                 }
-                
+
                 var notificationEntities = await _notificationService.GetUnreadNotificationsAsync();
-                
+
                 RecentNotifications.Clear();
                 if (notificationEntities != null)
                 {
@@ -261,12 +261,12 @@ namespace TDFMAUI.Features.Dashboard
                             Title = "Notification", // Default title
                             Level = NotificationLevel.Medium // Default level
                         });
-                    
+
                     foreach (var notification in recentNotifications)
                     {
                         RecentNotifications.Add(notification);
                     }
-                    
+
                     _logger.LogInformation("Loaded {Count} recent notifications", RecentNotifications.Count);
                 }
                 else
@@ -321,7 +321,7 @@ namespace TDFMAUI.Features.Dashboard
                     _logger.LogWarning("Cannot view request: Invalid request ID");
                     return;
                 }
-                
+
                 _logger.LogInformation("Navigating to request details page for request {RequestId}", requestId);
                 await Shell.Current.GoToAsync($"//RequestDetailsPage?RequestId={requestId}");
             }
@@ -331,7 +331,7 @@ namespace TDFMAUI.Features.Dashboard
                 await _notificationService.ShowErrorAsync("Navigation failed. Please try again.");
             }
         }
-        
+
         [RelayCommand]
         private async Task MarkNotificationAsReadAsync(int notificationId)
         {
@@ -342,10 +342,10 @@ namespace TDFMAUI.Features.Dashboard
                     _logger.LogWarning("Cannot mark notification as read: Invalid notification ID");
                     return;
                 }
-                
+
                 _logger.LogInformation("Marking notification {NotificationId} as read", notificationId);
                 bool success = await _notificationService.MarkAsSeenAsync(notificationId);
-                
+
                 if (success)
                 {
                     // Remove from the collection or update its status
@@ -353,10 +353,10 @@ namespace TDFMAUI.Features.Dashboard
                     if (notification != null)
                     {
                         RecentNotifications.Remove(notification);
-                        
+
                         // Update the unread count
                         UnreadNotificationsCount = Math.Max(0, UnreadNotificationsCount - 1);
-                        
+
                         // Update UI state
                         HasRecentNotifications = RecentNotifications.Count > 0;
                     }
@@ -372,11 +372,11 @@ namespace TDFMAUI.Features.Dashboard
                 await _notificationService.ShowErrorAsync("Failed to update notification. Please try again.");
             }
         }
-        
+
         // Clean up event subscriptions
         public void Cleanup()
         {
             App.UserChanged -= OnUserChanged;
         }
     }
-} 
+}

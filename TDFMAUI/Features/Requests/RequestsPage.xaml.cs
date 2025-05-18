@@ -20,11 +20,17 @@ public partial class RequestsPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        
+
         if (!_isInitialized && BindingContext is RequestsViewModel vm)
-        {            
+        {
             await vm.InitializeAsync();
             _isInitialized = true;
+        }
+        else if (BindingContext is RequestsViewModel vm2)
+        {
+            // Don't reload data automatically when returning to the page
+            // This prevents double loading when navigating back from other pages
+            // The user can use pull-to-refresh if they want to refresh the data
         }
         AdjustCollectionViewLayout();
     }

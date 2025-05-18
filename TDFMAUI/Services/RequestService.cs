@@ -64,8 +64,8 @@ public class RequestService : IRequestService
     public async Task<PaginatedResult<RequestResponseDto>> GetAllRequestsAsync(RequestPaginationDto pagination)
     {
         var queryString = BuildQueryString(pagination);
-        // Use ApiRoutes.Requests.Base
-        var uri = $"{_baseApiUrl}{ApiRoutes.Requests.Base}{queryString}";
+        // Use ApiRoutes.Requests.GetAll
+        var uri = $"{_baseApiUrl}{ApiRoutes.Requests.GetAll}{queryString}";
         _logger.LogInformation("Sending GET request to {Uri}", uri);
         var response = await _httpClient.GetAsync(uri);
         return await HandleApiResponse<PaginatedResult<RequestResponseDto>>(response, "GetAllRequestsAsync");

@@ -127,8 +127,19 @@ namespace TDFMAUI.Services
                 }
 
                 // Connect to the WebSocket server
-                var serverUri = new Uri(_serverUrl);
-                _logger.LogInformation("Connecting to WebSocket server at {Url}", serverUri);
+                // Add token to URL as a query parameter as a fallback in case the header doesn't work
+                string serverUrlWithToken = _serverUrl;
+                if (!serverUrlWithToken.Contains("?"))
+                {
+                    serverUrlWithToken += $"?token={Uri.EscapeDataString(token)}";
+                }
+                else
+                {
+                    serverUrlWithToken += $"&token={Uri.EscapeDataString(token)}";
+                }
+
+                var serverUri = new Uri(serverUrlWithToken);
+                _logger.LogInformation("Connecting to WebSocket server at {Url}", serverUri.GetLeftPart(UriPartial.Path));
 
                 try
                 {

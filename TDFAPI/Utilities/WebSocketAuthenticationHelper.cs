@@ -18,10 +18,10 @@ namespace TDFAPI.Utilities
         private readonly bool _validateIssuerAndAudience;
 
         public WebSocketAuthenticationHelper(
-            ILogger logger, 
-            byte[] key, 
-            string issuer, 
-            string audience, 
+            ILogger logger,
+            byte[] key,
+            string issuer,
+            string audience,
             bool validateIssuerAndAudience)
         {
             _logger = logger;
@@ -53,8 +53,8 @@ namespace TDFAPI.Utilities
 
                 // Validate and get claims principal from token
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
-                
-                if (validatedToken is not JwtSecurityToken jwtToken || 
+
+                if (validatedToken is not JwtSecurityToken jwtToken ||
                     !jwtToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
                 {
                     return (false, null, "Invalid token format");
@@ -85,13 +85,33 @@ namespace TDFAPI.Utilities
         public string ExtractTokenFromHeader(HttpContext context)
         {
             var authToken = string.Empty;
+
+            // Try to get from Authorization header first
             var authHeader = context.Request.Headers.Authorization.ToString();
-            
             if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
             {
                 authToken = authHeader.Substring(7);
+                _logger.LogInformation("Found token in Authorization header");
+                return authToken;
             }
-            
+
+            // If not found in Authorization header, try to get from query string
+            if (string.IsNullOrEmpty(authToken) && context.Request.Query.ContainsKey("token"))
+            {
+                authToken = context.Request.Query["token"];
+                _logger.LogInformation("Found token in query string");
+                return authToken;
+            }
+
+            // If still not found, try to get from cookie
+            if (string.IsNullOrEmpty(authToken) && context.Request.Cookies.ContainsKey("auth_token"))
+            {
+                authToken = context.Request.Cookies["auth_token"];
+                _logger.LogInformation("Found token in cookie");
+                return authToken;
+            }
+
+            _logger.LogWarning("No token found in request");
             return authToken;
         }
 
@@ -104,4 +124,4 @@ namespace TDFAPI.Utilities
             await context.Response.WriteAsync(message);
         }
     }
-} 
+}

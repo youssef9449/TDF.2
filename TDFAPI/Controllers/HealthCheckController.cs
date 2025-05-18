@@ -48,6 +48,25 @@ namespace TDFAPI.Controllers
         }
 
         /// <summary>
+        /// Simple ping endpoint that doesn't require authentication
+        /// </summary>
+        [HttpGet("ping")]
+        [Route(ApiRoutes.Health.Ping)]
+        [AllowAnonymous]
+        public IActionResult Ping()
+        {
+            return Ok(new ApiResponse<object>
+            {
+                Success = true,
+                Message = "Pong",
+                Data = new
+                {
+                    Timestamp = DateTime.UtcNow
+                }
+            });
+        }
+
+        /// <summary>
         /// Detailed health check that requires authentication
         /// </summary>
         [HttpGet("detailed")]

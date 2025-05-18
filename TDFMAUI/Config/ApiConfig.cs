@@ -326,13 +326,13 @@ namespace TDFMAUI.Config
 
             string[] healthCheckUrls = new[] {
                 // Try the configured URL first with ApiRoutes
-                BaseUrl.TrimEnd('/') + ApiRoutes.Health.Ping,
+                BaseUrl.TrimEnd('/') + "/" + ApiRoutes.Health.Ping,
                 // Fallback to legacy paths
-                BaseUrl.TrimEnd('/') + $"/{ApiRoutes.Base}/Health/ping",
-                BaseUrl.TrimEnd('/') + $"/{ApiRoutes.Base}/HealthCheck",
+                BaseUrl.TrimEnd('/') + $"/{ApiRoutes.Health.Base}/ping",
+                BaseUrl.TrimEnd('/') + $"/{ApiRoutes.Health.GetDefault}",
                 // Then try alternative protocols
-                baseUrlHttp.TrimEnd('/') + ApiRoutes.Health.Ping,
-                baseUrlHttps.TrimEnd('/') + ApiRoutes.Health.Ping,
+                baseUrlHttp.TrimEnd('/') + "/" + ApiRoutes.Health.Ping,
+                baseUrlHttps.TrimEnd('/') + "/" + ApiRoutes.Health.Ping,
                 // Try root path as last resort
                 BaseUrl.TrimEnd('/') + "/"
             };

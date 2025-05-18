@@ -1028,7 +1028,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var result = await GetAsync<object>("HealthCheck");
+                var result = await GetAsync<object>(ApiRoutes.Health.Ping);
                 return result != null;
             }
             catch
@@ -1041,12 +1041,12 @@ namespace TDFMAUI.Services
         {
             try
             {
-                await GetAsync<object>("HealthCheck");
+                await GetAsync<object>(ApiRoutes.Health.Ping);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "API Connectivity test failed using HealthCheck");
+                _logger?.LogWarning(ex, "API Connectivity test failed using {Endpoint}", ApiRoutes.Health.Ping);
                 return false;
             }
         }
@@ -1381,9 +1381,9 @@ namespace TDFMAUI.Services
             try
             {
                 _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Starting API request to {Endpoint}", ApiRoutes.Lookups.GetDepartments);
-                var result = await GetAsync<List<LookupItem>>(ApiRoutes.Lookups.GetDepartments, queueIfUnavailable);
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - API request completed, returned {Count} items", result?.Count ?? 0);
-                return result;
+                var result = await GetAsync<ApiResponse<List<LookupItem>>>(ApiRoutes.Lookups.GetDepartments, queueIfUnavailable);
+                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - API request completed, returned {Count} items", result?.Data?.Count ?? 0);
+                return result?.Data ?? new List<LookupItem>();
             }
             catch (Exception ex)
             {

@@ -45,7 +45,7 @@ namespace TDFAPI.Controllers
         [HttpGet("departments")]
         [Route(ApiRoutes.Lookups.GetDepartments)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
-        public async Task<ActionResult<List<LookupItem>>> GetDepartments()
+        public async Task<ActionResult<ApiResponse<List<LookupItem>>>> GetDepartments()
         {
             _logger.LogInformation("DIAGNOSTIC: GetDepartments endpoint called at {Time}", DateTime.UtcNow);
 
@@ -54,7 +54,7 @@ namespace TDFAPI.Controllers
                 Response.Headers.Append("Cache-Control", "public, max-age=3600");
                 var departments = await _lookupService.GetDepartmentsAsync();
                 _logger.LogInformation("DIAGNOSTIC: GetDepartments returning {Count} departments", departments?.Count ?? 0);
-                return Ok(departments);
+                return Ok(ApiResponse<List<LookupItem>>.SuccessResponse(departments));
             }
             catch (Exception ex)
             {

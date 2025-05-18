@@ -28,6 +28,7 @@ using StackExchange.Redis;
 using TDFShared.Models.Message;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.AspNetCore.HttpOverrides;
+using TDFShared.Constants;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -907,7 +908,7 @@ app.Map("/ws", async context =>
 // Log configured URLs before starting server
 logger.LogInformation("Server listening on: {Urls}", string.Join(", ", urls));
 
-app.MapHealthChecks($"/{ApiRoutes.Health.Base}", new HealthCheckOptions
+app.MapHealthChecks($"/{ApiRoutes.Health.GetDefault}", new HealthCheckOptions
 {
     ResultStatusCodes =
     {

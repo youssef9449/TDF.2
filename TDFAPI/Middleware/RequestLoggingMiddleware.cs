@@ -65,11 +65,21 @@ namespace TDFAPI.Middleware
         {
             // Check if this is a route without the /api prefix that should have it
             string path = context.Request.Path.Value?.ToLower();
-            if (path != null && !path.StartsWith($"/{ApiRoutes.Base}/") &&
+
+            // Check for double api prefix and fix it
+            if (path != null && path.StartsWith($"/{ApiRoutes.Base}/{ApiRoutes.Base}/"))
+            {
+                string correctedPath = path.Replace($"/{ApiRoutes.Base}/{ApiRoutes.Base}/", $"/{ApiRoutes.Base}/");
+                _logger.LogWarning("Detected request with double API prefix: {Path}. Rewriting to: {CorrectedPath}", path, correctedPath);
+                context.Request.Path = correctedPath;
+            }
+            // Check for routes that should have the /api prefix but don't
+            else if (path != null && !path.StartsWith($"/{ApiRoutes.Base}/") &&
                 (path.StartsWith("/users/") ||
                  path.StartsWith("/auth/") ||
                  path.StartsWith("/notifications/") ||
                  path.StartsWith("/messages/") ||
+                 path.StartsWith("/requests/") ||
                  path.StartsWith("/healthcheck") ||
                  path.StartsWith("/lookups/") ||
                  path.StartsWith($"/{ApiRoutes.Profile.Base.Replace(ApiRoutes.Base + "/", "")}/") ||

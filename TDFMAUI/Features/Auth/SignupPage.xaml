@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:vm="clr-namespace:TDFMAUI.Features.Auth" 
+             xmlns:vm="clr-namespace:TDFMAUI.Features.Auth"
              x:DataType="vm:SignupViewModel"
-             x:Class="TDFMAUI.Features.Auth.SignupPage" 
+             x:Class="TDFMAUI.Features.Auth.SignupPage"
              Title="Signup">
 
     <ScrollView>
@@ -17,13 +17,14 @@
             <Entry Placeholder="Full Name" Text="{Binding FullName}" />
 
             <Label Text="Department" />
-            <Picker Title="Select Department" 
-                    ItemsSource="{Binding Departments}" 
+            <Picker Title="Select Department"
+                    ItemsSource="{Binding Departments}"
                     ItemDisplayBinding="{Binding Name}"
-                    SelectedItem="{Binding SelectedDepartment}" />
+                    SelectedItem="{Binding SelectedDepartment}"
+                    IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}" />
 
             <Label Text="Title" />
-            <Picker Title="Select Title" 
+            <Picker Title="Select Title"
                     ItemsSource="{Binding Titles}"
                     SelectedItem="{Binding SelectedTitle}"
                     IsEnabled="{Binding Titles.Count, Converter={StaticResource IntToBoolConverter}}" />
@@ -36,4 +37,4 @@
 
         </VerticalStackLayout>
     </ScrollView>
-</ContentPage> 
+</ContentPage>

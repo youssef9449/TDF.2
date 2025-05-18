@@ -62,7 +62,7 @@ namespace TDFMAUI.Features.Auth
 
             Debug.WriteLine("[SignupViewModel] Dependencies injected. Calling LoadLookupsAsync...");
             // Load lookups asynchronously without blocking the constructor
-            _ = LoadLookupsAsync(); 
+            _ = LoadLookupsAsync();
             Debug.WriteLine("[SignupViewModel] Constructor - End (LoadLookupsAsync started)");
         }
 
@@ -70,7 +70,7 @@ namespace TDFMAUI.Features.Auth
         {
             Debug.WriteLine("[SignupViewModel] LoadLookupsAsync - Start");
             _logger?.LogInformation("DIAGNOSTIC: LoadLookupsAsync - Starting to load departments");
-            
+
             try
             {
                 // Test API connectivity first
@@ -83,20 +83,33 @@ namespace TDFMAUI.Features.Auth
                     Debug.WriteLine($"[SignupViewModel] API connectivity test error: {connEx.Message}");
                     _logger?.LogError(connEx, "DIAGNOSTIC: API connectivity test failed");
                 }
-                
+
                 _logger?.LogInformation("Loading departments for signup.");
                 Debug.WriteLine("[SignupViewModel] LoadLookupsAsync - Calling _lookupService.GetDepartmentsAsync() via standard service flow.");
-                
+
                 // Use the standard service layer to load departments
                 var departments = await _lookupService.GetDepartmentsAsync();
                 Debug.WriteLine($"[SignupViewModel] LoadLookupsAsync - _lookupService.GetDepartmentsAsync() returned. Count: {departments?.Count ?? 0}");
-                
+
                 if (departments != null && departments.Any())
                 {
                     Debug.WriteLine($"[SignupViewModel] Departments received. First item: {departments[0].Id} - {departments[0].Name}");
-                    Departments = new ObservableCollection<LookupItem>(departments);
+
+                    // Clear and add each department individually to ensure the ObservableCollection is updated
+                    Departments.Clear();
+                    foreach (var dept in departments)
+                    {
+                        Departments.Add(dept);
+                    }
+
                     _logger?.LogInformation($"Loaded {departments.Count} departments");
-                    Debug.WriteLine($"[SignupViewModel] Loaded {departments.Count} departments successfully");                 
+                    Debug.WriteLine($"[SignupViewModel] Loaded {departments.Count} departments successfully");
+
+                    // Auto-select the first department
+                    if (Departments.Count > 0)
+                    {
+                        SelectedDepartment = Departments[0];
+                    }
                 }
                 else
                 {
@@ -137,10 +150,10 @@ namespace TDFMAUI.Features.Auth
             {
                 HasError = false;
                 Titles.Clear();
-                
+
                 var departmentId = SelectedDepartment.Id;
                 _logger?.LogInformation($"Loading titles for department: {departmentId}");
-                
+
                 var titlesForDepartment = await _lookupService.GetTitlesForDepartmentAsync(departmentId);
                 if (titlesForDepartment != null && titlesForDepartment.Any())
                 {
@@ -149,7 +162,7 @@ namespace TDFMAUI.Features.Auth
                         Titles.Add(title);
                     }
                     _logger?.LogInformation($"Loaded {titlesForDepartment.Count} titles for department {departmentId}");
-                    
+
                     // Auto-select first title if available
                     if (Titles.Count > 0)
                     {
@@ -178,7 +191,7 @@ namespace TDFMAUI.Features.Auth
             ErrorMessage = string.Empty;
 
             // Validation
-            if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password) || 
+            if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password) ||
                 string.IsNullOrWhiteSpace(ConfirmPassword) || string.IsNullOrWhiteSpace(FullName) ||
                 SelectedDepartment == null || string.IsNullOrWhiteSpace(SelectedTitle))
             {
@@ -193,9 +206,9 @@ namespace TDFMAUI.Features.Auth
                 HasError = true;
                 return;
             }
- 
+
             // Password strength validation has been removed to allow any password
- 
+
             var signupModel = new SignupModel
             {
                 Username = Username,
@@ -343,7 +356,7 @@ namespace TDFMAUI.Features.Auth
             {
                 // Log the error
                 System.Diagnostics.Debug.WriteLine($"Navigation error: {ex.Message}");
-                
+
                 // Display error to user
                 ErrorMessage = $"Navigation error: {ex.Message}";
                 HasError = true;

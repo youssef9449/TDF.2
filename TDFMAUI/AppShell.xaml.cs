@@ -97,6 +97,17 @@ namespace TDFMAUI
             OnPropertyChanged(nameof(IsManager));
         }
 
+        protected override void OnAppearing()
+        {
+            base.OnAppearing();
+
+            // Setup swipe gestures for the initial page
+            // This ensures the Dashboard and other pages have the swipe gesture from the beginning
+            SetupRightSwipeGesture();
+
+            _logger?.LogInformation("AppShell.OnAppearing: Initial right swipe gestures set up");
+        }
+
         protected override void OnDisappearing()
         {
             base.OnDisappearing();
@@ -156,16 +167,16 @@ namespace TDFMAUI
         {
             _logger?.LogInformation("Attempting to set up right swipe gestures.");
 
-            // Gesture to open the flyout (swipe left on page content)
+            // Gesture to open the flyout (swipe from right edge on page content)
             if (CurrentPage is ContentPage page && page.Content != null)
             {
-                bool openGestureExists = page.Content.GestureRecognizers.Any(g => g is SwipeGestureRecognizer sgr && sgr.Direction == SwipeDirection.Left && sgr.CommandParameter as string == "open_users_flyout");
+                bool openGestureExists = page.Content.GestureRecognizers.Any(g => g is SwipeGestureRecognizer sgr && sgr.Direction == SwipeDirection.Right && sgr.CommandParameter as string == "open_users_flyout");
                 if (!openGestureExists)
                 {
-                    var openSwipeGesture = new SwipeGestureRecognizer { Direction = SwipeDirection.Left, CommandParameter = "open_users_flyout" };
+                    var openSwipeGesture = new SwipeGestureRecognizer { Direction = SwipeDirection.Right, CommandParameter = "open_users_flyout" };
                     openSwipeGesture.Swiped += OnOpenRightFlyout_Swiped;
                     page.Content.GestureRecognizers.Add(openSwipeGesture);
-                    _logger?.LogInformation("Added OPEN swipe gesture to current page content.");
+                    _logger?.LogInformation("Added OPEN swipe gesture (right edge) to current page content.");
                 }
             }
             else
@@ -173,14 +184,14 @@ namespace TDFMAUI
                  _logger?.LogWarning("CurrentPage is not a ContentPage with Content, cannot attach open swipe gesture.");
             }
 
-            // Gesture to close the flyout (swipe right on the flyout panel itself)
+            // Gesture to close the flyout (swipe left on the flyout panel itself)
             if (this.RightSideUsersFlyout?.Content != null && this.RightSideUsersFlyout.Content is VisualElement)
             {
                 View flyoutActualContent = (View)this.RightSideUsersFlyout.Content;
-                bool closeGestureExists = flyoutActualContent.GestureRecognizers.Any(g => g is SwipeGestureRecognizer sgr && sgr.Direction == SwipeDirection.Right && sgr.CommandParameter as string == "close_users_flyout");
+                bool closeGestureExists = flyoutActualContent.GestureRecognizers.Any(g => g is SwipeGestureRecognizer sgr && sgr.Direction == SwipeDirection.Left && sgr.CommandParameter as string == "close_users_flyout");
                 if (!closeGestureExists)
                 {
-                    var closeSwipeGesture = new SwipeGestureRecognizer { Direction = SwipeDirection.Right, CommandParameter = "close_users_flyout" };
+                    var closeSwipeGesture = new SwipeGestureRecognizer { Direction = SwipeDirection.Left, CommandParameter = "close_users_flyout" };
                     closeSwipeGesture.Swiped += OnCloseRightFlyout_Swiped;
                     flyoutActualContent.GestureRecognizers.Add(closeSwipeGesture);
                     _logger?.LogInformation("Added CLOSE swipe gesture to RightSideUsersFlyout's actual content (UsersRightPanel).");
@@ -194,7 +205,7 @@ namespace TDFMAUI
 
         private async void OnOpenRightFlyout_Swiped(object sender, SwipedEventArgs e)
         {
-            _logger?.LogInformation("Open right flyout (users panel) swiped.");
+            _logger?.LogInformation("Open right flyout (users panel) swiped from right edge.");
             if (Shell.Current.CurrentState.Location?.OriginalString != null && !Shell.Current.CurrentState.Location.OriginalString.EndsWith("//users"))
             {
                 _previousRoute = Shell.Current.CurrentState.Location.OriginalString;
@@ -239,7 +250,7 @@ namespace TDFMAUI
 
         private async void OnCloseRightFlyout_Swiped(object sender, SwipedEventArgs e)
         {
-            _logger?.LogInformation("Close right flyout (users panel) swiped.");
+            _logger?.LogInformation("Close right flyout (users panel) swiped to left.");
             await CloseUsersRightPanelAsync();
         }
 

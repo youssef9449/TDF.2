@@ -4,10 +4,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using TDFShared.DTOs.Common;
 using Microsoft.AspNetCore.RateLimiting;
+using TDFShared.Constants;
 
 namespace TDFAPI.Controllers
 {
-    [Route("api/[controller]")]
+    [Route(ApiRoutes.Lookups.Base)]
     [ApiController]
     [AllowAnonymous]
     [EnableRateLimiting("api")]
@@ -15,14 +16,15 @@ namespace TDFAPI.Controllers
     {
         private readonly ILookupService _lookupService;
         private readonly ILogger<LookupsController> _logger;
-        
+
         public LookupsController(ILookupService lookupService, ILogger<LookupsController> logger)
         {
             _lookupService = lookupService;
             _logger = logger;
         }
-        
+
         [HttpGet("all")]
+        [Route(ApiRoutes.Lookups.GetAll)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
         public async Task<ActionResult<ApiResponse<LookupResponseDto>>> GetAllLookups()
         {
@@ -39,13 +41,14 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<LookupResponseDto>.ErrorResponse("An error occurred retrieving lookup data"));
             }
         }
-        
+
         [HttpGet("departments")]
+        [Route(ApiRoutes.Lookups.GetDepartments)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
         public async Task<ActionResult<List<LookupItem>>> GetDepartments()
         {
             _logger.LogInformation("DIAGNOSTIC: GetDepartments endpoint called at {Time}", DateTime.UtcNow);
-            
+
             try
             {
                 Response.Headers.Append("Cache-Control", "public, max-age=3600");
@@ -59,7 +62,7 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<List<LookupItem>>.ErrorResponse("An error occurred retrieving departments"));
             }
         }
-        
+
         [HttpGet("titles/{department}")]
         public async Task<ActionResult<ApiResponse<List<string>>>> GetTitlesByDepartment(string department)
         {
@@ -74,8 +77,9 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<List<string>>.ErrorResponse($"Error retrieving titles: {ex.Message}"));
             }
         }
-        
+
         [HttpGet("leave-types")]
+        [Route(ApiRoutes.Lookups.GetLeaveTypes)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
         public async Task<ActionResult<ApiResponse<List<LookupItem>>>> GetLeaveTypes()
         {
@@ -91,8 +95,9 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<List<LookupItem>>.ErrorResponse("An error occurred retrieving leave types"));
             }
         }
-        
+
         [HttpGet("requesttypes")]
+        [Route(ApiRoutes.Lookups.GetRequestTypes)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
         public async Task<ActionResult<ApiResponse<List<string>>>> GetRequestTypes()
         {
@@ -108,8 +113,9 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<List<string>>.ErrorResponse("An error occurred retrieving request types"));
             }
         }
-        
+
         [HttpGet("status-codes")]
+        [Route(ApiRoutes.Lookups.GetStatusCodes)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
         public async Task<ActionResult<ApiResponse<List<LookupItem>>>> GetStatusCodes()
         {
@@ -126,4 +132,4 @@ namespace TDFAPI.Controllers
             }
         }
     }
-} 
+}

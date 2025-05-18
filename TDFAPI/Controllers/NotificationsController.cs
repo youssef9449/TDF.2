@@ -5,12 +5,13 @@ using TDFShared.DTOs.Messages;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using TDFShared.DTOs.Common;
+using TDFShared.Constants;
 
 namespace TDFAPI.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route("api/[controller]")]
+    [Route(ApiRoutes.Notifications.Base)]
     [EnableRateLimiting("api")]
     public class NotificationsController : ControllerBase
     {

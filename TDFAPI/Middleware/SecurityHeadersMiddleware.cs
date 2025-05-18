@@ -12,7 +12,7 @@ namespace TDFAPI.Middleware
         private readonly string _allowedOrigins;
 
         public SecurityHeadersMiddleware(
-            RequestDelegate next, 
+            RequestDelegate next,
             IWebHostEnvironment environment,
             IConfiguration configuration,
             ILogger<SecurityHeadersMiddleware> logger)
@@ -39,7 +39,7 @@ namespace TDFAPI.Middleware
                 context.Response.Headers["X-Frame-Options"] = "DENY";
                 context.Response.Headers["X-XSS-Protection"] = "1; mode=block";
                 context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-                
+
                 // Modern security headers
                 // Cross-Origin isolation headers - only apply to HTML content
                 if (IsHtmlResponse(context))
@@ -47,17 +47,17 @@ namespace TDFAPI.Middleware
                     context.Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
                     context.Response.Headers["Cross-Origin-Embedder-Policy"] = "require-corp";
                 }
-                
+
                 context.Response.Headers["Cross-Origin-Resource-Policy"] = "same-origin";
-                
+
                 // Add Strict-Transport-Security header with proper values
                 var hstsValue = _environment.IsProduction()
                     ? "max-age=31536000; includeSubDomains; preload" // 1 year for production
                     : "max-age=86400"; // 1 day for non-production
                 context.Response.Headers["Strict-Transport-Security"] = hstsValue;
-                
+
                 // Add comprehensive Permissions-Policy
-                context.Response.Headers["Permissions-Policy"] = 
+                context.Response.Headers["Permissions-Policy"] =
                     "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), " +
                     "microphone=(), payment=(), usb=(), interest-cohort=(), autoplay=(), " +
                     "ambient-light-sensor=(), battery=(), display-capture=(), " +
@@ -65,16 +65,16 @@ namespace TDFAPI.Middleware
                     "execution-while-out-of-viewport=(), fullscreen=(self), " +
                     "publickey-credentials-get=(), screen-wake-lock=(), " +
                     "web-share=(), xr-spatial-tracking=()";
-                
+
                 // Cache control handling based on request type
                 ApplyCacheControl(context);
-                
+
                 // Content Security Policy - with better protection
                 if (IsHtmlResponse(context))
                 {
                     ApplyContentSecurityPolicy(context);
                 }
-                
+
                 await _next(context);
             }
             catch (Exception ex)
@@ -87,7 +87,7 @@ namespace TDFAPI.Middleware
         private void ApplyCacheControl(HttpContext context)
         {
             // Static assets can be cached longer (1 day)
-            if (context.Request.Path.StartsWithSegments("/static") || 
+            if (context.Request.Path.StartsWithSegments("/static") ||
                 context.Request.Path.Value?.EndsWith(".css") == true ||
                 context.Request.Path.Value?.EndsWith(".js") == true ||
                 context.Request.Path.Value?.EndsWith(".png") == true ||
@@ -103,7 +103,7 @@ namespace TDFAPI.Middleware
             }
 
             // API endpoints - no caching by default
-            if (context.Request.Path.StartsWithSegments("/api"))
+            if (context.Request.Path.StartsWithSegments($"/{ApiRoutes.Base}"))
             {
                 context.Response.Headers["Cache-Control"] = "no-store, max-age=0";
                 return;
@@ -115,8 +115,8 @@ namespace TDFAPI.Middleware
 
         private void ApplyContentSecurityPolicy(HttpContext context)
         {
-            var allowedSources = string.IsNullOrEmpty(_allowedOrigins) 
-                ? "'self'" 
+            var allowedSources = string.IsNullOrEmpty(_allowedOrigins)
+                ? "'self'"
                 : $"'self' {_allowedOrigins}";
 
             var cspValue = $"default-src {allowedSources}; " +
@@ -125,7 +125,7 @@ namespace TDFAPI.Middleware
                        $"img-src {allowedSources} data:; " +
                        $"style-src {allowedSources}; " +
                        $"font-src {allowedSources}; " +
-                       $"connect-src {allowedSources} wss://*." + 
+                       $"connect-src {allowedSources} wss://*." +
                        context.Request.Host.Host.Replace("www.", "") + "; " +
                        $"media-src {allowedSources}; " +
                        "frame-src 'none'; " +
@@ -135,7 +135,7 @@ namespace TDFAPI.Middleware
                        "worker-src 'self'; " +
                        "manifest-src 'self'; " +
                        "upgrade-insecure-requests";
-                
+
             // In development, we might need to relax some policies
             if (!_environment.IsProduction())
             {
@@ -144,7 +144,7 @@ namespace TDFAPI.Middleware
                 // Allow inline styles for dev tools
                 cspValue = cspValue.Replace($"style-src {allowedSources}", $"style-src {allowedSources} 'unsafe-inline'");
             }
-            
+
             context.Response.Headers["Content-Security-Policy"] = cspValue;
         }
 

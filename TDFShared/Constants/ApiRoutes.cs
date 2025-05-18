@@ -11,6 +11,73 @@ namespace TDFShared.Constants
         public const string Base = "api";
 
         /// <summary>
+        /// Removes the API base prefix from a route if present
+        /// </summary>
+        /// <param name="route">The route to process</param>
+        /// <returns>The route without the API base prefix</returns>
+        public static string RemoveBasePrefix(string route)
+        {
+            route = route?.TrimStart('/') ?? string.Empty;
+            string prefix = $"{Base}/";
+
+            if (route.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return route.Substring(prefix.Length);
+            }
+
+            return route;
+        }
+
+        /// <summary>
+        /// API documentation route
+        /// </summary>
+        public const string Docs = Base + "/docs";
+
+        /// <summary>
+        /// Profile routes
+        /// </summary>
+        public static class Profile
+        {
+            /// <summary>
+            /// Base profile route
+            /// </summary>
+            public const string Base = ApiRoutes.Base + "/profile";
+        }
+
+        /// <summary>
+        /// Settings routes
+        /// </summary>
+        public static class Settings
+        {
+            /// <summary>
+            /// Base settings route
+            /// </summary>
+            public const string Base = ApiRoutes.Base + "/settings";
+        }
+
+        /// <summary>
+        /// Documents routes
+        /// </summary>
+        public static class Documents
+        {
+            /// <summary>
+            /// Base documents route
+            /// </summary>
+            public const string Base = ApiRoutes.Base + "/documents";
+        }
+
+        /// <summary>
+        /// Reports routes
+        /// </summary>
+        public static class Reports
+        {
+            /// <summary>
+            /// Base reports route
+            /// </summary>
+            public const string Base = ApiRoutes.Base + "/reports";
+        }
+
+        /// <summary>
         /// Authentication routes
         /// </summary>
         public static class Auth
@@ -19,6 +86,11 @@ namespace TDFShared.Constants
             /// Base auth route
             /// </summary>
             public const string Base = ApiRoutes.Base + "/auth";
+
+            /// <summary>
+            /// Reset password route
+            /// </summary>
+            public const string ResetPassword = Base + "/reset-password";
 
             /// <summary>
             /// Login route
@@ -107,6 +179,16 @@ namespace TDFShared.Constants
             public const string GetByDepartment = Base + "/department/{0}";
 
             /// <summary>
+            /// Update user route (format with user ID)
+            /// </summary>
+            public const string Update = Base + "/{0}";
+
+            /// <summary>
+            /// Delete user route (format with user ID)
+            /// </summary>
+            public const string Delete = Base + "/{0}";
+
+            /// <summary>
             /// Update user profile route
             /// </summary>
             public const string UpdateMyProfile = Base + "/profile";
@@ -120,6 +202,21 @@ namespace TDFShared.Constants
             /// Get all users with presence status
             /// </summary>
             public const string GetAllWithStatus = Base + "/all";
+
+            /// <summary>
+            /// Get all users route
+            /// </summary>
+            public const string GetAll = Base;
+
+            /// <summary>
+            /// Get current user route
+            /// </summary>
+            public const string GetCurrent = Base + "/current";
+
+            /// <summary>
+            /// Verify user route
+            /// </summary>
+            public const string Verify = Base + "/verify";
 
             public static string UsersBase => $"{Base}/users";
         }
@@ -174,6 +271,25 @@ namespace TDFShared.Constants
             /// </summary>
             public const string GetUserBalances = Base + "/balances/{0}";
 
+            /// <summary>
+            /// Get all requests route
+            /// </summary>
+            public const string GetAll = Base;
+
+            /// <summary>
+            /// Create request route
+            /// </summary>
+            public const string Create = Base;
+
+            /// <summary>
+            /// Update request route (format with request ID)
+            /// </summary>
+            public const string Update = Base + "/{0}";
+
+            /// <summary>
+            /// Delete request route (format with request ID)
+            /// </summary>
+            public const string Delete = Base + "/{0}";
         }
 
         /// <summary>
@@ -333,6 +449,11 @@ namespace TDFShared.Constants
             /// Base health route
             /// </summary>
             public const string Base = ApiRoutes.Base + "/healthcheck";
+
+            /// <summary>
+            /// Default health check route
+            /// </summary>
+            public const string GetDefault = Base;
 
             /// <summary>
             /// Ping route to check API health

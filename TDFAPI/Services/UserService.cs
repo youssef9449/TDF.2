@@ -156,7 +156,7 @@ namespace TDFAPI.Services
 
                 // Use the UserPresenceService to update status which will broadcast the change
                 using var scope = _serviceProvider.CreateScope();
-                var userPresenceService = scope.ServiceProvider.GetRequiredService<UserPresenceService>();
+                var userPresenceService = scope.ServiceProvider.GetRequiredService<IUserPresenceService>();
 
                 // This will update the database AND broadcast to all connected clients
                 var status = isOnline ? UserPresenceStatus.Online : UserPresenceStatus.Offline;

@@ -310,11 +310,7 @@ namespace TDFMAUI.Services
             try
             {
                 // Ensure relative path and pass directly to HttpClientService
-                endpoint = endpoint.TrimStart('/');
-                if (endpoint.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
-                {
-                    endpoint = endpoint.Substring(4);
-                }
+                endpoint = ApiRoutes.RemoveBasePrefix(endpoint);
                 var response = await _httpClientService.GetRawAsync(endpoint);
                 return response;
             }
@@ -337,11 +333,7 @@ namespace TDFMAUI.Services
             try
             {
                 // Ensure relative path and pass directly to HttpClientService
-                endpoint = endpoint.TrimStart('/');
-                 if (endpoint.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
-                {
-                    endpoint = endpoint.Substring(4);
-                }
+                endpoint = ApiRoutes.RemoveBasePrefix(endpoint);
                 var response = await _httpClientService.GetAsync<T>(endpoint);
                 return response;
             }
@@ -371,11 +363,7 @@ namespace TDFMAUI.Services
             try
             {
                 // Ensure relative path and pass directly to HttpClientService
-                endpoint = endpoint.TrimStart('/');
-                 if (endpoint.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
-                {
-                    endpoint = endpoint.Substring(4);
-                }
+                endpoint = ApiRoutes.RemoveBasePrefix(endpoint);
                 var response = await _httpClientService.PostAsync<TRequest, TResponse>(endpoint, data);
                 return response;
             }
@@ -406,11 +394,7 @@ namespace TDFMAUI.Services
             try
             {
                 // Ensure relative path and pass directly to HttpClientService
-                endpoint = endpoint.TrimStart('/');
-                if (endpoint.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
-                {
-                    endpoint = endpoint.Substring(4);
-                }
+                endpoint = ApiRoutes.RemoveBasePrefix(endpoint);
                 var response = await _httpClientService.PutAsync<TRequest, TResponse>(endpoint, data);
                 return response;
             }
@@ -451,11 +435,7 @@ namespace TDFMAUI.Services
             try
             {
                 // Ensure relative path and pass directly to HttpClientService
-                endpoint = endpoint.TrimStart('/');
-                 if (endpoint.StartsWith("api/", StringComparison.OrdinalIgnoreCase))
-                {
-                    endpoint = endpoint.Substring(4);
-                }
+                endpoint = ApiRoutes.RemoveBasePrefix(endpoint);
                 HttpResponseMessage httpResponse = await _httpClientService.DeleteAsync(endpoint);
                 return httpResponse;
             }
@@ -617,8 +597,8 @@ namespace TDFMAUI.Services
         public async Task<UserProfileDto> GetUserProfileAsync(int userId)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            // Format the GetById route with the userId parameter
-            string endpoint = $"users/{userId}/profile";
+            // Use ApiRoutes.Users.GetProfile for the profile endpoint
+            string endpoint = ApiRoutes.Users.GetProfile;
 
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                 return await QueueRequestAsync<UserProfileDto>(endpoint, null, "GET");
@@ -1153,7 +1133,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var response = await PostAsync<LoginRequestDto, LoginResponseDto>("api/auth/login", loginRequest);
+                var response = await PostAsync<LoginRequestDto, LoginResponseDto>(ApiRoutes.Auth.Login, loginRequest);
 
                 if (response != null && !string.IsNullOrEmpty(response.Token))
                 {
@@ -1180,7 +1160,7 @@ namespace TDFMAUI.Services
                 _logger.LogWarning("RegisterAsync(RegisterRequestDto) called, consider removing if SignupAsync is the primary path.");
                 // If kept, it should likely call the backend with RegisterRequestDto
                 // or be adapted.
-                return await PostAsync<RegisterRequestDto, RegisterResponseDto>("api/auth/register", registerRequest);
+                return await PostAsync<RegisterRequestDto, RegisterResponseDto>(ApiRoutes.Auth.Register, registerRequest);
             }
             catch (Exception ex)
             {
@@ -1194,7 +1174,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                return await GetAsync<UserDto>("api/users/current");
+                return await GetAsync<UserDto>(ApiRoutes.Users.GetCurrent);
             }
             catch (Exception ex)
             {
@@ -1305,7 +1285,7 @@ namespace TDFMAUI.Services
             try
             {
                 _logger?.LogInformation("ApiService: Creating request");
-                var response = await PostAsync<RequestCreateDto, RequestResponseDto>("api/requests", requestDto);
+                var response = await PostAsync<RequestCreateDto, RequestResponseDto>(ApiRoutes.Requests.Base, requestDto);
                 return response;
             }
             catch (Exception ex)
@@ -1320,7 +1300,8 @@ namespace TDFMAUI.Services
             try
             {
                 _logger?.LogInformation("ApiService: Updating request {RequestId}", requestId);
-                var response = await PutAsync<RequestUpdateDto, RequestResponseDto>($"api/requests/{requestId}", requestDto);
+                string endpoint = string.Format(ApiRoutes.Requests.Update, requestId);
+                var response = await PutAsync<RequestUpdateDto, RequestResponseDto>(endpoint, requestDto);
                 return response;
             }
             catch (Exception ex)
@@ -1335,7 +1316,8 @@ namespace TDFMAUI.Services
             try
             {
                 _logger?.LogInformation("ApiService: Getting request {RequestId}", requestId);
-                var response = await GetAsync<RequestResponseDto>($"api/requests/{requestId}", queueIfUnavailable);
+                string endpoint = string.Format(ApiRoutes.Requests.GetById, requestId);
+                var response = await GetAsync<RequestResponseDto>(endpoint, queueIfUnavailable);
                 return response;
             }
             catch (Exception ex)
@@ -1350,7 +1332,8 @@ namespace TDFMAUI.Services
             try
             {
                 _logger?.LogInformation("ApiService: Deleting request {RequestId}", requestId);
-                var response = await DeleteAsync($"api/requests/{requestId}");
+                string endpoint = string.Format(ApiRoutes.Requests.GetById, requestId);
+                var response = await DeleteAsync(endpoint);
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
@@ -1365,7 +1348,8 @@ namespace TDFMAUI.Services
             try
             {
                 _logger?.LogInformation("ApiService: Approving request {RequestId}", requestId);
-                var response = await PostAsync<RequestApprovalDto, ApiResponse<bool>>($"api/requests/{requestId}/approve", approvalDto);
+                string endpoint = string.Format(ApiRoutes.Requests.Approve, requestId);
+                var response = await PostAsync<RequestApprovalDto, ApiResponse<bool>>(endpoint, approvalDto);
                 return response?.Success ?? false;
             }
             catch (Exception ex)
@@ -1380,7 +1364,8 @@ namespace TDFMAUI.Services
             try
             {
                 _logger?.LogInformation("ApiService: Rejecting request {RequestId}", requestId);
-                var response = await PostAsync<RequestRejectDto, ApiResponse<bool>>($"api/requests/{requestId}/reject", rejectDto);
+                string endpoint = string.Format(ApiRoutes.Requests.Reject, requestId);
+                var response = await PostAsync<RequestRejectDto, ApiResponse<bool>>(endpoint, rejectDto);
                 return response?.Success ?? false;
             }
             catch (Exception ex)
@@ -1395,8 +1380,8 @@ namespace TDFMAUI.Services
         {
             try
             {
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Starting API request to lookups/departments");
-                var result = await GetAsync<List<LookupItem>>("lookups/departments", queueIfUnavailable);
+                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Starting API request to {Endpoint}", ApiRoutes.Lookups.GetDepartments);
+                var result = await GetAsync<List<LookupItem>>(ApiRoutes.Lookups.GetDepartments, queueIfUnavailable);
                 _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - API request completed, returned {Count} items", result?.Count ?? 0);
                 return result;
             }
@@ -1411,7 +1396,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                return await GetAsync<List<LookupItem>>("lookups/leave-types", queueIfUnavailable);
+                return await GetAsync<List<LookupItem>>(ApiRoutes.Lookups.GetLeaveTypes, queueIfUnavailable);
             }
             catch (Exception ex)
             {
@@ -1424,7 +1409,8 @@ namespace TDFMAUI.Services
         {
             try
             {
-                string endpoint = $"users/{userId}/leavebalances";
+                // Use ApiRoutes.Requests.GetUserBalances for the leave balances endpoint
+                string endpoint = string.Format(ApiRoutes.Requests.GetUserBalances, userId);
                 return await GetAsync<Dictionary<string, int>>(endpoint, queueIfUnavailable);
             }
             catch (Exception ex)
@@ -1438,7 +1424,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                string url = $"lookups/{Uri.EscapeDataString(lookupType)}";
+                string url = $"{ApiRoutes.Base}/lookups/{Uri.EscapeDataString(lookupType)}";
                 return await GetAsync<List<LookupItem>>(url, queueIfUnavailable);
             }
             catch (Exception ex)
@@ -1470,7 +1456,7 @@ namespace TDFMAUI.Services
                 // Call the backend registration endpoint using the correct DTO type
                 // Assuming PostAsync can handle CreateUserRequest and expects ApiResponse<UserDto>
                 // based on AuthController.Register signature
-                var response = await PostAsync<CreateUserRequest, ApiResponse<UserDto>>("api/auth/register", createUserRequest);
+                var response = await PostAsync<CreateUserRequest, ApiResponse<UserDto>>(ApiRoutes.Auth.Register, createUserRequest);
 
                 // Check the ApiResponse for success
                 return response != null && response.Success;

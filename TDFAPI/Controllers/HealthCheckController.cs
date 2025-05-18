@@ -28,6 +28,7 @@ namespace TDFAPI.Controllers
         /// Simple health check endpoint that doesn't require authentication
         /// </summary>
         [HttpGet]
+        [Route(ApiRoutes.Health.GetDefault)]
         [AllowAnonymous]
         public IActionResult Get()
         {

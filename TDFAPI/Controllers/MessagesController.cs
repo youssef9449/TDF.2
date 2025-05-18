@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
+using TDFShared.Constants;
 using TDFAPI.Services;
 using TDFShared.Exceptions;
 using TDFShared.DTOs.Messages;
@@ -14,7 +14,7 @@ namespace TDFAPI.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route("api/[controller]")]
+    [Route(ApiRoutes.Messages.Base)]
     [EnableRateLimiting("api")]
     public class MessagesController : ControllerBase
     {
@@ -79,6 +79,7 @@ namespace TDFAPI.Controllers
         }
 
         [HttpPost("chat")]
+        [Route(ApiRoutes.Messages.Chat)]
         [ProducesResponseType(typeof(ApiResponse<ChatMessageDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<ChatMessageDto>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<ChatMessageDto>), StatusCodes.Status409Conflict)]

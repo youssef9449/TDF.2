@@ -28,7 +28,7 @@ The codebase has been improved with several architectural enhancements:
 - Documented code with XML comments
 
 ### API Documentation
-- Added custom API documentation endpoint at `/api/docs`
+- Added custom API documentation endpoint at `/api/docs` (using ApiRoutes.Docs constant)
 - Added XML documentation generation for API endpoints
 
 ## Getting Started
@@ -83,8 +83,8 @@ For production deployment, ensure the following:
 
 ## Monitoring
 
-The application includes built-in health checks at the `/health` endpoint to monitor:
+The application includes built-in health checks at the `/api/healthcheck` endpoint (using ApiRoutes.Health.Base) to monitor:
 
 - Application status
 - Database connectivity
-- System resources 
+- System resources

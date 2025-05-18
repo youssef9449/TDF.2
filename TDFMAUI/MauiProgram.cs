@@ -12,6 +12,7 @@ using TDFMAUI.Features.Requests;
 using TDFMAUI.Features.Admin;
 using CommunityToolkit.Maui;
 using System.Diagnostics;
+using TDFShared.Constants;
 
 
 namespace TDFMAUI
@@ -95,8 +96,8 @@ namespace TDFMAUI
                     System.Diagnostics.Debug.WriteLine("Warning: appsettings.json not found, using default configuration");
 
                     // Set default API configuration
-                    ApiConfig.BaseUrl = "https://192.168.100.3:5001/api/";
-                    ApiConfig.WebSocketUrl = "wss://192.168.100.3:5001/ws";
+                    ApiConfig.BaseUrl = $"https://192.168.100.3:5001/{ApiRoutes.Base}/";
+                    ApiConfig.WebSocketUrl = $"wss://192.168.100.3:5001{ApiRoutes.WebSocket.Base}";
                     ApiConfig.Timeout = 30;
                     ApiConfig.DevelopmentMode = true;
                 }
@@ -117,13 +118,13 @@ namespace TDFMAUI
                     options.BaseUrl = builder.Configuration[$"{section}:BaseUrl"];
                     if (string.IsNullOrEmpty(options.BaseUrl))
                     {
-                        options.BaseUrl = "https://192.168.100.3:5001/api/"; // Default fallback
+                        options.BaseUrl = $"https://192.168.100.3:5001/{ApiRoutes.Base}/"; // Default fallback
                         System.Diagnostics.Debug.WriteLine($"Warning: {section}:BaseUrl not found in configuration. Using default DI BaseUrl: {options.BaseUrl}");
                     }
                     options.WebSocketUrl = builder.Configuration[$"{section}:WebSocketUrl"];
                     if (string.IsNullOrEmpty(options.WebSocketUrl))
                     {
-                        options.WebSocketUrl = "wss://192.168.100.3:5001/ws"; // Default fallback
+                        options.WebSocketUrl = $"wss://192.168.100.3:5001{ApiRoutes.WebSocket.Base}"; // Default fallback
                         System.Diagnostics.Debug.WriteLine($"Warning: {section}:WebSocketUrl not found in configuration. Using default DI WebSocketUrl: {options.WebSocketUrl}");
                     }
                     options.Timeout = int.TryParse(builder.Configuration["ApiSettings:Timeout"], out int timeout) ? timeout : 30;

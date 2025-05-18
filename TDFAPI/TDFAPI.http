@@ -1,6 +1,31 @@
 @TDFAPI_HostAddress = http://localhost:5266
 
-GET {{TDFAPI_HostAddress}}/weatherforecast/
+# Health check
+GET {{TDFAPI_HostAddress}}/api/healthcheck
 Accept: application/json
+
+###
+
+# API Documentation
+GET {{TDFAPI_HostAddress}}/api/docs
+Accept: application/json
+
+###
+
+# Authentication
+POST {{TDFAPI_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "password123"
+}
+
+###
+
+# Get all users (requires authentication)
+GET {{TDFAPI_HostAddress}}/api/users
+Accept: application/json
+Authorization: Bearer your_token_here
 
 ###

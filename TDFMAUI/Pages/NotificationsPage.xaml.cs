@@ -7,6 +7,7 @@ using TDFMAUI.Helpers;
 using TDFShared.DTOs.Messages;
 using TDFShared.Models.Notification;
 using TDFShared.Enums;
+using TDFShared.Constants;
 
 namespace TDFMAUI.Pages
 {
@@ -15,66 +16,66 @@ namespace TDFMAUI.Pages
         private readonly INotificationService _notificationService;
         private readonly WebSocketService _webSocketService;
         private readonly ApiService _apiService;
-        
+
         private ObservableCollection<NotificationViewModel> _notifications = new ObservableCollection<NotificationViewModel>();
         private Dictionary<int, string> _userCache = new Dictionary<int, string>();
-        
+
         // Commands
         public ICommand ViewCommand { get; private set; }
         public ICommand DeleteCommand { get; private set; }
-        
+
         public NotificationsPage(
             INotificationService notificationService,
             WebSocketService webSocketService,
             ApiService apiService)
         {
             InitializeComponent();
-            
+
             _notificationService = notificationService;
             _webSocketService = webSocketService;
             _apiService = apiService;
-            
+
             // Listen for real-time notification events
             _webSocketService.NotificationReceived += OnNotificationReceived;
-            
+
             // Initialize commands
             ViewCommand = new Command<int>(OnViewNotification);
             DeleteCommand = new Command<int>(OnDeleteNotification);
-            
+
             // Setup the collection view
             notificationsCollection.ItemsSource = _notifications;
             refreshView.Command = new Command(async () => await LoadNotifications());
         }
-        
+
         protected override async void OnAppearing()
         {
             base.OnAppearing();
             await LoadNotifications();
         }
-        
+
         protected override void OnDisappearing()
         {
             base.OnDisappearing();
-            
+
             // Unsubscribe from events
             _webSocketService.NotificationReceived -= OnNotificationReceived;
         }
-        
+
         private async Task LoadNotifications()
         {
             if (App.CurrentUser == null)
             {
                 return;
             }
-            
+
             loadingIndicator.IsVisible = true;
             loadingIndicator.IsRunning = true;
             refreshView.IsRefreshing = true;
-            
+
             try
             {
                 var notifications = await _notificationService.GetUnreadNotificationsAsync();
-                
+
                 // --- Pre-fetch sender names ---
                 var senderIdsToFetch = notifications
                     .Select(n => n.SenderID)
@@ -94,7 +95,7 @@ namespace TDFMAUI.Pages
                             if (user != null && !_userCache.ContainsKey(senderId.Value))
                             {
                                 // Cache the username or full name depending on what's available/preferred
-                                _userCache.Add(senderId.Value, user.Username); 
+                                _userCache.Add(senderId.Value, user.Username);
                             }
                         }
                         catch (Exception ex)
@@ -104,7 +105,7 @@ namespace TDFMAUI.Pages
                             // Optionally add a placeholder to cache to prevent re-fetching on error
                              if (!_userCache.ContainsKey(senderId.Value))
                              {
-                                 _userCache.Add(senderId.Value, $"User {senderId.Value}"); 
+                                 _userCache.Add(senderId.Value, $"User {senderId.Value}");
                              }
                         }
                     }
@@ -115,12 +116,12 @@ namespace TDFMAUI.Pages
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
                     _notifications.Clear();
-                    
+
                     foreach (var notification in notifications.OrderByDescending(n => n.Timestamp))
                     {
                         _notifications.Add(ConvertToViewModel(notification));
                     }
-                    
+
                     var noNotificationsLabel = this.FindByName<Label>("noNotificationsLabel");
                     if (noNotificationsLabel != null)
                         noNotificationsLabel.IsVisible = _notifications.Count == 0;
@@ -140,10 +141,10 @@ namespace TDFMAUI.Pages
             {
                 var refreshView = this.FindByName<RefreshView>("refreshView");
                 var loadingIndicator = this.FindByName<ActivityIndicator>("loadingIndicator");
-                
+
                 if (refreshView != null)
                     refreshView.IsRefreshing = false;
-                    
+
                 if (loadingIndicator != null)
                 {
                     loadingIndicator.IsVisible = false;
@@ -151,7 +152,7 @@ namespace TDFMAUI.Pages
                 }
             }
         }
-        
+
         private NotificationViewModel ConvertToViewModel(NotificationEntity notification)
         {
             return new NotificationViewModel
@@ -168,11 +169,11 @@ namespace TDFMAUI.Pages
                 BackgroundColor = notification.IsSeen ? Colors.White : Color.FromArgb("#E3F2FD")
             };
         }
-        
+
         private string FormatTimestamp(DateTime timestamp)
         {
             var timeAgo = DateTime.Now - timestamp;
-            
+
             if (timeAgo.TotalMinutes < 1)
                 return "Just now";
             if (timeAgo.TotalMinutes < 60)
@@ -181,11 +182,11 @@ namespace TDFMAUI.Pages
                 return $"{(int)timeAgo.TotalHours} hours ago";
             if (timeAgo.TotalDays < 7)
                 return $"{(int)timeAgo.TotalDays} days ago";
-                
+
             // Otherwise just return the date
             return timestamp.ToString("MMM dd, yyyy");
         }
-        
+
         private string GetSenderName(int senderId)
         {
             if (_userCache.TryGetValue(senderId, out var name))
@@ -195,17 +196,17 @@ namespace TDFMAUI.Pages
             // Fallback if caching failed (should ideally not happen often)
             return $"User {senderId}";
         }
-        
+
         private async void OnNotificationReceived(object sender, NotificationEventArgs e)
         {
             // Add the notification to our list if it's not already there
             // Check by NotificationId to prevent duplicates from WebSocket
             bool exists = _notifications.Any(n => n.NotificationId == e.NotificationId);
-            
+
             if (!exists)
             {
                 string senderName = e.SenderName;
-                
+
                 // --- Resolve Sender Name for new notification ---
                 if (e.SenderId.HasValue && string.IsNullOrEmpty(senderName))
                 {
@@ -264,7 +265,7 @@ namespace TDFMAUI.Pages
                     HasSender = e.SenderId.HasValue,
                     BackgroundColor = Color.FromArgb("#E3F2FD") // Highlight unread
                 };
-                
+
                 // Add it to the collection on the main thread (insert at top)
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
@@ -273,7 +274,7 @@ namespace TDFMAUI.Pages
                     if (noNotificationsLabel != null)
                         noNotificationsLabel.IsVisible = false; // Hide empty message if adding first one
                 });
-                
+
                 // Display a toast notification (already runs on main thread)
                 MainThread.BeginInvokeOnMainThread(async () =>
                 {
@@ -281,7 +282,7 @@ namespace TDFMAUI.Pages
                 });
             }
         }
-        
+
         private async Task ShowToastAsync(string message)
         {
             // Use the NotificationToast control instead of manually creating a toast
@@ -291,13 +292,13 @@ namespace TDFMAUI.Pages
                 message,
                 NotificationType.Info);
         }
-        
+
         private async void OnViewNotification(int notificationId)
         {
             var notification = _notifications.FirstOrDefault(n => n.NotificationId == notificationId);
             if (notification == null)
                 return;
-                
+
             // Mark as seen
             if (notification.IsNotSeen)
             {
@@ -309,11 +310,11 @@ namespace TDFMAUI.Pages
                     notification.BackgroundColor = Colors.White;
                 }
             }
-            
+
             // Display the notification detail
             await DisplayAlert("Notification", notification.Message, "OK");
         }
-        
+
         private async void OnDeleteNotification(int notificationId)
         {
             var notification = _notifications.FirstOrDefault(n => n.NotificationId == notificationId);
@@ -327,7 +328,8 @@ namespace TDFMAUI.Pages
             try
             {
                 // Call API to delete the notification
-                await _apiService.DeleteAsync($"notifications/{notificationId}"); // Endpoint will automatically get the /api/ prefix
+                string endpoint = string.Format(ApiRoutes.Notifications.Delete, notificationId);
+                await _apiService.DeleteAsync(endpoint);
 
                 // Remove from UI only after successful API call
                  _notifications.Remove(notification);
@@ -337,16 +339,16 @@ namespace TDFMAUI.Pages
                 await DisplayAlert("Error", $"Failed to delete notification: {ApiService.GetFriendlyErrorMessage(ex)}", "OK");
             }
         }
-        
+
         private async void OnMarkAllReadClicked(object sender, EventArgs e)
         {
             if (_notifications.Count == 0 || !_notifications.Any(n => n.IsNotSeen))
                 return;
-            
+
             var notificationIds = _notifications.Where(n => n.IsNotSeen).Select(n => n.NotificationId).ToList();
             if (notificationIds.Count == 0)
                 return;
-                
+
             var success = await _notificationService.MarkNotificationsAsSeenAsync(notificationIds);
             if (success)
             {
@@ -372,17 +374,17 @@ namespace TDFMAUI.Pages
             }
         }
     }
-    
+
     public class NotificationViewModel : BindableObject
     {
         public int NotificationId { get; set; }
         public string Message { get; set; }
         public DateTime Timestamp { get; set; }
         public string TimestampFormatted { get; set; }
-        
+
         private bool _isSeen;
-        public bool IsSeen 
-        { 
+        public bool IsSeen
+        {
             get => _isSeen;
             set
             {
@@ -394,7 +396,7 @@ namespace TDFMAUI.Pages
                 }
             }
         }
-        
+
         private bool _isNotSeen;
         public bool IsNotSeen
         {
@@ -409,11 +411,11 @@ namespace TDFMAUI.Pages
                 }
             }
         }
-        
+
         public int? SenderId { get; set; }
         public string SenderName { get; set; }
         public bool HasSender { get; set; }
-        
+
         private Color _backgroundColor;
         public Color BackgroundColor
         {
@@ -428,4 +430,4 @@ namespace TDFMAUI.Pages
             }
         }
     }
-} 
+}

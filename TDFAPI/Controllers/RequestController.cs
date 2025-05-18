@@ -14,7 +14,7 @@ namespace TDFAPI.Controllers
 {
     [ApiController]
     [Authorize]
-    [Route("api/requests")]
+    [Route(ApiRoutes.Requests.Base)]
     [ApiVersion("1.0")]
     public class RequestController : ControllerBase
     {
@@ -34,6 +34,7 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests
         [HttpGet("")]
+        [Route(ApiRoutes.Requests.GetAll)]
         [Authorize(Roles = "Admin,HR")]
         public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetAllRequests([FromQuery] RequestPaginationDto pagination)
         {
@@ -52,6 +53,7 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests/department/{department}
         [HttpGet("department/{department}")]
+        [Route(ApiRoutes.Requests.GetByDepartment)]
         [Authorize(Roles = "Admin,Manager,HR")]
         public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetRequestsByDepartment(string department, [FromQuery] RequestPaginationDto pagination)
         {
@@ -70,6 +72,7 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests/my
         [HttpGet("my")]
+        [Route(ApiRoutes.Requests.GetMy)]
         public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetMyRequests([FromQuery] RequestPaginationDto pagination)
         {
             try
@@ -93,6 +96,7 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests/user/{userId}
         [HttpGet("user/{userId:int}")]
+        [Route(ApiRoutes.Requests.GetByUserId)]
         [Authorize(Roles = "Admin,HR,Manager")]
         public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetRequestsByUserId(int userId, [FromQuery] RequestPaginationDto pagination)
         {
@@ -111,6 +115,7 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests/{id}
         [HttpGet("{id:guid}")]
+        [Route(ApiRoutes.Requests.GetById)]
         public async Task<ActionResult<RequestResponseDto>> GetRequestById(Guid id)
         {
             try
@@ -123,7 +128,7 @@ namespace TDFAPI.Controllers
                     _logger.LogWarning("Request with GUID {RequestId} not found.", id);
                     return NotFound();
                 }
-                
+
                 int currentUserId = GetCurrentUserId();
                 var currentUser = await _userService.GetUserByIdAsync(currentUserId);
                 if (currentUser == null) return Unauthorized("User not found.");
@@ -133,19 +138,19 @@ namespace TDFAPI.Controllers
                 bool isManager = User.IsInRole("Manager");
 
                 if (requestDto.RequestUserID != currentUserId && !isAdmin && !isHR)
-                { 
+                {
                     if (isManager && currentUser.Department == requestDto.RequestDepartment)
                     {
                         // Manager in the same department can view
                     }
                     else
                     {
-                         _logger.LogWarning("User {UserId} (Roles: {Roles}, Dept: {Dept}) tried to access request {RequestId} belonging to {OwnerId} in dept {RequestDept}", 
+                         _logger.LogWarning("User {UserId} (Roles: {Roles}, Dept: {Dept}) tried to access request {RequestId} belonging to {OwnerId} in dept {RequestDept}",
                             currentUserId, string.Join(',', User.FindAll(ClaimTypes.Role).Select(c=>c.Value)), currentUser.Department, id, requestDto.RequestUserID, requestDto.RequestDepartment);
                          return Forbid();
                     }
                 }
-                   
+
                 return Ok(requestDto);
             }
             catch (UnauthorizedAccessException ex)
@@ -162,6 +167,7 @@ namespace TDFAPI.Controllers
 
         // POST: api/requests
         [HttpPost("")]
+        [Route(ApiRoutes.Requests.Create)]
         public async Task<ActionResult<RequestResponseDto>> CreateRequest([FromBody] RequestCreateDto createDto)
         {
             if (!ModelState.IsValid)
@@ -173,7 +179,7 @@ namespace TDFAPI.Controllers
             {
                 int userId = GetCurrentUserId();
                 if (userId == 0) return Unauthorized("User ID could not be determined.");
-                
+
                 _logger.LogInformation("User {UserId} attempting to create request: {@CreateDto}", userId, createDto);
 
                 var createdRequestDto = await _requestService.CreateAsync(createDto, userId);
@@ -182,7 +188,7 @@ namespace TDFAPI.Controllers
                     _logger.LogError("Failed to create request for user {UserId}", userId);
                     return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create request.");
                 }
-                
+
                 return CreatedAtAction(nameof(GetRequestById), new { id = createdRequestDto.Id }, createdRequestDto);
             }
             catch (ArgumentException ex)
@@ -209,6 +215,7 @@ namespace TDFAPI.Controllers
 
         // PUT: api/requests/{id}
         [HttpPut("{id:guid}")]
+        [Route(ApiRoutes.Requests.Update)]
         public async Task<ActionResult<RequestResponseDto>> UpdateRequest(Guid id, [FromBody] RequestUpdateDto updateDto)
         {
             if (!ModelState.IsValid)
@@ -225,22 +232,22 @@ namespace TDFAPI.Controllers
 
                 var result = await _requestService.UpdateAsync(id, updateDto, userId);
                 bool success = result != null;
-                
+
                 if (!success)
                 {
                     var request = await _requestService.GetByIdAsync(id);
-                    if (request == null) 
-                    { 
+                    if (request == null)
+                    {
                         _logger.LogWarning("Attempted to update non-existent request {RequestId}", id);
                         return NotFound($"Request with ID {id} not found.");
-                    } 
+                    }
                     else
                     {
                         _logger.LogWarning("Failed to update request {RequestId} by user {UserId}. Might be concurrency or other DB issue.", id, userId);
                         return BadRequest("Failed to update the request. It might have been modified or deleted by another user.");
                     }
                 }
-                
+
                 return Ok(await _requestService.GetByIdAsync(id));
             }
             catch (ArgumentException ex)
@@ -272,13 +279,14 @@ namespace TDFAPI.Controllers
 
         // DELETE: api/requests/{id}
         [HttpDelete("{id:guid}")]
+        [Route(ApiRoutes.Requests.Delete)]
         public async Task<IActionResult> DeleteRequest(Guid id)
         {
             try
             {
                 int currentUserId = GetCurrentUserId();
 
-                var requestDto = await _requestService.GetByIdAsync(id); 
+                var requestDto = await _requestService.GetByIdAsync(id);
                 if (requestDto == null)
                     return NotFound();
 
@@ -292,7 +300,7 @@ namespace TDFAPI.Controllers
 
                 if (await _requestService.DeleteAsync(id, currentUserId))
                     return NoContent();
-                
+
                 _logger.LogWarning("Failed to delete request {RequestId} by user {UserId}", id, currentUserId);
                 return BadRequest("Failed to delete request");
             }
@@ -320,6 +328,7 @@ namespace TDFAPI.Controllers
 
         // POST: api/requests/{id}/approve
         [HttpPost("{id:guid}/approve")]
+        [Route(ApiRoutes.Requests.Approve)]
         [Authorize(Roles = "Admin,Manager,HR")]
         public async Task<IActionResult> ApproveRequest(Guid id, [FromBody] RequestApprovalDto approvalDto)
         {
@@ -328,29 +337,29 @@ namespace TDFAPI.Controllers
                 int approverId = GetCurrentUserId();
                 var approver = await _userService.GetUserByIdAsync(approverId);
                 if (approver == null) return Unauthorized("Approver not found.");
-                
+
                 // Ensure approver has roles before accessing them
                 bool isHR = approver.Role?.Contains("HR") ?? false;
-                _logger.LogInformation("{Role} {ApproverName} ({ApproverId}) attempting to approve request {RequestId}: {@ApprovalDto}", 
+                _logger.LogInformation("{Role} {ApproverName} ({ApproverId}) attempting to approve request {RequestId}: {@ApprovalDto}",
                     (isHR ? "HR" : "Manager"), approver.FullName, approverId, id, approvalDto);
-                
+
                 bool success = await _requestService.ApproveRequestAsync(id, approvalDto, approverId, approver.FullName, isHR);
 
                 if (!success)
                 {
                     var request = await _requestService.GetByIdAsync(id);
-                    if (request == null) 
+                    if (request == null)
                     {
                         _logger.LogWarning("Attempted to approve non-existent request {RequestId}", id);
                         return NotFound($"Request with ID {id} not found.");
-                    } 
-                    else 
+                    }
+                    else
                     {
                          _logger.LogWarning("Failed to approve request {RequestId}. Request status might prevent approval.", id);
                          return BadRequest("Failed to approve request. It might be in a state that cannot be approved (e.g., already finalized).");
                     }
                 }
-                
+
                 return Ok(new { message = "Request approved successfully." });
             }
             catch (ArgumentException ex)
@@ -377,6 +386,7 @@ namespace TDFAPI.Controllers
 
         // POST: api/requests/{id}/reject
         [HttpPost("{id:guid}/reject")]
+        [Route(ApiRoutes.Requests.Reject)]
         [Authorize(Roles = "Admin,Manager,HR")]
         public async Task<IActionResult> RejectRequest(Guid id, [FromBody] RequestRejectDto rejectDto)
         {
@@ -385,10 +395,10 @@ namespace TDFAPI.Controllers
                 int rejecterId = GetCurrentUserId();
                 var rejecter = await _userService.GetUserByIdAsync(rejecterId);
                 if (rejecter == null) return Unauthorized("Rejecter not found.");
-                
+
                 // Ensure rejecter has roles before accessing them
                 bool isHR = rejecter.Role?.Contains("HR") ?? false;
-                _logger.LogInformation("{Role} {RejecterName} ({RejecterId}) attempting to reject request {RequestId}: {@RejectDto}", 
+                _logger.LogInformation("{Role} {RejecterName} ({RejecterId}) attempting to reject request {RequestId}: {@RejectDto}",
                     (isHR ? "HR" : "Manager"), rejecter.FullName, rejecterId, id, rejectDto);
 
                 bool success = await _requestService.RejectRequestAsync(id, rejectDto, rejecterId, rejecter.FullName, isHR);
@@ -396,18 +406,18 @@ namespace TDFAPI.Controllers
                 if (!success)
                 {
                     var request = await _requestService.GetByIdAsync(id);
-                    if (request == null) 
+                    if (request == null)
                     {
                         _logger.LogWarning("Attempted to reject non-existent request {RequestId}", id);
                         return NotFound($"Request with ID {id} not found.");
                     }
-                     else 
+                     else
                     {
                          _logger.LogWarning("Failed to reject request {RequestId}. Request status might prevent rejection.", id);
                          return BadRequest("Failed to reject request. It might be in a state that cannot be rejected (e.g., already finalized).");
                     }
                 }
-                
+
                 return Ok(new { message = "Request rejected successfully." });
             }
             catch (ArgumentException ex)

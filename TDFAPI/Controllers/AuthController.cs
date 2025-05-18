@@ -11,10 +11,11 @@ using TDFAPI.Repositories;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using TDFAPI.Extensions;
+using TDFShared.Constants;
 
 namespace TDFAPI.Controllers
 {
-    [Route("api/[controller]")]
+    [Route(ApiRoutes.Auth.Base)]
     [ApiController]
     public class AuthController : ControllerBase
     {
@@ -22,10 +23,10 @@ namespace TDFAPI.Controllers
         private readonly IUserService _userService;
         private readonly IUserRepository _userRepository;
         private readonly ILogger<AuthController> _logger;
-        
+
         public AuthController(
-            IAuthService authService, 
-            IUserService userService, 
+            IAuthService authService,
+            IUserService userService,
             IUserRepository userRepository,
             ILogger<AuthController> logger)
         {
@@ -34,9 +35,10 @@ namespace TDFAPI.Controllers
             _userRepository = userRepository;
             _logger = logger;
         }
-        
+
         [EnableRateLimiting("auth")]
         [HttpPost("login")]
+        [Route(ApiRoutes.Auth.Login)]
         public async Task<ActionResult<ApiResponse<TokenResponse>>> Login([FromBody] AuthLoginRequest request)
         {
             try
@@ -46,39 +48,39 @@ namespace TDFAPI.Controllers
                 {
                     return BadRequest(ApiResponse<TokenResponse>.ErrorResponse("Username and password are required"));
                 }
-                
+
                 // Get client information for security logging
                 var ipAddress = HttpContext.GetRealIpAddress();
                 var userAgent = HttpContext.Request.Headers.UserAgent.ToString();
-                
+
                 _logger.LogInformation("Login attempt for user {Username} from IP {IpAddress}", request.Username, ipAddress);
-                
+
                 var tokenResponse = await _authService.LoginAsync(request.Username, request.Password);
                 if (tokenResponse == null)
                 {
                     // Check if account is locked - we could enhance AuthService to return specific failure reasons
                     var user = await _userService.GetByUsernameAsync(request.Username);
                     var userAuth = user != null ? await _userRepository.GetUserAuthDataAsync(user.UserID) : null;
-                    
+
                     if (userAuth != null && userAuth.IsLocked && userAuth.LockoutEnd.HasValue && userAuth.LockoutEnd.Value > DateTime.UtcNow)
                     {
                         var remainingLockoutTime = Math.Ceiling((userAuth.LockoutEnd.Value - DateTime.UtcNow).TotalMinutes);
                         _logger.LogWarning("Failed login attempt for locked account: {Username} from IP {IpAddress}", request.Username, ipAddress);
                         return Unauthorized(ApiResponse<TokenResponse>.ErrorResponse($"Account is temporarily locked. Please try again in {remainingLockoutTime} minute(s)"));
                     }
-                    
+
                     _logger.LogWarning("Failed login attempt for user {Username} from IP {IpAddress}", request.Username, ipAddress);
                     return Unauthorized(ApiResponse<TokenResponse>.ErrorResponse("Invalid username or password"));
                 }
-                
+
                 // Include useful information in the success response
-                _logger.LogInformation("User {UserId} ({Username}) successfully logged in from {IpAddress}", 
+                _logger.LogInformation("User {UserId} ({Username}) successfully logged in from {IpAddress}",
                     tokenResponse.UserId, request.Username, ipAddress);
-                    
+
                 // Update user's online status
                 await _userService.UpdateUserPresenceAsync(tokenResponse.UserId, true, userAgent);
-                    
-                return Ok(ApiResponse<TokenResponse>.SuccessResponse(tokenResponse, 
+
+                return Ok(ApiResponse<TokenResponse>.SuccessResponse(tokenResponse,
                     $"Login successful. Token expires in {(tokenResponse.Expiration - DateTime.UtcNow).TotalMinutes:0} minutes"));
             }
             catch (Exception ex)
@@ -87,9 +89,10 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<TokenResponse>.ErrorResponse("An error occurred during login"));
             }
         }
-        
+
         [EnableRateLimiting("auth")]
         [HttpPost("refresh-token")]
+        [Route(ApiRoutes.Auth.RefreshToken)]
         public async Task<ActionResult<ApiResponse<TokenResponse>>> RefreshToken([FromBody] RefreshTokenRequest request)
         {
             try
@@ -98,21 +101,21 @@ namespace TDFAPI.Controllers
                 {
                     return BadRequest(ApiResponse<TokenResponse>.ErrorResponse("Token and refresh token are required"));
                 }
-                
+
                 // Get client information for security logging
                 var ipAddress = HttpContext.GetRealIpAddress();
-                
+
                 var tokenResponse = await _authService.RefreshTokenAsync(request.Token, request.RefreshToken);
                 if (tokenResponse == null)
                 {
                     _logger.LogWarning("Invalid refresh token attempt from IP {IpAddress}", ipAddress);
                     return Unauthorized(ApiResponse<TokenResponse>.ErrorResponse("Invalid or expired tokens"));
                 }
-                
-                _logger.LogInformation("User {UserId} ({Username}) refreshed their token from {IpAddress}", 
+
+                _logger.LogInformation("User {UserId} ({Username}) refreshed their token from {IpAddress}",
                     tokenResponse.UserId, tokenResponse.Username, ipAddress);
-                    
-                return Ok(ApiResponse<TokenResponse>.SuccessResponse(tokenResponse, 
+
+                return Ok(ApiResponse<TokenResponse>.SuccessResponse(tokenResponse,
                     $"Token refreshed successfully. New token expires in {(tokenResponse.Expiration - DateTime.UtcNow).TotalMinutes:0} minutes"));
             }
             catch (Exception ex)
@@ -121,9 +124,10 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<TokenResponse>.ErrorResponse("An error occurred while refreshing the token"));
             }
         }
-        
+
         [EnableRateLimiting("auth")]
         [HttpPost("register")]
+        [Route(ApiRoutes.Auth.Register)]
         public async Task<ActionResult<ApiResponse<UserDto>>> Register([FromBody] CreateUserRequest request)
         {
             try
@@ -133,36 +137,36 @@ namespace TDFAPI.Controllers
                 {
                     return BadRequest(ApiResponse<UserDto>.ErrorResponse("Username and password are required"));
                 }
-                
+
                 // Validate username format (letters, numbers, underscore, no spaces)
                 if (!System.Text.RegularExpressions.Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]+$"))
                 {
                     return BadRequest(ApiResponse<UserDto>.ErrorResponse("Username can only contain letters, numbers, and underscores"));
                 }
-                
+
                 // Check if username already exists
                 var existingUser = await _userService.GetByUsernameAsync(request.Username);
                 if (existingUser != null)
                 {
                     return BadRequest(ApiResponse<UserDto>.ErrorResponse("Username already exists"));
                 }
-                
-                // Sanitize inputs 
+
+                // Sanitize inputs
                 request.FullName = request.FullName?.Trim();
                 request.Department = request.Department?.Trim();
                 request.Title = request.Title?.Trim();
-                
+
                 // Prevent self-assignment of admin privileges for regular registrations
                 request.IsAdmin = false; // Force to false for public registrations
                 request.IsManager = false; // Also force IsManager to false
-                request.IsHR = false; 
+                request.IsHR = false;
 
                 // Set account status flag for future verification system
                 // For now, we'll just create the user without verification
 
                 var userId = await _userService.CreateAsync(request);
                 var newUser = await _userService.GetUserDtoByIdAsync(userId);
-                
+
                 _logger.LogInformation("New user registered: {Username}", request.Username);
                 return Ok(ApiResponse<UserDto>.SuccessResponse(newUser, "User registered successfully"));
             }
@@ -172,19 +176,20 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<UserDto>.ErrorResponse($"An error occurred: {ex.Message}"));
             }
         }
-        
+
         [Authorize]
         [HttpPost("logout")]
+        [Route(ApiRoutes.Auth.Logout)]
         public async Task<ActionResult<ApiResponse<object>>> Logout()
         {
             try
             {
                 // Get client information for security logging
                 var ipAddress = HttpContext.GetRealIpAddress();
-                
+
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 var username = User.Identity?.Name;
-                
+
                 if (!string.IsNullOrEmpty(userId) && int.TryParse(userId, out var id))
                 {
                     // Invalidate the refresh token by setting it to null
@@ -206,14 +211,14 @@ namespace TDFAPI.Controllers
 
                     // Update user's offline status
                     await _userService.UpdateUserPresenceAsync(id, false);
-                    
+
                     _logger.LogInformation("User {UserId} ({Username}) logged out from {IpAddress}", id, username, ipAddress);
                 }
                 else
                 {
                     _logger.LogWarning("Logout attempted with invalid user identity from {IpAddress}", ipAddress);
                 }
-                
+
                 return Ok(ApiResponse<object>.SuccessResponse(null, "Logout successful"));
             }
             catch (Exception ex)
@@ -223,4 +228,4 @@ namespace TDFAPI.Controllers
             }
         }
     }
-} 
+}

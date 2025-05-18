@@ -638,7 +638,7 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 
     // Add manual API documentation endpoint
-    app.MapGet("/api/docs", () =>
+    app.MapGet($"/{ApiRoutes.Docs}", () =>
     {
         var apiDocs = new
         {
@@ -646,10 +646,10 @@ if (app.Environment.IsDevelopment())
             Version = "v1.0",
             Endpoints = new[]
             {
-                new { Path = "/api/auth/login", Method = "POST", Description = "User authentication" },
-                new { Path = "/api/auth/refresh-token", Method = "POST", Description = "Refresh JWT token" },
-                new { Path = "/api/users", Method = "GET", Description = "Get all users" },
-                new { Path = "/api/messages", Method = "GET", Description = "Get messages" },
+                new { Path = $"/{ApiRoutes.Auth.Login}", Method = "POST", Description = "User authentication" },
+                new { Path = $"/{ApiRoutes.Auth.RefreshToken}", Method = "POST", Description = "Refresh JWT token" },
+                new { Path = $"/{ApiRoutes.Users.Base}", Method = "GET", Description = "Get all users" },
+                new { Path = $"/{ApiRoutes.Messages.Base}", Method = "GET", Description = "Get messages" },
                 // Add other endpoints as needed
             },
             Authentication = "JWT Bearer Token"
@@ -907,7 +907,7 @@ app.Map("/ws", async context =>
 // Log configured URLs before starting server
 logger.LogInformation("Server listening on: {Urls}", string.Join(", ", urls));
 
-app.MapHealthChecks("/health", new HealthCheckOptions
+app.MapHealthChecks($"/{ApiRoutes.Health.Base}", new HealthCheckOptions
 {
     ResultStatusCodes =
     {

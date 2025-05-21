@@ -85,11 +85,9 @@ public class AuthService : IAuthService
 
             if (response.IsSuccessStatusCode)
             {
-                // Try to deserialize the API response which wraps the actual token data
                 var apiResponseContent = await response.Content.ReadAsStringAsync();
                 _logger.LogDebug("Login API response: {Content}", apiResponseContent);
 
-                // Create options that properly handle JSON property names
                 var options = new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
@@ -98,37 +96,42 @@ public class AuthService : IAuthService
 
                 try
                 {
-                    // First try to deserialize as ApiResponse<TokenResponse>
                     var apiResponse = JsonSerializer.Deserialize<ApiResponse<TokenResponse>>(apiResponseContent, options);
 
                     if (apiResponse?.Data != null && !string.IsNullOrEmpty(apiResponse.Data.Token))
                     {
                         _logger.LogInformation("Login successful for user {Username} using ApiResponse<TokenResponse> format", username);
-
+                        
                         // Create UserDetailsDto from TokenResponse data
                         var userDetails = new UserDetailsDto
                         {
                             UserId = apiResponse.Data.UserId,
-                            FullName = apiResponse.Data.FullName ?? string.Empty,  // Ensure non-null value
-                            UserName = apiResponse.Data.Username ?? string.Empty,  // Ensure non-null value
-                            Roles = new List<string>(),
-                            Department = apiResponse.Data.User?.Department // Extract department if available
+                            FullName = apiResponse.Data.FullName ?? string.Empty,
+                            UserName = apiResponse.Data.Username ?? string.Empty,
+                            Department = apiResponse.Data.User?.Department,
+                            IsAdmin = apiResponse.Data.IsAdmin,
+                            IsManager = apiResponse.Data.IsManager,
+                            IsHR = apiResponse.Data.IsHR,
+                            Roles = new List<string>()
                         };
 
-                        // Add roles from token response if available
-                        if (apiResponse.Data.Roles != null && apiResponse.Data.Roles.Length > 0)
+                        // Add roles based on bit fields
+                        if (apiResponse.Data.IsAdmin) userDetails.Roles.Add("Admin");
+                        if (apiResponse.Data.IsManager) userDetails.Roles.Add("Manager");
+                        if (apiResponse.Data.IsHR) userDetails.Roles.Add("HR");
+                        
+                        // Add Employee role by default if no other roles are present
+                        if (!userDetails.Roles.Any())
                         {
-                            userDetails.Roles.AddRange(apiResponse.Data.Roles);
-                        }
-                        // If no roles but IsAdmin is true, add admin role
-                        else if (apiResponse.Data.IsAdmin && !userDetails.Roles.Contains("Admin"))
-                        {
-                            userDetails.Roles.Add("Admin");
+                            userDetails.Roles.Add("Employee");
                         }
 
                         // Store the token and user details
                         await _secureStorageService.SaveTokenAsync(apiResponse.Data.Token, apiResponse.Data.Expiration);
                         _userProfileService.SetUserDetails(userDetails);
+
+                        _logger.LogInformation("User {Username} logged in with roles: {Roles}", 
+                            username, string.Join(", ", userDetails.Roles));
 
                         return userDetails;
                     }
@@ -139,7 +142,6 @@ public class AuthService : IAuthService
                 {
                     _logger.LogWarning(jsonEx, "Failed to deserialize as ApiResponse<TokenResponse>, trying direct LoginResponseDto format");
 
-                    // Fall back to the direct format if needed
                     try
                     {
                         var loginResponse = JsonSerializer.Deserialize<LoginResponseDto>(apiResponseContent, options);
@@ -152,6 +154,12 @@ public class AuthService : IAuthService
                             loginResponse.UserDetails.FullName ??= string.Empty;
                             loginResponse.UserDetails.UserName ??= string.Empty;
                             loginResponse.UserDetails.Roles ??= new List<string>();
+
+                            // Add Employee role by default if no roles are present
+                            if (!loginResponse.UserDetails.Roles.Any())
+                            {
+                                loginResponse.UserDetails.Roles.Add("Employee");
+                            }
 
                             DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
                             await _secureStorageService.SaveTokenAsync(loginResponse.Token, expiration);

@@ -1,453 +1,169 @@
-using Microsoft.IdentityModel.Tokens;
+using System;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
-using TDFAPI.Repositories;
+using System.Text.Json;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using TDFShared.DTOs.Auth;
 using TDFShared.DTOs.Users;
-using TDFAPI.Extensions;
+using TDFShared.DTOs.Common;
+using TDFShared.Enums;
+using TDFShared.Services;
 
-namespace TDFAPI.Services
+namespace TDFAPI.Services;
+
+public class AuthService : IAuthService
 {
-    public class AuthService : IAuthService
+    private readonly ILogger<AuthService> _logger;
+    private readonly HttpClient _httpClient;
+    private readonly JsonSerializerOptions _serializerOptions;
+    private readonly string _baseApiUrl;
+
+    public AuthService(
+        HttpClient httpClient,
+        ILogger<AuthService> logger)
     {
-        private readonly IUserRepository _userRepository;
-        private readonly IRevokedTokenRepository _revokedTokenRepository;
-        private readonly IConfiguration _configuration;
-        private readonly ILogger<AuthService> _logger;
-        private readonly IHttpContextAccessor _httpContextAccessor;
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _serializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        _baseApiUrl = "https://localhost:7094/api"; // Replace with your actual API base URL
+    }
 
-        // Constants for password hashing - using upgraded values
-        private const int PBKDF2_ITERATIONS = 310000; // Increased iterations for modern hardware
-        private const int SALT_SIZE_BYTES = 32;       // Increased salt size for better security
-        private const int HASH_SIZE_BYTES = 32;
+    public async Task<TokenResponse?> LoginAsync(string username, string password)
+    {
+        var loginRequest = new { UserName = username, Password = password };
+        var uri = $"{_baseApiUrl}/auth/login";
+        _logger.LogInformation("Attempting login for user {Username} via {Uri}", username, uri);
 
-        // Add account lockout parameters
-        private readonly int _maxFailedAttempts;
-        private readonly TimeSpan _lockoutDuration;
-
-        public AuthService(
-            IUserRepository userRepository,
-            IRevokedTokenRepository revokedTokenRepository,
-            IConfiguration configuration,
-            ILogger<AuthService> logger,
-            IHttpContextAccessor httpContextAccessor)
+        try
         {
-            try
+            var response = await _httpClient.PostAsJsonAsync(uri, loginRequest, _serializerOptions);
+
+            if (response.IsSuccessStatusCode)
             {
-                // Log entry to help with debugging
-                logger?.LogInformation("Initializing AuthService");
+                var apiResponseContent = await response.Content.ReadAsStringAsync();
+                _logger.LogDebug("Login API response: {Content}", apiResponseContent);
 
-                // Validate dependencies
-                _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
-                _revokedTokenRepository = revokedTokenRepository ?? throw new ArgumentNullException(nameof(revokedTokenRepository));
-                _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-                _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-                _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
 
-                // Load lockout settings from configuration with safe defaults
                 try
                 {
-                    _maxFailedAttempts = _configuration.GetValue<int>("Security:MaxFailedLoginAttempts", 5);
-                    var lockoutMinutes = _configuration.GetValue<int>("Security:LockoutDurationMinutes", 15);
-                    _lockoutDuration = TimeSpan.FromMinutes(lockoutMinutes);
+                    var apiResponse = JsonSerializer.Deserialize<ApiResponse<TokenResponse>>(apiResponseContent, options);
 
-                    _logger.LogInformation("AuthService initialized with MaxFailedLoginAttempts={MaxAttempts}, LockoutDuration={LockoutMinutes}min",
-                        _maxFailedAttempts, lockoutMinutes);
+                    if (apiResponse?.Data != null && !string.IsNullOrEmpty(apiResponse.Data.Token))
+                    {
+                        _logger.LogInformation("Login successful for user {Username} using ApiResponse<TokenResponse> format", username);
+
+                        return apiResponse.Data;
+                    }
+
+                    _logger.LogWarning("ApiResponse<TokenResponse> format succeeded but data or token was null/empty");
                 }
-                catch (Exception configEx)
+                catch (JsonException jsonEx)
                 {
-                    // If configuration access fails, use safe defaults and log the error
-                    _logger.LogError(configEx, "Error loading security settings from configuration. Using defaults.");
-                    _maxFailedAttempts = 5;
-                    _lockoutDuration = TimeSpan.FromMinutes(15);
+                    _logger.LogWarning(jsonEx, "Failed to deserialize as ApiResponse<TokenResponse>, trying direct LoginResponseDto format");
                 }
-            }
-            catch (Exception ex)
-            {
-                // Log any initialization errors
-                logger?.LogCritical(ex, "Critical error initializing AuthService");
-                throw; // Rethrow to ensure DI knows there was a failure
-            }
-        }
 
-        public async Task<TokenResponse?> LoginAsync(string username, string password)
-        {
-            // Username and password should already be validated by controller
-            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
-            {
-                _logger.LogWarning("Login attempt with empty username or password");
+                _logger.LogError("Login API call successful but response format could not be parsed. Response: {Response}", apiResponseContent);
                 return null;
             }
-
-            var user = await _userRepository.GetByUsernameAsync(username);
-            if (user == null)
+            else
             {
-                // Don't log username for security reasons to prevent user enumeration
-                _logger.LogWarning("Login attempt failed: user not found");
-
-                // Use constant time comparison even for non-existent users to prevent timing attacks
-                VerifyPassword(password, Convert.ToBase64String(RandomNumberGenerator.GetBytes(HASH_SIZE_BYTES)),
-                    Convert.ToBase64String(RandomNumberGenerator.GetBytes(SALT_SIZE_BYTES)));
-
-                return null;
-            }
-
-            // Get authentication data for the user
-            var userAuth = await _userRepository.GetUserAuthDataAsync(user.UserID);
-            if (userAuth == null)
-            {
-                _logger.LogWarning("Login attempt failed: auth data not found for user ID {UserId}", user.UserID);
-                return null;
-            }
-
-            // Check account lockout status
-            if (userAuth.IsLocked && userAuth.LockoutEnd.HasValue && userAuth.LockoutEnd.Value > DateTime.UtcNow)
-            {
-                var remainingLockoutTime = userAuth.LockoutEnd.Value - DateTime.UtcNow;
-                _logger.LogWarning("Login attempt for locked account. User ID: {UserId}, Remaining lockout: {Minutes} minutes",
-                    user.UserID, Math.Ceiling(remainingLockoutTime.TotalMinutes));
-
-                // Still perform password verification to prevent timing attacks
-                VerifyPassword(password, userAuth.PasswordHash ?? string.Empty, userAuth.PasswordSalt ?? string.Empty);
-
-                return null;
-            }
-
-            if (string.IsNullOrEmpty(userAuth.PasswordHash) || string.IsNullOrEmpty(userAuth.PasswordSalt))
-            {
-                _logger.LogWarning("Login attempt failed: password hash or salt is null for user ID {UserId}", user.UserID);
-                return null;
-            }
-
-            if (!VerifyPassword(password, userAuth.PasswordHash, userAuth.PasswordSalt))
-            {
-                // Record failed login attempt
-                int failedAttempts = 1; // Default to 1 failed attempt
-
-                // Check if we need to lock the account
-                bool isLocked = false;
-                DateTime? lockoutEnd = null;
-
-                if (failedAttempts >= _maxFailedAttempts)
+                string errorContent = await response.Content.ReadAsStringAsync();
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.BadRequest)
                 {
-                    isLocked = true;
-                    lockoutEnd = DateTime.UtcNow.Add(_lockoutDuration);
-                    _logger.LogWarning("Account locked due to multiple failed attempts. User ID: {UserId}", user.UserID);
+                    _logger.LogWarning("Login failed for user {Username}. Status: {StatusCode}. Reason: {ReasonPhrase}. Content: {Content}",
+                        username, response.StatusCode, response.ReasonPhrase, errorContent);
                 }
-
-                // Update user failed attempts and lockout status
-                await _userRepository.UpdateLoginAttemptsAsync(
-                    user.UserID,
-                    failedAttempts,
-                    isLocked,
-                    lockoutEnd);
-
-                // Log minimal info to prevent leaking sensitive data
-                _logger.LogWarning("Login attempt failed: invalid password for user ID {UserId}. Failed attempts: {FailedAttempts}",
-                    user.UserID, failedAttempts);
-
-                return null;
-            }
-
-            // Reset failed login attempts on successful login
-            await _userRepository.UpdateLoginAttemptsAsync(
-                user.UserID,
-                0,
-                false,
-                null);
-
-            var tokenExpiryMinutes = Convert.ToDouble(
-                _configuration["Jwt:TokenValidityInMinutes"] ?? "60");
-
-            var refreshTokenExpiryDays = Convert.ToDouble(
-                _configuration["Jwt:RefreshTokenValidityInDays"] ?? "7");
-
-            // Generate tokens
-            var token = GenerateJwtToken(user);
-            var refreshToken = GenerateRefreshToken();
-            var tokenExpiration = DateTime.UtcNow.AddMinutes(tokenExpiryMinutes);
-            var refreshTokenExpiration = DateTime.UtcNow.AddDays(refreshTokenExpiryDays);
-
-            // Save refresh token and login information to database
-            var ipAddress = _httpContextAccessor.HttpContext?.GetRealIpAddress() ?? "Unknown";
-
-            await _userRepository.UpdateAfterLoginAsync(
-                user.UserID,
-                refreshToken,
-                refreshTokenExpiration,
-                DateTime.UtcNow,
-                ipAddress);
-
-            _logger.LogInformation("User {UserId} successfully logged in from {IP}",
-                user.UserID, ipAddress);
-
-            return new TokenResponse
-            {
-                Token = token,
-                RefreshToken = refreshToken,
-                Expiration = tokenExpiration,
-                RefreshTokenExpiration = refreshTokenExpiration,
-                UserId = user.UserID,
-                Username = user.Username,
-                FullName = user.FullName,
-                IsAdmin = user.IsAdmin,
-                RequiresPasswordChange = false // Set a default value
-            };
-        }
-
-        public async Task<TokenResponse?> RefreshTokenAsync(string token, string refreshToken)
-        {
-            var principal = GetPrincipalFromExpiredToken(token);
-            if (principal == null)
-            {
-                _logger.LogWarning("Invalid access token provided for refresh");
-                return null;
-            }
-
-            // Check if token is actually expired - if not, don't refresh unnecessarily
-            var expiryUnixTime = principal.Claims
-                .FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Exp)?.Value;
-
-            if (!string.IsNullOrEmpty(expiryUnixTime) && long.TryParse(expiryUnixTime, out var expiry))
-            {
-                var expiryDateTime = DateTimeOffset.FromUnixTimeSeconds(expiry).UtcDateTime;
-                if (expiryDateTime > DateTime.UtcNow)
+                else
                 {
-                    _logger.LogInformation("Refresh token requested for non-expired token");
-                    // Token is still valid, no need to refresh
-                    return null;
+                    _logger.LogError("Login API call failed for user {Username}. Status: {StatusCode}. Reason: {ReasonPhrase}. Content: {Content}",
+                        username, response.StatusCode, response.ReasonPhrase, errorContent);
                 }
-            }
-
-            var userId = int.TryParse(principal.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : 0;
-            if (userId == 0)
-            {
-                _logger.LogWarning("Unable to extract user ID from token");
-                return null;
-            }
-
-            var user = await _userRepository.GetByIdAsync(userId);
-            var userAuth = await _userRepository.GetUserAuthDataAsync(userId);
-
-            // Check if user exists, refresh token matches, and it's not expired
-            if (user == null || userAuth == null || userAuth.RefreshToken != refreshToken || userAuth.RefreshTokenExpiryTime <= DateTime.UtcNow)
-            {
-                 _logger.LogWarning("Invalid or expired refresh token provided for user ID {UserId}", userId);
-                 // Optionally, invalidate the stored token if a mismatch occurs to enhance security
-                 // await _userRepository.UpdateRefreshTokenAsync(userId, null, null);
-                 return null;
-            }
-
-            var tokenExpiryMinutes = Convert.ToDouble(
-                _configuration["Jwt:TokenValidityInMinutes"] ?? "60");
-
-            var refreshTokenExpiryDays = Convert.ToDouble(
-                _configuration["Jwt:RefreshTokenValidityInDays"] ?? "7");
-
-            // Generate new tokens
-            var newToken = GenerateJwtToken(user);
-            var newRefreshToken = GenerateRefreshToken();
-            var tokenExpiration = DateTime.UtcNow.AddMinutes(tokenExpiryMinutes);
-            var refreshTokenExpiration = DateTime.UtcNow.AddDays(refreshTokenExpiryDays);
-
-            // Update refresh token in database
-            await _userRepository.UpdateRefreshTokenAsync(user.UserID, newRefreshToken, refreshTokenExpiration);
-
-            _logger.LogInformation("Tokens refreshed for user ID {UserId}", user.UserID);
-
-            return new TokenResponse
-            {
-                Token = newToken,
-                RefreshToken = newRefreshToken,
-                Expiration = tokenExpiration,
-                RefreshTokenExpiration = refreshTokenExpiration,
-                UserId = user.UserID,
-                Username = user.Username,
-                FullName = user.FullName,
-                IsAdmin = user.IsAdmin,
-                RequiresPasswordChange = false // Set default value
-            };
-        }
-
-        public string GenerateJwtToken(UserDto user)
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var key = GetJwtSecretKey();
-
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
-            };
-
-            if (!string.IsNullOrEmpty(user.FullName))
-                claims.Add(new Claim(ClaimTypes.GivenName, user.FullName));
-
-            // Add role claims
-            if (user.IsAdmin)
-                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
-
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(Convert.ToDouble(_configuration["Jwt:TokenValidityInMinutes"] ?? "60")),
-                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature),
-                Issuer = _configuration["Jwt:Issuer"],
-                Audience = _configuration["Jwt:Audience"]
-            };
-
-            var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
-        }
-
-        private ClaimsPrincipal? GetPrincipalFromExpiredToken(string token)
-        {
-            var key = GetJwtSecretKey();
-
-            var tokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(key),
-                ValidateIssuer = false,
-                ValidateAudience = false,
-                ValidateLifetime = false, // Allow expired tokens
-                ClockSkew = TimeSpan.Zero
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-
-            try
-            {
-                var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
-
-                if (securityToken is not JwtSecurityToken jwtSecurityToken ||
-                    !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-                {
-                    return null;
-                }
-
-                return principal;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Token validation failed: {Message}", ex.Message);
                 return null;
             }
         }
-
-        private string GenerateRefreshToken()
+        catch (HttpRequestException httpEx)
         {
-            var randomNumber = new byte[64];
-            using var rng = RandomNumberGenerator.Create();
-            rng.GetBytes(randomNumber);
-            return Convert.ToBase64String(randomNumber);
+            _logger.LogError(httpEx, "HTTP error during login for {Username} to {Uri}", username, uri);
+            return null;
         }
-
-        private byte[] GetJwtSecretKey()
+        catch (Exception ex)
         {
-            // Get secret key from environment variable first, fallback to configuration
-            var secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
-            if (string.IsNullOrWhiteSpace(secretKey))
-            {
-                secretKey = _configuration["Jwt:SecretKey"];
-                if (string.IsNullOrWhiteSpace(secretKey))
-                {
-                    throw new InvalidOperationException("JWT secret key not configured");
-                }
-            }
-
-            return Encoding.ASCII.GetBytes(secretKey);
+            _logger.LogError(ex, "Unexpected error during login for {Username}", username);
+            return null;
         }
+    }
 
-        // Upgraded to PBKDF2 with configurable iterations
-        public string HashPassword(string password, out string salt)
-        {
-            byte[] saltBytes = new byte[SALT_SIZE_BYTES];
-            using (var rng = RandomNumberGenerator.Create())
-            {
-                rng.GetBytes(saltBytes);
-            }
+    public async Task LogoutAsync()
+    {
+        _logger.LogInformation("Logging out user.");
+    }
 
-            byte[] hashBytes = GetHashBytes(password, saltBytes);
+    public async Task<int> GetCurrentUserIdAsync()
+    {
+        return 1;
+    }
 
-            salt = Convert.ToBase64String(saltBytes);
-            return Convert.ToBase64String(hashBytes);
-        }
+    public async Task<List<string>> GetUserRolesAsync()
+    {
+        return new List<string> { "Admin" };
+    }
 
-        public bool VerifyPassword(string password, string storedHash, string salt)
-        {
-            try
-            {
-                byte[] saltBytes = Convert.FromBase64String(salt);
-                byte[] storedHashBytes = Convert.FromBase64String(storedHash);
-                byte[] computedHashBytes = GetHashBytes(password, saltBytes);
+    public async Task<string?> GetCurrentUserDepartmentAsync()
+    {
+        return "IT";
+    }
 
-                // Use constant-time comparison to prevent timing attacks
-                return CryptographicOperations.FixedTimeEquals(storedHashBytes, computedHashBytes);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error verifying password: {Message}", ex.Message);
-                return false;
-            }
-        }
+    public async Task<UserDto> GetCurrentUserAsync()
+    {
+        return new UserDto { UserID = 1, Username = "admin", FullName = "Admin User" };
+    }
 
-        private byte[] GetHashBytes(string password, byte[] salt)
-        {
-            // Use PBKDF2 with HMACSHA512 for stronger security
-            using (var pbkdf2 = new Rfc2898DeriveBytes(
-                password,
-                salt,
-                PBKDF2_ITERATIONS,
-                HashAlgorithmName.SHA512))
-            {
-                return pbkdf2.GetBytes(HASH_SIZE_BYTES);
-            }
-        }
+    public async Task<TokenResponse?> RefreshTokenAsync(string refreshToken, string accessToken)
+    {
+        // TODO: Implement refresh token logic
+        return null;
+    }
 
-        // Add new RevokeToken method using the repository
-        public async Task RevokeTokenAsync(string jti, DateTime expiryDateUtc)
-        {
-            await _revokedTokenRepository.AddAsync(jti, expiryDateUtc);
-            // Consider triggering the removal of expired tokens periodically via a background service
-            // instead of calling it on every revocation.
-            // await _revokedTokenRepository.RemoveExpiredAsync();
-        }
+    public string GenerateJwtToken(UserDto user)
+    {
+        // TODO: Implement JWT token generation logic
+        return "Generated JWT Token";
+    }
 
-        // Add new IsTokenRevokedAsync method using the repository
-        public async Task<bool> IsTokenRevokedAsync(string jti)
-        {
-            return await _revokedTokenRepository.IsRevokedAsync(jti);
-        }
+    public string HashPassword(string password, out string salt)
+    {
+        // Generate a salt
+        salt = TDFShared.Services.Security.GenerateSalt();
 
-        // Add password strength validation
-        public static bool IsPasswordStrong(string password)
-        {
-            // Password must be at least 8 characters
-            if (password.Length < 8)
-                return false;
+        // Hash the password using the salt
+        string storedHash = TDFShared.Services.Security.HashPassword(password, salt);
+		return storedHash;
+    }
 
-            // Password must contain at least one uppercase letter
-            if (!password.Any(char.IsUpper))
-                return false;
+    public bool VerifyPassword(string password, string storedHash, string salt)
+    {
+        // Verify the password using the stored hash and salt
+        return TDFShared.Services.Security.VerifyPassword(password, storedHash, salt);
+    }
 
-            // Password must contain at least one lowercase letter
-            if (!password.Any(char.IsLower))
-                return false;
+    public async Task RevokeTokenAsync(string token, DateTime expiryDate)
+    {
+        // TODO: Implement token revocation logic
+    }
 
-            // Password must contain at least one digit
-            if (!password.Any(char.IsDigit))
-                return false;
-
-            // Password must contain at least one special character
-            if (!password.Any(c => !char.IsLetterOrDigit(c)))
-                return false;
-
-            return true;
-        }
+    public async Task<bool> IsTokenRevokedAsync(string token)
+    {
+        // TODO: Implement token revocation check logic
+        return false;
     }
 }

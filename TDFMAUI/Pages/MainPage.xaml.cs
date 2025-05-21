@@ -75,7 +75,7 @@ public partial class MainPage : ContentPage
 
     private async void OnAdminClicked(object sender, EventArgs e)
     {
-        if (App.CurrentUser != null && App.CurrentUser.IsAdmin)
+        if (App.CurrentUser != null && App.CurrentUser.IsAdmin == true)
         {
             var requestService = App.Services.GetRequiredService<IRequestService>();
             var apiService = App.Services.GetRequiredService<ApiService>();
@@ -89,4 +89,4 @@ public partial class MainPage : ContentPage
         var loginViewModel = App.Services.GetService<LoginPageViewModel>();
         await Navigation.PushAsync(new LoginPage(loginViewModel));
     }
-} 
+}

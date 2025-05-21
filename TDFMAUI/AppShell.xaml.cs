@@ -19,14 +19,13 @@ namespace TDFMAUI
         private readonly IUserPresenceService _userPresenceService;
         private string _previousRoute = "//"; // To store the route before opening the flyout
 
-        /// <summary>
-        /// Gets the previous route that was navigated from before the current route
+        /// <summary>        /// Gets the previous route that was navigated from before the current route
         /// </summary>
         public string PreviousRoute => _previousRoute;
-
-        public bool IsAdmin => App.CurrentUser?.Roles?.Contains("Admin", StringComparer.OrdinalIgnoreCase) ?? false;
-        public bool IsHR => App.CurrentUser?.Roles?.Contains("HR", StringComparer.OrdinalIgnoreCase) ?? false;
-        public bool IsManager => App.CurrentUser?.Roles?.Contains("Manager", StringComparer.OrdinalIgnoreCase) ?? false;
+        
+        public bool IsAdmin => App.CurrentUser?.IsAdmin ?? false;
+        public bool IsHR => App.CurrentUser?.IsHR ?? false;
+        public bool IsManager => App.CurrentUser?.IsManager ?? false;
 
         public bool IsDevelopmentMode => ApiConfig.DevelopmentMode;
         public bool IsDesktopUser => DeviceHelper.IsDesktop;

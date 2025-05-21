@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Common;
+using TDFShared.Services;
 using TDFMAUI.Services;
 using TDFMAUI.Features.Requests; // For AddRequestPage navigation
 using TDFShared.Exceptions;
@@ -39,19 +40,19 @@ namespace TDFMAUI.ViewModels
         [NotifyCanExecuteChangedFor(nameof(RefreshRequestsCommand))]
         private bool _showPendingOnly = true; // Default to showing pending
 
-        // Role properties
+        // Role properties with nullable bool type
         [ObservableProperty]
-        private bool _isAdmin;
+        private bool? _isAdmin;
         [ObservableProperty]
-        private bool _isManager;
+        private bool? _isManager;
         [ObservableProperty]
-        private bool _isHR;
+        private bool? _isHR;
 
         // Computed Properties
-        public bool CanManageRequests => IsAdmin || IsManager || IsHR;
-        public bool CanApproveReject => CanManageRequests; // Base logic, might need refinement
-        public bool CanEditDeleteAny => IsAdmin; // Example: Only Admin can edit/delete anyone's
-        public bool CanFilterByDepartment => IsManager; // Example: Only Manager can filter by department
+        public bool CanManageRequests => RequestAuthorizationService.CanManageRequests(IsAdmin, IsManager, IsHR);
+        public bool CanApproveReject => RequestAuthorizationService.CanManageRequests(IsAdmin, IsManager, IsHR);
+        public bool CanEditDeleteAny => RequestAuthorizationService.CanEditDeleteAny(IsAdmin);
+        public bool CanFilterByDepartment => RequestAuthorizationService.CanFilterByDepartment(IsManager);
 
         public List<string> StatusOptions => RequestOptions.StatusOptions;
         public List<string> TypeOptions => RequestOptions.TypeOptions;
@@ -84,29 +85,31 @@ namespace TDFMAUI.ViewModels
         {
             try
             {
-                var roles = await _authService.GetUserRolesAsync();
-                IsAdmin = roles.Contains("Admin");
-                IsManager = roles.Contains("Manager");
-                IsHR = roles.Contains("HR");
-                _logger.LogInformation("User roles loaded: Admin={IsAdmin}, Manager={IsManager}, HR={IsHR}", IsAdmin, IsManager, IsHR);
-                SetTitleBasedOnRole();
+                var currentUser = await _authService.GetCurrentUserAsync();
+                if (currentUser != null)
+                {
+                    IsAdmin = currentUser.IsAdmin;
+                    IsManager = currentUser.IsManager;
+                    IsHR = currentUser.IsHR;
+                    _logger.LogInformation("User roles loaded: Admin={IsAdmin}, Manager={IsManager}, HR={IsHR}", IsAdmin, IsManager, IsHR);
+                    SetTitleBasedOnRole();
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to load user roles.");
-                // Handle error appropriately, maybe default to non-privileged view
-                IsAdmin = IsManager = IsHR = false;
+                IsAdmin = IsManager = IsHR = null;
                 Title = "My Requests";
             }
         }
 
         private void SetTitleBasedOnRole()
         {
-            if (IsAdmin || IsHR)
+            if (IsAdmin == true || IsHR == true)
             {
                 Title = "All Requests";
             }
-            else if (IsManager)
+            else if (IsManager == true)
             {
                 Title = "Team Requests"; // Or manage own + team?
             }
@@ -123,7 +126,7 @@ namespace TDFMAUI.ViewModels
             Requests.Clear();
             try
             {
-                if (_currentUserId == 0 && !(IsAdmin || IsHR || IsManager))
+                if (_currentUserId == 0 && !(IsAdmin == true || IsHR == true || IsManager == true))
                 {
                     _logger.LogWarning("Cannot load requests: User not authenticated.");
                     await Shell.Current.DisplayAlert("Auth Error", "Could not verify user.", "OK");
@@ -140,12 +143,12 @@ namespace TDFMAUI.ViewModels
 
                 PaginatedResult<RequestResponseDto>? result = null;
 
-                if (IsAdmin || IsHR)
+                if (IsAdmin == true || IsHR == true)
                 {
                     _logger.LogInformation("Loading all requests (Admin/HR view) with filter: {Filter}", pagination.FilterStatus);
                     result = await _requestService.GetAllRequestsAsync(pagination);
                 }
-                else if (IsManager)
+                else if (IsManager == true)
                 {
                     string? department = await _authService.GetCurrentUserDepartmentAsync();
                     if (!string.IsNullOrEmpty(department))
@@ -236,18 +239,27 @@ namespace TDFMAUI.ViewModels
         private bool CanEditDeleteRequest(RequestResponseDto? request)
         {
             if (request == null) return false;
-            // Admin can always edit/delete. User can edit/delete their own if pending.
-            return IsAdmin || (request.RequestUserID == _currentUserId && request.Status == RequestStatus.Pending);
+            return RequestAuthorizationService.CanEditRequest(request, _currentUserId, IsAdmin);
         }
 
         // Helper to check if current user can approve/reject a specific request
         private bool CanApproveRejectRequest(RequestResponseDto? request)
         {
             if (request == null) return false;
-            // Admin/Manager/HR can approve/reject requests *not* their own.
-            // TODO: Add logic for Manager only approving their department? Requires department info on request DTO.
-            // TODO: Add logic for HR only approving after manager? Requires checking both statuses.
-            return CanManageRequests && request.RequestUserID != _currentUserId && request.Status == RequestStatus.Pending; // Simplified check for now
+            if (request.RequestUserID == _currentUserId) return false; // Can't approve/reject own requests
+            if (request.Status != RequestStatus.Pending) return false;
+
+            var canManage = RequestAuthorizationService.CanManageRequests(IsAdmin, IsManager, IsHR);
+            if (!canManage) return false;
+
+            // If manager (not admin/HR), check department match
+            if (IsManager == true && IsAdmin != true && IsHR != true)
+            {
+                var currentUserDepartment = Task.Run(async () => await _authService.GetCurrentUserDepartmentAsync()).Result;
+                return request.RequestDepartment == currentUserDepartment;
+            }
+
+            return true;
         }
 
         [RelayCommand(CanExecute = nameof(CanApproveRejectRequest))]

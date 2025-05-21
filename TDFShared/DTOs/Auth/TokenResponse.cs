@@ -65,6 +65,18 @@ namespace TDFShared.DTOs.Auth
         public bool IsAdmin { get; set; } = false;
 
         /// <summary>
+        /// Flag indicating if the user has manager privileges
+        /// </summary>
+        [JsonPropertyName("isManager")]
+        public bool IsManager { get; set; } = false;
+
+        /// <summary>
+        /// Flag indicating if the user has HR privileges
+        /// </summary>
+        [JsonPropertyName("isHR")]
+        public bool IsHR { get; set; } = false;
+
+        /// <summary>
         /// Flag indicating if the user RequiresPasswordChange
         /// </summary>
         [JsonPropertyName("requiresPasswordChange")]
@@ -100,4 +112,4 @@ namespace TDFShared.DTOs.Auth
         [JsonPropertyName("roles")]
         public string[] Roles { get; set; } = Array.Empty<string>();
     }
-} 
+}

@@ -2,16 +2,15 @@ using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Windows.Input;
-using TDFMAUI.Services;
 using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.Maui.Controls;
-using Microsoft.Extensions.DependencyInjection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TDFShared.DTOs.Requests;
-using System.ComponentModel;
+using TDFShared.Services;
 using TDFShared.Enums;
+using TDFMAUI.Services;
 
 namespace TDFMAUI.ViewModels
 {
@@ -22,10 +21,11 @@ namespace TDFMAUI.ViewModels
         public static readonly List<string> DepartmentOptions = new() { "All", "HR", "IT", "Finance", "Marketing", "Operations" };
     }
 
-    public partial class RequestApprovalViewModel : BaseViewModel, INotifyPropertyChanged
+    public partial class RequestApprovalViewModel : ObservableObject
     {
         private readonly IRequestService _requestService;
         private readonly INotificationService _notificationService;
+        private readonly IAuthService _authService;
 
         [ObservableProperty]
         private ObservableCollection<RequestResponseDto> _requests;
@@ -34,73 +34,47 @@ namespace TDFMAUI.ViewModels
         private RequestResponseDto _selectedRequest;
 
         [ObservableProperty]
-        ObservableCollection<RequestResponseDto> pendingRequests;
+        private ObservableCollection<RequestResponseDto> _pendingRequests;
 
+        [ObservableProperty]
         private bool _isLoading;
-        public bool IsLoading
-        {
-            get => _isLoading;
-            set => SetProperty(ref _isLoading, value);
-        }
 
+        [ObservableProperty]
         private int _pendingCount;
-        public int PendingCount
-        {
-            get => _pendingCount;
-            set => SetProperty(ref _pendingCount, value);
-        }
 
+        [ObservableProperty]
         private int _approvedCount;
-        public int ApprovedCount
-        {
-            get => _approvedCount;
-            set => SetProperty(ref _approvedCount, value);
-        }
 
+        [ObservableProperty]
         private int _rejectedCount;
-        public int RejectedCount
-        {
-            get => _rejectedCount;
-            set => SetProperty(ref _rejectedCount, value);
-        }
 
+        [ObservableProperty]
         private DateTime _fromDate = DateTime.Now.AddDays(-30);
-        public DateTime FromDate
-        {
-            get => _fromDate;
-            set => SetProperty(ref _fromDate, value);
-        }
 
+        [ObservableProperty]
         private DateTime _toDate = DateTime.Now;
-        public DateTime ToDate
-        {
-            get => _toDate;
-            set => SetProperty(ref _toDate, value);
-        }
 
+        [ObservableProperty]
         private string _selectedStatus = "All";
-        public string SelectedStatus
-        {
-            get => _selectedStatus;
-            set => SetProperty(ref _selectedStatus, value);
-        }
 
+        [ObservableProperty]
         private string _selectedType = "All";
-        public string SelectedType
-        {
-            get => _selectedType;
-            set => SetProperty(ref _selectedType, value);
-        }
 
+        [ObservableProperty]
         private string _selectedDepartment = "All";
-        public string SelectedDepartment
-        {
-            get => _selectedDepartment;
-            set => SetProperty(ref _selectedDepartment, value);
-        }
 
-        public bool IsHR => App.CurrentUser?.Department?.Contains("HR") == true ||
-                          App.CurrentUser?.Title?.Contains("HR") == true;
+        // Role properties using nullable bool
+        [ObservableProperty]
+        private bool? _isAdmin;
+
+        [ObservableProperty]
+        private bool? _isManager;
+
+        [ObservableProperty]
+        private bool? _isHR;
+
+        [ObservableProperty]
+        private string _title = string.Empty;
 
         public ICommand ApproveCommand { get; private set; }
         public ICommand RejectCommand { get; private set; }
@@ -108,68 +82,173 @@ namespace TDFMAUI.ViewModels
         public ICommand FilterCommand { get; private set; }
         public ICommand RefreshCommand { get; private set; }
 
-        public new event PropertyChangedEventHandler PropertyChanged;
-
         public List<string> StatusOptions => RequestOptions.StatusOptions;
         public List<string> TypeOptions => RequestOptions.TypeOptions;
         public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
 
-        public RequestApprovalViewModel(IRequestService requestService, INotificationService notificationService)
+        public bool CanManageRequests => RequestAuthorizationService.CanManageRequests(IsAdmin, IsManager, IsHR);
+        public bool CanEditDeleteAny => RequestAuthorizationService.CanEditDeleteAny(IsAdmin);
+        public bool CanFilterByDepartment => RequestAuthorizationService.CanFilterByDepartment(IsManager);
+
+        public RequestApprovalViewModel(IRequestService requestService, INotificationService notificationService, IAuthService authService)
         {
-            Title = "Request Approval";
+            _title = "Request Approval";
             _requestService = requestService;
             _notificationService = notificationService;
+            _authService = authService;
             Requests = new ObservableCollection<RequestResponseDto>();
+            PendingRequests = new ObservableCollection<RequestResponseDto>();
 
             InitializeCommands();
+            LoadUserRolesAsync().ConfigureAwait(false);
             LoadRequestsAsync().ConfigureAwait(false);
         }
 
-        // --- Centralized Validation and Command Enablement ---
-        private bool CanApprove(RequestResponseDto request) => request != null && request.Status == RequestStatus.Pending;
-        private bool CanReject(RequestResponseDto request) => request != null && request.Status == RequestStatus.Pending;
-        private bool CanView(RequestResponseDto request) => request != null;
-
-        // DRY up command enablement for int ID commands
-        public bool CanExecuteApprove(int id) => Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanApprove(req);
-        public bool CanExecuteReject(int id) => Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanReject(req);
-        public bool CanExecuteView(int id) => Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanView(req);
-
-        // Robust client-side validation for leave requests
-        private List<string> ValidateRequest(RequestResponseDto request)
+        private async Task LoadUserRolesAsync()
         {
-            var errors = new List<string>();
-            if (request == null) { errors.Add("Request is null."); return errors; }
-            // Enum 'LeaveType' cannot be null or whitespace. If a specific 'None' or 'Undefined' value exists, check against that.
-            // For now, assuming the enum type itself makes it 'required' in a sense.
-            if (request.RequestStartDate == default) errors.Add("Start date is required.");
-            if (request.LeaveType == LeaveType.Permission) {
-                if (!request.RequestBeginningTime.HasValue || !request.RequestEndingTime.HasValue)
-                    errors.Add("Both beginning and ending times are required for Permission leave.");
-                if (request.RequestEndDate.HasValue && request.RequestEndDate.Value.Date != request.RequestStartDate.Date)
-                    errors.Add("Permission leave must start and end on the same day.");
-                if (request.RequestEndingTime <= request.RequestBeginningTime)
-                    errors.Add("Ending time must be after beginning time for Permission leave.");
+            try
+            {
+                var currentUser = await _authService.GetCurrentUserAsync();
+                if (currentUser != null)
+                {
+                    IsAdmin = currentUser.IsAdmin;
+                    IsManager = currentUser.IsManager;
+                    IsHR = currentUser.IsHR;
+                    OnPropertyChanged(nameof(CanManageRequests));
+                    OnPropertyChanged(nameof(CanEditDeleteAny));
+                    OnPropertyChanged(nameof(CanFilterByDepartment));
+                }
             }
-            if (request.LeaveType == LeaveType.WorkFromHome) {
-                if (request.RequestBeginningTime.HasValue || request.RequestEndingTime.HasValue)
-                    errors.Add("Work From Home leave cannot have specific times; only full days are allowed.");
+            catch (Exception ex)
+            {
+                await _notificationService.ShowErrorAsync($"Error loading user roles: {ex.Message}");
             }
-            if (request.RequestEndDate.HasValue && request.RequestEndDate.Value < request.RequestStartDate)
-                errors.Add("End date cannot be before start date.");
-            return errors;
         }
 
         private void InitializeCommands()
         {
             ApproveCommand = new Command<int>(async (id) => await ApproveRequestAsync(id), CanExecuteApprove);
             RejectCommand = new Command<int>(async (id) => await RejectRequestAsync(id), CanExecuteReject);
-            ViewCommand = new Command<int>(async (id) => await ViewRequestAsync(id), CanExecuteView);
+            ViewCommand = new Command<int>(async (id) => await ViewRequestAsync(id));
             FilterCommand = new Command(async () => await LoadRequestsAsync());
             RefreshCommand = new Command(async () => await LoadRequestsAsync());
         }
 
-        [RelayCommand]
+        // Authorization checks using RequestAuthorizationService
+        private bool CanApprove(RequestResponseDto request) 
+        {
+            if (request == null) return false;
+            if (request.Status != RequestStatus.Pending) return false;
+
+            var canManage = RequestAuthorizationService.CanManageRequests(IsAdmin, IsManager, IsHR);
+            if (!canManage) return false;
+
+            // Additional check for managers - can only approve requests from their department
+            if (IsManager == true && IsAdmin != true && IsHR != true)
+            {
+                var currentUserDepartment = Task.Run(async () => await _authService.GetCurrentUserDepartmentAsync()).Result;
+                return request.RequestDepartment == currentUserDepartment;
+            }
+
+            return true;
+        }
+
+        private bool CanReject(RequestResponseDto request) => CanApprove(request); // Same logic as approve
+
+        public bool CanExecuteApprove(int id) => 
+            Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanApprove(req);
+
+        public bool CanExecuteReject(int id) => 
+            Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanReject(req);
+
+        partial void OnRequestsChanged(ObservableCollection<RequestResponseDto> value)
+        {
+            // Update command can-execute state when requests change
+            (ApproveCommand as Command)?.ChangeCanExecute();
+            (RejectCommand as Command)?.ChangeCanExecute();
+        }
+
+        private async Task ApproveRequestAsync(int requestId)
+        {
+            var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
+            if (request == null) return;
+
+            try
+            {
+                IsLoading = true;
+                var approvalDto = new RequestApprovalDto
+                {
+                    Status = RequestStatus.Approved,
+                    Comment = "Approved via approval page"
+                };
+                
+                bool success = await _requestService.ApproveRequestAsync(requestId, approvalDto);
+                if (success)
+                {
+                    await _notificationService.ShowSuccessAsync("Request approved successfully");
+                    await LoadRequestsAsync();
+                }
+                else
+                {
+                    await _notificationService.ShowErrorAsync("Failed to approve request");
+                }
+            }
+            catch (Exception ex)
+            {
+                await _notificationService.ShowErrorAsync($"Error approving request: {ex.Message}");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        private async Task RejectRequestAsync(int requestId)
+        {
+            var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
+            if (request == null) return;
+
+            string reason = await Shell.Current.DisplayPromptAsync(
+                "Reject Request",
+                "Please provide a reason for rejection:",
+                "OK",
+                "Cancel",
+                keyboard: Keyboard.Text
+            );
+
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                if (reason != null) // User didn't cancel
+                    await _notificationService.ShowErrorAsync("A rejection reason is required");
+                return;
+            }
+
+            try
+            {
+                IsLoading = true;
+                var rejectDto = new RequestRejectDto { RejectReason = reason };
+                
+                bool success = await _requestService.RejectRequestAsync(requestId, rejectDto);
+                if (success)
+                {
+                    await _notificationService.ShowSuccessAsync("Request rejected successfully");
+                    await LoadRequestsAsync();
+                }
+                else
+                {
+                    await _notificationService.ShowErrorAsync("Failed to reject request");
+                }
+            }
+            catch (Exception ex)
+            {
+                await _notificationService.ShowErrorAsync($"Error rejecting request: {ex.Message}");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
         public async Task LoadRequestsAsync()
         {
             if (IsLoading) return;
@@ -184,12 +263,21 @@ namespace TDFMAUI.ViewModels
                     PageSize = 20,
                     FromDate = FromDate,
                     ToDate = ToDate,
-                    FilterStatus = (string.IsNullOrEmpty(SelectedStatus) || SelectedStatus == "All") ? (RequestStatus?)null : Enum.TryParse<RequestStatus>(SelectedStatus, true, out var parsedStatus) ? parsedStatus : (RequestStatus?)null,
-                    FilterType = (string.IsNullOrEmpty(SelectedType) || SelectedType == "All") ? (LeaveType?)null : Enum.TryParse<LeaveType>(SelectedType, true, out var parsedType) ? parsedType : (LeaveType?)null
+                    FilterStatus = (string.IsNullOrEmpty(SelectedStatus) || SelectedStatus == "All") 
+                        ? (RequestStatus?)null 
+                        : Enum.TryParse<RequestStatus>(SelectedStatus, true, out var parsedStatus) ? parsedStatus : (RequestStatus?)null,
+                    FilterType = (string.IsNullOrEmpty(SelectedType) || SelectedType == "All") 
+                        ? (LeaveType?)null 
+                        : Enum.TryParse<LeaveType>(SelectedType, true, out var parsedType) ? parsedType : (LeaveType?)null
                 };
 
-                string department = (string.IsNullOrEmpty(SelectedDepartment) || SelectedDepartment == "All") ? null : SelectedDepartment;
-                var requests = await _requestService.GetRequestsByDepartmentAsync(department, requestPagination);
+                var currentUserDepartment = IsManager == true && IsAdmin != true && IsHR != true
+                    ? await _authService.GetCurrentUserDepartmentAsync()
+                    : null;
+
+                var requests = currentUserDepartment != null
+                    ? await _requestService.GetRequestsByDepartmentAsync(currentUserDepartment, requestPagination)
+                    : await _requestService.GetAllRequestsAsync(requestPagination);
 
                 if (requests?.Items != null)
                 {
@@ -213,150 +301,34 @@ namespace TDFMAUI.ViewModels
             }
         }
 
-        private async Task ApproveRequestAsync(int requestId)
-        {
-            var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
-            var errors = ValidateRequest(request);
-            if (errors.Any())
-            {
-                await _notificationService.ShowErrorAsync(string.Join("\n", errors));
-                return;
-            }
-
-            try
-            {
-                IsLoading = true;
-                await _requestService.ApproveRequestAsync(requestId, new RequestApprovalDto
-                {
-                    Status = RequestStatus.Approved,
-                    Comment = "Approved by manager"
-                });
-                await _notificationService.ShowSuccessAsync("Request approved successfully");
-                await LoadRequestsAsync();
-            }
-            catch (Exception ex)
-            {
-                await _notificationService.ShowErrorAsync($"Error approving request: {ex.Message}");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        private async Task RejectRequestAsync(int requestId)
-        {
-            var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
-            var errors = ValidateRequest(request);
-            if (errors.Any())
-            {
-                await _notificationService.ShowErrorAsync(string.Join("\n", errors));
-                return;
-            }
-
-            try
-            {
-                IsLoading = true;
-                await _requestService.RejectRequestAsync(requestId, new RequestRejectDto
-                {
-                    RejectReason = "Rejected by manager"
-                });
-                await _notificationService.ShowSuccessAsync("Request rejected successfully");
-                await LoadRequestsAsync();
-            }
-            catch (Exception ex)
-            {
-                await _notificationService.ShowErrorAsync($"Error rejecting request: {ex.Message}");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
         private async Task ViewRequestAsync(int requestId)
         {
             var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
-            var errors = ValidateRequest(request);
-            if (errors.Any())
-            {
-                await Shell.Current.DisplayAlert("Validation Error", string.Join("\n", errors), "OK");
-                return;
-            }
-
-            if (requestId <= 0) return;
+            if (request == null) return;
 
             try
             {
                 var requestDetails = await _requestService.GetRequestByIdAsync(requestId);
                 if (requestDetails == null)
                 {
-                    await Shell.Current.DisplayAlert("Error", "Could not find request details.", "OK");
+                    await _notificationService.ShowErrorAsync("Could not find request details");
                     return;
                 }
 
-                await Shell.Current.GoToAsync($"TDFMAUI/Features/Requests/RequestDetailsPage", new Dictionary<string, object>
+                await Shell.Current.GoToAsync($"RequestDetailsPage", new Dictionary<string, object>
                 {
                     {"RequestId", requestDetails.RequestID}
                 });
             }
             catch (Exception ex)
             {
-                await Shell.Current.DisplayAlert("Error", $"Failed to load request details: {ex.Message}", "OK");
+                await _notificationService.ShowErrorAsync($"Error viewing request details: {ex.Message}");
             }
         }
 
-        public void FilterRequests(string status, string type, string department, DateTime? fromDate, DateTime? toDate)
+        public void FilterRequests()
         {
-            if (IsLoading) return;
-
-            IsLoading = true;
-            try
-            {
-                var allRequests = new List<RequestResponseDto>(Requests);
-
-                if (!string.IsNullOrEmpty(status) && !status.Equals("All", StringComparison.OrdinalIgnoreCase))
-                {
-                    allRequests = allRequests.Where(r => r.Status.ToString().Equals(status, StringComparison.OrdinalIgnoreCase)).ToList();
-                }
-
-                if (!string.IsNullOrEmpty(type) && !type.Equals("All", StringComparison.OrdinalIgnoreCase))
-                {
-                    allRequests = allRequests.Where(r => r.LeaveType.ToString().Equals(type, StringComparison.OrdinalIgnoreCase)).ToList();
-                }
-
-                if (!string.IsNullOrEmpty(department) && !department.Equals("All", StringComparison.OrdinalIgnoreCase))
-                {
-                    allRequests = allRequests.Where(r => r.RequestDepartment?.Equals(department, StringComparison.OrdinalIgnoreCase) == true).ToList();
-                }
-
-                if (fromDate.HasValue)
-                {
-                    allRequests = allRequests.Where(r => r.RequestStartDate >= fromDate.Value.Date).ToList();
-                }
-
-                if (toDate.HasValue)
-                {
-                    allRequests = allRequests.Where(r => r.RequestStartDate <= toDate.Value.Date.AddDays(1).AddTicks(-1)).ToList();
-                }
-
-                Requests.Clear();
-                foreach (var request in allRequests)
-                {
-                    Requests.Add(request);
-                }
-
-                OnPropertyChanged(nameof(Requests));
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        protected new void OnPropertyChanged(string propertyName)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            LoadRequestsAsync().ConfigureAwait(false);
         }
     }
 }

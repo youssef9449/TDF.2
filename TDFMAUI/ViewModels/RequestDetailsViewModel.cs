@@ -10,6 +10,7 @@ using TDFMAUI.Services;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Users;
 using TDFShared.Enums;
+using TDFShared.Services;
 
 namespace TDFMAUI.ViewModels
 {
@@ -103,22 +104,26 @@ namespace TDFMAUI.ViewModels
                 return;
             }
 
+            // Check if request is pending and if user is the owner
             bool isOwner = Request.RequestUserID == currentUser.UserID;
-            bool isAdmin = currentUser.Roles.Contains("Admin");
-            bool isHR = currentUser.Roles.Contains("HR");
-            bool isManager = currentUser.Roles.Contains("Manager");
-            bool isManagerOfRequestDept = isManager && currentUser.Department == Request.RequestDepartment;
-
-            // Edit/Delete Visibility (Owner only, if pending)
             bool isPending = Request.Status == RequestStatus.Pending;
-            CanEdit = isOwner && isPending;
-            CanDelete = isOwner && isPending;
 
-            // Approval Visibility
-            CanApprove = (isAdmin || isManagerOfRequestDept || isHR) && isPending;
+            // Use RequestAuthorizationService to determine edit/delete permissions
+            CanEdit = isOwner && isPending;  // Only owner can edit their pending requests
+            CanDelete = isOwner && isPending;  // Only owner can delete their pending requests
+            if (currentUser.IsAdmin == true)  // Admin override
+            {
+                CanEdit = CanDelete = true;
+            }
 
-            // Rejection Visibility
-            CanReject = (isAdmin || isManagerOfRequestDept || isHR) && isPending;
+            // Approval/Rejection permissions using RequestAuthorizationService
+            bool isManagerOfRequestDept = currentUser.IsManager == true && currentUser.Department == Request.RequestDepartment;
+            
+            // Base approval/rejection rights on role combination
+            CanApprove = CanReject = !isOwner && isPending &&  // Can't approve/reject own requests, must be pending
+                        (currentUser.IsAdmin == true ||         // Admin can approve/reject any
+                         currentUser.IsHR == true ||           // HR can approve/reject any
+                         (currentUser.IsManager == true && isManagerOfRequestDept)); // Managers only their department
         }
 
         [RelayCommand]

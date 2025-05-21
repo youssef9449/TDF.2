@@ -3,14 +3,16 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using TDFShared.DTOs.Requests;
-using TDFShared.Exceptions; 
-using System.Windows.Input; // Needed for ICommand
-using Microsoft.Maui.Controls; // Needed for Command
-using System.Collections.ObjectModel; // Needed for ObservableCollection
-using System.Threading.Tasks; // Needed for async Task
-using TDFMAUI.Services; // Added for IRequestService, IAuthService
+using TDFShared.Exceptions;
+using TDFShared.Services;
+using TDFShared.Factories;
+using System.Windows.Input;
+using Microsoft.Maui.Controls;
+using System.Collections.ObjectModel;
+using System.Threading.Tasks;
+using TDFMAUI.Services;
 using TDFShared.Enums;
-using Microsoft.Extensions.Logging; // Added for logging
+using Microsoft.Extensions.Logging;
 
 namespace TDFMAUI.ViewModels
 {
@@ -135,27 +137,28 @@ namespace TDFMAUI.ViewModels
 
         public bool IsNotBusy => !IsBusy;
 
-        public RequestCreateDto RequestCreateDto => new RequestCreateDto
-        {
-            // Don't set UserId here; it will be set in OnSubmit
-            LeaveType = Enum.TryParse<LeaveType>(this._selectedLeaveType, true, out var createLeaveType) ? createLeaveType : default,
-            RequestStartDate = this._requestFromDay,
-            RequestEndDate = this._requestToDay ?? this._requestFromDay,
-            RequestBeginningTime = (this.SelectedLeaveType == "Permission" || this.SelectedLeaveType == "External Assignment") ? this._requestBeginningTime : null,
-            RequestEndingTime = (this.SelectedLeaveType == "Permission" || this.SelectedLeaveType == "External Assignment") ? this._requestEndingTime : null,
-            RequestReason = this._requestReason
-        };
+        public RequestCreateDto RequestCreateDto => 
+            Enum.TryParse<LeaveType>(SelectedLeaveType, true, out LeaveType leaveType)
+                ? RequestDtoFactory.CreateRequestDto(
+                    leaveType,
+                    StartDate,
+                    EndDate,
+                    StartTime,
+                    EndTime,
+                    RequestReason,
+                    0) // UserId will be set in OnSubmit
+                : new RequestCreateDto();
 
-        public RequestUpdateDto RequestUpdateDto => new RequestUpdateDto
-        {
-            LeaveType = Enum.TryParse<LeaveType>(this._selectedLeaveType, true, out var updateLeaveType) ? updateLeaveType : default,
-            RequestStartDate = this._requestFromDay,
-            RequestEndDate = this._requestToDay ?? this._requestFromDay,
-            RequestBeginningTime = (this.SelectedLeaveType == "Permission" || this.SelectedLeaveType == "External Assignment") ? this._requestBeginningTime : null,
-            RequestEndingTime = (this.SelectedLeaveType == "Permission" || this.SelectedLeaveType == "External Assignment") ? this._requestEndingTime : null,
-            RequestReason = this._requestReason,
-            Remarks = null
-        };
+        public RequestUpdateDto RequestUpdateDto =>
+            Enum.TryParse<LeaveType>(SelectedLeaveType, true, out LeaveType leaveType)
+                ? RequestDtoFactory.CreateUpdateDto(
+                    leaveType,
+                    StartDate,
+                    EndDate,
+                    StartTime,
+                    EndTime,
+                    RequestReason)
+                : new RequestUpdateDto();
 
         public ICommand SubmitRequestCommand { get; }
         public ICommand CancelCommand { get; }
@@ -211,12 +214,10 @@ namespace TDFMAUI.ViewModels
         private void LoadLeaveTypes()
         {
             LeaveTypes.Clear();
-            LeaveTypes.Add("Annual");
-            LeaveTypes.Add("Work From Home");
-            LeaveTypes.Add("Unpaid");
-            LeaveTypes.Add("Emergency");
-            LeaveTypes.Add("Permission");
-            LeaveTypes.Add("External Assignment");
+            foreach (LeaveType type in Enum.GetValues(typeof(LeaveType)))
+            {
+                LeaveTypes.Add(type.ToString());
+            }
             SelectedLeaveType = LeaveTypes.FirstOrDefault() ?? string.Empty;
         }
 
@@ -297,61 +298,27 @@ namespace TDFMAUI.ViewModels
 
         public bool Validate()
         {
-            var errors = new List<string>();
-
             if (string.IsNullOrWhiteSpace(SelectedLeaveType))
             {
-                errors.Add("Leave type is required.");
+                ValidationErrors = new List<string> { "Leave type is required." };
+                return false;
             }
 
-            if (StartDate.Date < DateTime.Today)
+            if (Enum.TryParse<LeaveType>(SelectedLeaveType, true, out LeaveType leaveType))
             {
-                errors.Add("Start date cannot be in the past.");
-            }
+                var errors = RequestValidationService.ValidateRequest(
+                    StartDate,
+                    EndDate,
+                    leaveType,
+                    StartTime,
+                    EndTime);
 
-            if (EndDate.HasValue && EndDate.Value.Date < StartDate.Date)
-            {
-                errors.Add("End date cannot be before the start date.");
+                ValidationErrors = errors;
+                return !errors.Any();
             }
-
-            if (SelectedLeaveType == "Permission" || SelectedLeaveType == "External Assignment")
-            {
-                if (!StartTime.HasValue || !EndTime.HasValue)
-                {
-                    errors.Add("Both From Time and To Time must be provided for this leave type.");
-                }
-                else if (EndTime.Value <= StartTime.Value)
-                {
-                    errors.Add("To Time must be after From Time.");
-                }
-
-                // For Permission or External Assignment, they must be on the same day.
-                // StartDate and EndDate pickers should ideally enforce this or be a single day picker.
-                // For now, we'll validate that if EndDate is set, it's the same as StartDate.
-                if (EndDate.HasValue && EndDate.Value.Date != StartDate.Date)
-                {
-                    errors.Add("Permissions and External Assignments must start and end on the same calendar day.");
-                }
-                 // Also, ensure EndDate is set if it's a time-based request, effectively making it a single-day event.
-                if (!EndDate.HasValue)
-                {
-                     // Silently set EndDate to StartDate for these types if not already set,
-                     // or add a validation error if strict single-day selection is required from UI.
-                     // For now, let's assume UI might allow EndDate to be null initially.
-                     // If EndDate is null, the DTOs will use StartDate.
-                }
-            }
-            else // For other leave types, ensure times are null
-            {
-                // This logic is implicitly handled by DTOs now, but good to be aware
-                // if (StartTime.HasValue || EndTime.HasValue)
-                // {
-                //    errors.Add("Time fields should not be set for this leave type.");
-                // }
-            }
-
-            ValidationErrors = errors;
-            return !HasErrors;
+            
+            ValidationErrors = new List<string> { "Invalid leave type selected." };
+            return false;
         }
 
         #region INotifyPropertyChanged Implementation

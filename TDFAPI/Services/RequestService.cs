@@ -1,11 +1,14 @@
 using System;
+using System.Threading.Tasks;
 using TDFAPI.Repositories;
 using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Requests;
 using TDFShared.Models.Request;
 using TDFShared.Enums;
 using TDFShared.Exceptions;
+using TDFShared.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using EntityNotFoundException = TDFAPI.Exceptions.EntityNotFoundException;
 using RequestStatusEnum = TDFShared.Enums.RequestStatus;
 
@@ -95,7 +98,7 @@ namespace TDFAPI.Services
                 if (user == null)
                     throw new EntityNotFoundException("User", userId);
 
-                ValidateCreateDto(createDto);
+                RequestValidationService.ValidateCreateDto(createDto);
                 await ValidateRequestDates(
                     createDto.RequestStartDate,
                     createDto.RequestEndDate,
@@ -406,6 +409,59 @@ namespace TDFAPI.Services
             }
         }
 
+        public async Task<RequestResponseDto> ProcessRequestApprovalAsync(int requestId, RequestApprovalDto approvalDto, int approverId)
+        {
+            // Get the approver's details
+            var approver = await _userRepository.GetByIdAsync(approverId);
+            if (approver == null)
+                throw new UnauthorizedAccessException("Approver not found");
+
+            // Get the request
+            var request = await _requestRepository.GetByIdAsync(requestId);
+            if (request == null)
+                throw new EntityNotFoundException("Request", requestId);
+
+            // Validate approver's authorization
+            bool canApprove = RequestAuthorizationService.CanManageDepartment(
+                approver.IsAdmin,
+                approver.IsManager,
+                approver.IsHR,
+                approver.Department,
+                request.RequestDepartment);
+
+            if (!canApprove)
+                throw new UnauthorizedAccessException("User is not authorized to approve this request");
+
+            // Validate request state
+            if (request.RequestStatus != RequestStatusEnum.Pending)
+                throw new BusinessRuleException("Request is not in a state that can be approved");
+
+            // Perform the approval
+            var now = DateTime.UtcNow;
+            
+            // Update request status
+            if (approver.IsHR == true)
+            {
+                request.RequestStatus = RequestStatusEnum.Approved;
+                request.HRApprovalDate = now;
+                request.HRApproverId = approverId;
+                request.HRRemarks = approvalDto.Remarks;
+            }
+            else
+            {
+                request.RequestStatus = RequestStatusEnum.ManagerApproved;
+                request.ManagerApprovalDate = now;
+                request.ManagerApproverId = approverId;
+                request.ManagerRemarks = approvalDto.Remarks;
+            }
+
+            // Update in database
+            await _requestRepository.UpdateAsync(request);
+
+            // Return updated request DTO
+            return await GetByIdAsync(requestId);
+        }
+
         public async Task<Dictionary<string, int>> GetLeaveBalancesAsync(int userId)
         {
             // Assuming RequestRepository handles fetching integer balances
@@ -446,18 +502,7 @@ namespace TDFAPI.Services
         
         private async Task ValidateRequestDates(DateTime startDate, DateTime? endDate, int userId, LeaveType leaveType, int existingRequestId = 0) 
         {
-            if (startDate.Date < DateTime.UtcNow.Date)
-                throw new TDFShared.Exceptions.ValidationException("Start date cannot be in the past.");
-
-            DateTime effectiveEndDate = endDate ?? startDate;
-
-            if (effectiveEndDate.Date < startDate.Date)
-                throw new TDFShared.Exceptions.ValidationException("End date cannot be before the start date.");
-            
-            if (_supportedLeaveTypes.Contains(leaveType) && await _requestRepository.HasConflictingRequestsAsync(userId, startDate, effectiveEndDate, existingRequestId))
-            {
-                throw new TDFShared.Exceptions.BusinessRuleException("There is a conflicting request during the selected dates.");
-            }
+            await RequestValidationService.ValidateConflictingRequests(startDate, endDate, userId, _requestRepository.HasConflictingRequestsAsync, existingRequestId);
         }
 
         private int CalculateBusinessDays(DateTime startDate, DateTime endDate)
@@ -611,54 +656,22 @@ namespace TDFAPI.Services
 
         private void ValidateCreateDto(RequestCreateDto dto)
         {
-            if (dto == null) throw new ValidationException("Request data is required.");
+            // Type support validation
             if (!_supportedLeaveTypes.Contains(dto.LeaveType))
-                throw new ValidationException($"Leave type '{dto.LeaveType.ToString()}' is not supported.");
-            if (dto.RequestStartDate == default) throw new ValidationException("Start date is required.");
+                throw new ValidationException($"Leave type '{dto.LeaveType}' is not supported.");
 
-            // Permission: must have both times and be on the same day
-            if (dto.LeaveType == LeaveType.Permission)
-            {
-                if (!dto.RequestBeginningTime.HasValue || !dto.RequestEndingTime.HasValue)
-                    throw new ValidationException("Both beginning and ending times are required for Permission leave.");
-                if (dto.RequestEndDate.HasValue && dto.RequestEndDate.Value.Date != dto.RequestStartDate.Date)
-                    throw new ValidationException("Permission leave must start and end on the same day.");
-                if (dto.RequestEndingTime <= dto.RequestBeginningTime)
-                    throw new ValidationException("Ending time must be after beginning time for Permission leave.");
-            }
-            // Work From Home: only allow full days (no times)
-            if (dto.LeaveType == LeaveType.WorkFromHome)
-            {
-                if (dto.RequestBeginningTime.HasValue || dto.RequestEndingTime.HasValue)
-                    throw new ValidationException("Work From Home leave cannot have specific times; only full days are allowed.");
-            }
-            // Add more field checks as needed for other types
+            // Base validation using shared service
+            RequestValidationService.ValidateCreateDto(dto);
         }
 
         private void ValidateUpdateDto(RequestUpdateDto dto)
         {
-            if (dto == null) throw new ValidationException("Request data is required.");
+            // Type support validation
             if (!_supportedLeaveTypes.Contains(dto.LeaveType))
-                throw new ValidationException($"Leave type '{dto.LeaveType.ToString()}' is not supported.");
-            if (dto.RequestStartDate == default) throw new ValidationException("Start date is required.");
+                throw new ValidationException($"Leave type '{dto.LeaveType}' is not supported.");
 
-            // Permission: must have both times and be on the same day
-            if (dto.LeaveType == LeaveType.Permission)
-            {
-                if (!dto.RequestBeginningTime.HasValue || !dto.RequestEndingTime.HasValue)
-                    throw new ValidationException("Both beginning and ending times are required for Permission leave.");
-                if (dto.RequestEndDate.HasValue && dto.RequestEndDate.Value.Date != dto.RequestStartDate.Date)
-                    throw new ValidationException("Permission leave must start and end on the same day.");
-                if (dto.RequestEndingTime <= dto.RequestBeginningTime)
-                    throw new ValidationException("Ending time must be after beginning time for Permission leave.");
-            }
-            // Work From Home: only allow full days (no times)
-            if (dto.LeaveType == LeaveType.WorkFromHome)
-            {
-                if (dto.RequestBeginningTime.HasValue || dto.RequestEndingTime.HasValue)
-                    throw new ValidationException("Work From Home leave cannot have specific times; only full days are allowed.");
-            }
-            // Add more field checks as needed for other types
+            // Base validation using shared service
+            RequestValidationService.ValidateUpdateDto(dto);
         }
 
         private bool IsPending(RequestEntity request)

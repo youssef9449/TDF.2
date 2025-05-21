@@ -340,11 +340,10 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                int approverId = GetCurrentUserId();
-                var approver = await _userService.GetUserByIdAsync(approverId);
+                int approverId = GetCurrentUserId();                var approver = await _userService.GetUserByIdAsync(approverId);
                 if (approver == null) return Unauthorized("Approver not found.");
 
-                bool isHR = approver.Role?.Contains("HR") ?? false;
+                bool isHR = approver.IsHR;
                 _logger.LogInformation("{Role} {ApproverName} ({ApproverId}) attempting to approve request {RequestId}: {@ApprovalDto}",
                     (isHR ? "HR" : "Manager"), approver.FullName, approverId, id, approvalDto);
 
@@ -402,11 +401,10 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                int rejecterId = GetCurrentUserId();
-                var rejecter = await _userService.GetUserByIdAsync(rejecterId);
+                int rejecterId = GetCurrentUserId();                var rejecter = await _userService.GetUserByIdAsync(rejecterId);
                 if (rejecter == null) return Unauthorized("Rejecter not found.");
 
-                bool isHR = rejecter.Role?.Contains("HR") ?? false;
+                bool isHR = rejecter.IsHR;
                 _logger.LogInformation("{Role} {RejecterName} ({RejecterId}) attempting to reject request {RequestId}: {@RejectDto}",
                     (isHR ? "HR" : "Manager"), rejecter.FullName, rejecterId, id, rejectDto);
 

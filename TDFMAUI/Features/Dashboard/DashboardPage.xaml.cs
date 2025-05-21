@@ -28,14 +28,14 @@ namespace TDFMAUI.Features.Dashboard
                 // If still null, create a new instance with required services
                 if (_viewModel == null)
                 {
-                    var apiService = IPlatformApplication.Current?.Services.GetService<ApiService>();
+                    var requestService = IPlatformApplication.Current?.Services.GetService<IRequestService>();
                     var notificationService = IPlatformApplication.Current?.Services.GetService<INotificationService>();
                     var logger = IPlatformApplication.Current?.Services.GetService<Microsoft.Extensions.Logging.ILogger<DashboardViewModel>>();
                     
-                    if (apiService != null && notificationService != null)
+                    if (requestService != null && notificationService != null)
                     {
                         _viewModel = new DashboardViewModel(
-                            apiService, 
+                            requestService, 
                             notificationService, 
                             logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<DashboardViewModel>.Instance);
                     }

@@ -8,7 +8,7 @@ namespace TDFMAUI.Features.Requests
     public partial class RequestDetailsPage : ContentPage
     {
         private readonly RequestDetailsViewModel _viewModel;
-        public Guid RequestId { get; set; }
+        public int RequestId { get; set; }
 
         public RequestDetailsPage(RequestDetailsViewModel viewModel)
         {
@@ -21,7 +21,7 @@ namespace TDFMAUI.Features.Requests
         {
             base.OnAppearing();
             
-            if (_viewModel.RequestId == Guid.Empty && RequestId != Guid.Empty)
+            if (_viewModel.RequestId <= 0 && RequestId > 0)
             {
                 _viewModel.RequestId = RequestId;
             }

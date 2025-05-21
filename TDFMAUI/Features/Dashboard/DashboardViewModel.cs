@@ -7,12 +7,13 @@ using TDFMAUI.ViewModels;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Messages;
 using Microsoft.Extensions.Logging;
+using TDFShared.Enums;
 
 namespace TDFMAUI.Features.Dashboard
 {
     public partial class DashboardViewModel : BaseViewModel
     {
-        private readonly ApiService _apiService;
+        private readonly IRequestService _requestService;
         private readonly INotificationService _notificationService;
         private readonly ILogger<DashboardViewModel> _logger;
 
@@ -49,11 +50,11 @@ namespace TDFMAUI.Features.Dashboard
         private bool isRefreshing;
 
         public DashboardViewModel(
-            ApiService apiService,
+            IRequestService requestService,
             INotificationService notificationService,
             ILogger<DashboardViewModel> logger)
         {
-            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -76,7 +77,8 @@ namespace TDFMAUI.Features.Dashboard
         // Default parameterless constructor
         public DashboardViewModel()
         {
-            _apiService = _apiService ?? throw new ArgumentNullException(nameof(_apiService));
+            // TODO: Review default constructor. This line likely needs to resolve IRequestService from a service provider if this constructor is used at runtime.
+            _requestService = _requestService ?? throw new ArgumentNullException(nameof(_requestService)); // This will likely fail if not properly injected
             _notificationService = _notificationService ?? throw new ArgumentNullException(nameof(_notificationService));
             _logger = _logger ?? throw new ArgumentNullException(nameof(_logger));
 
@@ -164,10 +166,13 @@ namespace TDFMAUI.Features.Dashboard
                 var pendingPagination = new RequestPaginationDto
                 {
                     PageSize = 1,
-                    FilterStatus = "Pending", // Corrected property name
+                    FilterStatus = RequestStatus.Pending, // Corrected property name
                     CountOnly = true
                 };
-                var pendingResult = await _apiService.GetRequestsAsync(pendingPagination, App.CurrentUser.UserID);
+                if (App.CurrentUser != null) { // Add safety check, though outer method already has one
+                    pendingPagination.UserId = App.CurrentUser.UserID;
+                }
+                var pendingResult = await _requestService.GetAllRequestsAsync(pendingPagination);
                 PendingRequestsCount = pendingResult?.TotalCount ?? 0;
 
                 // Get unread notifications count
@@ -208,12 +213,15 @@ namespace TDFMAUI.Features.Dashboard
                     Ascending = false // Corrected property name and value type
                 };
 
-                var result = await _apiService.GetRequestsAsync(pagination, App.CurrentUser.UserID);
+                if (App.CurrentUser != null) { // Add safety check
+                    pagination.UserId = App.CurrentUser.UserID;
+                }
+                var recentResult = await _requestService.GetAllRequestsAsync(pagination);
 
                 RecentRequests.Clear();
-                if (result?.Items != null)
+                if (recentResult?.Items != null)
                 {
-                    foreach (var req in result.Items)
+                    foreach (var req in recentResult.Items)
                     {
                         RecentRequests.Add(req);
                     }

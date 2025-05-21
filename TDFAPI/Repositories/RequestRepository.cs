@@ -21,14 +21,14 @@ namespace TDFAPI.Repositories
             _logger = logger;
         }
 
-        public async Task<RequestEntity> GetByIdAsync(Guid requestId)
+        public async Task<RequestEntity> GetByIdAsync(int requestId)
         {
             try
             {
                 var request = await _context.Requests
                     .Include(r => r.User)
                     .ThenInclude(u => u.AnnualLeave)
-                    .FirstOrDefaultAsync(r => r.Id == requestId);
+                    .FirstOrDefaultAsync(r => r.RequestID == requestId);
 
                 if (request?.User != null)
                 {
@@ -128,13 +128,13 @@ namespace TDFAPI.Repositories
             return await ExecutePaginatedQueryAsync(baseQuery, pagination);
         }
 
-        public async Task<Guid> CreateAsync(RequestEntity request)
+        public async Task<int> CreateAsync(RequestEntity request)
         {
             try
             {
                 await _context.Requests.AddAsync(request);
                 await _context.SaveChangesAsync();
-                return request.Id;
+                return request.RequestID;
             }
             catch (DbUpdateException ex)
             {
@@ -179,7 +179,7 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<bool> DeleteAsync(Guid requestId)
+        public async Task<bool> DeleteAsync(int requestId)
         {
             try
             {
@@ -227,8 +227,8 @@ namespace TDFAPI.Repositories
                 {
                     { "AnnualBalance", user.AnnualLeave.GetAnnualBalance() },
                     { "CasualBalance", user.AnnualLeave.GetCasualBalance() },
-                    { "AnnualUsed", await GetLeaveUsedAsync(userId, "Annual") },
-                    { "CasualUsed", await GetLeaveUsedAsync(userId, "Emergency") }
+                    { "AnnualUsed", await GetLeaveUsedAsync(userId, LeaveType.Annual) },
+                    { "CasualUsed", await GetLeaveUsedAsync(userId, LeaveType.Emergency) } // Assuming Emergency covers Casual for this context
                 };
 
                 return balances;
@@ -240,7 +240,7 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<bool> UpdateLeaveBalanceAsync(int userId, string leaveType, int days, bool isAdding)
+        public async Task<bool> UpdateLeaveBalanceAsync(int userId, LeaveType leaveType, int days, bool isAdding)
         {
             try
             {
@@ -256,28 +256,26 @@ namespace TDFAPI.Repositories
                 }
 
                 // Update the appropriate balance column based on leave type
-                switch (leaveType.ToLowerInvariant())
+                switch (leaveType)
                 {
-                    case "annual":
+                    case LeaveType.Annual:
                         leaveRecord.AnnualUsed += isAdding ? -days : days;
                         break;
-                    case "emergency":
-                    case "casual leave":
-                    case "casual":
+                    case LeaveType.Emergency: // Assuming Casual Leave maps to Emergency for balance purposes
                         leaveRecord.CasualUsed += isAdding ? -days : days;
                         break;
-                    case "permission":
+                    case LeaveType.Permission:
                         leaveRecord.PermissionsUsed += isAdding ? -days : days;
                         break;
-                    case "unpaid":
+                    case LeaveType.Unpaid:
                         leaveRecord.UnpaidUsed += isAdding ? -days : days;
                         break;
-                    case "work from home":
-                    case "external assignment":
+                    case LeaveType.WorkFromHome:
+                    case LeaveType.ExternalAssignment:
                         // These don't affect leave balances
                         return true;
                     default:
-                        _logger.LogWarning("Attempted to update balance for unhandled leave type: {LeaveType}", leaveType);
+                        _logger.LogWarning("Attempted to update balance for unhandled leave type: {LeaveType}", leaveType.ToString());
                         return false;
                 }
 
@@ -291,24 +289,22 @@ namespace TDFAPI.Repositories
 
                     bool hasInsufficientBalance = false;
 
-                    switch (leaveType.ToLowerInvariant())
+                    switch (leaveType)
                     {
-                        case "annual":
+                        case LeaveType.Annual:
                             hasInsufficientBalance = annualBalance < 0;
                             break;
-                        case "emergency":
-                        case "casual leave":
-                        case "casual":
+                        case LeaveType.Emergency:
                             hasInsufficientBalance = casualBalance < 0;
                             break;
-                        case "permission":
+                        case LeaveType.Permission:
                             hasInsufficientBalance = permissionsBalance < 0;
                             break;
                     }
 
                     if (hasInsufficientBalance)
                     {
-                        _logger.LogWarning("Insufficient balance for user {UserId}, leave type {LeaveType}", userId, leaveType);
+                        _logger.LogWarning("Insufficient balance for user {UserId}, leave type {LeaveType}", userId, leaveType.ToString());
                         return false;
                     }
                 }
@@ -334,11 +330,11 @@ namespace TDFAPI.Repositories
                 int permissionsUsed = await _context.Requests
                     .CountAsync(r =>
                         r.RequestUserID == userId &&
-                        r.RequestType == "Permission" &&
+                        r.RequestType == LeaveType.Permission &&
                         r.RequestFromDay >= startOfMonth &&
                         r.RequestFromDay <= endOfMonth &&
-                        (r.RequestStatus == "Approved" || r.RequestStatus == "Pending") &&
-                        (r.RequestHRStatus == "Approved" || r.RequestHRStatus == "Pending"));
+                        (r.RequestStatus == RequestStatus.Approved || r.RequestStatus == RequestStatus.Pending) &&
+                        (r.RequestHRStatus == RequestStatus.Approved || r.RequestHRStatus == RequestStatus.Pending));
 
                 return permissionsUsed;
             }
@@ -349,7 +345,7 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<int> GetPendingDaysCountAsync(int userId, string requestType)
+        public async Task<int> GetPendingDaysCountAsync(int userId, LeaveType requestType)
         {
             try
             {
@@ -357,9 +353,9 @@ namespace TDFAPI.Repositories
                 var pendingRequests = await _context.Requests
                     .Where(r =>
                         r.RequestUserID == userId &&
-                        r.RequestType == requestType &&
-                        r.RequestStatus == "Pending" &&
-                        r.RequestHRStatus == "Pending")
+                        r.RequestType == requestType && // Now compares LeaveType enum with LeaveType parameter
+                        r.RequestStatus == RequestStatus.Pending &&
+                        r.RequestHRStatus == RequestStatus.Pending)
                     .ToListAsync();
 
                 int totalDays = pendingRequests.Sum(r => r.RequestNumberOfDays);
@@ -368,12 +364,12 @@ namespace TDFAPI.Repositories
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting pending days count for user {UserId} and type {RequestType}",
-                    userId, requestType);
+                    userId, requestType.ToString());
                 throw;
             }
         }
 
-        public async Task<bool> HasConflictingRequestsAsync(int userId, DateTime startDate, DateTime endDate, Guid requestId = default)
+        public async Task<bool> HasConflictingRequestsAsync(int userId, DateTime startDate, DateTime endDate, int requestId = 0)
         {
             try
             {
@@ -381,10 +377,10 @@ namespace TDFAPI.Repositories
                 var conflictingRequestsCount = await _context.Requests
                     .CountAsync(r =>
                         r.RequestUserID == userId &&
-                        r.Id != requestId && // Exclude current request when updating
-                        (r.RequestType == "Annual" || r.RequestType == "Work From Home" ||
-                         r.RequestType == "Unpaid" || r.RequestType == "Emergency") &&
-                        r.RequestStatus != "Rejected" && r.RequestHRStatus != "Rejected" && // Ignore rejected requests
+                        r.RequestID != requestId && // Exclude current request when updating
+                        (r.RequestType == LeaveType.Annual || r.RequestType == LeaveType.WorkFromHome ||
+                        r.RequestType == LeaveType.Unpaid || r.RequestType == LeaveType.Emergency) &&
+                        r.RequestStatus != RequestStatus.Rejected && r.RequestHRStatus != RequestStatus.Rejected && // Ignore rejected requests
                         ((r.RequestFromDay <= endDate && r.RequestToDay >= startDate) || // Overlapping date ranges
                          (r.RequestToDay == null && r.RequestFromDay >= startDate && r.RequestFromDay <= endDate))); // Single day requests
 
@@ -449,17 +445,17 @@ namespace TDFAPI.Repositories
             RequestPaginationDto pagination)
         {
             // Filter by status if specified
-            if (!string.IsNullOrEmpty(pagination.FilterStatus))
+            if (pagination.FilterStatus.HasValue)
             {
                 query = query.Where(r =>
-                    r.RequestStatus == pagination.FilterStatus ||
-                    r.RequestHRStatus == pagination.FilterStatus);
+                    r.RequestStatus == pagination.FilterStatus.Value ||
+                    r.RequestHRStatus == pagination.FilterStatus.Value);
             }
 
             // Filter by type if specified
-            if (!string.IsNullOrEmpty(pagination.FilterType))
+            if (pagination.FilterType.HasValue)
             {
-                query = query.Where(r => r.RequestType == pagination.FilterType);
+                query = query.Where(r => r.RequestType == pagination.FilterType.Value);
             }
 
             // Filter by date range if specified
@@ -543,7 +539,7 @@ namespace TDFAPI.Repositories
 
         #region Helper Methods
 
-        private async Task<int> GetLeaveUsedAsync(int userId, string leaveType)
+        private async Task<int> GetLeaveUsedAsync(int userId, LeaveType leaveType)
         {
             // Count approved leave days for the current year
             DateTime startOfYear = new DateTime(DateTime.Now.Year, 1, 1);
@@ -552,11 +548,11 @@ namespace TDFAPI.Repositories
             var approvedRequests = await _context.Requests
                 .Where(r =>
                     r.RequestUserID == userId &&
-                    r.RequestType == leaveType &&
+                    r.RequestType == leaveType && // Now compares LeaveType enum with LeaveType parameter
                     r.RequestFromDay >= startOfYear &&
                     r.RequestFromDay <= endOfYear &&
-                    r.RequestStatus == "Approved" &&
-                    r.RequestHRStatus == "Approved")
+                    r.RequestStatus == RequestStatus.Approved &&
+                    r.RequestHRStatus == RequestStatus.Approved)
                 .ToListAsync();
 
             int totalDays = approvedRequests.Sum(r => r.RequestNumberOfDays);

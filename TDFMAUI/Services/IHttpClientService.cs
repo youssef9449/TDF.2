@@ -18,6 +18,7 @@ namespace TDFMAUI.Services
         void SetAuthorizationHeader(string token);
         void ClearAuthorizationHeader();
         Task EnsureSuccessStatusCodeAsync(HttpResponseMessage response);
+        string GetFullUrl(string endpoint);
         Task<string> GetRawAsync(string endpoint);
     }
-} 
+}

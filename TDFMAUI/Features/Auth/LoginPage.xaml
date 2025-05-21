@@ -11,7 +11,9 @@
 
     <ContentPage.Resources>
         <Style x:Key="EntryStyle" TargetType="Entry">
-            <Setter Property="TextColor" Value="Black" />
+            <Setter Property="TextColor">
+                <AppThemeBinding Light="Black" Dark="Black" />
+            </Setter>
             <Setter Property="BackgroundColor" Value="#F5F5F7" />
             <Setter Property="PlaceholderColor" Value="#999999" />
             <Setter Property="FontSize" Value="16" />

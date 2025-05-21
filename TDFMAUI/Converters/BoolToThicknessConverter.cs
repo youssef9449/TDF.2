@@ -9,7 +9,6 @@ namespace TDFMAUI.Converters
     /// Converts a boolean to a Thickness.
     /// Parameter format: "trueThickness|falseThickness" where each thickness is in the format "left,top,right,bottom"
     /// </summary>
-    /// 
     
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
@@ -40,9 +39,9 @@ namespace TDFMAUI.Converters
         /// Parse a thickness string in the format "left,top,right,bottom" or "uniform"
         /// </summary>
         private Thickness ParseThickness(string thicknessStr)
-
-
         {
+
+
             if (string.IsNullOrEmpty(thicknessStr))
                 return new Thickness(0);
 

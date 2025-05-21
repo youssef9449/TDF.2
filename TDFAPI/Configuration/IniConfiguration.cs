@@ -20,23 +20,23 @@ namespace TDFAPI.Configuration
         private static Dictionary<string, object> _webSocketSettings = new();
         private static Dictionary<string, object> _rateLimitSettings = new();
         private static bool _isInitialized = false;
-        
+
         private const string ConfigFileName = "config.ini";
-        
+
         public static void Initialize()
         {
             if (_isInitialized)
                 return;
-                
+
             try
             {
                 // Get the actual application's execution directory
                 string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
                 string projectDirectory = AppContext.BaseDirectory;
                 string iniFilePath = Path.Combine(appDirectory, ConfigFileName);
-                
+
                 Console.WriteLine($"Looking for configuration at: {iniFilePath}");
-                
+
                 // If config file doesn't exist in the execution directory but exists in the project directory,
                 // copy it to the execution directory
                 if (!File.Exists(iniFilePath))
@@ -54,13 +54,17 @@ namespace TDFAPI.Configuration
                             Console.WriteLine($"Failed to copy config file: {ex.Message}");
                         }
                     }
-                    else
+
+                    // If the file still doesn't exist after trying to copy, create a new one
+                    if (!File.Exists(iniFilePath))
                     {
-                        // In the Initialize() method, update the section where the config file is created:
-                        if (!File.Exists(iniFilePath))
+                        Console.WriteLine($"Config file not found. Will create a new one at: {iniFilePath}");
+
+                        try
                         {
-                            Console.WriteLine($"Config file not found in project directory. Will create a new one at: {iniFilePath}");
-                            
+                            // Ensure the directory exists
+                            Directory.CreateDirectory(Path.GetDirectoryName(iniFilePath));
+
                             // Create default configuration with server URLs
                             _iniFile = new IniFile(iniFilePath);
                             _iniFile.Write("Server", "Urls", "http://localhost:5000,https://localhost:5001");
@@ -74,18 +78,32 @@ namespace TDFAPI.Configuration
                             _iniFile.Write("WebSockets", "TimeoutMinutes", "30");
                             _iniFile.Write("WebSockets", "KeepAliveMinutes", "2");
                             _iniFile.Write("RateLimiting", "GlobalLimitPerMinute", "100");
-                            
+
                             Console.WriteLine("Created new configuration file with default values");
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            _iniFile = new IniFile(iniFilePath);
+                            Console.WriteLine($"Failed to create config file: {ex.Message}");
+                            Console.WriteLine("Will use default values for configuration");
+
+                            // Create an in-memory IniFile with default values
+                            _iniFile = new IniFile(":memory:");
+                            _iniFile.Write("Server", "Urls", "http://localhost:5000,https://localhost:5001");
+                            _iniFile.Write("Jwt", "SecretKey", Guid.NewGuid().ToString());
+                            _iniFile.Write("Jwt", "Issuer", "TDFAPI");
+                            _iniFile.Write("Jwt", "Audience", "TDFClient");
+                            _iniFile.Write("Security", "MaxFailedLoginAttempts", "5");
+                            _iniFile.Write("Security", "LockoutDurationMinutes", "15");
                         }
                     }
+                    else
+                    {
+                        _iniFile = new IniFile(iniFilePath);
+                    }
                 }
-                
+
                 _iniFile = new IniFile(iniFilePath);
-                
+
                 // Validate required settings
                 _connectionString = BuildConnectionString(); // Build connection string first
                 _jwtSecretKey = _iniFile.Read("Jwt", "SecretKey", Guid.NewGuid().ToString()); // Use a secure default if missing
@@ -118,7 +136,7 @@ namespace TDFAPI.Configuration
                 // Development Allowed Origins
                 string devOriginsValue = _iniFile.Read("App", "DevelopmentAllowedOrigins", "");
                 _developmentAllowedOrigins = new List<string>();
-                
+
                 if (!string.IsNullOrWhiteSpace(devOriginsValue))
                 {
                     foreach (string origin in devOriginsValue.Split(','))
@@ -140,61 +158,61 @@ namespace TDFAPI.Configuration
                         "http://localhost:5173"
                     });
                 }
-                
+
                 // Security settings
                 _securitySettings = new Dictionary<string, object>
                 {
-                    ["MaxFailedLoginAttempts"] = int.TryParse(_iniFile.Read("Security", "MaxFailedLoginAttempts", "5"), 
+                    ["MaxFailedLoginAttempts"] = int.TryParse(_iniFile.Read("Security", "MaxFailedLoginAttempts", "5"),
                         out int maxAttempts) ? maxAttempts : 5,
-                    ["LockoutDurationMinutes"] = int.TryParse(_iniFile.Read("Security", "LockoutDurationMinutes", "15"), 
+                    ["LockoutDurationMinutes"] = int.TryParse(_iniFile.Read("Security", "LockoutDurationMinutes", "15"),
                         out int lockoutMinutes) ? lockoutMinutes : 15
                 };
-                
+
                 // Parse password requirements
                 var passwordRequirements = new Dictionary<string, object>
                 {
-                    ["MinimumLength"] = int.TryParse(_iniFile.Read("Security", "PasswordMinimumLength", "12"), 
+                    ["MinimumLength"] = int.TryParse(_iniFile.Read("Security", "PasswordMinimumLength", "12"),
                         out int minLength) ? minLength : 12,
-                    ["RequireUppercase"] = bool.TryParse(_iniFile.Read("Security", "PasswordRequireUppercase", "true"), 
+                    ["RequireUppercase"] = bool.TryParse(_iniFile.Read("Security", "PasswordRequireUppercase", "true"),
                         out bool requireUpper) && requireUpper,
-                    ["RequireLowercase"] = bool.TryParse(_iniFile.Read("Security", "PasswordRequireLowercase", "true"), 
+                    ["RequireLowercase"] = bool.TryParse(_iniFile.Read("Security", "PasswordRequireLowercase", "true"),
                         out bool requireLower) && requireLower,
-                    ["RequireDigit"] = bool.TryParse(_iniFile.Read("Security", "PasswordRequireDigit", "true"), 
+                    ["RequireDigit"] = bool.TryParse(_iniFile.Read("Security", "PasswordRequireDigit", "true"),
                         out bool requireDigit) && requireDigit,
-                    ["RequireSpecialCharacter"] = bool.TryParse(_iniFile.Read("Security", "PasswordRequireSpecialCharacter", "true"), 
+                    ["RequireSpecialCharacter"] = bool.TryParse(_iniFile.Read("Security", "PasswordRequireSpecialCharacter", "true"),
                         out bool requireSpecial) && requireSpecial
                 };
-                
+
                 _securitySettings["PasswordRequirements"] = passwordRequirements;
-                
+
                 // WebSocket settings
                 _webSocketSettings = new Dictionary<string, object>
                 {
-                    ["TimeoutMinutes"] = int.TryParse(_iniFile.Read("WebSockets", "TimeoutMinutes", "30"), 
+                    ["TimeoutMinutes"] = int.TryParse(_iniFile.Read("WebSockets", "TimeoutMinutes", "30"),
                         out int timeoutMinutes) ? timeoutMinutes : 30,
-                    ["KeepAliveMinutes"] = double.TryParse(_iniFile.Read("WebSockets", "KeepAliveMinutes", "2"), 
+                    ["KeepAliveMinutes"] = double.TryParse(_iniFile.Read("WebSockets", "KeepAliveMinutes", "2"),
                         out double keepAliveMinutes) ? keepAliveMinutes : 2,
-                    ["MaxMessagesPerMinute"] = int.TryParse(_iniFile.Read("WebSockets", "MaxMessagesPerMinute", "120"), 
+                    ["MaxMessagesPerMinute"] = int.TryParse(_iniFile.Read("WebSockets", "MaxMessagesPerMinute", "120"),
                         out int maxMessages) ? maxMessages : 120,
-                    ["ReceiveBufferSize"] = int.TryParse(_iniFile.Read("WebSockets", "ReceiveBufferSize", "65536"), 
+                    ["ReceiveBufferSize"] = int.TryParse(_iniFile.Read("WebSockets", "ReceiveBufferSize", "65536"),
                         out int bufferSize) ? bufferSize : 65536
                 };
-                
+
                 // Rate limiting settings
                 _rateLimitSettings = new Dictionary<string, object>
                 {
-                    ["GlobalLimitPerMinute"] = int.TryParse(_iniFile.Read("RateLimiting", "GlobalLimitPerMinute", "100"), 
+                    ["GlobalLimitPerMinute"] = int.TryParse(_iniFile.Read("RateLimiting", "GlobalLimitPerMinute", "100"),
                         out int globalLimit) ? globalLimit : 100,
-                    ["AuthLimitPerMinute"] = int.TryParse(_iniFile.Read("RateLimiting", "AuthLimitPerMinute", "10"), 
+                    ["AuthLimitPerMinute"] = int.TryParse(_iniFile.Read("RateLimiting", "AuthLimitPerMinute", "10"),
                         out int authLimit) ? authLimit : 10,
-                    ["ApiLimitPerMinute"] = int.TryParse(_iniFile.Read("RateLimiting", "ApiLimitPerMinute", "60"), 
+                    ["ApiLimitPerMinute"] = int.TryParse(_iniFile.Read("RateLimiting", "ApiLimitPerMinute", "60"),
                         out int apiLimit) ? apiLimit : 60,
-                    ["StaticLimitPerMinute"] = int.TryParse(_iniFile.Read("RateLimiting", "StaticLimitPerMinute", "200"), 
+                    ["StaticLimitPerMinute"] = int.TryParse(_iniFile.Read("RateLimiting", "StaticLimitPerMinute", "200"),
                         out int staticLimit) ? staticLimit : 200
                 };
-                
+
                 _isInitialized = true;
-                
+
                 Console.WriteLine("Configuration loaded successfully from INI file");
                 Console.WriteLine($"Connection String: {MaskConnectionString(_connectionString)}");
                 Console.WriteLine($"JWT Configuration: Issuer=${_jwtIssuer}, Audience=${_jwtAudience}, " +
@@ -266,7 +284,7 @@ namespace TDFAPI.Configuration
                 return _jwtAudience;
             }
         }
-        
+
         public static void UpdateConfigFile()
         {
             try
@@ -280,17 +298,17 @@ namespace TDFAPI.Configuration
                 {
                     throw new InvalidOperationException("Failed to initialize configuration.");
                 }
-                
+
                 // Ensure Server section exists
                 var urlsValue = _iniFile.Read("Server", "Urls", "");
                 if (string.IsNullOrEmpty(urlsValue))
                 {
                     _iniFile.Write("Server", "Urls", "http://localhost:5000,https://localhost:5001");
                 }
-                
+
                 // Update ini file with current configuration
                 var currentSettings = _iniFile.GetSafeConfiguration();
-                
+
                 // Check if any new settings need to be added
                 if (!currentSettings.ContainsKey("WebSockets"))
                 {
@@ -300,7 +318,7 @@ namespace TDFAPI.Configuration
                     _iniFile.Write("WebSockets", "MaxMessagesPerMinute", "120");
                     _iniFile.Write("WebSockets", "ReceiveBufferSize", "65536");
                 }
-                
+
                 EnsureInitialized();
                 // This method seems intended to update/ensure sections exist, not return a value.
                 // Removed: return _jwtAudience;
@@ -311,7 +329,7 @@ namespace TDFAPI.Configuration
                 // Optionally re-throw or handle more gracefully
             }
         }
-        
+
         public static List<string> AllowedOrigins
         {
             get
@@ -320,7 +338,7 @@ namespace TDFAPI.Configuration
                 return _allowedOrigins;
             }
         }
-        
+
         public static List<string> DevelopmentAllowedOrigins
         {
             get
@@ -329,7 +347,7 @@ namespace TDFAPI.Configuration
                 return _developmentAllowedOrigins;
             }
         }
-        
+
         public static T GetSecuritySetting<T>(string key, T defaultValue)
         {
             EnsureInitialized();
@@ -337,15 +355,15 @@ namespace TDFAPI.Configuration
             {
                 return typedValue;
             }
-            
+
             if (key == "PasswordRequirements" && _securitySettings.TryGetValue(key, out var pwdRequirements))
             {
                 return (T)pwdRequirements;
             }
-            
+
             return defaultValue;
         }
-        
+
         public static T GetWebSocketSetting<T>(string key, T defaultValue)
         {
             EnsureInitialized();
@@ -355,7 +373,7 @@ namespace TDFAPI.Configuration
             }
             return defaultValue;
         }
-        
+
         public static T GetRateLimitSetting<T>(string key, T defaultValue)
         {
             EnsureInitialized();
@@ -365,13 +383,13 @@ namespace TDFAPI.Configuration
             }
             return defaultValue;
         }
-        
+
         public static T GetRedisSetting<T>(string key, T defaultValue)
         {
             EnsureInitialized();
             return GetConfigurationValue("Redis", key, defaultValue);
         }
-        
+
         private static T GetConfigurationValue<T>(string section, string key, T defaultValue)
         {
             var value = _iniFile.Read(section, key, null);
@@ -389,13 +407,13 @@ namespace TDFAPI.Configuration
                 return defaultValue;
             }
         }
-        
+
         // Add this method to the IniConfiguration class
         public static List<string> GetServerUrls()
         {
             EnsureInitialized();
             var urls = new List<string>();
-            
+
             // Read from Server section in config.ini
             string urlsValue = _iniFile.Read("Server", "Urls", "");
             if (!string.IsNullOrWhiteSpace(urlsValue))
@@ -409,44 +427,44 @@ namespace TDFAPI.Configuration
                     }
                 }
             }
-            
+
             return urls;
         }
         // Add validation methods
         public static void ValidateConfiguration()
         {
             var errors = new List<string>();
-            
+
             // Validate database connection
             if (string.IsNullOrEmpty(ConnectionString))
             {
                 errors.Add("Database connection string is missing");
             }
-            
+
             // Validate JWT settings
             if (string.IsNullOrEmpty(JwtIssuer))
             {
                 errors.Add("JWT Issuer is missing");
             }
-            
+
             if (string.IsNullOrEmpty(JwtAudience))
             {
                 errors.Add("JWT Audience is missing");
             }
-            
+
             // Validate server URLs
             var urls = GetServerUrls();
             if (urls.Count == 0)
             {
                 errors.Add("No server URLs configured");
             }
-            
+
             // In production, validate CORS origins
             if (!IsRunningInDevelopment() && AllowedOrigins.Count == 0)
             {
                 errors.Add("No CORS origins configured for production");
             }
-            
+
             // If there are validation errors, throw an exception
             if (errors.Count > 0)
             {
@@ -469,7 +487,7 @@ namespace TDFAPI.Configuration
                 Initialize();
             }
         }
-        
+
         private static string BuildConnectionString()
         {
             // Read connection method from the config file
@@ -503,7 +521,7 @@ namespace TDFAPI.Configuration
                 Console.WriteLine("Trusted_Connection is missing or invalid in the config file. Using 'true'.");
                 trustedConnection = "true";
             }
-            
+
             // Check for TrustServerCertificate
             string trustServerCertificate = _iniFile.Read("Database", "TrustServerCertificate", "").ToLower();
             if (string.IsNullOrWhiteSpace(trustServerCertificate) || (trustServerCertificate != "true" && trustServerCertificate != "false"))
@@ -555,31 +573,31 @@ namespace TDFAPI.Configuration
             {
                 connectionString += $"Connection Timeout={timeoutValue};";
             }
-            
+
             // Add additional connection parameters
             string minPoolSize = _iniFile.Read("Database", "MinPoolSize", "10");
             if (!string.IsNullOrWhiteSpace(minPoolSize) && int.TryParse(minPoolSize, out int minPoolSizeValue) && minPoolSizeValue > 0)
             {
                 connectionString += $"Min Pool Size={minPoolSizeValue};";
             }
-            
+
             string maxPoolSize = _iniFile.Read("Database", "MaxPoolSize", "200");
             if (!string.IsNullOrWhiteSpace(maxPoolSize) && int.TryParse(maxPoolSize, out int maxPoolSizeValue) && maxPoolSizeValue > 0)
             {
                 connectionString += $"Max Pool Size={maxPoolSizeValue};";
             }
-            
+
             // Add application name for monitoring
             connectionString += "Application Name=TDFAPI;";
 
             return connectionString;
         }
-        
+
         private static string MaskConnectionString(string connectionString)
         {
             // Simple masking for security - don't show full connection string in logs
-            return connectionString.Contains("Password=") 
-                ? System.Text.RegularExpressions.Regex.Replace(connectionString, "Password=([^;]*)", "Password=******") 
+            return connectionString.Contains("Password=")
+                ? System.Text.RegularExpressions.Regex.Replace(connectionString, "Password=([^;]*)", "Password=******")
                 : connectionString;
         }
     }

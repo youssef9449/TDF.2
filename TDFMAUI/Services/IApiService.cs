@@ -28,12 +28,12 @@ namespace TDFMAUI.Services
         Task<UserProfileDto> GetUserProfileAsync(int userId);
         
         // Requests
-        Task<RequestResponseDto> GetRequestByIdAsync(Guid requestId, bool queueIfUnavailable = true);
+        Task<RequestResponseDto> GetRequestByIdAsync(int requestId, bool queueIfUnavailable = true);
         Task<RequestResponseDto> CreateRequestAsync(RequestCreateDto requestDto);
-        Task<RequestResponseDto> UpdateRequestAsync(Guid requestId, RequestUpdateDto requestDto);
-        Task<bool> DeleteRequestAsync(Guid requestId);
-        Task<bool> ApproveRequestAsync(Guid requestId, RequestApprovalDto approvalDto);
-        Task<bool> RejectRequestAsync(Guid requestId, RequestRejectDto rejectDto);
+        Task<RequestResponseDto> UpdateRequestAsync(int requestId, RequestUpdateDto requestDto);
+        Task<bool> DeleteRequestAsync(int requestId);
+        Task<bool> ApproveRequestAsync(int requestId, RequestApprovalDto approvalDto);
+        Task<bool> RejectRequestAsync(int requestId, RequestRejectDto rejectDto);
         Task<PaginatedResult<RequestResponseDto>> GetRequestsAsync(RequestPaginationDto pagination, int? userId = null, string department = null, bool queueIfUnavailable = true);
         
         // Leaderboard and balances
@@ -46,4 +46,4 @@ namespace TDFMAUI.Services
         // Connectivity
         Task<bool> TestConnectivityAsync();
     }
-} 
+}

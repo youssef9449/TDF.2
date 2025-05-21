@@ -73,58 +73,251 @@ namespace TDFMAUI.Features.Auth
 
             try
             {
-                // Test API connectivity first
+                // Check network connectivity
+                var networkAccess = Connectivity.NetworkAccess;
+                Debug.WriteLine($"[SignupViewModel] Network connectivity status: {networkAccess}");
+                _logger?.LogInformation("DIAGNOSTIC: Network connectivity status: {NetworkStatus}", networkAccess);
+
+                if (networkAccess != NetworkAccess.Internet)
+                {
+                    Debug.WriteLine($"[SignupViewModel] No internet connectivity. Network status: {networkAccess}");
+                    _logger?.LogWarning("DIAGNOSTIC: No internet connectivity. Network status: {NetworkStatus}", networkAccess);
+
+                    await MainThread.InvokeOnMainThreadAsync(() => {
+                        ErrorMessage = $"No internet connection. Please check your network settings and try again.";
+                        HasError = true;
+                    });
+
+                    // Create default departments as fallback
+                    await MainThread.InvokeOnMainThreadAsync(() => {
+                        Debug.WriteLine("[SignupViewModel] Creating default departments as fallback");
+                        _logger?.LogInformation("DIAGNOSTIC: Creating default departments as fallback");
+
+                        Departments.Clear();
+                        Departments.Add(new LookupItem("IT", "IT"));
+                        Departments.Add(new LookupItem("HR", "HR"));
+                        Departments.Add(new LookupItem("Finance", "Finance"));
+                        Departments.Add(new LookupItem("Marketing", "Marketing"));
+                        Departments.Add(new LookupItem("Operations", "Operations"));
+                        Departments.Add(new LookupItem("Sales", "Sales"));
+
+                        if (Departments.Count > 0)
+                        {
+                            SelectedDepartment = Departments[0];
+                        }
+                    });
+
+                    return;
+                }
+
+                // Test API connectivity
                 bool connected = false;
                 try {
+                    Debug.WriteLine("[SignupViewModel] Testing API connectivity");
+                    _logger?.LogInformation("DIAGNOSTIC: Testing API connectivity");
+
                     connected = await _apiService.TestConnectivityAsync();
                     Debug.WriteLine($"[SignupViewModel] API connectivity test result: {connected}");
                     _logger?.LogInformation("DIAGNOSTIC: API connectivity test result: {Connected}", connected);
+
+                    if (!connected)
+                    {
+                        Debug.WriteLine("[SignupViewModel] API connectivity test failed");
+                        _logger?.LogWarning("DIAGNOSTIC: API connectivity test failed");
+
+                        await MainThread.InvokeOnMainThreadAsync(() => {
+                            ErrorMessage = "Could not connect to the server. Please try again later.";
+                            HasError = true;
+                        });
+
+                        // Create default departments as fallback
+                        await MainThread.InvokeOnMainThreadAsync(() => {
+                            Debug.WriteLine("[SignupViewModel] Creating default departments as fallback");
+                            _logger?.LogInformation("DIAGNOSTIC: Creating default departments as fallback");
+
+                            Departments.Clear();
+                            Departments.Add(new LookupItem("IT", "IT"));
+                            Departments.Add(new LookupItem("HR", "HR"));
+                            Departments.Add(new LookupItem("Finance", "Finance"));
+                            Departments.Add(new LookupItem("Marketing", "Marketing"));
+                            Departments.Add(new LookupItem("Operations", "Operations"));
+                            Departments.Add(new LookupItem("Sales", "Sales"));
+
+                            if (Departments.Count > 0)
+                            {
+                                SelectedDepartment = Departments[0];
+                            }
+                        });
+
+                        return;
+                    }
                 } catch (Exception connEx) {
                     Debug.WriteLine($"[SignupViewModel] API connectivity test error: {connEx.Message}");
                     _logger?.LogError(connEx, "DIAGNOSTIC: API connectivity test failed");
+
+                    // Continue anyway, the GetDepartmentsAsync call might still work
                 }
 
-                _logger?.LogInformation("Loading departments for signup.");
-                Debug.WriteLine("[SignupViewModel] LoadLookupsAsync - Calling _lookupService.GetDepartmentsAsync() via standard service flow.");
+                // Try to load departments using a more robust approach
+                Debug.WriteLine("[SignupViewModel] Starting enhanced department loading process");
+                _logger?.LogInformation("DIAGNOSTIC: Starting enhanced department loading process");
 
-                // Use the standard service layer to load departments
-                var departments = await _lookupService.GetDepartmentsAsync();
-                Debug.WriteLine($"[SignupViewModel] LoadLookupsAsync - _lookupService.GetDepartmentsAsync() returned. Count: {departments?.Count ?? 0}");
+                List<LookupItem> departments = null;
 
-                if (departments != null && departments.Any())
+                // First try the direct API service call as it's more reliable
+                try
                 {
-                    Debug.WriteLine($"[SignupViewModel] Departments received. First item: {departments[0].Id} - {departments[0].Name}");
+                    Debug.WriteLine("[SignupViewModel] Calling _apiService.GetDepartmentsAsync() directly");
+                    _logger?.LogInformation("DIAGNOSTIC: Calling _apiService.GetDepartmentsAsync() directly");
 
-                    // Clear and add each department individually to ensure the ObservableCollection is updated
-                    Departments.Clear();
-                    foreach (var dept in departments)
+                    departments = await _apiService.GetDepartmentsAsync(queueIfUnavailable: false);
+                    Debug.WriteLine($"[SignupViewModel] _apiService.GetDepartmentsAsync() returned. Count: {departments?.Count ?? 0}");
+                    _logger?.LogInformation("DIAGNOSTIC: _apiService.GetDepartmentsAsync() returned. Count: {Count}", departments?.Count ?? 0);
+
+                    if (departments != null && departments.Count > 0)
                     {
-                        Departments.Add(dept);
+                        Debug.WriteLine($"[SignupViewModel] First department from ApiService: {departments[0].Id} - {departments[0].Name}");
+                        _logger?.LogInformation("DIAGNOSTIC: First department from ApiService: Id={Id}, Name={Name}, Value={Value}",
+                            departments[0].Id, departments[0].Name, departments[0].Value);
+
+                        // Log all departments for debugging
+                        for (int i = 0; i < Math.Min(departments.Count, 5); i++)
+                        {
+                            var dept = departments[i];
+                            Debug.WriteLine($"[SignupViewModel] Department[{i}]: Id={dept.Id}, Name={dept.Name}, Value={dept.Value}");
+                            _logger?.LogInformation("DIAGNOSTIC: Department[{Index}]: Id={Id}, Name={Name}, Value={Value}",
+                                i, dept.Id, dept.Name, dept.Value);
+                        }
                     }
-
-                    _logger?.LogInformation($"Loaded {departments.Count} departments");
-                    Debug.WriteLine($"[SignupViewModel] Loaded {departments.Count} departments successfully");
-
-                    // Auto-select the first department
-                    if (Departments.Count > 0)
+                    else
                     {
-                        SelectedDepartment = Departments[0];
+                        Debug.WriteLine("[SignupViewModel] ApiService returned no departments, will try LookupService");
+                        _logger?.LogWarning("DIAGNOSTIC: ApiService returned no departments, will try LookupService");
                     }
                 }
-                else
+                catch (Exception apiEx)
                 {
-                    Debug.WriteLine("[SignupViewModel] No departments were returned");
-                    _logger?.LogWarning("Failed to load departments.");
-                    ErrorMessage = "Failed to load departments.";
-                    HasError = true;
+                    Debug.WriteLine($"[SignupViewModel] Error calling _apiService.GetDepartmentsAsync(): {apiEx.Message}");
+                    _logger?.LogError(apiEx, "DIAGNOSTIC: Error calling _apiService.GetDepartmentsAsync(): {Message}", apiEx.Message);
                 }
+
+                // If API service failed or returned no data, try the LookupService
+                if (departments == null || departments.Count == 0)
+                {
+                    try
+                    {
+                        Debug.WriteLine("[SignupViewModel] Calling _lookupService.GetDepartmentsAsync() as fallback");
+                        _logger?.LogInformation("DIAGNOSTIC: Calling _lookupService.GetDepartmentsAsync() as fallback");
+
+                        var lookupServiceDepartments = await _lookupService.GetDepartmentsAsync();
+                        Debug.WriteLine($"[SignupViewModel] _lookupService.GetDepartmentsAsync() returned. Count: {lookupServiceDepartments?.Count ?? 0}");
+                        _logger?.LogInformation("DIAGNOSTIC: _lookupService.GetDepartmentsAsync() returned. Count: {Count}", lookupServiceDepartments?.Count ?? 0);
+
+                        if (lookupServiceDepartments != null && lookupServiceDepartments.Count > 0)
+                        {
+                            Debug.WriteLine($"[SignupViewModel] First department from LookupService: {lookupServiceDepartments[0].Id} - {lookupServiceDepartments[0].Name}");
+                            _logger?.LogInformation("DIAGNOSTIC: First department from LookupService: Id={Id}, Name={Name}, Value={Value}",
+                                lookupServiceDepartments[0].Id, lookupServiceDepartments[0].Name, lookupServiceDepartments[0].Value);
+
+                            departments = lookupServiceDepartments;
+                        }
+                        else
+                        {
+                            Debug.WriteLine("[SignupViewModel] LookupService also returned no departments");
+                            _logger?.LogWarning("DIAGNOSTIC: LookupService also returned no departments");
+                        }
+                    }
+                    catch (Exception lookupEx)
+                    {
+                        Debug.WriteLine($"[SignupViewModel] Error calling _lookupService.GetDepartmentsAsync(): {lookupEx.Message}");
+                        _logger?.LogError(lookupEx, "DIAGNOSTIC: Error calling _lookupService.GetDepartmentsAsync(): {Message}", lookupEx.Message);
+                    }
+                }
+
+                // If both services failed, use default departments
+                if (departments == null || !departments.Any())
+                {
+                    Debug.WriteLine("[SignupViewModel] Both services failed to return departments. Using defaults.");
+                    _logger?.LogWarning("DIAGNOSTIC: Both services failed to return departments. Using defaults.");
+
+                    departments = new List<LookupItem>
+                    {
+                        new LookupItem("IT", "IT"),
+                        new LookupItem("HR", "HR"),
+                        new LookupItem("Finance", "Finance"),
+                        new LookupItem("Marketing", "Marketing"),
+                        new LookupItem("Operations", "Operations"),
+                        new LookupItem("Sales", "Sales")
+                    };
+                }
+
+                // Ensure we're on the main thread for UI updates
+                await MainThread.InvokeOnMainThreadAsync(() => {
+                    if (departments != null && departments.Any())
+                    {
+                        Debug.WriteLine($"[SignupViewModel] Departments received. First item: {departments[0].Id} - {departments[0].Value}");
+                        _logger?.LogInformation("DIAGNOSTIC: Departments received. First item: {Id} - {Value}",
+                            departments[0].Id, departments[0].Value);
+
+                        // Clear and add each department individually to ensure the ObservableCollection is updated
+                        Departments.Clear();
+                        foreach (var dept in departments)
+                        {
+                            Departments.Add(dept);
+                            Debug.WriteLine($"[SignupViewModel] Added department: {dept.Id} - {dept.Value}");
+                        }
+
+                        _logger?.LogInformation("DIAGNOSTIC: Loaded {Count} departments", departments.Count);
+                        Debug.WriteLine($"[SignupViewModel] Loaded {departments.Count} departments successfully");
+
+                        // Auto-select the first department
+                        if (Departments.Count > 0)
+                        {
+                            SelectedDepartment = Departments[0];
+                            Debug.WriteLine($"[SignupViewModel] Auto-selected department: {SelectedDepartment.Id} - {SelectedDepartment.Value}");
+                            _logger?.LogInformation("DIAGNOSTIC: Auto-selected department: {Id} - {Value}",
+                                SelectedDepartment.Id, SelectedDepartment.Value);
+                        }
+
+                        // Clear any previous errors
+                        HasError = false;
+                        ErrorMessage = string.Empty;
+                    }
+                    else
+                    {
+                        Debug.WriteLine("[SignupViewModel] No departments were returned");
+                        _logger?.LogWarning("DIAGNOSTIC: Failed to load departments.");
+                        ErrorMessage = "Failed to load departments.";
+                        HasError = true;
+                    }
+                });
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[SignupViewModel] Error loading departments: {ex.Message}");
-                _logger?.LogError(ex, "Error loading departments.");
-                ErrorMessage = "An error occurred while loading necessary data.";
-                HasError = true;
+                _logger?.LogError(ex, "DIAGNOSTIC: Error loading departments.");
+
+                await MainThread.InvokeOnMainThreadAsync(() => {
+                    ErrorMessage = "An error occurred while loading necessary data.";
+                    HasError = true;
+
+                    // Create default departments as fallback
+                    Debug.WriteLine("[SignupViewModel] Creating default departments as fallback after exception");
+                    _logger?.LogInformation("DIAGNOSTIC: Creating default departments as fallback after exception");
+
+                    Departments.Clear();
+                    Departments.Add(new LookupItem("IT", "IT"));
+                    Departments.Add(new LookupItem("HR", "HR"));
+                    Departments.Add(new LookupItem("Finance", "Finance"));
+                    Departments.Add(new LookupItem("Marketing", "Marketing"));
+                    Departments.Add(new LookupItem("Operations", "Operations"));
+                    Departments.Add(new LookupItem("Sales", "Sales"));
+
+                    if (Departments.Count > 0)
+                    {
+                        SelectedDepartment = Departments[0];
+                    }
+                });
             }
         }
 
@@ -132,7 +325,7 @@ namespace TDFMAUI.Features.Auth
         {
             if (value != null)
             {
-                _logger?.LogInformation($"Department selected: {value.Name} (ID: {value.Id})");
+                _logger?.LogInformation($"Department selected: Name={value.Name}, Value={value.Value}, ID={value.Id}");
                 _ = LoadTitlesForSelectedDepartmentAsync();
             }
             else
@@ -151,17 +344,18 @@ namespace TDFMAUI.Features.Auth
                 HasError = false;
                 Titles.Clear();
 
-                var departmentId = SelectedDepartment.Id;
-                _logger?.LogInformation($"Loading titles for department: {departmentId}");
+                // Use Value property first, then fall back to Name, then Id
+                var departmentName = SelectedDepartment.Value ?? SelectedDepartment.Name ?? SelectedDepartment.Id;
+                _logger?.LogInformation($"Loading titles for department: {departmentName}");
 
-                var titlesForDepartment = await _lookupService.GetTitlesForDepartmentAsync(departmentId);
+                var titlesForDepartment = await _lookupService.GetTitlesForDepartmentAsync(departmentName);
                 if (titlesForDepartment != null && titlesForDepartment.Any())
                 {
                     foreach (var title in titlesForDepartment)
                     {
                         Titles.Add(title);
                     }
-                    _logger?.LogInformation($"Loaded {titlesForDepartment.Count} titles for department {departmentId}");
+                    _logger?.LogInformation($"Loaded {titlesForDepartment.Count} titles for department {departmentName}");
 
                     // Auto-select first title if available
                     if (Titles.Count > 0)
@@ -171,14 +365,15 @@ namespace TDFMAUI.Features.Auth
                 }
                 else
                 {
-                    _logger?.LogWarning($"No titles found for department: {departmentId}");
+                    _logger?.LogWarning($"No titles found for department: {departmentName}");
                     ErrorMessage = $"No titles found for the selected department.";
                     HasError = true;
                 }
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, $"Error loading titles for department {SelectedDepartment?.Id}");
+                var deptName = SelectedDepartment?.Value ?? SelectedDepartment?.Name ?? SelectedDepartment?.Id ?? "unknown";
+                _logger?.LogError(ex, $"Error loading titles for department {deptName}");
                 ErrorMessage = "Failed to load titles for the selected department.";
                 HasError = true;
             }
@@ -214,7 +409,7 @@ namespace TDFMAUI.Features.Auth
                 Username = Username,
                 Password = Password,
                 FullName = FullName,
-                Department = SelectedDepartment?.Name ?? string.Empty,
+                Department = SelectedDepartment?.Value ?? SelectedDepartment?.Name ?? string.Empty,
                 Title = SelectedTitle ?? string.Empty
             };
 

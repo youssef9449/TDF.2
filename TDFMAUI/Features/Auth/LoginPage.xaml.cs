@@ -37,6 +37,7 @@ namespace TDFMAUI.Features.Auth
                 {
                     handler.PlatformView.BorderStyle = UITextBorderStyle.None;
                     handler.PlatformView.BackgroundColor = UIColor.Clear;
+                    handler.PlatformView.TextColor = UIColor.Black; // Explicitly set text color to black
                 });
 #endif
             }

@@ -24,8 +24,8 @@ namespace TDFMAUI.Services
         private const int MaxRetries = 3;
         private static readonly TimeSpan InitialDelay = TimeSpan.FromSeconds(1);
 
-        public HttpClientService(HttpClient httpClient, 
-                                 SecureStorageService secureStorageService, 
+        public HttpClientService(HttpClient httpClient,
+                                 SecureStorageService secureStorageService,
                                  IOptions<ApiSettings> apiSettings, // Inject IOptions<ApiSettings>
                                  ILogger<HttpClientService> logger)
         {
@@ -36,11 +36,11 @@ namespace TDFMAUI.Services
             _secureStorageService = secureStorageService ?? throw new ArgumentNullException(nameof(secureStorageService));
             _apiSettings = apiSettings?.Value ?? throw new ArgumentNullException(nameof(apiSettings)); // Get settings from IOptions
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             // Configure HttpClient
             _httpClient.BaseAddress = new Uri(_apiSettings.BaseUrl);
             _httpClient.Timeout = TimeSpan.FromSeconds(_apiSettings.Timeout);
-            
+
             _logger.LogInformation($"HttpClientService Initialized. BaseUrl: {_apiSettings.BaseUrl}, Timeout: {_apiSettings.Timeout}s");
 
             // Log constructor exit
@@ -76,6 +76,28 @@ namespace TDFMAUI.Services
             _logger.LogInformation("HttpClientService: ClearAuthorizationHeader - Authorization header CLEARED.");
         }
 
+        /// <summary>
+        /// Gets the full URL for a given endpoint by combining it with the base URL
+        /// </summary>
+        /// <param name="endpoint">The relative endpoint path</param>
+        /// <returns>The full URL</returns>
+        public string GetFullUrl(string endpoint)
+        {
+            if (string.IsNullOrEmpty(endpoint))
+            {
+                return _httpClient.BaseAddress?.ToString() ?? _apiSettings.BaseUrl;
+            }
+
+            // Remove leading slash if present
+            endpoint = endpoint.TrimStart('/');
+
+            // Combine base URL with endpoint
+            string baseUrl = _httpClient.BaseAddress?.ToString() ?? _apiSettings.BaseUrl;
+            baseUrl = baseUrl.TrimEnd('/');
+
+            return $"{baseUrl}/{endpoint}";
+        }
+
         public async Task<T> GetAsync<T>(string endpoint)
         {
             return await ExecuteWithRetryAsync(async () =>
@@ -108,7 +130,7 @@ namespace TDFMAUI.Services
                         var effectiveStatusCode = apiResponse.StatusCode != 0 ? (HttpStatusCode)apiResponse.StatusCode : response.StatusCode;
                         throw new ApiException(effectiveStatusCode, apiResponse.Message ?? $"API operation failed for {endpoint} despite a success status code.", await response.Content.ReadAsStringAsync());
                     }
-                    
+
                     _logger.LogWarning("Deserialized ApiResponse was null for GET {Endpoint}, though HTTP status was {StatusCode}", endpoint, response.StatusCode);
                     // This case (null apiResponse after successful HTTP and deserialization attempt) is unusual.
                     // Throwing an exception is safer than returning default(T) which might hide issues.
@@ -147,7 +169,7 @@ namespace TDFMAUI.Services
                 }
             });
         }
-        
+
         public async Task PostAsync<TRequest>(string endpoint, TRequest data)
         {
             await ExecuteWithRetryAsync(async () =>
@@ -181,7 +203,7 @@ namespace TDFMAUI.Services
                 }
             });
         }
-        
+
         public async Task PutAsync<TRequest>(string endpoint, TRequest data)
         {
              await ExecuteWithRetryAsync(async () =>
@@ -230,9 +252,9 @@ namespace TDFMAUI.Services
                  _logger.LogError(ex, "Failed to read error response content.");
             }
 
-            _logger.LogWarning("API request failed with status {StatusCode}. Endpoint: {RequestUri}. Content: {ErrorContent}", 
+            _logger.LogWarning("API request failed with status {StatusCode}. Endpoint: {RequestUri}. Content: {ErrorContent}",
                 response.StatusCode, response.RequestMessage?.RequestUri, errorContent);
-                
+
             // Attempt to deserialize standard error response
             ApiResponse<object> apiError = null;
             if (response.Content.Headers.ContentType?.MediaType == "application/json")
@@ -249,20 +271,20 @@ namespace TDFMAUI.Services
             }
 
             string errorMessage = apiError?.ErrorMessage ?? apiError?.Message ?? response.ReasonPhrase ?? "API request failed.";
-            
+
             // Include validation errors if present
             if (apiError?.Errors != null && apiError.Errors.Any())
             {
                 errorMessage += " " + string.Join(" ", apiError.Errors.SelectMany(kv => kv.Value));
             }
-            
+
             // Check if this is related to the missing RevokedTokens table
             if (errorContent.Contains("Invalid object name 'RevokedTokens'"))
             {
                 _logger.LogWarning("Detected RevokedTokens database issue. This requires server-side fixes.");
                 errorMessage = "Authentication system requires database updates. Please contact administrators.";
             }
-            
+
             throw new ApiException(response.StatusCode, errorMessage, errorContent);
         }
 
@@ -289,7 +311,7 @@ namespace TDFMAUI.Services
                 }
             }
         }
-        
+
          private async Task ExecuteWithRetryAsync(Func<Task> action)
         {
             int retries = 0;
@@ -318,8 +340,8 @@ namespace TDFMAUI.Services
         private bool IsRetryableException(Exception ex)
         {
             // Handle network-related exceptions (should be retried)
-            if (ex is HttpRequestException || 
-                ex is TaskCanceledException || 
+            if (ex is HttpRequestException ||
+                ex is TaskCanceledException ||
                 ex is TimeoutException)
             {
                 return true;
@@ -329,14 +351,14 @@ namespace TDFMAUI.Services
             if (ex is ApiException apiEx)
             {
                 _logger.LogDebug("Checking if API exception with status {StatusCode} is retryable", apiEx.StatusCode);
-                
+
                 // Check for specific database errors that need server-side fixes
                 if (apiEx.ResponseContent?.Contains("Invalid object name 'RevokedTokens'") == true)
                 {
                     _logger.LogWarning("RevokedTokens database issue detected - no retry");
                     return false; // Don't retry database structure issues
                 }
-                
+
                 // Retry on server errors (5xx) and some specific 4xx errors
                 return IsRetryableStatusCode(apiEx.StatusCode);
             }
@@ -360,4 +382,4 @@ namespace TDFMAUI.Services
             _httpClient?.Dispose();
         }
     }
-} 
+}

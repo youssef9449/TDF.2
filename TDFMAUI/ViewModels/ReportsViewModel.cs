@@ -9,13 +9,14 @@ using System.Collections.Generic;
 using Microsoft.Maui.Controls; // For INavigation or Shell navigation
 using TDFShared.DTOs.Requests; // Added
 using TDFShared.DTOs.Common; // Added for pagination
+using TDFShared.Enums;
 using TDFMAUI.Features.Requests;
 
 namespace TDFMAUI.ViewModels
 {
     public partial class ReportsViewModel : ObservableObject
     {
-        private readonly ApiService _apiService;
+        private readonly IRequestService _requestService;
         private readonly INavigation _navigation; // Assuming navigation is passed from the page
 
         [ObservableProperty]
@@ -25,7 +26,7 @@ namespace TDFMAUI.ViewModels
         private ObservableCollection<RequestResponseDto> _requests = new();
 
         [ObservableProperty]
-        private List<string> _statusOptions = new() { "All", "Pending", "Approved", "Rejected" }; // Add more if needed
+        private List<string> _statusOptions = new List<string> { "All" }.Concat(Enum.GetNames(typeof(RequestStatus))).ToList();
 
         [ObservableProperty]
         private string _selectedStatus = "All"; // Default filter
@@ -42,9 +43,9 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private RequestResponseDto _selectedRequest;
 
-        public ReportsViewModel(ApiService apiService, INavigation navigation)
+        public ReportsViewModel(IRequestService requestService, INavigation navigation)
         {
-            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
         }
 
@@ -68,7 +69,7 @@ namespace TDFMAUI.ViewModels
                 // Create a RequestPaginationDto for filtering
                 var pagination = new RequestPaginationDto
                 {
-                    FilterStatus = statusFilter,
+                    FilterStatus = statusFilter == null ? (RequestStatus?)null : Enum.TryParse<RequestStatus>(statusFilter, true, out var parsedStatus) ? parsedStatus : (RequestStatus?)null,
                     FromDate = FromDate,
                     ToDate = ToDate,
                     Page = 1,
@@ -76,7 +77,8 @@ namespace TDFMAUI.ViewModels
                 };
                 
                 // Call GetRequestsAsync with the proper parameters
-                var fetchedRequests = await _apiService.GetRequestsAsync(pagination, userIdToFetch, null);
+                // Ensure pagination.UserId is set correctly before this call
+                var fetchedRequests = await _requestService.GetAllRequestsAsync(pagination);
 
                 if (fetchedRequests?.Items != null)
                 {
@@ -90,7 +92,8 @@ namespace TDFMAUI.ViewModels
             catch (Exception ex)
             {
                 // Use ApiService helper for user-friendly messages
-                await Shell.Current.DisplayAlert("Error", $"Failed to load requests: {ApiService.GetFriendlyErrorMessage(ex)}", "OK");
+                // TODO: Consider a common error helper or handle more generically if ApiService.GetFriendlyErrorMessage is not accessible.
+                await Shell.Current.DisplayAlert("Error", $"Failed to load requests: {ex.Message}", "OK");
                 RequestCountText = "Error loading requests";
             }
             finally
@@ -124,7 +127,7 @@ namespace TDFMAUI.ViewModels
             // Use Shell navigation instead
             await Shell.Current.GoToAsync($"{nameof(RequestDetailsPage)}", new Dictionary<string, object>
             {
-                {"RequestId", request.Id}
+                {"RequestId", request.RequestID}
             });
         }
         

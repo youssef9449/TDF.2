@@ -3,6 +3,8 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 using TDFShared.DTOs.Users;
+using TDFShared.DTOs.Requests;
+using TDFShared.Enums;
 
 namespace TDFShared.Models.Request
 {
@@ -14,8 +16,12 @@ namespace TDFShared.Models.Request
         /// <summary>
         /// Unique identifier for the request
         /// </summary>
-        [Key]
         public Guid Id { get; set; }
+
+        [Key]
+        [Column("RequestID")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int RequestID { get; set; }
 
         /// <summary>
         /// ID of the user who created the request
@@ -30,7 +36,7 @@ namespace TDFShared.Models.Request
         /// <summary>
         /// Type of request (e.g., "Time Off", "Sick Leave", etc.)
         /// </summary>
-        public string RequestType { get; set; } = string.Empty;
+        public LeaveType RequestType { get; set; }
 
         /// <summary>
         /// Reason for the request provided by the requester
@@ -40,7 +46,7 @@ namespace TDFShared.Models.Request
         /// <summary>
         /// Current status of the request (Pending, Approved, Rejected)
         /// </summary>
-        public string RequestStatus { get; set; } = "Pending";
+        public RequestStatus RequestStatus { get; set; } = Enums.RequestStatus.Pending;
 
         /// <summary>
         /// Person who closed the request (approver or rejecter)
@@ -50,7 +56,7 @@ namespace TDFShared.Models.Request
         /// <summary>
         /// HR department status for the request
         /// </summary>
-        public string RequestHRStatus { get; set; } = "Pending";
+        public RequestStatus RequestHRStatus { get; set; } = Enums.RequestStatus.Pending;
 
         /// <summary>
         /// HR person who closed the request
@@ -102,7 +108,6 @@ namespace TDFShared.Models.Request
         /// <summary>
         /// When the request was created
         /// </summary>
-        [Column("request_created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         /// <summary>
@@ -141,14 +146,5 @@ namespace TDFShared.Models.Request
         /// Additional remarks for the request
         /// </summary>
         public string? Remarks { get; set; }
-    }
-
-    // Static class to hold Request Status constants
-    public static class RequestStatus
-    {
-        public const string Pending = "Pending";
-        public const string Approved = "Approved";
-        public const string Rejected = "Rejected";
-        public const string Cancelled = "Cancelled"; // Added Cancelled Status
     }
 }

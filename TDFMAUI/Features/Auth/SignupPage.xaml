@@ -6,27 +6,44 @@
              x:Class="TDFMAUI.Features.Auth.SignupPage"
              Title="Signup">
 
+    <ContentPage.Resources>
+        <Style x:Key="EntryStyle" TargetType="Entry">
+            <Setter Property="TextColor">
+                <AppThemeBinding Light="Black" Dark="Black" />
+            </Setter>
+            <!-- Add other common Entry properties here if needed -->
+        </Style>
+        <Style x:Key="PickerStyle" TargetType="Picker">
+            <Setter Property="TextColor">
+                <AppThemeBinding Light="Black" Dark="Black" />
+            </Setter>
+            <!-- Add other common Picker properties here if needed -->
+        </Style>
+    </ContentPage.Resources>
+
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="10" VerticalOptions="Center">
 
             <Label Text="Create Account" FontSize="Large" HorizontalOptions="Center" />
 
-            <Entry Placeholder="Username" Text="{Binding Username}" />
-            <Entry Placeholder="Password" IsPassword="True" Text="{Binding Password}" />
-            <Entry Placeholder="Confirm Password" IsPassword="True" Text="{Binding ConfirmPassword}" />
-            <Entry Placeholder="Full Name" Text="{Binding FullName}" />
+            <Entry Placeholder="Username" Text="{Binding Username}" Style="{StaticResource EntryStyle}" />
+            <Entry Placeholder="Password" IsPassword="True" Text="{Binding Password}" Style="{StaticResource EntryStyle}" />
+            <Entry Placeholder="Confirm Password" IsPassword="True" Text="{Binding ConfirmPassword}" Style="{StaticResource EntryStyle}" />
+            <Entry Placeholder="Full Name" Text="{Binding FullName}" Style="{StaticResource EntryStyle}" />
 
             <Label Text="Department" />
             <Picker Title="Select Department"
                     ItemsSource="{Binding Departments}"
                     ItemDisplayBinding="{Binding Name}"
                     SelectedItem="{Binding SelectedDepartment}"
+                    Style="{StaticResource PickerStyle}"
                     IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}" />
 
             <Label Text="Title" />
             <Picker Title="Select Title"
                     ItemsSource="{Binding Titles}"
                     SelectedItem="{Binding SelectedTitle}"
+                    Style="{StaticResource PickerStyle}"
                     IsEnabled="{Binding Titles.Count, Converter={StaticResource IntToBoolConverter}}" />
 
             <Button Text="Sign Up" Command="{Binding SignupCommand}" Margin="0,10,0,0" />

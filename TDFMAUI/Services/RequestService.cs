@@ -1,192 +1,162 @@
 using System;
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
+using System.Collections.Generic; 
+using System.Threading.Tasks;
 using TDFShared.DTOs.Requests;
-using TDFMAUI.Config; // Added for ApiConfig
-using Microsoft.Extensions.Logging; // Added for logging
-using TDFShared.DTOs.Common; // Added for PaginatedResult
-using TDFShared.Exceptions;
-using TDFShared.Constants;
+using TDFShared.DTOs.Common;
+using Microsoft.Extensions.Logging;
 
-namespace TDFMAUI.Services;
-
-public class RequestService : IRequestService
+namespace TDFMAUI.Services 
 {
-    private readonly HttpClient _httpClient;
-    private readonly JsonSerializerOptions _serializerOptions;
-    private readonly ILogger<RequestService> _logger;
-    private readonly string _baseApiUrl; // Store base URL
-
-    public RequestService(HttpClient httpClient, ILogger<RequestService> logger)
+    public class RequestService : IRequestService
     {
-        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _serializerOptions = new JsonSerializerOptions
+        private readonly IApiService _apiService;
+        private readonly ILogger<RequestService> _logger;
+
+        public RequestService(IApiService apiService, ILogger<RequestService> logger)
         {
-            PropertyNameCaseInsensitive = true // Common for web APIs
-        };
-        // Get Base URL from static ApiConfig
-        _baseApiUrl = ApiConfig.BaseUrl ?? throw new InvalidOperationException("API Base URL is not configured.");
-        _logger.LogInformation("RequestService initialized with Base URL: {BaseUrl}", _baseApiUrl);
-    }
-
-    public async Task<RequestResponseDto> CreateRequestAsync(RequestCreateDto requestDto)
-    {
-        // Use ApiRoutes.Requests.Base from TDFShared
-        var uri = $"{_baseApiUrl}{ApiRoutes.Requests.Base}";
-        _logger.LogInformation("Sending POST request to {Uri}", uri);
-        var response = await _httpClient.PostAsJsonAsync(uri, requestDto, _serializerOptions);
-        return await HandleApiResponse<RequestResponseDto>(response, "CreateRequestAsync");
-    }
-
-    public async Task<RequestResponseDto> UpdateRequestAsync(Guid requestId, RequestUpdateDto requestDto)
-    {
-        // Use ApiRoutes.Requests.GetById with string.Format
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetById, requestId)}";
-        _logger.LogInformation("Sending PUT request to {Uri}", uri);
-        var response = await _httpClient.PutAsJsonAsync(uri, requestDto, _serializerOptions);
-        return await HandleApiResponse<RequestResponseDto>(response, "UpdateRequestAsync");
-    }
-
-    // --- New Method Implementations ---
-
-    public async Task<PaginatedResult<RequestResponseDto>> GetMyRequestsAsync(RequestPaginationDto pagination)
-    {
-        var queryString = BuildQueryString(pagination);
-        // Use ApiRoutes.Requests.GetMy
-        var uri = $"{_baseApiUrl}{ApiRoutes.Requests.GetMy}{queryString}";
-        _logger.LogInformation("Sending GET request to {Uri}", uri);
-        var response = await _httpClient.GetAsync(uri);
-        return await HandleApiResponse<PaginatedResult<RequestResponseDto>>(response, "GetMyRequestsAsync");
-    }
-
-    public async Task<PaginatedResult<RequestResponseDto>> GetAllRequestsAsync(RequestPaginationDto pagination)
-    {
-        var queryString = BuildQueryString(pagination);
-        // Use ApiRoutes.Requests.GetAll
-        var uri = $"{_baseApiUrl}{ApiRoutes.Requests.GetAll}{queryString}";
-        _logger.LogInformation("Sending GET request to {Uri}", uri);
-        var response = await _httpClient.GetAsync(uri);
-        return await HandleApiResponse<PaginatedResult<RequestResponseDto>>(response, "GetAllRequestsAsync");
-    }
-
-    public async Task<PaginatedResult<RequestResponseDto>> GetRequestsByDepartmentAsync(string department, RequestPaginationDto pagination)
-    {
-        var queryString = BuildQueryString(pagination);
-        // Use ApiRoutes.Requests.GetByDepartment with string.Format
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetByDepartment, Uri.EscapeDataString(department))}{queryString}";
-        _logger.LogInformation("Sending GET request to {Uri}", uri);
-        var response = await _httpClient.GetAsync(uri);
-        return await HandleApiResponse<PaginatedResult<RequestResponseDto>>(response, "GetRequestsByDepartmentAsync");
-    }
-
-    public async Task<RequestResponseDto> GetRequestByIdAsync(Guid requestId)
-    {
-        // Use ApiRoutes.Requests.GetById with string.Format
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetById, requestId)}";
-        _logger.LogInformation("Sending GET request to {Uri}", uri);
-        var response = await _httpClient.GetAsync(uri);
-        return await HandleApiResponse<RequestResponseDto>(response, "GetRequestByIdAsync");
-    }
-
-    public async Task<bool> DeleteRequestAsync(Guid requestId)
-    {
-        // Use ApiRoutes.Requests.GetById with string.Format
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.GetById, requestId)}";
-        _logger.LogInformation("Sending DELETE request to {Uri}", uri);
-        var response = await _httpClient.DeleteAsync(uri);
-        _logger.LogInformation("DeleteRequestAsync: Received response status {StatusCode}", response.StatusCode);
-        return response.IsSuccessStatusCode;
-    }
-
-    public async Task<bool> ApproveRequestAsync(Guid requestId, RequestApprovalDto approvalDto)
-    {
-        // Use ApiRoutes.Requests.Approve with string.Format
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.Approve, requestId)}";
-        _logger.LogInformation("Sending POST request to {Uri}", uri);
-        var response = await _httpClient.PostAsJsonAsync(uri, approvalDto, _serializerOptions);
-        _logger.LogInformation("ApproveRequestAsync: Received response status {StatusCode}", response.StatusCode);
-        return response.IsSuccessStatusCode;
-    }
-
-    public async Task<bool> RejectRequestAsync(Guid requestId, RequestRejectDto rejectDto)
-    {
-        // Use ApiRoutes.Requests.Reject with string.Format
-        var uri = $"{_baseApiUrl}{string.Format(ApiRoutes.Requests.Reject, requestId)}";
-        _logger.LogInformation("Sending POST request to {Uri}", uri);
-        var response = await _httpClient.PostAsJsonAsync(uri, rejectDto, _serializerOptions);
-        _logger.LogInformation("RejectRequestAsync: Received response status {StatusCode}", response.StatusCode);
-        return response.IsSuccessStatusCode;
-    }
-
-    // Helper to build query string from pagination DTO
-    private string BuildQueryString(RequestPaginationDto dto)
-    {
-        var queryParams = new List<string>();
-
-        if (dto.Page > 0) queryParams.Add($"page={dto.Page}");
-        if (dto.PageSize > 0) queryParams.Add($"pageSize={dto.PageSize}");
-        if (!string.IsNullOrEmpty(dto.SortBy)) queryParams.Add($"sortBy={Uri.EscapeDataString(dto.SortBy)}");
-        queryParams.Add($"ascending={dto.Ascending.ToString().ToLower()}"); // Add ascending bool
-        if (!string.IsNullOrEmpty(dto.FilterStatus) && !dto.FilterStatus.Equals("All", StringComparison.OrdinalIgnoreCase))
-            queryParams.Add($"filterStatus={Uri.EscapeDataString(dto.FilterStatus)}");
-        if (!string.IsNullOrEmpty(dto.FilterType) && !dto.FilterType.Equals("All", StringComparison.OrdinalIgnoreCase))
-            queryParams.Add($"filterType={Uri.EscapeDataString(dto.FilterType)}");
-        if (dto.FromDate.HasValue) queryParams.Add($"fromDate={dto.FromDate.Value:yyyy-MM-dd}");
-        if (dto.ToDate.HasValue) queryParams.Add($"toDate={dto.ToDate.Value:yyyy-MM-dd}");
-        if (dto.UserId.HasValue) queryParams.Add($"userId={dto.UserId.Value}");
-        if (!string.IsNullOrEmpty(dto.Department))
-            queryParams.Add($"department={Uri.EscapeDataString(dto.Department)}");
-
-        return queryParams.Any() ? "?" + string.Join("&", queryParams) : string.Empty;
-    }
-
-    // Helper to handle API responses (optional but recommended)
-    private async Task<T> HandleApiResponse<T>(HttpResponseMessage response, string operationName)
-    {
-        _logger.LogInformation("{Operation}: Received response status {StatusCode}", operationName, response.StatusCode);
-        var content = await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
-        {
-            _logger.LogError("{Operation}: API request failed with status {StatusCode}. Content: {Content}",
-                             operationName, response.StatusCode, content);
-            // Throw a specific exception based on status code or content if needed
-            response.EnsureSuccessStatusCode(); // This will throw HttpRequestException
+            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _logger.LogInformation("RequestService initialized, using IApiService.");
         }
 
-        if (string.IsNullOrWhiteSpace(content))
+        public async Task<RequestResponseDto> CreateRequestAsync(RequestCreateDto requestDto)
         {
-            _logger.LogWarning("{Operation}: API returned success status but empty body.", operationName);
-            // Handle cases where the API might return an empty body on success (e.g., 204 No Content for PUT/DELETE)
-            return default; // Return default for T (could be null)
-        }
-
-        try
-        {
-            var result = JsonSerializer.Deserialize<T>(content, _serializerOptions);
-            if (result == null)
+            if (requestDto == null) throw new ArgumentNullException(nameof(requestDto));
+            _logger.LogInformation("RequestService: Calling IApiService.CreateRequestAsync");
+            try
             {
-                _logger.LogError("{Operation}: Failed to deserialize non-empty API response to type {TypeName}. Content: {Content}",
-                                 operationName, typeof(T).Name, content);
-                throw new ApiException($"Failed to deserialize API response to type {typeof(T).Name}.");
+                return await _apiService.CreateRequestAsync(requestDto);
             }
-            _logger.LogInformation("{Operation}: Successfully deserialized response to {TypeName}.", operationName, typeof(T).Name);
-            return result;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RequestService: Error in CreateRequestAsync: {Message}", ex.Message);
+                throw; 
+            }
         }
-        catch (JsonException ex)
+
+        public async Task<RequestResponseDto> UpdateRequestAsync(int requestId, RequestUpdateDto requestDto)
         {
-            _logger.LogError(ex, "{Operation}: JSON Deserialization Error. Content: {Content}", operationName, content);
-            throw new ApiException("Error processing response from API.", ex);
+            if (requestDto == null) throw new ArgumentNullException(nameof(requestDto));
+            _logger.LogInformation("RequestService: Calling IApiService.UpdateRequestAsync for requestId {RequestId}", requestId);
+            try
+            {
+                return await _apiService.UpdateRequestAsync(requestId, requestDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RequestService: Error in UpdateRequestAsync for requestId {RequestId}: {Message}", requestId, ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<PaginatedResult<RequestResponseDto>> GetMyRequestsAsync(RequestPaginationDto pagination)
+        {
+            if (pagination == null) throw new ArgumentNullException(nameof(pagination));
+            _logger.LogInformation("RequestService: Attempting to get current user ID for GetMyRequestsAsync.");
+            try
+            {
+                int userId = await _apiService.GetCurrentUserIdAsync();
+                if (userId == 0) 
+                {
+                    _logger.LogWarning("RequestService: GetMyRequestsAsync - Could not determine current user ID or user ID is 0. Returning empty result.");
+                    return new PaginatedResult<RequestResponseDto> { Items = new List<RequestResponseDto>(), TotalCount = 0, PageNumber = pagination.Page, PageSize = pagination.PageSize };
+                }
+                _logger.LogInformation("RequestService: Calling IApiService.GetRequestsAsync for current user ID {UserId}", userId);
+                return await _apiService.GetRequestsAsync(pagination, userId, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RequestService: Error in GetMyRequestsAsync: {Message}", ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<PaginatedResult<RequestResponseDto>> GetAllRequestsAsync(RequestPaginationDto pagination)
+        {
+            if (pagination == null) throw new ArgumentNullException(nameof(pagination));
+            _logger.LogInformation("RequestService: Calling IApiService.GetRequestsAsync for all requests");
+            try
+            {
+                return await _apiService.GetRequestsAsync(pagination, null, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RequestService: Error in GetAllRequestsAsync: {Message}", ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<PaginatedResult<RequestResponseDto>> GetRequestsByDepartmentAsync(string department, RequestPaginationDto pagination)
+        {
+            if (pagination == null) throw new ArgumentNullException(nameof(pagination));
+            _logger.LogInformation("RequestService: Calling IApiService.GetRequestsAsync for department {Department}", department);
+            try
+            {
+                return await _apiService.GetRequestsAsync(pagination, null, department);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RequestService: Error in GetRequestsByDepartmentAsync for department {Department}: {Message}", department, ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<RequestResponseDto> GetRequestByIdAsync(int requestId)
+        {
+            _logger.LogInformation("RequestService: Calling IApiService.GetRequestByIdAsync for requestId {RequestId}", requestId);
+            try
+            {
+                return await _apiService.GetRequestByIdAsync(requestId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RequestService: Error in GetRequestByIdAsync for requestId {RequestId}: {Message}", requestId, ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<bool> DeleteRequestAsync(int requestId)
+        {
+            _logger.LogInformation("RequestService: Calling IApiService.DeleteRequestAsync for requestId {RequestId}", requestId);
+            try
+            {
+                return await _apiService.DeleteRequestAsync(requestId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RequestService: Error in DeleteRequestAsync for requestId {RequestId}: {Message}", requestId, ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<bool> ApproveRequestAsync(int requestId, RequestApprovalDto approvalDto)
+        {
+            if (approvalDto == null) throw new ArgumentNullException(nameof(approvalDto));
+            _logger.LogInformation("RequestService: Calling IApiService.ApproveRequestAsync for requestId {RequestId}", requestId);
+            try
+            {
+                return await _apiService.ApproveRequestAsync(requestId, approvalDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RequestService: Error in ApproveRequestAsync for requestId {RequestId}: {Message}", requestId, ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<bool> RejectRequestAsync(int requestId, RequestRejectDto rejectDto)
+        {
+            if (rejectDto == null) throw new ArgumentNullException(nameof(rejectDto));
+            _logger.LogInformation("RequestService: Calling IApiService.RejectRequestAsync for requestId {RequestId}", requestId);
+            try
+            {
+                return await _apiService.RejectRequestAsync(requestId, rejectDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RequestService: Error in RejectRequestAsync for requestId {RequestId}: {Message}", requestId, ex.Message);
+                throw;
+            }
         }
     }
 }
-
-
-// Simple custom exception class
-//public class ApiException : Exception
-//{
-//    public ApiException(string message) : base(message) { }
-//    public ApiException(string message, Exception innerException) : base(message, innerException) { }
-//}

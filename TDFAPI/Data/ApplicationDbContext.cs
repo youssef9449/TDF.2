@@ -3,7 +3,10 @@ using TDFShared.Models.User;
 using TDFShared.Models.Message;
 using TDFShared.Models.Notification;
 using TDFShared.Models.Request;
+using TDFShared.Models.Department;
+using TDFAPI.Domain;
 using TDFAPI.Domain.Auth;
+using TDFShared.Enums;
 
 namespace TDFAPI.Data
 {
@@ -20,6 +23,7 @@ namespace TDFAPI.Data
         public DbSet<MessageEntity> Messages { get; set; }
         public DbSet<AnnualLeaveEntity> AnnualLeaves { get; set; }
         public DbSet<RevokedToken> RevokedTokens { get; set; }
+        public DbSet<DepartmentEntity> Departments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -72,8 +76,8 @@ namespace TDFAPI.Data
             builder.Entity<RequestEntity>(entity =>
             {
                 entity.ToTable("Requests");
-                entity.HasKey(e => e.Id);
-                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+                entity.HasKey(e => e.RequestID);
+                entity.Property(e => e.RequestID).ValueGeneratedOnAdd();
                 entity.Property(e => e.RequestUserID).IsRequired();
                 entity.Property(e => e.RequestUserFullName).IsRequired().HasMaxLength(255).IsUnicode(false);
                 entity.Property(e => e.RequestFromDay).IsRequired().HasColumnType("date");
@@ -81,14 +85,32 @@ namespace TDFAPI.Data
                 entity.Property(e => e.RequestBeginningTime).HasColumnType("time(7)");
                 entity.Property(e => e.RequestEndingTime).HasColumnType("time(7)");
                 entity.Property(e => e.RequestReason).HasMaxLength(255);
-                entity.Property(e => e.RequestStatus).HasMaxLength(50).HasDefaultValue("Pending");
-                entity.Property(e => e.RequestType).IsRequired().HasMaxLength(255).IsUnicode(false);
+                entity.Property(e => e.RequestStatus)
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasConversion<string>() // Convert enum to string for DB
+                    .HasDefaultValue(RequestStatus.Pending); // Set default using enum
+                entity.Property(e => e.RequestType)
+                    .IsRequired()
+                    .HasMaxLength(255)
+                    .HasConversion<string>() // Convert enum to string for DB
+                    .IsUnicode(false);
                 entity.Property(e => e.RequestRejectReason).HasMaxLength(255);
                 entity.Property(e => e.RequestCloser).HasMaxLength(255).IsUnicode(false);
                 entity.Property(e => e.RequestDepartment).IsRequired().HasMaxLength(255).IsUnicode(false);
-                entity.Property(e => e.RequestNumberOfDays);
+                entity.Property(e => e.RequestNumberOfDays).HasColumnName("request_number_of_days");
                 entity.Property(e => e.RequestHRCloser).HasMaxLength(255);
-                entity.Property(e => e.RequestHRStatus).HasMaxLength(50);
+                entity.Property(e => e.RequestHRStatus)
+                    .HasMaxLength(50)
+                    .HasConversion<string>() // Convert enum to string for DB
+                    .IsRequired(false); // Assuming RequestHRStatus can be null
+                entity.Property(e => e.CreatedAt).HasColumnName("request_created_at");
+                entity.Property(e => e.ApprovedAt);
+                entity.Property(e => e.RejectedAt);
+                entity.Property(e => e.UpdatedAt);
+                entity.Property(e => e.ApproverComment);
+                entity.Property(e => e.Remarks);
+                entity.Property(e => e.RowVersion);
 
                 // Configure the relationship with User
                 entity.HasOne(r => r.User)
@@ -171,6 +193,27 @@ namespace TDFAPI.Data
                     .HasForeignKey<AnnualLeaveEntity>(d => d.UserID)
                     .OnDelete(DeleteBehavior.Cascade)
                     .HasConstraintName("FK_AnnualLeave_Users");
+            });
+
+            builder.Entity<DepartmentEntity>(entity =>
+            {
+                entity.ToTable("Departments");
+
+                // Configure composite key since the table doesn't have a primary key
+                entity.HasNoKey();
+
+                // Configure properties to match the database schema
+                entity.Property(e => e.Name)
+                    .HasColumnName("Department")
+                    .HasMaxLength(255)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.Title)
+                    .HasMaxLength(100)
+                    .IsUnicode(false);
+
+                // Ignore SortOrder property as it's not in the database
+                entity.Ignore(e => e.SortOrder);
             });
         }
     }

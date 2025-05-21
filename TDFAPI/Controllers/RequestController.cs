@@ -9,6 +9,7 @@ using TDFShared.Constants;
 using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using System.Linq;
+using TDFAPI.Exceptions;
 
 namespace TDFAPI.Controllers
 {
@@ -82,10 +83,10 @@ namespace TDFAPI.Controllers
                 var result = await _requestService.GetByUserIdAsync(userId, pagination);
                 return Ok(result);
             }
-            catch (UnauthorizedAccessException ex)
+            catch (TDFAPI.Exceptions.UnauthorizedAccessException ex)
             {
-                 _logger.LogWarning(ex, "Unauthorized access attempt in GetMyRequests");
-                 return Forbid();
+                _logger.LogWarning(ex, "Unauthorized access attempt in GetMyRequests");
+                return Forbid();
             }
             catch (Exception ex)
             {
@@ -102,7 +103,7 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                 _logger.LogInformation("Admin/HR/Manager getting requests for user {TargetUserId} with pagination: {@Pagination}", userId, pagination);
+                _logger.LogInformation("Admin/HR/Manager getting requests for user {TargetUserId} with pagination: {@Pagination}", userId, pagination);
                 var result = await _requestService.GetByUserIdAsync(userId, pagination);
                 return Ok(result);
             }
@@ -114,18 +115,18 @@ namespace TDFAPI.Controllers
         }
 
         // GET: api/requests/{id}
-        [HttpGet("{id:guid}")]
+        [HttpGet("{id:int}")]
         [Route(ApiRoutes.Requests.GetById)]
-        public async Task<ActionResult<RequestResponseDto>> GetRequestById(Guid id)
+        public async Task<ActionResult<RequestResponseDto>> GetRequestById(int id)
         {
             try
             {
-                _logger.LogInformation("Attempting to retrieve request with GUID {RequestId}", id);
+                _logger.LogInformation("Attempting to retrieve request with ID {RequestId}", id);
                 RequestResponseDto requestDto = await _requestService.GetByIdAsync(id);
 
                 if (requestDto == null)
                 {
-                    _logger.LogWarning("Request with GUID {RequestId} not found.", id);
+                    _logger.LogWarning("Request with ID {RequestId} not found.", id);
                     return NotFound();
                 }
 
@@ -145,22 +146,22 @@ namespace TDFAPI.Controllers
                     }
                     else
                     {
-                         _logger.LogWarning("User {UserId} (Roles: {Roles}, Dept: {Dept}) tried to access request {RequestId} belonging to {OwnerId} in dept {RequestDept}",
-                            currentUserId, string.Join(',', User.FindAll(ClaimTypes.Role).Select(c=>c.Value)), currentUser.Department, id, requestDto.RequestUserID, requestDto.RequestDepartment);
-                         return Forbid();
+                        _logger.LogWarning("User {UserId} (Roles: {Roles}, Dept: {Dept}) tried to access request {RequestId} belonging to {OwnerId} in dept {RequestDept}",
+                            currentUserId, string.Join(',', User.FindAll(ClaimTypes.Role).Select(c => c.Value)), currentUser.Department, id, requestDto.RequestUserID, requestDto.RequestDepartment);
+                        return Forbid();
                     }
                 }
 
                 return Ok(requestDto);
             }
-            catch (UnauthorizedAccessException ex)
+            catch (TDFAPI.Exceptions.UnauthorizedAccessException ex)
             {
-                 _logger.LogWarning(ex, "Unauthorized access attempt in GetRequestById for GUID {RequestId}", id);
-                 return Forbid();
+                _logger.LogWarning(ex, "Unauthorized access attempt in GetRequestById for ID {RequestId}", id);
+                return Forbid();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving request with GUID {RequestId}", id);
+                _logger.LogError(ex, "Error retrieving request with ID {RequestId}", id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -189,19 +190,19 @@ namespace TDFAPI.Controllers
                     return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create request.");
                 }
 
-                return CreatedAtAction(nameof(GetRequestById), new { id = createdRequestDto.Id }, createdRequestDto);
+                return CreatedAtAction(nameof(GetRequestById), new { id = createdRequestDto.RequestID }, createdRequestDto);
             }
-            catch (ArgumentException ex)
+            catch (TDFShared.Exceptions.ValidationException ex)
             {
                 _logger.LogWarning(ex, "Validation error creating request.");
                 return BadRequest(ex.Message);
             }
-            catch (InvalidOperationException ex)
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
             {
-                 _logger.LogWarning(ex, "Business logic error creating request.");
+                _logger.LogWarning(ex, "Business logic error creating request.");
                 return BadRequest(ex.Message);
             }
-            catch (UnauthorizedAccessException ex)
+            catch (TDFAPI.Exceptions.UnauthorizedAccessException ex)
             {
                 _logger.LogWarning(ex, "Unauthorized access attempt in CreateRequest");
                 return Forbid();
@@ -214,9 +215,9 @@ namespace TDFAPI.Controllers
         }
 
         // PUT: api/requests/{id}
-        [HttpPut("{id:guid}")]
+        [HttpPut("{id:int}")]
         [Route(ApiRoutes.Requests.Update)]
-        public async Task<ActionResult<RequestResponseDto>> UpdateRequest(Guid id, [FromBody] RequestUpdateDto updateDto)
+        public async Task<ActionResult<RequestResponseDto>> UpdateRequest(int id, [FromBody] RequestUpdateDto updateDto)
         {
             if (!ModelState.IsValid)
             {
@@ -228,7 +229,7 @@ namespace TDFAPI.Controllers
                 int userId = GetCurrentUserId();
                 if (userId == 0) return Unauthorized("User ID could not be determined.");
 
-                _logger.LogInformation("User {UserId} attempting to update request GUID {RequestId} with data: {@UpdateDto}", userId, id, updateDto);
+                _logger.LogInformation("User {UserId} attempting to update request ID {RequestId} with data: {@UpdateDto}", userId, id, updateDto);
 
                 var result = await _requestService.UpdateAsync(id, updateDto, userId);
                 bool success = result != null;
@@ -250,37 +251,37 @@ namespace TDFAPI.Controllers
 
                 return Ok(await _requestService.GetByIdAsync(id));
             }
-            catch (ArgumentException ex)
+            catch (TDFShared.Exceptions.ValidationException ex)
             {
-                _logger.LogWarning(ex, "Validation error updating request GUID {RequestId}.", id);
+                _logger.LogWarning(ex, "Validation error updating request ID {RequestId}.", id);
                 return BadRequest(ex.Message);
             }
-            catch (InvalidOperationException ex)
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
             {
-                _logger.LogWarning(ex, "Business logic error updating request GUID {RequestId}.", id);
+                _logger.LogWarning(ex, "Business logic error updating request ID {RequestId}.", id);
                 return BadRequest(ex.Message);
             }
-            catch (KeyNotFoundException ex)
+            catch (EntityNotFoundException ex)
             {
-                _logger.LogWarning("Update failed: Request with GUID {RequestId} not found.", id);
+                _logger.LogWarning("Update failed: Request with ID {RequestId} not found.", id);
                 return NotFound(ex.Message);
             }
-            catch (UnauthorizedAccessException ex)
+            catch (TDFAPI.Exceptions.UnauthorizedAccessException ex)
             {
-                 _logger.LogWarning(ex, "Unauthorized access attempt in UpdateRequest for GUID {RequestId}", id);
-                 return Forbid();
+                _logger.LogWarning(ex, "Unauthorized access attempt in UpdateRequest for ID {RequestId}", id);
+                return Forbid();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating request GUID {RequestId}", id);
+                _logger.LogError(ex, "Error updating request ID {RequestId}", id);
                 return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred while updating the request.");
             }
         }
 
         // DELETE: api/requests/{id}
-        [HttpDelete("{id:guid}")]
+        [HttpDelete("{id:int}")]
         [Route(ApiRoutes.Requests.Delete)]
-        public async Task<IActionResult> DeleteRequest(Guid id)
+        public async Task<IActionResult> DeleteRequest(int id)
         {
             try
             {
@@ -304,33 +305,38 @@ namespace TDFAPI.Controllers
                 _logger.LogWarning("Failed to delete request {RequestId} by user {UserId}", id, currentUserId);
                 return BadRequest("Failed to delete request");
             }
-            catch (ArgumentException ex)
+            catch (TDFShared.Exceptions.ValidationException ex)
             {
                 _logger.LogWarning(ex, "Validation error deleting request {RequestId}: {ErrorMessage}", id, ex.Message);
                 return BadRequest(ex.Message);
             }
-            catch (UnauthorizedAccessException ex)
+            catch (TDFAPI.Exceptions.UnauthorizedAccessException ex)
             {
-                 _logger.LogWarning(ex, "Unauthorized access attempt in DeleteRequest for GUID {RequestId}", id);
+                _logger.LogWarning(ex, "Unauthorized access attempt in DeleteRequest for ID {RequestId}", id);
                 return Forbid();
             }
-            catch (InvalidOperationException ex)
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
             {
-                 _logger.LogWarning(ex, "Business logic error deleting request {RequestId}: {ErrorMessage}", id, ex.Message);
+                _logger.LogWarning(ex, "Business logic error deleting request {RequestId}: {ErrorMessage}", id, ex.Message);
                 return BadRequest(ex.Message);
+            }
+            catch (EntityNotFoundException ex)
+            {
+                _logger.LogWarning("Delete failed: Request with ID {RequestId} not found.", id);
+                return NotFound(ex.Message);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting request with GUID {RequestId}", id);
+                _logger.LogError(ex, "Error deleting request with ID {RequestId}", id);
                 return StatusCode(500, "Internal server error");
             }
         }
 
         // POST: api/requests/{id}/approve
-        [HttpPost("{id:guid}/approve")]
+        [HttpPost("{id:int}/approve")]
         [Route(ApiRoutes.Requests.Approve)]
         [Authorize(Roles = "Admin,Manager,HR")]
-        public async Task<IActionResult> ApproveRequest(Guid id, [FromBody] RequestApprovalDto approvalDto)
+        public async Task<IActionResult> ApproveRequest(int id, [FromBody] RequestApprovalDto approvalDto)
         {
             try
             {
@@ -338,7 +344,6 @@ namespace TDFAPI.Controllers
                 var approver = await _userService.GetUserByIdAsync(approverId);
                 if (approver == null) return Unauthorized("Approver not found.");
 
-                // Ensure approver has roles before accessing them
                 bool isHR = approver.Role?.Contains("HR") ?? false;
                 _logger.LogInformation("{Role} {ApproverName} ({ApproverId}) attempting to approve request {RequestId}: {@ApprovalDto}",
                     (isHR ? "HR" : "Manager"), approver.FullName, approverId, id, approvalDto);
@@ -355,40 +360,45 @@ namespace TDFAPI.Controllers
                     }
                     else
                     {
-                         _logger.LogWarning("Failed to approve request {RequestId}. Request status might prevent approval.", id);
-                         return BadRequest("Failed to approve request. It might be in a state that cannot be approved (e.g., already finalized).");
+                        _logger.LogWarning("Failed to approve request {RequestId}. Request status might prevent approval.", id);
+                        return BadRequest("Failed to approve request. It might be in a state that cannot be approved (e.g., already finalized).");
                     }
                 }
 
                 return Ok(new { message = "Request approved successfully." });
             }
-            catch (ArgumentException ex)
+            catch (EntityNotFoundException ex)
             {
-                 _logger.LogWarning(ex, "Validation error approving request {RequestId}: {ErrorMessage}", id, ex.Message);
+                _logger.LogWarning(ex, "Not found error approving request {RequestId}.", id);
+                return NotFound(ex.Message);
+            }
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error approving request {RequestId}.", id);
                 return BadRequest(ex.Message);
             }
-            catch (InvalidOperationException ex)
+            catch (TDFShared.Exceptions.ValidationException ex)
             {
-                 _logger.LogWarning(ex, "Business logic error approving request {RequestId}: {ErrorMessage}", id, ex.Message);
+                _logger.LogWarning(ex, "Validation error approving request {RequestId}.", id);
                 return BadRequest(ex.Message);
             }
-             catch (UnauthorizedAccessException ex)
+            catch (TDFAPI.Exceptions.UnauthorizedAccessException ex)
             {
-                 _logger.LogWarning(ex, "Unauthorized access attempt in ApproveRequest for GUID {RequestId}", id);
-                 return Forbid();
+                _logger.LogWarning(ex, "Unauthorized access attempt in ApproveRequest for ID {RequestId}", id);
+                return Forbid();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error approving request with GUID {RequestId}", id);
+                _logger.LogError(ex, "Error approving request with ID {RequestId}", id);
                 return StatusCode(500, "Internal server error");
             }
         }
 
         // POST: api/requests/{id}/reject
-        [HttpPost("{id:guid}/reject")]
+        [HttpPost("{id:int}/reject")]
         [Route(ApiRoutes.Requests.Reject)]
         [Authorize(Roles = "Admin,Manager,HR")]
-        public async Task<IActionResult> RejectRequest(Guid id, [FromBody] RequestRejectDto rejectDto)
+        public async Task<IActionResult> RejectRequest(int id, [FromBody] RequestRejectDto rejectDto)
         {
             try
             {
@@ -396,7 +406,6 @@ namespace TDFAPI.Controllers
                 var rejecter = await _userService.GetUserByIdAsync(rejecterId);
                 if (rejecter == null) return Unauthorized("Rejecter not found.");
 
-                // Ensure rejecter has roles before accessing them
                 bool isHR = rejecter.Role?.Contains("HR") ?? false;
                 _logger.LogInformation("{Role} {RejecterName} ({RejecterId}) attempting to reject request {RequestId}: {@RejectDto}",
                     (isHR ? "HR" : "Manager"), rejecter.FullName, rejecterId, id, rejectDto);
@@ -411,33 +420,38 @@ namespace TDFAPI.Controllers
                         _logger.LogWarning("Attempted to reject non-existent request {RequestId}", id);
                         return NotFound($"Request with ID {id} not found.");
                     }
-                     else
+                    else
                     {
-                         _logger.LogWarning("Failed to reject request {RequestId}. Request status might prevent rejection.", id);
-                         return BadRequest("Failed to reject request. It might be in a state that cannot be rejected (e.g., already finalized).");
+                        _logger.LogWarning("Failed to reject request {RequestId}. Request status might prevent rejection.", id);
+                        return BadRequest("Failed to reject request. It might be in a state that cannot be rejected (e.g., already finalized).");
                     }
                 }
 
                 return Ok(new { message = "Request rejected successfully." });
             }
-            catch (ArgumentException ex)
+            catch (EntityNotFoundException ex)
             {
-                 _logger.LogWarning(ex, "Validation error rejecting request {RequestId}: {ErrorMessage}", id, ex.Message);
+                _logger.LogWarning(ex, "Not found error rejecting request {RequestId}.", id);
+                return NotFound(ex.Message);
+            }
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error rejecting request {RequestId}.", id);
                 return BadRequest(ex.Message);
             }
-            catch (InvalidOperationException ex)
+            catch (TDFShared.Exceptions.ValidationException ex)
             {
-                 _logger.LogWarning(ex, "Business logic error rejecting request {RequestId}: {ErrorMessage}", id, ex.Message);
+                _logger.LogWarning(ex, "Validation error rejecting request {RequestId}.", id);
                 return BadRequest(ex.Message);
             }
-             catch (UnauthorizedAccessException ex)
+            catch (TDFAPI.Exceptions.UnauthorizedAccessException ex)
             {
-                 _logger.LogWarning(ex, "Unauthorized access attempt in RejectRequest for GUID {RequestId}", id);
-                 return Forbid();
+                _logger.LogWarning(ex, "Unauthorized access attempt in RejectRequest for ID {RequestId}", id);
+                return Forbid();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error rejecting request with GUID {RequestId}", id);
+                _logger.LogError(ex, "Error rejecting request with ID {RequestId}", id);
                 return StatusCode(500, "Internal server error");
             }
         }

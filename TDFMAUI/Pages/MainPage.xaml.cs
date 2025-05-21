@@ -3,6 +3,7 @@ using TDFMAUI.Services;
 using TDFMAUI.Features.Admin;
 using TDFMAUI.Features.Auth;
 using TDFMAUI.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace TDFMAUI.Pages;
 
@@ -76,7 +77,9 @@ public partial class MainPage : ContentPage
     {
         if (App.CurrentUser != null && App.CurrentUser.IsAdmin)
         {
-            await Navigation.PushAsync(new AdminPage(_apiService));
+            var requestService = App.Services.GetRequiredService<IRequestService>();
+            var apiService = App.Services.GetRequiredService<ApiService>();
+            await Navigation.PushAsync(new AdminPage(requestService, apiService));
         }
     }
 

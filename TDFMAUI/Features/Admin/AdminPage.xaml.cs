@@ -8,14 +8,16 @@ namespace TDFMAUI.Features.Admin
 {
     public partial class AdminPage : ContentPage
     {
-        private readonly ApiService _apiService; 
+        private readonly IRequestService _requestService;
+        private readonly ApiService _apiService; // For user-related calls until UserApiService is used
         private List<UserDto> _users; 
         private List<RequestResponseDto> _requests; 
 
-        public AdminPage(ApiService apiService) 
+        public AdminPage(IRequestService requestService, ApiService apiService) 
         {
             InitializeComponent();
-            _apiService = apiService;
+            _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
+            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
             LoadData();
         }
 
@@ -38,14 +40,15 @@ namespace TDFMAUI.Features.Admin
                 
                 var pagination = new RequestPaginationDto { Page = 1, PageSize = 100 }; 
                 // TODO: Replace with call to new RequestApiService
-                var requestsResult = await _apiService.GetRequestsAsync(pagination, null, null); 
+                var requestsResult = await _requestService.GetAllRequestsAsync(pagination); 
                 _requests = requestsResult?.Items?.ToList() ?? new List<RequestResponseDto>();
 
                 // Remove UI update logic - should be handled by ViewModel or removed if sections are simplified
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Error", ApiService.GetFriendlyErrorMessage(ex), "OK");
+                // TODO: Consider a common error helper or handle more generically if ApiService.GetFriendlyErrorMessage is not accessible.
+                await DisplayAlert("Error", $"Failed to load data: {ex.Message}", "OK");
             }
             finally
             {

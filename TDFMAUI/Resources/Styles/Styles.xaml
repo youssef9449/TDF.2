@@ -60,7 +60,7 @@
     </Style>
 
     <Style TargetType="Entry">
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource Gray100}}" />
+        <Setter Property="TextColor" Value="Black" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
         <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}" />
@@ -69,7 +69,7 @@
                 <VisualStateGroup x:Name="CommonStates">
                     <VisualState x:Name="Normal">
                         <VisualState.Setters>
-                            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource Gray100}}" />
+                            <Setter Property="TextColor" Value="Black" />
                         </VisualState.Setters>
                     </VisualState>
                     <VisualState x:Name="Disabled">
@@ -109,7 +109,7 @@
     </Style>
 
     <Style TargetType="Picker">
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource Gray100}}" />
+        <Setter Property="TextColor" Value="Black" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
         <Setter Property="TitleColor" Value="{StaticResource Gray500}" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}" />
@@ -120,13 +120,13 @@
     </Style>
 
     <Style TargetType="DatePicker">
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource Gray100}}" />
+        <Setter Property="TextColor" Value="Black" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}" />
     </Style>
 
     <Style TargetType="TimePicker">
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource Gray100}}" />
+        <Setter Property="TextColor" Value="Black" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}" />
     </Style>

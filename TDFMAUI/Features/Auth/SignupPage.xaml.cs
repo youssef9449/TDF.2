@@ -23,40 +23,56 @@ public partial class SignupPage : ContentPage
         Debug.WriteLine("[SignupPage] DI constructor - ViewModel assigned successfully");
     }
 
-    protected override async void OnAppearing()
+    protected override void OnAppearing()
     {
         base.OnAppearing();
 
         // Log that the page appeared
         Debug.WriteLine("[SignupPage] OnAppearing");
 
-        // Explicitly load data when page appears
+        // Check if departments are already loaded
         if (_viewModel != null)
         {
-            Debug.WriteLine("[SignupPage] OnAppearing - ViewModel is available, attempting to load departments");
-            try
+            Debug.WriteLine($"[SignupPage] OnAppearing - ViewModel is available, Departments count: {_viewModel.Departments?.Count ?? 0}");
+
+            // Only load departments if they're not already loaded
+            if (_viewModel.Departments == null || _viewModel.Departments.Count == 0)
             {
-                // Use the command if available
-                if (_viewModel.LoadDepartmentsCommand?.CanExecute(null) ?? false)
-                {
-                    Debug.WriteLine("[SignupPage] OnAppearing - Executing LoadDepartmentsCommand");
-                    await _viewModel.LoadDepartmentsCommand.ExecuteAsync(null);
-                }
-                else
-                {
-                    Debug.WriteLine("[SignupPage] OnAppearing - LoadDepartmentsCommand is null or cannot execute. Check ViewModel state.");
-                }
+                Debug.WriteLine("[SignupPage] OnAppearing - No departments loaded yet, will load them now");
+
+                // Use MainThread.BeginInvokeOnMainThread to avoid blocking the UI
+                MainThread.BeginInvokeOnMainThread(async () => {
+                    try
+                    {
+                        // Use the command if available
+                        if (_viewModel.LoadDepartmentsCommand?.CanExecute(null) ?? false)
+                        {
+                            Debug.WriteLine("[SignupPage] OnAppearing - Executing LoadDepartmentsCommand");
+                            await _viewModel.LoadDepartmentsCommand.ExecuteAsync(null);
+                        }
+                        else
+                        {
+                            Debug.WriteLine("[SignupPage] OnAppearing - LoadDepartmentsCommand is null or cannot execute. Check ViewModel state.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[SignupPage] OnAppearing - Error executing LoadDepartmentsCommand: {ex.Message}");
+                    }
+                });
             }
-            catch (Exception ex)
+            else
             {
-                Debug.WriteLine($"[SignupPage] OnAppearing - Error executing LoadDepartmentsCommand: {ex.Message}");
+                Debug.WriteLine("[SignupPage] OnAppearing - Departments already loaded, skipping reload");
             }
         }
         else
         {
             Debug.WriteLine("[SignupPage] OnAppearing - ViewModel is NULL, cannot load departments");
             // Optionally display an error to the user here
-            await DisplayAlert("Error", "ViewModel not available. Cannot load signup data.", "OK");
+            MainThread.BeginInvokeOnMainThread(async () => {
+                await DisplayAlert("Error", "ViewModel not available. Cannot load signup data.", "OK");
+            });
         }
     }
 

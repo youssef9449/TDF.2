@@ -1085,13 +1085,13 @@ namespace TDFMAUI.Services
                 queryParams.Add($"sortBy={Uri.EscapeDataString(pagination.SortBy)}");
             }
             queryParams.Add($"ascending={pagination.Ascending}");
-            if (!string.IsNullOrEmpty(pagination.FilterStatus) && !pagination.FilterStatus.Equals("All", StringComparison.OrdinalIgnoreCase))
+            if (pagination.FilterStatus.HasValue)
             {
-                queryParams.Add($"filterStatus={Uri.EscapeDataString(pagination.FilterStatus)}");
+                queryParams.Add($"filterStatus={Uri.EscapeDataString(pagination.FilterStatus.Value.ToString())}");
             }
-             if (!string.IsNullOrEmpty(pagination.FilterType) && !pagination.FilterType.Equals("All", StringComparison.OrdinalIgnoreCase))
+             if (pagination.FilterType.HasValue)
             {
-                queryParams.Add($"filterType={Uri.EscapeDataString(pagination.FilterType)}");
+                queryParams.Add($"filterType={Uri.EscapeDataString(pagination.FilterType.Value.ToString())}");
             }
             if (pagination.FromDate.HasValue)
             {
@@ -1248,14 +1248,14 @@ namespace TDFMAUI.Services
                         queryParams.Add($"toDate={pagination.ToDate.Value:yyyy-MM-dd}");
                     }
 
-                    if (!string.IsNullOrEmpty(pagination.FilterStatus) && pagination.FilterStatus != "All")
+                    if (pagination.FilterStatus.HasValue)
                     {
-                        queryParams.Add($"status={pagination.FilterStatus}");
+                        queryParams.Add($"status={pagination.FilterStatus.Value.ToString()}");
                     }
 
-                    if (!string.IsNullOrEmpty(pagination.FilterType) && pagination.FilterType != "All")
+                    if (pagination.FilterType.HasValue)
                     {
-                        queryParams.Add($"type={pagination.FilterType}");
+                        queryParams.Add($"type={pagination.FilterType.Value.ToString()}");
                     }
                 }
 
@@ -1269,7 +1269,8 @@ namespace TDFMAUI.Services
                     queryParams.Add($"department={Uri.EscapeDataString(department)}");
                 }
 
-                string url = $"requests{(queryParams.Any() ? $"?{string.Join("&", queryParams)}" : "")}";
+                string baseUrl = ApiRoutes.RemoveBasePrefix(ApiRoutes.Requests.GetAll);
+                string url = $"{baseUrl}{(queryParams.Any() ? $"?{string.Join("&", queryParams)}" : "")}";
 
                 return await GetAsync<PaginatedResult<RequestResponseDto>>(url, queueIfUnavailable);
             }
@@ -1295,7 +1296,7 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<RequestResponseDto> UpdateRequestAsync(Guid requestId, RequestUpdateDto requestDto)
+        public async Task<RequestResponseDto> UpdateRequestAsync(int requestId, RequestUpdateDto requestDto)
         {
             try
             {
@@ -1311,7 +1312,7 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<RequestResponseDto> GetRequestByIdAsync(Guid requestId, bool queueIfUnavailable = true)
+        public async Task<RequestResponseDto> GetRequestByIdAsync(int requestId, bool queueIfUnavailable = true)
         {
             try
             {
@@ -1327,12 +1328,13 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<bool> DeleteRequestAsync(Guid requestId)
+
+        public async Task<bool> DeleteRequestAsync(int requestId)
         {
             try
             {
                 _logger?.LogInformation("ApiService: Deleting request {RequestId}", requestId);
-                string endpoint = string.Format(ApiRoutes.Requests.GetById, requestId);
+                string endpoint = string.Format(ApiRoutes.Requests.Delete, requestId);
                 var response = await DeleteAsync(endpoint);
                 return response.IsSuccessStatusCode;
             }
@@ -1343,7 +1345,7 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<bool> ApproveRequestAsync(Guid requestId, RequestApprovalDto approvalDto)
+        public async Task<bool> ApproveRequestAsync(int requestId, RequestApprovalDto approvalDto)
         {
             try
             {
@@ -1359,7 +1361,7 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<bool> RejectRequestAsync(Guid requestId, RequestRejectDto rejectDto)
+        public async Task<bool> RejectRequestAsync(int requestId, RequestRejectDto rejectDto)
         {
             try
             {
@@ -1380,16 +1382,109 @@ namespace TDFMAUI.Services
         {
             try
             {
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Starting API request to {Endpoint}", ApiRoutes.Lookups.GetDepartments);
-                var result = await GetAsync<ApiResponse<List<LookupItem>>>(ApiRoutes.Lookups.GetDepartments, queueIfUnavailable);
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - API request completed, returned {Count} items", result?.Data?.Count ?? 0);
-                return result?.Data ?? new List<LookupItem>();
+                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync called in TDFMAUI ApiService");
+
+                // Check network connectivity
+                var networkAccess = Connectivity.NetworkAccess;
+                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Network status: {NetworkStatus}", networkAccess);
+
+                if (networkAccess != NetworkAccess.Internet)
+                {
+                    _logger.LogWarning("DIAGNOSTIC: GetDepartmentsAsync - No internet connectivity. Returning default departments.");
+                    return GetDefaultDepartments();
+                }
+
+                // Log API endpoint details
+                string endpoint = ApiRoutes.Lookups.GetDepartments;
+                string fullUrl = _httpClientService.GetFullUrl(endpoint);
+                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Starting API request to endpoint: {Endpoint}, full URL: {FullUrl}", endpoint, fullUrl);
+
+                // Make the API call with detailed logging
+                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Making HTTP request");
+
+                // Try direct HTTP request first to diagnose any issues
+                try
+                {
+                    string rawResponse = await _httpClientService.GetRawAsync(endpoint);
+                    _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Raw response received: {Length} characters",
+                        rawResponse?.Length ?? 0);
+
+                    if (!string.IsNullOrEmpty(rawResponse))
+                    {
+                        _logger.LogDebug("DIAGNOSTIC: GetDepartmentsAsync - Raw response preview: {Preview}",
+                            rawResponse.Length > 100 ? rawResponse.Substring(0, 100) + "..." : rawResponse);
+                    }
+                }
+                catch (Exception rawEx)
+                {
+                    _logger.LogError(rawEx, "DIAGNOSTIC: GetDepartmentsAsync - Error getting raw response: {Message}", rawEx.Message);
+                }
+
+                // Now make the actual API call
+                var result = await GetAsync<ApiResponse<List<LookupItem>>>(endpoint, queueIfUnavailable);
+
+                // Log the result
+                if (result == null)
+                {
+                    _logger.LogWarning("DIAGNOSTIC: GetDepartmentsAsync - API request returned null result");
+                    return GetDefaultDepartments();
+                }
+
+                if (!result.Success)
+                {
+                    _logger.LogWarning("DIAGNOSTIC: GetDepartmentsAsync - API request failed with status code {StatusCode}: {ErrorMessage}",
+                        result.StatusCode, result.ErrorMessage);
+                    return GetDefaultDepartments();
+                }
+
+                if (result.Data == null)
+                {
+                    _logger.LogWarning("DIAGNOSTIC: GetDepartmentsAsync - API request succeeded but returned null data");
+                    return GetDefaultDepartments();
+                }
+
+                // Log successful result
+                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - API request completed successfully, returned {Count} items", result.Data.Count);
+
+                // If we got an empty list, return default departments
+                if (result.Data.Count == 0)
+                {
+                    _logger.LogWarning("DIAGNOSTIC: GetDepartmentsAsync - API returned empty list. Using defaults.");
+                    return GetDefaultDepartments();
+                }
+
+                // Log the first few departments for debugging
+                for (int i = 0; i < Math.Min(result.Data.Count, 5); i++)
+                {
+                    var dept = result.Data[i];
+                    _logger.LogInformation("DIAGNOSTIC: Department[{Index}] - Id: {Id}, Name: {Name}, Value: {Value}",
+                        i, dept.Id, dept.Name, dept.Value);
+                }
+
+                return result.Data;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "DIAGNOSTIC ERROR: Error getting departments: {Message}", ex.Message);
-                throw;
+                return GetDefaultDepartments();
             }
+        }
+
+        private List<LookupItem> GetDefaultDepartments()
+        {
+            _logger.LogInformation("DIAGNOSTIC: Creating default department list as fallback");
+            var defaultDepartments = new List<LookupItem>
+            {
+                new LookupItem("IT", "IT"),
+                new LookupItem("HR", "HR"),
+                new LookupItem("Finance", "Finance"),
+                new LookupItem("Marketing", "Marketing"),
+                new LookupItem("Operations", "Operations"),
+                new LookupItem("Sales", "Sales")
+            };
+
+            _logger.LogInformation("DIAGNOSTIC: Created default department list with {Count} items", defaultDepartments.Count);
+            return defaultDepartments;
         }
 
         public async Task<List<LookupItem>> GetLeaveTypesAsync(bool queueIfUnavailable = true)

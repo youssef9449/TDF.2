@@ -88,8 +88,8 @@
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.1" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="8.0.40" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.40" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="8.0.41" />
+		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.41" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
@@ -136,7 +136,7 @@
 	  <PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop" Version="8.0.3" />
 	  <!-- Use a stable Windows App SDK version compatible with .NET 8 -->
 	  <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.231115000" />
-	  <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
+	  <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4188" />
 	</ItemGroup>
 
 	<!-- Android-specific references -->
@@ -158,8 +158,7 @@
 
 	<!-- Windows App SDK Configuration -->
 	<WindowsPackageType>None</WindowsPackageType>
-	<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-	<RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+	<WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
 	<PlatformTarget>x64</PlatformTarget>
 
 	<!-- WinUI Configuration -->

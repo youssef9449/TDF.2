@@ -8,13 +8,13 @@ namespace TDFMAUI.Pages
     {
         private readonly ReportsViewModel _viewModel;
 
-        // Inject ViewModel and ApiService via constructor
-        public ReportsPage(ApiService apiService)
+        // Inject ViewModel and IRequestService via constructor
+        public ReportsPage(IRequestService requestService)
         {
             InitializeComponent();
             
             // Create the ViewModel, passing dependencies
-            _viewModel = new ReportsViewModel(apiService, Navigation);
+            _viewModel = new ReportsViewModel(requestService, Navigation);
             
             // Set the binding context for the page
             BindingContext = _viewModel;

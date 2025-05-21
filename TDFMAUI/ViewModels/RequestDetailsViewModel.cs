@@ -9,6 +9,7 @@ using TDFMAUI.Features.Requests;
 using TDFMAUI.Services;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Users;
+using TDFShared.Enums;
 
 namespace TDFMAUI.ViewModels
 {
@@ -20,7 +21,7 @@ namespace TDFMAUI.ViewModels
         private readonly ILogger<RequestDetailsViewModel> _logger;
 
         [ObservableProperty] 
-        private Guid _requestId;
+        private int _requestId;
 
         [ObservableProperty]
         private RequestResponseDto _request;
@@ -48,9 +49,9 @@ namespace TDFMAUI.ViewModels
             await LoadRequestDetailsAsync();
         }
         
-        partial void OnRequestIdChanged(Guid value)
+        partial void OnRequestIdChanged(int value)
         {
-            if (value != Guid.Empty)
+            if (value > 0)
             {
                 Task.Run(async () => await LoadRequestDetailsAsync());
             }
@@ -59,7 +60,7 @@ namespace TDFMAUI.ViewModels
         [RelayCommand]
         private async Task LoadRequestDetailsAsync()
         {
-            if (RequestId == Guid.Empty) return;
+            if (RequestId <= 0) return;
             
             IsLoading = true;
             try
@@ -109,7 +110,7 @@ namespace TDFMAUI.ViewModels
             bool isManagerOfRequestDept = isManager && currentUser.Department == Request.RequestDepartment;
 
             // Edit/Delete Visibility (Owner only, if pending)
-            bool isPending = Request.Status == "Pending";
+            bool isPending = Request.Status == RequestStatus.Pending;
             CanEdit = isOwner && isPending;
             CanDelete = isOwner && isPending;
 
@@ -142,13 +143,13 @@ namespace TDFMAUI.ViewModels
                 IsLoading = true;
                 try
                 {
-                    await _apiService.DeleteRequestAsync(Request.Id);
+                    await _apiService.DeleteRequestAsync(Request.RequestID);
                     await Shell.Current.DisplayAlert("Success", "Request deleted successfully.", "OK");
                     await Shell.Current.GoToAsync("..");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to delete request {RequestId}", Request.Id);
+                    _logger.LogError(ex, "Failed to delete request {RequestId}", Request.RequestID);
                     await Shell.Current.DisplayAlert("Error", $"Failed to delete request: {ex.Message}", "OK");
                 }
                 finally
@@ -170,7 +171,7 @@ namespace TDFMAUI.ViewModels
             try
             {
                 var approvalDto = new RequestApprovalDto { Comment = comment };
-                bool success = await _apiService.ApproveRequestAsync(Request.Id, approvalDto);
+                bool success = await _apiService.ApproveRequestAsync(Request.RequestID, approvalDto);
                 
                 if (success)
                 {
@@ -184,7 +185,7 @@ namespace TDFMAUI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to approve request {RequestId}", Request.Id);
+                _logger.LogError(ex, "Failed to approve request {RequestId}", Request.RequestID);
                 await Shell.Current.DisplayAlert("Error", $"Failed to approve request: {ex.Message}", "OK");
             }
             finally
@@ -210,7 +211,7 @@ namespace TDFMAUI.ViewModels
             try
             {
                 var rejectDto = new RequestRejectDto { RejectReason = reason };
-                bool success = await _apiService.RejectRequestAsync(Request.Id, rejectDto);
+                bool success = await _apiService.RejectRequestAsync(Request.RequestID, rejectDto);
                 
                 if (success)
                 {
@@ -224,7 +225,7 @@ namespace TDFMAUI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to reject request {RequestId}", Request.Id);
+                _logger.LogError(ex, "Failed to reject request {RequestId}", Request.RequestID);
                 await Shell.Current.DisplayAlert("Error", $"Failed to reject request: {ex.Message}", "OK");
             }
             finally
@@ -239,4 +240,4 @@ namespace TDFMAUI.ViewModels
             await Shell.Current.GoToAsync("..");
         }
     }
-} 
+}

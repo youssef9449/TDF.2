@@ -3,7 +3,11 @@ using TDFAPI.Repositories;
 using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Requests;
 using TDFShared.Models.Request;
+using TDFShared.Enums;
+using TDFShared.Exceptions;
 using Microsoft.EntityFrameworkCore;
+using EntityNotFoundException = TDFAPI.Exceptions.EntityNotFoundException;
+using RequestStatusEnum = TDFShared.Enums.RequestStatus;
 
 namespace TDFAPI.Services
 {
@@ -14,8 +18,16 @@ namespace TDFAPI.Services
         private readonly INotificationService _notificationService;
         private readonly ILogger<RequestService> _logger;
 
-        // Known leave request types
-        private readonly string[] _leaveTypes = { "Annual", "Work From Home", "Unpaid", "Emergency", "Permission", "External Assignment" };
+        // Known leave request types (now using enum)
+        private static readonly LeaveType[] _supportedLeaveTypes =
+        {
+            LeaveType.Annual,
+            LeaveType.Emergency,
+            LeaveType.Unpaid,
+            LeaveType.Permission,
+            LeaveType.ExternalAssignment,
+            LeaveType.WorkFromHome
+        };
 
         public RequestService(
             IRequestRepository requestRepository, 
@@ -29,87 +41,114 @@ namespace TDFAPI.Services
             _logger = logger;
         }
 
-        // Returns Response DTO
-        public async Task<RequestResponseDto> GetByIdAsync(Guid id)
+        /// <summary>
+        /// Gets a request by its unique identifier.
+        /// </summary>
+        /// <param name="id">The request integer ID.</param>
+        /// <returns>The request response DTO.</returns>
+        /// <exception cref="EntityNotFoundException">Thrown if the request does not exist.</exception>
+        public async Task<RequestResponseDto> GetByIdAsync(int id)
         {
             var request = await _requestRepository.GetByIdAsync(id);
-            return await MapToResponseDto(request); // Pass userId if needed for balance
+            if (request == null)
+                throw new EntityNotFoundException("Request", id);
+            return await MapToResponseDto(request);
         }
 
-        // Uses DTO for pagination, returns Paginated Response DTOs
+        /// <summary>
+        /// Gets paginated requests for a user.
+        /// </summary>
         public async Task<PaginatedResult<RequestResponseDto>> GetByUserIdAsync(int userId, RequestPaginationDto pagination)
         {
             var paginatedResult = await _requestRepository.GetByUserIdAsync(userId, pagination);
             return await MapToPaginatedResponseDto(paginatedResult); 
         }
 
+        /// <summary>
+        /// Gets all paginated requests.
+        /// </summary>
         public async Task<PaginatedResult<RequestResponseDto>> GetAllAsync(RequestPaginationDto pagination)
         {
              var paginatedResult = await _requestRepository.GetAllAsync(pagination);
              return await MapToPaginatedResponseDto(paginatedResult);
         }
 
+        /// <summary>
+        /// Gets paginated requests by department.
+        /// </summary>
         public async Task<PaginatedResult<RequestResponseDto>> GetByDepartmentAsync(string department, RequestPaginationDto pagination)
         {
              var paginatedResult = await _requestRepository.GetByDepartmentAsync(department, pagination);
              return await MapToPaginatedResponseDto(paginatedResult);
         }
 
+        /// <summary>
+        /// Creates a new request for a user.
+        /// </summary>
+        /// <exception cref="ValidationException">Thrown if validation fails.</exception>
+        /// <exception cref="BusinessRuleException">Thrown if business rules are violated.</exception>
         public async Task<RequestResponseDto> CreateAsync(RequestCreateDto createDto, int userId)
         {
             try
             {
                 var user = await _userRepository.GetByIdAsync(userId);
                 if (user == null)
-                    throw new ArgumentException($"User with ID {userId} does not exist");
+                    throw new EntityNotFoundException("User", userId);
 
-                // Use DTO properties for validation
-                DateTime effectiveEndDate = await ValidateRequestDates(
+                ValidateCreateDto(createDto);
+                await ValidateRequestDates(
                     createDto.RequestStartDate,
                     createDto.RequestEndDate,
                     userId,
                     createDto.LeaveType);
 
-                // Calculate days using integers
                 int numberOfDays = CalculateBusinessDays(
                     createDto.RequestStartDate,
-                    effectiveEndDate); // Removed time arguments
+                    createDto.RequestEndDate ?? createDto.RequestStartDate);
 
-                // Map Create DTO to Request Model
                 var request = new RequestEntity
                 {
-                    Id = Guid.NewGuid(),
                     RequestUserID = userId,
                     RequestUserFullName = user.FullName,
                     RequestDepartment = user.Department,
                     RequestType = createDto.LeaveType,
-                    RequestReason = createDto.RequestReason,
+                    RequestReason = createDto.RequestReason ?? string.Empty,
                     RequestFromDay = createDto.RequestStartDate,
                     RequestToDay = createDto.RequestEndDate,
                     RequestBeginningTime = createDto.RequestBeginningTime,
                     RequestEndingTime = createDto.RequestEndingTime,
-                    RequestStatus = "Pending",
-                    RequestHRStatus = "Pending",
-                    RequestNumberOfDays = numberOfDays, // Assign int value
+                    RequestStatus = RequestStatusEnum.Pending,
+                    RequestHRStatus = RequestStatusEnum.Pending,
+                    RequestNumberOfDays = numberOfDays,
                     CreatedAt = DateTime.UtcNow
                 };
 
-                Guid requestId = await _requestRepository.CreateAsync(request);
+                int requestId = await _requestRepository.CreateAsync(request);
 
-                if (requestId != Guid.Empty)
+                if (requestId > 0)
                 {
-                    await NotifyDepartmentManagers(user.Department, $"New request from {user.FullName}: {createDto.LeaveType} request", userId);
-                    await NotifyHR($"New request from {user.FullName} in {user.Department}: {createDto.LeaveType} request", userId);
+                    await NotifyDepartmentManagers(user.Department, $"New request from {user.FullName}: {createDto.LeaveType.ToString()} request", userId);
+                    await NotifyHR($"New request from {user.FullName} in {user.Department}: {createDto.LeaveType.ToString()} request", userId);
                 }
 
                 var createdRequestEntity = await _requestRepository.GetByIdAsync(requestId);
                 if (createdRequestEntity == null)
                 {
                     _logger.LogError("Failed to fetch newly created request with ID {RequestId}", requestId);
-                    throw new InvalidOperationException("Failed to retrieve the created request after saving.");
+                    throw new BusinessRuleException("Failed to retrieve the created request after saving.");
                 }
 
                 return await MapToResponseDto(createdRequestEntity);
+            }
+            catch (ValidationException ex)
+            {
+                _logger.LogWarning(ex, "Validation error creating request for user {UserId}: {ErrorMessage}", userId, ex.Message);
+                throw;
+            }
+            catch (BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error creating request for user {UserId}: {ErrorMessage}", userId, ex.Message);
+                throw;
             }
             catch (Exception ex)
             {
@@ -118,50 +157,49 @@ namespace TDFAPI.Services
             }
         }
 
-        // Uses Update DTO for input
-        public async Task<RequestResponseDto> UpdateAsync(Guid id, RequestUpdateDto updateDto, int userId)
+        /// <summary>
+        /// Updates an existing request.
+        /// </summary>
+        public async Task<RequestResponseDto> UpdateAsync(int id, RequestUpdateDto updateDto, int userId)
         {
             try
             {
                 var existingRequest = await _requestRepository.GetByIdAsync(id);
                 if (existingRequest == null)
-                    throw new KeyNotFoundException($"Request with ID {id} does not exist");
+                    throw new EntityNotFoundException("Request", id);
 
                 await EnsureUserCanModifyRequest(existingRequest, userId);
-                
-                // Optimistic concurrency check
-                if (updateDto.RowVersion != null && !existingRequest.RowVersion.SequenceEqual(updateDto.RowVersion))
+
+                if (updateDto.RowVersion != null && (existingRequest.RowVersion == null || !existingRequest.RowVersion.SequenceEqual(updateDto.RowVersion)))
                 {
                     throw new DbUpdateConcurrencyException($"The request has been modified by another user. Please refresh and try again.");
                 }
 
-                // Use DTO properties for validation
-                DateTime effectiveEndDate = await ValidateRequestDates(
+                ValidateUpdateDto(updateDto);
+                await ValidateRequestDates(
                     updateDto.RequestStartDate,
                     updateDto.RequestEndDate,
                     existingRequest.RequestUserID,
                     updateDto.LeaveType,
                     id);
 
-                // Recalculate days using integers
                 int numberOfDays = CalculateBusinessDays(
                     updateDto.RequestStartDate,
-                    effectiveEndDate); // Removed time arguments
+                    updateDto.RequestEndDate ?? updateDto.RequestStartDate);
 
-                // Update fields from DTO
                 existingRequest.RequestType = updateDto.LeaveType;
-                existingRequest.RequestReason = updateDto.RequestReason;
+                existingRequest.RequestReason = updateDto.RequestReason ?? string.Empty;
                 existingRequest.RequestFromDay = updateDto.RequestStartDate;
                 existingRequest.RequestToDay = updateDto.RequestEndDate;
                 existingRequest.RequestBeginningTime = updateDto.RequestBeginningTime;
                 existingRequest.RequestEndingTime = updateDto.RequestEndingTime;
-                existingRequest.RequestNumberOfDays = numberOfDays; // Assign int value
-                
-                bool statusChanged = existingRequest.RequestStatus != "Pending" || existingRequest.RequestHRStatus != "Pending";
+                existingRequest.RequestNumberOfDays = numberOfDays;
+
+                bool statusChanged = existingRequest.RequestStatus != RequestStatusEnum.Pending || existingRequest.RequestHRStatus != RequestStatusEnum.Pending;
                 if (statusChanged)
                 {
-                    existingRequest.RequestStatus = "Pending";
-                    existingRequest.RequestHRStatus = "Pending";
+                    existingRequest.RequestStatus = RequestStatusEnum.Pending;
+                    existingRequest.RequestHRStatus = RequestStatusEnum.Pending;
                     existingRequest.RequestCloser = null;
                     existingRequest.RequestHRCloser = null;
                     existingRequest.RequestRejectReason = null;
@@ -169,7 +207,6 @@ namespace TDFAPI.Services
                 }
 
                 existingRequest.UpdatedAt = DateTime.UtcNow;
-                // Update the row version on save
                 existingRequest.RowVersion = Guid.NewGuid().ToByteArray();
 
                 bool updated = await _requestRepository.UpdateAsync(existingRequest);
@@ -184,10 +221,20 @@ namespace TDFAPI.Services
                 if (updatedRequestEntity == null)
                 {
                     _logger.LogError("Failed to fetch updated request with ID {RequestId}", id);
-                    throw new InvalidOperationException("Failed to retrieve the updated request after saving.");
+                    throw new BusinessRuleException("Failed to retrieve the updated request after saving.");
                 }
 
                 return await MapToResponseDto(updatedRequestEntity);
+            }
+            catch (ValidationException ex)
+            {
+                _logger.LogWarning(ex, "Validation error updating request {RequestId} by user {UserId}: {ErrorMessage}", id, userId, ex.Message);
+                throw;
+            }
+            catch (BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error updating request {RequestId} by user {UserId}: {ErrorMessage}", id, userId, ex.Message);
+                throw;
             }
             catch (Exception ex)
             {
@@ -196,31 +243,35 @@ namespace TDFAPI.Services
             }
         }
 
-        public async Task<bool> DeleteAsync(Guid id, int userId)
+        /// <summary>
+        /// Deletes a request if allowed by business rules.
+        /// </summary>
+        public async Task<bool> DeleteAsync(int id, int userId)
         {
-             try
+            try
             {
                 var existingRequest = await _requestRepository.GetByIdAsync(id);
                 if (existingRequest == null)
-                    throw new KeyNotFoundException($"Request with ID {id} does not exist");
+                    throw new EntityNotFoundException("Request", id);
 
                 await EnsureUserCanModifyRequest(existingRequest, userId);
 
-                // Check both statuses before allowing deletion
-                if (existingRequest.RequestStatus != "Pending" || existingRequest.RequestHRStatus != "Pending") 
-                    throw new InvalidOperationException("Only requests that are pending both manager and HR approval can be deleted.");
+                if (!IsPending(existingRequest))
+                    throw new BusinessRuleException("Only requests that are pending both manager and HR approval can be deleted.");
 
                 bool deleted = await _requestRepository.DeleteAsync(id);
 
                 if (deleted)
                 {
-                     // Notify managers (and optionally HR) that the request was deleted
-                     await NotifyDepartmentManagers(existingRequest.RequestDepartment, $"{existingRequest.RequestUserFullName} deleted a pending {existingRequest.RequestType} request.", userId);
-                     // Optionally notify HR
-                     // await NotifyHR($"{existingRequest.RequestUserFullName} deleted a pending request in {existingRequest.RequestDepartment}.", userId);
+                    await NotifyDepartmentManagers(existingRequest.RequestDepartment, $"{existingRequest.RequestUserFullName} deleted a pending {existingRequest.RequestType} request.", userId);
                 }
 
                 return deleted;
+            }
+            catch (BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error deleting request {RequestId} by user {UserId}: {ErrorMessage}", id, userId, ex.Message);
+                throw;
             }
             catch (Exception ex)
             {
@@ -229,80 +280,58 @@ namespace TDFAPI.Services
             }
         }
 
-        // Uses Approval DTO for input
-        public async Task<bool> ApproveRequestAsync(Guid requestId, RequestApprovalDto approvalDto, int approverId, string approverName, bool isHR)
+        /// <summary>
+        /// Approves a request as manager or HR, enforcing business rules and leave balance.
+        /// </summary>
+        /// <exception cref="EntityNotFoundException">Thrown if the request does not exist.</exception>
+        /// <exception cref="BusinessRuleException">Thrown if the request cannot be approved.</exception>
+        public async Task<bool> ApproveRequestAsync(int requestId, RequestApprovalDto approvalDto, int approverId, string approverName, bool isHR)
         {
             try
             {
                 var request = await _requestRepository.GetByIdAsync(requestId);
                 if (request == null)
-                    throw new KeyNotFoundException($"Request with ID {requestId} not found.");
+                    throw new EntityNotFoundException("Request", requestId);
 
-                // Logic to determine which status to update and check current state
-                string currentStatus = isHR ? request.RequestHRStatus : request.RequestStatus;
-                if (currentStatus != "Pending")
-                    throw new InvalidOperationException($"Request is not pending {(isHR ? "HR" : "Manager")} approval. Current status: {currentStatus}");
+                if (!IsPendingForApproval(request, isHR))
+                    throw new BusinessRuleException($"Request is not pending {(isHR ? "HR" : "Manager")} approval. Current status: {(isHR ? request.RequestHRStatus : request.RequestStatus)}");
 
-                // Check if both manager and HR have approved the request
-                bool fullyApproved = false;
-                if (isHR && request.RequestStatus == "Approved") 
-                {
-                    // HR is approving and manager has already approved
-                    fullyApproved = true;
-                }
-                else if (!isHR && request.RequestHRStatus == "Approved")
-                {
-                    // Manager is approving and HR has already approved
-                    fullyApproved = true;
-                }
-
-                // Handle balance deduction if it's a leave type and fully approved
+                bool fullyApproved = IsFullyApprovedAfterThisAction(request, isHR);
                 string? balanceType = GetBalanceTypeForRequest(request.RequestType);
-                
+
                 if (balanceType != null && fullyApproved)
                 {
                     _logger.LogInformation("Request {RequestId} fully approved. Updating leave balance for {LeaveType}.", requestId, balanceType);
-                    // Pass the integer number of days
                     bool balanceUpdated = await _requestRepository.UpdateLeaveBalanceAsync(
                         request.RequestUserID,
-                        balanceType,
-                        request.RequestNumberOfDays, // Pass int value
-                        false); // isAdding = false (deducting)
+                        Enum.Parse<LeaveType>(balanceType, true),
+                        request.RequestNumberOfDays,
+                        false);
 
                     if (!balanceUpdated)
                     {
-                        // If balance update fails (e.g., insufficient funds), reject the request instead
                         _logger.LogWarning($"Insufficient balance for request {requestId}. Auto-rejecting.");
                         await RejectRequestAsync(requestId, new RequestRejectDto { RejectReason = "Insufficient leave balance." }, approverId, "System", isHR);
-                        
-                        // Notify user about auto-rejection due to balance
                         await _notificationService.CreateNotificationAsync(
                                 request.RequestUserID,
                                 $"Your {request.RequestType} request was automatically rejected due to insufficient balance.");
-                        return false; // Indicate failure due to balance
+                        return false;
                     }
-                    
-                    // Balance updated successfully
-                    _logger.LogInformation($"Leave balance updated for user {request.RequestUserID}, type {balanceType}, days {request.RequestNumberOfDays}");
                 }
 
-                // Update the status
-                bool statusUpdated = await UpdateRequestStatus(request, "Approved", approverName, isHR, approvalDto.Comment);
+                bool statusUpdated = await UpdateRequestStatus(request, RequestStatusEnum.Approved, approverName, isHR, approvalDto.Comment);
 
                 if (statusUpdated)
                 {
-                    // Notify the user who made the request
                     await _notificationService.CreateNotificationAsync(
                         request.RequestUserID,
                         $"Your {request.RequestType} request has been {(isHR ? "processed by HR" : "reviewed by your manager")}: Approved.");
 
-                    // If manager approved, notify HR
                     if (!isHR)
                     {
                         await NotifyHR($"{request.RequestUserFullName}'s request has been approved by manager and requires HR review.", approverId);
                     }
-                    // If HR approved (and manager already approved), notify user of final approval
-                    else if (isHR && request.RequestStatus == "Approved")
+                    else if (isHR && request.RequestStatus == RequestStatusEnum.Approved)
                     {
                         await _notificationService.CreateNotificationAsync(
                             request.RequestUserID,
@@ -312,6 +341,11 @@ namespace TDFAPI.Services
 
                 return statusUpdated;
             }
+            catch (BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error approving request {RequestId} by approver {ApproverId}: {ErrorMessage}", requestId, approverId, ex.Message);
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error approving request {RequestId} by approver {ApproverId} (IsHR: {IsHR})", requestId, approverId, isHR);
@@ -319,63 +353,35 @@ namespace TDFAPI.Services
             }
         }
 
-        // Helper to determine which balance to update
-        private string? GetBalanceTypeForRequest(string requestType)
-        {
-            // Case-insensitive comparison is safer
-            if (requestType.Equals("Annual", StringComparison.OrdinalIgnoreCase))
-            {
-                return "annual"; 
-            }
-            if (requestType.Equals("Emergency", StringComparison.OrdinalIgnoreCase) || 
-                requestType.Equals("Casual Leave", StringComparison.OrdinalIgnoreCase))
-            {
-                 return "casual";
-            }
-            if (requestType.Equals("Permission", StringComparison.OrdinalIgnoreCase))
-            {
-                return "permission";
-            }
-            if (requestType.Equals("Unpaid", StringComparison.OrdinalIgnoreCase))
-            {
-                return "unpaid";
-            }
-            // Work from home and External assignment don't affect balances
-            
-            // Return null if the type doesn't affect a known balance
-            return null; 
-        }
-
-        // Uses Reject DTO for input
-        public async Task<bool> RejectRequestAsync(Guid requestId, RequestRejectDto rejectDto, int rejecterId, string rejecterName, bool isHR)
+        /// <summary>
+        /// Rejects a request as manager or HR, enforcing business rules.
+        /// </summary>
+        /// <exception cref="EntityNotFoundException">Thrown if the request does not exist.</exception>
+        /// <exception cref="BusinessRuleException">Thrown if the request cannot be rejected.</exception>
+        public async Task<bool> RejectRequestAsync(int requestId, RequestRejectDto rejectDto, int rejecterId, string rejecterName, bool isHR)
         {
             try
             {
                 var request = await _requestRepository.GetByIdAsync(requestId);
                 if (request == null)
-                    throw new KeyNotFoundException($"Request with ID {requestId} not found.");
+                    throw new EntityNotFoundException("Request", requestId);
 
-                // Check current status
-                string currentStatus = isHR ? request.RequestHRStatus : request.RequestStatus;
-                if (currentStatus != "Pending")
-                    throw new InvalidOperationException($"Request is not pending {(isHR ? "HR" : "Manager")} approval. Current status: {currentStatus}");
+                if (!IsPendingForApproval(request, isHR))
+                    throw new BusinessRuleException($"Request is not pending {(isHR ? "HR" : "Manager")} approval. Current status: {(isHR ? request.RequestHRStatus : request.RequestStatus)}");
 
-                // Update the status with rejection reason from DTO
                 bool updated = await UpdateRequestStatus(
-                    request, 
-                    "Rejected", 
-                    rejecterName, 
-                    isHR, 
+                    request,
+                    RequestStatusEnum.Rejected,
+                    rejecterName,
+                    isHR,
                     rejectDto.RejectReason);
 
                 if (updated)
                 {
-                    // Notify user of rejection
                     await _notificationService.CreateNotificationAsync(
                         request.RequestUserID,
                         $"Your {request.RequestType} request has been rejected by {(isHR ? "HR" : "your manager")}. Reason: {rejectDto.RejectReason}");
 
-                    // Notify other party (HR if manager rejected, Manager if HR rejected)
                     if (!isHR)
                     {
                         await NotifyHR($"Request from {request.RequestUserFullName} rejected by manager.", rejecterId);
@@ -387,6 +393,11 @@ namespace TDFAPI.Services
                 }
 
                 return updated;
+            }
+            catch (BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error rejecting request {RequestId} by user {RejecterId}: {ErrorMessage}", requestId, rejecterId, ex.Message);
+                throw;
             }
             catch (Exception ex)
             {
@@ -408,13 +419,14 @@ namespace TDFAPI.Services
 
         public async Task<int> GetPendingDaysCountAsync(int userId, string requestType)
         {
-            return await _requestRepository.GetPendingDaysCountAsync(userId, requestType);
+            LeaveType leaveType = ParseLeaveType(requestType);
+            return await _requestRepository.GetPendingDaysCountAsync(userId, leaveType);
         }
         
-        public async Task<bool> HasConflictingRequestsAsync(int userId, DateTime startDate, DateTime endDate, Guid requestId = default)
+        public async Task<bool> HasConflictingRequestsAsync(int userId, DateTime startDate, DateTime endDate, int requestId = 0)
         {
              return await _requestRepository.HasConflictingRequestsAsync(userId, startDate, endDate, requestId);
-        }
+         }
 
         #region Helper Methods
 
@@ -424,31 +436,28 @@ namespace TDFAPI.Services
             if (user == null)
                  throw new UnauthorizedAccessException("User not found.");
 
-            // Allow if user is the owner OR if user is an Admin (check Role property)
-            if (request.RequestUserID != userId && user.Role != "Admin") // Changed from user.Roles.Contains
+            // Allow if user is the owner OR if user is an Admin
+            if (request.RequestUserID != userId && user.IsAdmin != true)
             {
-                 _logger.LogWarning("User {UserId} (Role: {Role}) attempted to modify request {RequestId} owned by {OwnerId}", userId, user.Role, request.Id, request.RequestUserID); // Changed from user.Roles
+                 _logger.LogWarning("User {UserId} (IsAdmin: {IsAdmin}) attempted to modify request {RequestId} owned by {OwnerId}", userId, user.IsAdmin, request.RequestID, request.RequestUserID);
                 throw new UnauthorizedAccessException("User is not authorized to modify this request.");
             }
         }
         
-        private async Task<DateTime> ValidateRequestDates(DateTime startDate, DateTime? endDate, int userId, string requestType, Guid existingRequestId = default)
+        private async Task ValidateRequestDates(DateTime startDate, DateTime? endDate, int userId, LeaveType leaveType, int existingRequestId = 0) 
         {
             if (startDate.Date < DateTime.UtcNow.Date)
-                throw new ArgumentException("Start date cannot be in the past.");
+                throw new TDFShared.Exceptions.ValidationException("Start date cannot be in the past.");
 
             DateTime effectiveEndDate = endDate ?? startDate;
 
             if (effectiveEndDate.Date < startDate.Date)
-                throw new ArgumentException("End date cannot be before the start date.");
+                throw new TDFShared.Exceptions.ValidationException("End date cannot be before the start date.");
             
-            // Check for conflicts only for leave types
-            if (_leaveTypes.Contains(requestType) && await _requestRepository.HasConflictingRequestsAsync(userId, startDate, effectiveEndDate, existingRequestId))
+            if (_supportedLeaveTypes.Contains(leaveType) && await _requestRepository.HasConflictingRequestsAsync(userId, startDate, effectiveEndDate, existingRequestId))
             {
-                throw new InvalidOperationException("There is a conflicting request during the selected dates.");
+                throw new TDFShared.Exceptions.BusinessRuleException("There is a conflicting request during the selected dates.");
             }
-            
-            return effectiveEndDate;
         }
 
         private int CalculateBusinessDays(DateTime startDate, DateTime endDate)
@@ -479,13 +488,13 @@ namespace TDFAPI.Services
             return businessDays;
         }
 
-        private async Task<bool> UpdateRequestStatus(RequestEntity request, string newStatus, string actorName, bool isHR, string? comment)
+        private async Task<bool> UpdateRequestStatus(RequestEntity request, RequestStatusEnum newStatus, string actorName, bool isHR, string? comment)
         {
              // Prevent updating already finalized requests
-            if ((request.RequestStatus == "Approved" && request.RequestHRStatus == "Approved") ||
-                request.RequestStatus == "Rejected" || request.RequestHRStatus == "Rejected")
+            if ((request.RequestStatus == RequestStatusEnum.Approved && request.RequestHRStatus == RequestStatusEnum.Approved) ||
+                request.RequestStatus == RequestStatusEnum.Rejected || request.RequestHRStatus == RequestStatusEnum.Rejected)
             {
-                 _logger.LogWarning("Attempted to update status of already finalized request {RequestId}", request.Id);
+                 _logger.LogWarning("Attempted to update status of already finalized request {RequestId}", request.RequestID);
                 throw new InvalidOperationException("Cannot update status of an already finalized request.");
             }
 
@@ -498,11 +507,11 @@ namespace TDFAPI.Services
                     request.RequestHRCloser = actorName;
                     
                     // Update timestamps appropriately based on status
-                    if (newStatus == "Approved")
+                    if (newStatus == RequestStatusEnum.Approved)
                     {
                         request.ApprovedAt = DateTime.UtcNow;
                     }
-                    else if (newStatus == "Rejected")
+                    else if (newStatus == RequestStatusEnum.Rejected)
                     {
                         request.RejectedAt = DateTime.UtcNow;
                         request.RequestRejectReason = comment ?? "Rejected by HR";
@@ -518,15 +527,15 @@ namespace TDFAPI.Services
                     request.RequestCloser = actorName;
                     
                     // Update timestamps appropriately based on status
-                    if (newStatus == "Approved")
+                    if (newStatus == RequestStatusEnum.Approved)
                     {
                         // If HR already approved, then this is the final approval
-                        if (request.RequestHRStatus == "Approved")
+                        if (request.RequestHRStatus == RequestStatusEnum.Approved)
                         {
                             request.ApprovedAt = DateTime.UtcNow;
                         }
                     }
-                    else if (newStatus == "Rejected")
+                    else if (newStatus == RequestStatusEnum.Rejected)
                     {
                         request.RejectedAt = DateTime.UtcNow;
                         request.RequestRejectReason = comment ?? "Rejected by manager";
@@ -569,13 +578,118 @@ namespace TDFAPI.Services
                      message: message); // Sender context might vary, using null for now
             }
         }
+
+        // --- Status/Approval Helpers ---
+        private bool IsPendingForApproval(RequestEntity request, bool isHR)
+        {
+            return isHR
+                ? request.RequestHRStatus == RequestStatusEnum.Pending && request.RequestStatus == RequestStatusEnum.Approved
+                : request.RequestStatus == RequestStatusEnum.Pending;
+        }
+        private bool IsFullyApprovedAfterThisAction(RequestEntity request, bool isHR)
+        {
+            return (isHR && request.RequestStatus == RequestStatusEnum.Approved) ||
+                   (!isHR && request.RequestHRStatus == RequestStatusEnum.Approved);
+        }
+        
+        // --- Centralized Validation Helpers ---
+        private LeaveType ParseLeaveType(string leaveType)
+        {
+            if (string.IsNullOrWhiteSpace(leaveType))
+                throw new ValidationException("Leave type is required.");
+            if (Enum.TryParse<LeaveType>(leaveType.Replace(" ", ""), true, out var parsed))
+                return parsed;
+            // Map aliases
+            if (leaveType.Equals("Casual Leave", StringComparison.OrdinalIgnoreCase) || leaveType.Equals("Casual", StringComparison.OrdinalIgnoreCase))
+                return LeaveType.Emergency;
+            if (leaveType.Equals("External Assignment", StringComparison.OrdinalIgnoreCase))
+                return LeaveType.ExternalAssignment;
+            if (leaveType.Equals("Work From Home", StringComparison.OrdinalIgnoreCase) || leaveType.Equals("WFH", StringComparison.OrdinalIgnoreCase))
+                return LeaveType.WorkFromHome;
+            throw new ValidationException($"Unsupported leave type: {leaveType}");
+        }
+
+        private void ValidateCreateDto(RequestCreateDto dto)
+        {
+            if (dto == null) throw new ValidationException("Request data is required.");
+            if (!_supportedLeaveTypes.Contains(dto.LeaveType))
+                throw new ValidationException($"Leave type '{dto.LeaveType.ToString()}' is not supported.");
+            if (dto.RequestStartDate == default) throw new ValidationException("Start date is required.");
+
+            // Permission: must have both times and be on the same day
+            if (dto.LeaveType == LeaveType.Permission)
+            {
+                if (!dto.RequestBeginningTime.HasValue || !dto.RequestEndingTime.HasValue)
+                    throw new ValidationException("Both beginning and ending times are required for Permission leave.");
+                if (dto.RequestEndDate.HasValue && dto.RequestEndDate.Value.Date != dto.RequestStartDate.Date)
+                    throw new ValidationException("Permission leave must start and end on the same day.");
+                if (dto.RequestEndingTime <= dto.RequestBeginningTime)
+                    throw new ValidationException("Ending time must be after beginning time for Permission leave.");
+            }
+            // Work From Home: only allow full days (no times)
+            if (dto.LeaveType == LeaveType.WorkFromHome)
+            {
+                if (dto.RequestBeginningTime.HasValue || dto.RequestEndingTime.HasValue)
+                    throw new ValidationException("Work From Home leave cannot have specific times; only full days are allowed.");
+            }
+            // Add more field checks as needed for other types
+        }
+
+        private void ValidateUpdateDto(RequestUpdateDto dto)
+        {
+            if (dto == null) throw new ValidationException("Request data is required.");
+            if (!_supportedLeaveTypes.Contains(dto.LeaveType))
+                throw new ValidationException($"Leave type '{dto.LeaveType.ToString()}' is not supported.");
+            if (dto.RequestStartDate == default) throw new ValidationException("Start date is required.");
+
+            // Permission: must have both times and be on the same day
+            if (dto.LeaveType == LeaveType.Permission)
+            {
+                if (!dto.RequestBeginningTime.HasValue || !dto.RequestEndingTime.HasValue)
+                    throw new ValidationException("Both beginning and ending times are required for Permission leave.");
+                if (dto.RequestEndDate.HasValue && dto.RequestEndDate.Value.Date != dto.RequestStartDate.Date)
+                    throw new ValidationException("Permission leave must start and end on the same day.");
+                if (dto.RequestEndingTime <= dto.RequestBeginningTime)
+                    throw new ValidationException("Ending time must be after beginning time for Permission leave.");
+            }
+            // Work From Home: only allow full days (no times)
+            if (dto.LeaveType == LeaveType.WorkFromHome)
+            {
+                if (dto.RequestBeginningTime.HasValue || dto.RequestEndingTime.HasValue)
+                    throw new ValidationException("Work From Home leave cannot have specific times; only full days are allowed.");
+            }
+            // Add more field checks as needed for other types
+        }
+
+        private bool IsPending(RequestEntity request)
+        {
+            return request.RequestStatus == RequestStatusEnum.Pending && request.RequestHRStatus == RequestStatusEnum.Pending;
+        }
+        // Helper to determine which balance to update
+        private string? GetBalanceTypeForRequest(LeaveType leaveType) 
+        {
+            switch (leaveType)
+            {
+                case LeaveType.Annual:
+                    return "annual";
+                case LeaveType.Emergency:
+                    return "casual";
+                case LeaveType.Permission:
+                    return "permission";
+                case LeaveType.Unpaid:
+                    return "unpaid";
+                // ExternalAssignment and WorkFromHome do not affect balances
+                default:
+                    return null;
+            }
+        }
         
         // ----- Mappers ----- 
         
         private async Task<RequestResponseDto> MapToResponseDto(RequestEntity? request)
         {
             if (request == null)
-                return null; // Or throw appropriate exception
+                throw new EntityNotFoundException("Request", "null");
 
             // Fetch balances using the potentially updated method returning int dictionary
             Dictionary<string, int> balances = await GetLeaveBalancesAsync(request.RequestUserID);
@@ -587,12 +701,10 @@ namespace TDFAPI.Services
                 remainingBalance = balanceValue;
             }
 
-            // Fetch user details for RequestUserFullName if needed (should already be on the request object)
-            var user = await _userRepository.GetByIdAsync(request.RequestUserID);
 
             return new RequestResponseDto
             {
-                Id = request.Id,
+                RequestID = request.RequestID,
                 RequestUserID = request.RequestUserID,
                 UserName = request.RequestUserFullName,
                 LeaveType = request.RequestType,
@@ -614,7 +726,7 @@ namespace TDFAPI.Services
         
          private async Task<PaginatedResult<RequestResponseDto>> MapToPaginatedResponseDto(PaginatedResult<RequestEntity> paginatedRequests)
         {
-            if (paginatedRequests == null) return null;
+            if (paginatedRequests == null) throw new EntityNotFoundException("Request", "null");
             
             // Map items asynchronously if MapToResponseDto becomes async (due to balance fetch)
             var mappedItems = new List<RequestResponseDto>();
@@ -637,4 +749,4 @@ namespace TDFAPI.Services
 
         #endregion
     }
-} 
+}

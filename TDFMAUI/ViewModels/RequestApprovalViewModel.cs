@@ -11,12 +11,20 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TDFShared.DTOs.Requests;
 using System.ComponentModel;
+using TDFShared.Enums;
 
 namespace TDFMAUI.ViewModels
 {
+    public static class RequestOptions
+    {
+        public static readonly List<string> StatusOptions = new List<string> { "All" }.Concat(Enum.GetNames(typeof(RequestStatus))).ToList();
+        public static readonly List<string> TypeOptions = new List<string> { "All" }.Concat(Enum.GetNames(typeof(LeaveType))).ToList();
+        public static readonly List<string> DepartmentOptions = new() { "All", "HR", "IT", "Finance", "Marketing", "Operations" };
+    }
+
     public partial class RequestApprovalViewModel : BaseViewModel, INotifyPropertyChanged
     {
-        private readonly ApiService _apiService;
+        private readonly IRequestService _requestService;
         private readonly INotificationService _notificationService;
 
         [ObservableProperty]
@@ -91,7 +99,7 @@ namespace TDFMAUI.ViewModels
             set => SetProperty(ref _selectedDepartment, value);
         }
 
-        public bool IsHR => App.CurrentUser?.Department?.Contains("HR") == true || 
+        public bool IsHR => App.CurrentUser?.Department?.Contains("HR") == true ||
                           App.CurrentUser?.Title?.Contains("HR") == true;
 
         public ICommand ApproveCommand { get; private set; }
@@ -100,22 +108,16 @@ namespace TDFMAUI.ViewModels
         public ICommand FilterCommand { get; private set; }
         public ICommand RefreshCommand { get; private set; }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public new event PropertyChangedEventHandler PropertyChanged;
 
-        public RequestApprovalViewModel()
+        public List<string> StatusOptions => RequestOptions.StatusOptions;
+        public List<string> TypeOptions => RequestOptions.TypeOptions;
+        public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
+
+        public RequestApprovalViewModel(IRequestService requestService, INotificationService notificationService)
         {
             Title = "Request Approval";
-            _apiService = App.Current.Handler.MauiContext?.Services.GetService<ApiService>();
-            _notificationService = App.Current.Handler.MauiContext?.Services.GetService<INotificationService>();
-
-            InitializeCommands();
-            LoadRequestsAsync().ConfigureAwait(false);
-        }
-
-        public RequestApprovalViewModel(ApiService apiService, INotificationService notificationService)
-        {
-            Title = "Request Approval";
-            _apiService = apiService;
+            _requestService = requestService;
             _notificationService = notificationService;
             Requests = new ObservableCollection<RequestResponseDto>();
 
@@ -123,11 +125,46 @@ namespace TDFMAUI.ViewModels
             LoadRequestsAsync().ConfigureAwait(false);
         }
 
+        // --- Centralized Validation and Command Enablement ---
+        private bool CanApprove(RequestResponseDto request) => request != null && request.Status == RequestStatus.Pending;
+        private bool CanReject(RequestResponseDto request) => request != null && request.Status == RequestStatus.Pending;
+        private bool CanView(RequestResponseDto request) => request != null;
+
+        // DRY up command enablement for int ID commands
+        public bool CanExecuteApprove(int id) => Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanApprove(req);
+        public bool CanExecuteReject(int id) => Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanReject(req);
+        public bool CanExecuteView(int id) => Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanView(req);
+
+        // Robust client-side validation for leave requests
+        private List<string> ValidateRequest(RequestResponseDto request)
+        {
+            var errors = new List<string>();
+            if (request == null) { errors.Add("Request is null."); return errors; }
+            // Enum 'LeaveType' cannot be null or whitespace. If a specific 'None' or 'Undefined' value exists, check against that.
+            // For now, assuming the enum type itself makes it 'required' in a sense.
+            if (request.RequestStartDate == default) errors.Add("Start date is required.");
+            if (request.LeaveType == LeaveType.Permission) {
+                if (!request.RequestBeginningTime.HasValue || !request.RequestEndingTime.HasValue)
+                    errors.Add("Both beginning and ending times are required for Permission leave.");
+                if (request.RequestEndDate.HasValue && request.RequestEndDate.Value.Date != request.RequestStartDate.Date)
+                    errors.Add("Permission leave must start and end on the same day.");
+                if (request.RequestEndingTime <= request.RequestBeginningTime)
+                    errors.Add("Ending time must be after beginning time for Permission leave.");
+            }
+            if (request.LeaveType == LeaveType.WorkFromHome) {
+                if (request.RequestBeginningTime.HasValue || request.RequestEndingTime.HasValue)
+                    errors.Add("Work From Home leave cannot have specific times; only full days are allowed.");
+            }
+            if (request.RequestEndDate.HasValue && request.RequestEndDate.Value < request.RequestStartDate)
+                errors.Add("End date cannot be before start date.");
+            return errors;
+        }
+
         private void InitializeCommands()
         {
-            ApproveCommand = new Command<int>(async (id) => await ApproveRequestAsync(id));
-            RejectCommand = new Command<int>(async (id) => await RejectRequestAsync(id));
-            ViewCommand = new Command<int>(async (id) => await ViewRequestAsync(id));
+            ApproveCommand = new Command<int>(async (id) => await ApproveRequestAsync(id), CanExecuteApprove);
+            RejectCommand = new Command<int>(async (id) => await RejectRequestAsync(id), CanExecuteReject);
+            ViewCommand = new Command<int>(async (id) => await ViewRequestAsync(id), CanExecuteView);
             FilterCommand = new Command(async () => await LoadRequestsAsync());
             RefreshCommand = new Command(async () => await LoadRequestsAsync());
         }
@@ -137,10 +174,6 @@ namespace TDFMAUI.ViewModels
         {
             if (IsLoading) return;
             IsLoading = true;
-            if (Requests == null)
-            {
-                Requests = new ObservableCollection<RequestResponseDto>();
-            }
             Requests.Clear();
 
             try
@@ -151,12 +184,12 @@ namespace TDFMAUI.ViewModels
                     PageSize = 20,
                     FromDate = FromDate,
                     ToDate = ToDate,
-                    FilterStatus = SelectedStatus,
-                    FilterType = SelectedType
+                    FilterStatus = (string.IsNullOrEmpty(SelectedStatus) || SelectedStatus == "All") ? (RequestStatus?)null : Enum.TryParse<RequestStatus>(SelectedStatus, true, out var parsedStatus) ? parsedStatus : (RequestStatus?)null,
+                    FilterType = (string.IsNullOrEmpty(SelectedType) || SelectedType == "All") ? (LeaveType?)null : Enum.TryParse<LeaveType>(SelectedType, true, out var parsedType) ? parsedType : (LeaveType?)null
                 };
 
-                string department = SelectedDepartment == "All" ? null : SelectedDepartment;
-                var requests = await _apiService.GetRequestsAsync(requestPagination, null, department);
+                string department = (string.IsNullOrEmpty(SelectedDepartment) || SelectedDepartment == "All") ? null : SelectedDepartment;
+                var requests = await _requestService.GetRequestsByDepartmentAsync(department, requestPagination);
 
                 if (requests?.Items != null)
                 {
@@ -165,9 +198,9 @@ namespace TDFMAUI.ViewModels
                         Requests.Add(request);
                     }
 
-                    PendingCount = requests.Items.Count(r => r.Status == "Pending");
-                    ApprovedCount = requests.Items.Count(r => r.Status == "Approved");
-                    RejectedCount = requests.Items.Count(r => r.Status == "Rejected");
+                    PendingCount = requests.Items.Count(r => r.Status == RequestStatus.Pending);
+                    ApprovedCount = requests.Items.Count(r => r.Status == RequestStatus.Approved);
+                    RejectedCount = requests.Items.Count(r => r.Status == RequestStatus.Rejected);
                 }
             }
             catch (Exception ex)
@@ -182,13 +215,20 @@ namespace TDFMAUI.ViewModels
 
         private async Task ApproveRequestAsync(int requestId)
         {
+            var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
+            var errors = ValidateRequest(request);
+            if (errors.Any())
+            {
+                await _notificationService.ShowErrorAsync(string.Join("\n", errors));
+                return;
+            }
+
             try
             {
                 IsLoading = true;
-                var guidRequestId = new Guid(requestId.ToString("D").PadLeft(32, '0'));
-                await _apiService.ApproveRequestAsync(guidRequestId, new RequestApprovalDto 
-                { 
-                    Status = "Approved",
+                await _requestService.ApproveRequestAsync(requestId, new RequestApprovalDto
+                {
+                    Status = RequestStatus.Approved,
                     Comment = "Approved by manager"
                 });
                 await _notificationService.ShowSuccessAsync("Request approved successfully");
@@ -206,12 +246,19 @@ namespace TDFMAUI.ViewModels
 
         private async Task RejectRequestAsync(int requestId)
         {
+            var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
+            var errors = ValidateRequest(request);
+            if (errors.Any())
+            {
+                await _notificationService.ShowErrorAsync(string.Join("\n", errors));
+                return;
+            }
+
             try
             {
                 IsLoading = true;
-                var guidRequestId = new Guid(requestId.ToString("D").PadLeft(32, '0'));
-                await _apiService.RejectRequestAsync(guidRequestId, new RequestRejectDto 
-                { 
+                await _requestService.RejectRequestAsync(requestId, new RequestRejectDto
+                {
                     RejectReason = "Rejected by manager"
                 });
                 await _notificationService.ShowSuccessAsync("Request rejected successfully");
@@ -229,23 +276,28 @@ namespace TDFMAUI.ViewModels
 
         private async Task ViewRequestAsync(int requestId)
         {
+            var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
+            var errors = ValidateRequest(request);
+            if (errors.Any())
+            {
+                await Shell.Current.DisplayAlert("Validation Error", string.Join("\n", errors), "OK");
+                return;
+            }
+
             if (requestId <= 0) return;
-            
+
             try
             {
-                // Properly handle Guid conversion by using the request ID to construct a properly formatted Guid
-                var guidRequestId = new Guid(requestId.ToString("D").PadLeft(32, '0'));
-                var request = await _apiService.GetRequestByIdAsync(guidRequestId);
-                if (request == null)
+                var requestDetails = await _requestService.GetRequestByIdAsync(requestId);
+                if (requestDetails == null)
                 {
                     await Shell.Current.DisplayAlert("Error", "Could not find request details.", "OK");
                     return;
                 }
-                
-                // Navigate via Shell rather than direct navigation
+
                 await Shell.Current.GoToAsync($"TDFMAUI/Features/Requests/RequestDetailsPage", new Dictionary<string, object>
                 {
-                    {"RequestId", request.Id}
+                    {"RequestId", requestDetails.RequestID}
                 });
             }
             catch (Exception ex)
@@ -254,13 +306,6 @@ namespace TDFMAUI.ViewModels
             }
         }
 
-        public List<string> StatusOptions => new List<string> { "All", "Pending", "Approved", "Rejected" };
-        public List<string> TypeOptions => new List<string> { "All", "Vacation", "Sick Leave", "Personal", "Other" };
-        public List<string> DepartmentOptions => new List<string> { "All", "HR", "IT", "Finance", "Marketing", "Operations" };
-
-        /// <summary>
-        /// Filters the Requests collection based on specified criteria
-        /// </summary>
         public void FilterRequests(string status, string type, string department, DateTime? fromDate, DateTime? toDate)
         {
             if (IsLoading) return;
@@ -268,30 +313,23 @@ namespace TDFMAUI.ViewModels
             IsLoading = true;
             try
             {
-                // Start with all requests or fetch them if needed
                 var allRequests = new List<RequestResponseDto>(Requests);
 
-                // Apply status filter
                 if (!string.IsNullOrEmpty(status) && !status.Equals("All", StringComparison.OrdinalIgnoreCase))
                 {
-                    allRequests = allRequests.Where(r => r.Status?.Equals(status, StringComparison.OrdinalIgnoreCase) == true).ToList();
+                    allRequests = allRequests.Where(r => r.Status.ToString().Equals(status, StringComparison.OrdinalIgnoreCase)).ToList();
                 }
 
-                // Apply type filter
                 if (!string.IsNullOrEmpty(type) && !type.Equals("All", StringComparison.OrdinalIgnoreCase))
                 {
-                    allRequests = allRequests.Where(r => r.LeaveType?.Equals(type, StringComparison.OrdinalIgnoreCase) == true).ToList();
+                    allRequests = allRequests.Where(r => r.LeaveType.ToString().Equals(type, StringComparison.OrdinalIgnoreCase)).ToList();
                 }
 
-                // Apply department filter
                 if (!string.IsNullOrEmpty(department) && !department.Equals("All", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Note: This assumes requests have a department property or similar
-                    // You may need to adjust based on your actual data model
                     allRequests = allRequests.Where(r => r.RequestDepartment?.Equals(department, StringComparison.OrdinalIgnoreCase) == true).ToList();
                 }
 
-                // Apply date filters
                 if (fromDate.HasValue)
                 {
                     allRequests = allRequests.Where(r => r.RequestStartDate >= fromDate.Value.Date).ToList();
@@ -302,7 +340,6 @@ namespace TDFMAUI.ViewModels
                     allRequests = allRequests.Where(r => r.RequestStartDate <= toDate.Value.Date.AddDays(1).AddTicks(-1)).ToList();
                 }
 
-                // Update the Requests collection
                 Requests.Clear();
                 foreach (var request in allRequests)
                 {
@@ -317,9 +354,9 @@ namespace TDFMAUI.ViewModels
             }
         }
 
-        protected void OnPropertyChanged(string propertyName)
+        protected new void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
-} 
+}

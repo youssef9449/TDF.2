@@ -31,11 +31,6 @@ namespace TDFShared.Enums
         /// <summary>
         /// Request is in progress
         /// </summary>
-        InProgress,
-        
-        /// <summary>
-        /// Request has been completed
-        /// </summary>
-        Completed
+        All
     }
 } 

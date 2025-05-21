@@ -9,6 +9,7 @@ using Microsoft.Maui.Controls; // Needed for Command
 using System.Collections.ObjectModel; // Needed for ObservableCollection
 using System.Threading.Tasks; // Needed for async Task
 using TDFMAUI.Services; // Added for IRequestService, IAuthService
+using TDFShared.Enums;
 using Microsoft.Extensions.Logging; // Added for logging
 
 namespace TDFMAUI.ViewModels
@@ -20,7 +21,7 @@ namespace TDFMAUI.ViewModels
         private readonly ILogger<AddRequestViewModel> _logger;
 
         private bool _isEditMode;
-        private Guid _requestId;
+        private int _requestId;
         private string _requestType = string.Empty;
         private string _requestReason = string.Empty;
         private DateTime _requestFromDay = DateTime.Today;
@@ -40,7 +41,7 @@ namespace TDFMAUI.ViewModels
             set => SetProperty(ref _isEditMode, value);
         }
 
-        public Guid RequestId
+        public int RequestId
         {
             get => _requestId;
             set => SetProperty(ref _requestId, value);
@@ -137,7 +138,7 @@ namespace TDFMAUI.ViewModels
         public RequestCreateDto RequestCreateDto => new RequestCreateDto
         {
             // Don't set UserId here; it will be set in OnSubmit
-            LeaveType = this._selectedLeaveType,
+            LeaveType = Enum.TryParse<LeaveType>(this._selectedLeaveType, true, out var createLeaveType) ? createLeaveType : default,
             RequestStartDate = this._requestFromDay,
             RequestEndDate = this._requestToDay ?? this._requestFromDay,
             RequestBeginningTime = (this.SelectedLeaveType == "Permission" || this.SelectedLeaveType == "External Assignment") ? this._requestBeginningTime : null,
@@ -147,7 +148,7 @@ namespace TDFMAUI.ViewModels
 
         public RequestUpdateDto RequestUpdateDto => new RequestUpdateDto
         {
-            LeaveType = this._selectedLeaveType,
+            LeaveType = Enum.TryParse<LeaveType>(this._selectedLeaveType, true, out var updateLeaveType) ? updateLeaveType : default,
             RequestStartDate = this._requestFromDay,
             RequestEndDate = this._requestToDay ?? this._requestFromDay,
             RequestBeginningTime = (this.SelectedLeaveType == "Permission" || this.SelectedLeaveType == "External Assignment") ? this._requestBeginningTime : null,
@@ -173,14 +174,14 @@ namespace TDFMAUI.ViewModels
             if (existingRequest != null)
             {
                 IsEditMode = true;
-                RequestId = existingRequest.Id;
-                SelectedLeaveType = existingRequest.LeaveType;
+                RequestId = existingRequest.RequestID;
+                SelectedLeaveType = existingRequest.LeaveType.ToString();
                 RequestReason = existingRequest.RequestReason;
                 StartDate = existingRequest.RequestStartDate;
                 EndDate = existingRequest.RequestEndDate;
 
                 // If it's a type that uses time, populate StartTime and EndTime
-                if (existingRequest.LeaveType == "Permission" || existingRequest.LeaveType == "External Assignment")
+                if (existingRequest.LeaveType == LeaveType.Permission || existingRequest.LeaveType == LeaveType.ExternalAssignment)
                 {
                     StartTime = existingRequest.RequestBeginningTime;
                     EndTime = existingRequest.RequestEndingTime;
@@ -191,7 +192,7 @@ namespace TDFMAUI.ViewModels
                     EndTime = null;
                 }
 
-                _requestType = existingRequest.LeaveType;
+                _requestType = existingRequest.LeaveType.ToString();
                 _requestFromDay = existingRequest.RequestStartDate;
                 _requestToDay = existingRequest.RequestEndDate;
                 // _requestBeginningTime and _requestEndingTime are directly bound to StartTime and EndTime properties
@@ -199,7 +200,7 @@ namespace TDFMAUI.ViewModels
             else
             {
                 IsEditMode = false;
-                RequestId = Guid.NewGuid();
+                RequestId = 0;
                 StartDate = DateTime.Today;
                 EndDate = DateTime.Today;
                 StartTime = null; // Initialize to null for new requests
@@ -256,7 +257,7 @@ namespace TDFMAUI.ViewModels
                     response = await _requestService.CreateRequestAsync(createDto);
                      _logger.LogInformation("Create request completed.");
                      // Assuming the response contains the new ID, update the ViewModel if needed
-                     if (response != null) RequestId = response.Id;
+                     if (response != null) RequestId = response.RequestID;
                 }
 
                 if (response != null) // Check if API call was successful (HandleApiResponse should handle errors)
@@ -375,4 +376,4 @@ namespace TDFMAUI.ViewModels
         }
         #endregion
     }
-} 
+}

@@ -27,6 +27,7 @@ public class AuthService : IAuthService
     private readonly IUserProfileService _userProfileService;
     private readonly HttpClient _httpClient;
     private readonly ILogger<AuthService> _logger;
+    private readonly ISecurityService _securityService;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly string _baseApiUrl;
 
@@ -34,6 +35,7 @@ public class AuthService : IAuthService
         SecureStorageService secureStorageService,
         IUserProfileService userProfileService,
         HttpClient httpClient,
+        ISecurityService securityService,
         ILogger<AuthService> logger)
     {
         try
@@ -53,6 +55,10 @@ public class AuthService : IAuthService
             logger?.LogInformation("Checking HttpClient...");
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             logger?.LogInformation("HttpClient resolved successfully.");
+
+            logger?.LogInformation("Checking SecurityService...");
+            _securityService = securityService ?? throw new ArgumentNullException(nameof(securityService));
+            logger?.LogInformation("SecurityService resolved successfully.");
 
             logger?.LogInformation("Saving logger reference...");
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -103,7 +109,7 @@ public class AuthService : IAuthService
                     if (apiResponse?.Data != null && !string.IsNullOrEmpty(apiResponse.Data.Token))
                     {
                         _logger.LogInformation("Login successful for user {Username} using ApiResponse<TokenResponse> format", username);
-                        
+
                         // Create UserDetailsDto from TokenResponse data
                         var userDetails = new UserDetailsDto
                         {
@@ -121,7 +127,7 @@ public class AuthService : IAuthService
                         if (apiResponse.Data.IsAdmin) userDetails.Roles.Add("Admin");
                         if (apiResponse.Data.IsManager) userDetails.Roles.Add("Manager");
                         if (apiResponse.Data.IsHR) userDetails.Roles.Add("HR");
-                        
+
                         // Add Employee role by default if no other roles are present
                         if (userDetails.Roles.Count == 0)
                         {
@@ -132,7 +138,7 @@ public class AuthService : IAuthService
                         await _secureStorageService.SaveTokenAsync(apiResponse.Data.Token, apiResponse.Data.Expiration);
                         _userProfileService.SetUserDetails(userDetails);
 
-                        _logger.LogInformation("User {Username} logged in with roles: {Roles}", 
+                        _logger.LogInformation("User {Username} logged in with roles: {Roles}",
                             username, string.Join(", ", userDetails.Roles));
 
                         return apiResponse.Data;
@@ -166,7 +172,7 @@ public class AuthService : IAuthService
 DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
                             await _secureStorageService.SaveTokenAsync(loginResponse.Token, expiration);
                             _userProfileService.SetUserDetails(loginResponse.UserDetails);
-                            
+
                             // Create and return TokenResponse
                             return new TokenResponse
                             {
@@ -330,9 +336,9 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
             if (handler.CanReadToken(token))
             {
                 var jwtToken = handler.ReadJwtToken(token);
-                var userIdClaim = jwtToken.Claims.FirstOrDefault(claim => 
-                    claim.Type == ClaimTypes.NameIdentifier || 
-                    claim.Type == "sub" || 
+                var userIdClaim = jwtToken.Claims.FirstOrDefault(claim =>
+                    claim.Type == ClaimTypes.NameIdentifier ||
+                    claim.Type == "sub" ||
                     claim.Type == "nameid");
 
                 if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
@@ -340,7 +346,7 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
                     _logger.LogInformation("Successfully retrieved User ID {UserId} from token", userId);
                     return userId;
                 }
-                
+
                 _logger.LogWarning("Token does not contain a valid user ID claim");
             }
             else
@@ -352,7 +358,7 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
         {
             _logger.LogError(ex, "Error retrieving or parsing token for user ID");
         }
-        
+
         return 0;
     }
 
@@ -373,13 +379,13 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
                 var jwtToken = handler.ReadJwtToken(token);
                 var departmentClaim = jwtToken.Claims
                     .FirstOrDefault(c => c.Type == "department" || c.Type == "dept");
-                
+
                 if (departmentClaim != null)
                 {
                     _logger.LogDebug("Found department claim: {Department}", departmentClaim.Value);
                     return departmentClaim.Value;
                 }
-                
+
                 _logger.LogWarning("No department claim found in token");
             }
             else
@@ -391,14 +397,14 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
         {
             _logger.LogError(ex, "Error retrieving user department from token");
         }
-        
+
         return null;
     }
 
     public async Task RevokeTokenAsync(string jti, DateTime expiryDateUtc, int? userId = null)
     {
         _ = jti ?? throw new ArgumentNullException(nameof(jti));
-        
+
         try
         {
             // In MAUI client, we'll just remove the token from secure storage
@@ -417,7 +423,7 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
     {
         var roles = new List<string>();
         const string roleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
-        
+
         try
         {
             var (token, _) = await _secureStorageService.GetTokenAsync();
@@ -433,7 +439,7 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
                 var jwtToken = handler.ReadJwtToken(token);
                 var roleClaims = jwtToken.Claims
                     .Where(c => c.Type == "role" || c.Type == ClaimTypes.Role || c.Type == roleClaimType);
-                
+
                 roles = roleClaims.Select(c => c.Value).Distinct().ToList();
                 _logger.LogDebug("Found {RoleCount} roles in token", roles.Count);
             }
@@ -446,7 +452,7 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
         {
             _logger.LogError(ex, "Error retrieving user roles from token");
         }
-        
+
         return roles.AsReadOnly();
     }
 
@@ -497,7 +503,7 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
             {
                 _logger.LogWarning(
                     "Failed to retrieve user details for {UserId}. Status: {StatusCode}",
-                    userId, 
+                    userId,
                     response.StatusCode);
                 return null;
             }
@@ -512,24 +518,24 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
     public async Task<TokenResponse?> RefreshTokenAsync(string token, string refreshToken)
     {
         _logger.LogInformation("Attempting to refresh token");
-        
+
         try
         {
             var refreshRequest = new { Token = token, RefreshToken = refreshToken };
             var uri = $"{_baseApiUrl}/auth/refresh-token";
-            
+
             var response = await _httpClient.PostAsJsonAsync(uri, refreshRequest, _serializerOptions);
             response.EnsureSuccessStatusCode();
-            
+
             var tokenResponse = await response.Content.ReadFromJsonAsync<ApiResponse<TokenResponse>>(_serializerOptions);
-            
+
             if (tokenResponse?.Data != null)
             {
                 await _secureStorageService.SaveTokenAsync(tokenResponse.Data.Token, tokenResponse.Data.Expiration);
                 _logger.LogInformation("Token refreshed successfully");
                 return tokenResponse.Data;
             }
-            
+
             _logger.LogWarning("Token refresh response did not contain valid data");
             return null;
         }
@@ -543,14 +549,14 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
     public string GenerateJwtToken(UserDto user)
     {
         _logger.LogInformation("Generating JWT token for user {UserId}", user.UserID);
-        
+
         // Note: In a real application, this would generate a JWT token on the client side
         // This is typically done on the server side, so this is a simplified version
         // that just returns a mock token for demonstration purposes
-        
+
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = System.Text.Encoding.ASCII.GetBytes("your-secret-key-here"); // Should be stored securely
-        
+
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
@@ -571,49 +577,35 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
             Subject = new ClaimsIdentity(claims),
             Expires = DateTime.UtcNow.AddHours(24),
             SigningCredentials = new Microsoft.IdentityModel.Tokens.SigningCredentials(
-                new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(key), 
+                new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(key),
                 Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256Signature)
         };
-        
+
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
     }
 
+    /// <summary>
+    /// Hashes a password using the shared SecurityService
+    /// </summary>
     public string HashPassword(string password, out string salt)
     {
-        using var deriveBytes = new System.Security.Cryptography.Rfc2898DeriveBytes(
-            password, 
-            16, // Salt size
-            10000, // Iteration count
-            System.Security.Cryptography.HashAlgorithmName.SHA256);
-            
-        var hash = Convert.ToBase64String(deriveBytes.GetBytes(32)); // 32 bytes = 256 bits
-        salt = Convert.ToBase64String(deriveBytes.Salt);
-        
-        _logger.LogDebug("Password hashed successfully");
-        return hash;
+        _logger.LogDebug("Hashing password using shared SecurityService");
+        return _securityService.HashPassword(password, out salt);
     }
 
+    /// <summary>
+    /// Verifies a password using the shared SecurityService
+    /// </summary>
     public bool VerifyPassword(string password, string storedHash, string salt)
     {
         try
         {
-            var saltBytes = Convert.FromBase64String(salt);
-            
-            using var deriveBytes = new System.Security.Cryptography.Rfc2898DeriveBytes(
-                password,
-                saltBytes,
-                10000, // Must match the iteration count used in HashPassword
-                System.Security.Cryptography.HashAlgorithmName.SHA256);
-                
-            var testHash = Convert.ToBase64String(deriveBytes.GetBytes(32));
-            
-            bool isValid = testHash == storedHash;
+            bool isValid = _securityService.VerifyPassword(password, storedHash, salt);
             if (!isValid)
             {
                 _logger.LogWarning("Password verification failed");
             }
-            
             return isValid;
         }
         catch (Exception ex)
@@ -626,15 +618,15 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
     public async Task RevokeTokenAsync(string jti, DateTime expiryDateUtc)
     {
         _logger.LogInformation("Revoking token with JTI: {Jti}", jti);
-        
+
         try
         {
             var uri = $"{_baseApiUrl}/auth/revoke-token";
             var request = new { Jti = jti, ExpiryDateUtc = expiryDateUtc };
-            
+
             var response = await _httpClient.PostAsJsonAsync(uri, request, _serializerOptions);
             response.EnsureSuccessStatusCode();
-            
+
             _logger.LogInformation("Token revoked successfully");
         }
         catch (Exception ex)
@@ -647,21 +639,21 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
     public async Task<bool> IsTokenRevokedAsync(string jti)
     {
         _logger.LogDebug("Checking if token with JTI is revoked: {Jti}", jti);
-        
+
         try
         {
             var uri = $"{_baseApiUrl}/auth/is-token-revoked/{Uri.EscapeDataString(jti)}";
-            
+
             var response = await _httpClient.GetAsync(uri);
             response.EnsureSuccessStatusCode();
-            
+
             var result = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(_serializerOptions);
-            
+
             if (result?.Data == true)
             {
                 _logger.LogInformation("Token with JTI {Jti} is revoked", jti);
             }
-            
+
             return result?.Data ?? false;
         }
         catch (Exception ex)

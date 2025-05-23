@@ -551,6 +551,19 @@ builder.Services.AddSingleton<TDFAPI.Messaging.Interfaces.IEventMediator, EventM
 // Register API-specific services
 builder.Services.AddApiServices();
 
+// Register SecurityService
+builder.Services.AddScoped<TDFShared.Services.ISecurityService, TDFShared.Services.SecurityService>();
+
+// Register shared HTTP client services
+builder.Services.AddHttpClient<TDFShared.Services.IHttpClientService, TDFShared.Services.HttpClientService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+    client.DefaultRequestHeaders.Add("User-Agent", "TDF-API/1.0");
+});
+
+// Register connectivity service
+builder.Services.AddSingleton<TDFShared.Services.IConnectivityService, TDFShared.Services.ConnectivityService>();
+
 // Register AuthService with the shared interface
 builder.Services.AddScoped<TDFShared.Services.IAuthService, AuthService>();
 

@@ -19,7 +19,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using TDFAPI.Domain.Auth;   
+using TDFAPI.Domain.Auth;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -40,15 +40,11 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
     private readonly IRevokedTokenRepository _revokedTokenRepository;
     private readonly IConfiguration _configuration;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ISecurityService _securityService;
     private readonly string _jwtSecretKey;
     private readonly int _jwtTokenExpirationMinutes;
     private readonly int _refreshTokenExpirationDays;
     private bool _disposed = false;
-
-    // Constants for password hashing - using upgraded values
-    private const int PBKDF2_ITERATIONS = 310000; // Increased iterations for modern hardware
-    private const int SALT_SIZE_BYTES = 32;       // Increased salt size for better security
-    private const int HASH_SIZE_BYTES = 32;
 
     // Account lockout parameters
     private readonly int _maxFailedAttempts;
@@ -59,16 +55,18 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
         IRevokedTokenRepository revokedTokenRepository,
         IConfiguration configuration,
         IHttpContextAccessor httpContextAccessor,
+        ISecurityService securityService,
         ILogger<AuthService> logger)
     {
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _revokedTokenRepository = revokedTokenRepository ?? throw new ArgumentNullException(nameof(revokedTokenRepository));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+        _securityService = securityService ?? throw new ArgumentNullException(nameof(securityService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
         // Get JWT settings from configuration
-        _jwtSecretKey = _configuration["Jwt:SecretKey"] ?? 
+        _jwtSecretKey = _configuration["Jwt:SecretKey"] ??
             throw new InvalidOperationException("JWT Secret Key is not configured");
 
         // Get token expiration settings with defaults
@@ -130,13 +128,13 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             // Check if account is locked
             if (userAuth.IsLocked && userAuth.LockoutEnd.HasValue && userAuth.LockoutEnd.Value > DateTime.UtcNow)
             {
-                _logger.LogWarning("Login failed: Account for user {UserId} is locked until {LockoutEnd}", 
+                _logger.LogWarning("Login failed: Account for user {UserId} is locked until {LockoutEnd}",
                     user.UserID, userAuth.LockoutEnd);
                 return null;
             }
 
-            // Verify password
-            if (!VerifyPassword(password, userAuth.PasswordHash, userAuth.PasswordSalt))
+            // Verify password using shared SecurityService
+            if (!_securityService.VerifyPassword(password, userAuth.PasswordHash, userAuth.PasswordSalt))
             {
                 // Update failed login attempts
                 var failedAttempts = userAuth.FailedLoginAttempts + 1;
@@ -144,12 +142,12 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 var lockoutEnd = isLocked ? DateTime.UtcNow.Add(_lockoutDuration) : (DateTime?)null; // Lock for lockout duration
 
                 await _userRepository.UpdateLoginAttemptsAsync(
-                    user.UserID, 
-                    failedAttempts, 
-                    isLocked, 
+                    user.UserID,
+                    failedAttempts,
+                    isLocked,
                     lockoutEnd);
 
-                _logger.LogWarning("Login failed: Invalid password for user {UserId} (attempt {Attempts})", 
+                _logger.LogWarning("Login failed: Invalid password for user {UserId} (attempt {Attempts})",
                     user.UserID, failedAttempts);
 
                 return null;
@@ -283,7 +281,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
     public async Task<IReadOnlyList<string>> GetUserRolesAsync()
     {
         var roles = new List<string>(3); // Pre-allocate with expected capacity
-        
+
         try
         {
             var userId = GetCurrentUserId();
@@ -320,7 +318,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
         try
         {
             // First try to get from claims (useful for API calls with JWT)
-            var departmentClaim = GetCurrentUserClaim(ClaimTypes.Locality) ?? 
+            var departmentClaim = GetCurrentUserClaim(ClaimTypes.Locality) ??
                                 GetCurrentUserClaim("department") ??
                                 GetCurrentUserClaim("dept");
 
@@ -328,7 +326,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             {
                 return departmentClaim;
             }
-            
+
             // If not in claims, get from user data in database
             var userId = GetCurrentUserId();
             if (userId <= 0)
@@ -336,20 +334,20 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 _logger.LogWarning("Cannot get department: Invalid user ID");
                 return null;
             }
-            
+
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
             {
                 _logger.LogWarning("Cannot get department: User with ID {UserId} not found", userId);
                 return null;
             }
-            
+
             if (string.IsNullOrEmpty(user.Department))
             {
                 _logger.LogInformation("No department set for user {UserId}", userId);
                 return null;
             }
-            
+
             return user.Department;
         }
         catch (Exception ex)
@@ -369,7 +367,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 _logger.LogWarning("Cannot get current user: Invalid user ID");
                 return null;
             }
-            
+
             // Get user from repository
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
@@ -377,16 +375,16 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 _logger.LogWarning("User with ID {UserId} not found", userId);
                 return null;
             }
-            
+
             // Get user roles
             var roles = (await GetUserRolesAsync()).ToList();
-            
+
             // Get department
             var department = await GetCurrentUserDepartmentAsync();
-            
+
             // Map to DTO
-            return new UserDto 
-            { 
+            return new UserDto
+            {
                 UserID = user.UserID,
                 Username = user.Username,
                 Department = department ?? user.Department,
@@ -449,9 +447,9 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
 
             // Get user auth data to validate refresh token
             var userAuth = await _userRepository.GetUserAuthDataAsync(userId);
-            if (userAuth == null || 
-                string.IsNullOrEmpty(userAuth.RefreshToken) || 
-                userAuth.RefreshToken != refreshToken || 
+            if (userAuth == null ||
+                string.IsNullOrEmpty(userAuth.RefreshToken) ||
+                userAuth.RefreshToken != refreshToken ||
                 userAuth.RefreshTokenExpiryTime == null ||
                 userAuth.RefreshTokenExpiryTime < DateTime.UtcNow)
             {
@@ -493,7 +491,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             foreach (var prop in userType.GetProperties())
             {
                 // Skip properties we've already set explicitly
-                if (prop.Name == nameof(UserDto.UserID) || 
+                if (prop.Name == nameof(UserDto.UserID) ||
                     prop.Name == nameof(UserDto.Username) ||
                     prop.Name == nameof(UserDto.FullName) ||
                     prop.Name == nameof(UserDto.IsAdmin) ||
@@ -565,7 +563,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
 
     public string GenerateJwtToken(UserDto user)
     {
-        ArgumentNullException.ThrowIfNull(user);    
+        ArgumentNullException.ThrowIfNull(user);
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.ASCII.GetBytes(_jwtSecretKey);
 
@@ -589,7 +587,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
         if (user.IsHR) claims.Add(new Claim("isHR", "true"));
 
         var creds = new SigningCredentials(
-            new SymmetricSecurityKey(key), 
+            new SymmetricSecurityKey(key),
             SecurityAlgorithms.HmacSha256Signature);
 
         var tokenDescriptor = new SecurityTokenDescriptor
@@ -605,75 +603,29 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
         return tokenHandler.WriteToken(token);
     }
 
-    // Upgraded to PBKDF2 with configurable iterations
+    /// <summary>
+    /// Hashes a password using the shared SecurityService
+    /// </summary>
     public string HashPassword(string password, out string salt)
     {
-        byte[] saltBytes = new byte[SALT_SIZE_BYTES];
-        using (var rng = RandomNumberGenerator.Create())
-        {
-            rng.GetBytes(saltBytes);
-        }
-
-        byte[] hashBytes = GetHashBytes(password, saltBytes);
-
-        salt = Convert.ToBase64String(saltBytes);
-        return Convert.ToBase64String(hashBytes);
+        return _securityService.HashPassword(password, out salt);
     }
 
+    /// <summary>
+    /// Verifies a password using the shared SecurityService
+    /// </summary>
     public bool VerifyPassword(string password, string storedHash, string salt)
     {
-        try
-        {
-            byte[] saltBytes = Convert.FromBase64String(salt);
-            byte[] storedHashBytes = Convert.FromBase64String(storedHash);
-            byte[] computedHashBytes = GetHashBytes(password, saltBytes);
-
-            // Use constant-time comparison to prevent timing attacks
-            return CryptographicOperations.FixedTimeEquals(storedHashBytes, computedHashBytes);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error verifying password: {Message}", ex.Message);
-            return false;
-        }
+        return _securityService.VerifyPassword(password, storedHash, salt);
     }
 
-    private byte[] GetHashBytes(string password, byte[] salt)
-    {
-        // Use PBKDF2 with HMACSHA512 for stronger security
-        using (var pbkdf2 = new Rfc2898DeriveBytes(
-            password, 
-            salt, 
-            PBKDF2_ITERATIONS, 
-            HashAlgorithmName.SHA512))
-        {
-            return pbkdf2.GetBytes(HASH_SIZE_BYTES);
-        }
-    }
-
+    /// <summary>
+    /// Validates password strength using the shared SecurityService
+    /// </summary>
     public static bool IsPasswordStrong(string password)
     {
-        // Password must be at least 8 characters
-        if (password.Length < 8)
-            return false;
-
-        // Password must contain at least one uppercase letter
-        if (!password.Any(char.IsUpper))
-            return false;
-
-        // Password must contain at least one lowercase letter
-        if (!password.Any(char.IsLower))
-            return false;
-
-        // Password must contain at least one digit
-        if (!password.Any(char.IsDigit))
-            return false;
-
-        // Password must contain at least one special character
-        if (!password.Any(c => !char.IsLetterOrDigit(c)))
-            return false;
-
-        return true;
+        var securityService = new SecurityService();
+        return securityService.IsPasswordStrong(password, out _);
     }
 
     public async Task RevokeTokenAsync(string jti, DateTime expiryDateUtc, int? userId = null)
@@ -695,7 +647,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
 
             // Add to revoked tokens
             await _revokedTokenRepository.AddAsync(jti, expiryDateUtc, userId);
-            
+
             _logger.LogInformation("Successfully revoked token with JTI: {Jti} for user {UserId}", jti, userId?.ToString() ?? "unknown");
         }
         catch (Exception ex)
@@ -712,18 +664,18 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             _logger.LogWarning("Token validation failed: JTI is null or empty");
             return false;
         }
-        
+
         try
         {
             // Check if token is revoked
             bool isRevoked = await _revokedTokenRepository.IsRevokedAsync(jti);
-            
+
             if (isRevoked)
             {
                 _logger.LogDebug("Token with JTI {Jti} is revoked", jti);
                 return true;
             }
-            
+
             _logger.LogDebug("Token with JTI {Jti} is not revoked", jti);
             return false;
         }
@@ -735,9 +687,9 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             return false;
         }
     }
-    
+
     #region IDisposable Implementation
-    
+
     /// <summary>
     /// Protected implementation of Dispose pattern.
     /// </summary>
@@ -752,13 +704,13 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 // Note: _httpClient is typically managed by the HttpClientFactory, so we don't dispose it here
                 _logger.LogDebug("AuthService disposed");
             }
-            
+
             // Free unmanaged resources here
-            
+
             _disposed = true;
         }
     }
-    
+
     /// <summary>
     /// Public implementation of Dispose pattern.
     /// </summary>
@@ -767,7 +719,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
         Dispose(true);
         GC.SuppressFinalize(this);
     }
-    
+
     /// <summary>
     /// Finalizer for AuthService.
     /// </summary>
@@ -775,6 +727,6 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
     {
         Dispose(false);
     }
-    
+
     #endregion
 }

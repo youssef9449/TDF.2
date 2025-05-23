@@ -217,10 +217,25 @@ namespace TDFMAUI
             // Register RequestService
             builder.Services.AddTransient<IRequestService, RequestService>();
 
+            // Register SecurityService
+            builder.Services.AddSingleton<TDFShared.Services.ISecurityService, TDFShared.Services.SecurityService>();
+
+            // Register shared HTTP client services directly
+            builder.Services.AddHttpClient<TDFShared.Services.IHttpClientService, TDFShared.Services.HttpClientService>((serviceProvider, client) =>
+            {
+                var apiSettings = serviceProvider.GetRequiredService<IOptions<ApiSettings>>().Value;
+                client.BaseAddress = new Uri(apiSettings.BaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(apiSettings.Timeout);
+                client.DefaultRequestHeaders.Add("User-Agent", "TDF-MAUI/1.0");
+            });
+
+            // Register platform-specific connectivity service
+            builder.Services.AddSingleton<TDFShared.Services.IConnectivityService, ConnectivityService>();
+
             // Register AuthService with fully qualified interface name
             builder.Services.AddSingleton<TDFShared.Services.IAuthService, AuthService>();
 
-            
+
             // Register NotificationService hierarchy
             builder.Services.AddSingleton<IPlatformNotificationService, PlatformNotificationService>();
             builder.Services.AddSingleton<NotificationService>();

@@ -42,7 +42,7 @@ namespace TDFMAUI.Services
     /// </summary>
     public class ApiService : IApiService, IDisposable
     {
-        private readonly IHttpClientService _httpClientService;
+        private readonly TDFShared.Services.IHttpClientService _httpClientService;
         private readonly SecureStorageService _secureStorage;
         private readonly JsonSerializerOptions _jsonOptions;
         private NetworkMonitorService _networkMonitor;
@@ -71,7 +71,7 @@ namespace TDFMAUI.Services
         }
 
         public ApiService(
-            IHttpClientService httpClientService,
+            TDFShared.Services.IHttpClientService httpClientService,
             SecureStorageService secureStorage,
             ILogger<ApiService> logger,
             NetworkMonitorService networkMonitor)
@@ -258,7 +258,7 @@ namespace TDFMAUI.Services
             if (!string.IsNullOrEmpty(tokenInfo.Token) && tokenInfo.Expiration > DateTime.UtcNow)
             {
                 _logger?.LogInformation("ApiService: InitializeAuthenticationAsync - Found valid token in secure storage. Token: {Token}, Expires: {Expiration}", tokenInfo.Token.Length > 10 ? tokenInfo.Token.Substring(0, 10) + "..." : tokenInfo.Token, tokenInfo.Expiration);
-                _httpClientService.SetAuthorizationHeader(tokenInfo.Token);
+                await _httpClientService.SetAuthenticationTokenAsync(tokenInfo.Token);
                 _logger?.LogInformation("ApiService: Initialization - Authorization header SET with stored token.");
             }
             else
@@ -271,7 +271,7 @@ namespace TDFMAUI.Services
                 {
                     _logger?.LogWarning("ApiService: InitializeAuthenticationAsync - Token found but expired. Expires: {Expiration}, Current UTC: {UtcNow}", tokenInfo.Expiration, DateTime.UtcNow);
                 }
-                _httpClientService.ClearAuthorizationHeader();
+                await _httpClientService.ClearAuthenticationTokenAsync();
                 _logger?.LogInformation("ApiService: Initialization - Authorization header CLEARED.");
             }
             _initialized = true;
@@ -472,7 +472,7 @@ namespace TDFMAUI.Services
                 DateTime tokenExpiration = DateTime.UtcNow.AddHours(24);
 
                 await _secureStorage.SaveTokenAsync(tokenResponse.Data.Token, tokenExpiration);
-                _httpClientService.SetAuthorizationHeader(tokenResponse.Data.Token);
+                await _httpClientService.SetAuthenticationTokenAsync(tokenResponse.Data.Token);
 
                 var userDto = new UserDto {
                     UserID = tokenResponse.Data.UserId,
@@ -487,14 +487,14 @@ namespace TDFMAUI.Services
             {
                 _logger.LogWarning("Login failed for user {Username}: {StatusCode} - {Message}", username, ex.StatusCode, ex.Message);
                 await _secureStorage.ClearTokenAsync();
-                _httpClientService.ClearAuthorizationHeader();
+                await _httpClientService.ClearAuthenticationTokenAsync();
                 throw;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error during login for user {Username}", username);
                 await _secureStorage.ClearTokenAsync();
-                _httpClientService.ClearAuthorizationHeader();
+                await _httpClientService.ClearAuthenticationTokenAsync();
                 throw new ApiException("An unexpected error occurred during login.", ex);
             }
         }
@@ -510,6 +510,7 @@ namespace TDFMAUI.Services
             {
                  await PostAsync<object, object>(endpoint, null);
                 await _secureStorage.ClearTokenAsync();
+                await _httpClientService.ClearAuthenticationTokenAsync();
                 _logger?.LogInformation("ApiService: Logout successful, token cleared.");
                 return true;
             }
@@ -517,6 +518,7 @@ namespace TDFMAUI.Services
             {
                  _logger.LogError(ex, "Error during logout API call");
                  await _secureStorage.ClearTokenAsync();
+                 await _httpClientService.ClearAuthenticationTokenAsync();
                  return false;
             }
         }

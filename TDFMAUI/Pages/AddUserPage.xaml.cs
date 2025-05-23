@@ -97,17 +97,8 @@ public partial class AddUserPage : ContentPage
 
     private bool IsPasswordStrong(string password, out string validationMessage)
     {
-        validationMessage = string.Empty;
-        if (string.IsNullOrEmpty(password) || password.Length < 8)
-        {
-            validationMessage = "Password must be at least 8 characters.";
-            return false;
-        }
-        if (!password.Any(char.IsUpper)) { validationMessage = "Password needs an uppercase letter."; return false; }
-        if (!password.Any(char.IsLower)) { validationMessage = "Password needs a lowercase letter."; return false; }
-        if (!password.Any(char.IsDigit)) { validationMessage = "Password needs a digit."; return false; }
-        if (!password.Any(c => !char.IsLetterOrDigit(c))) { validationMessage = "Password needs a special character."; return false; }
-        return true;
+        var securityService = new TDFShared.Services.SecurityService();
+        return securityService.IsPasswordStrong(password, out validationMessage);
     }
 
     private async void OnAddUserClicked(object sender, EventArgs e)
@@ -154,7 +145,7 @@ public partial class AddUserPage : ContentPage
         try
         {
             var selectedDept = (LookupItem)departmentPicker.SelectedItem;
-            
+
             var createUserRequest = new CreateUserRequest
             {
                 Username = usernameEntry.Text,

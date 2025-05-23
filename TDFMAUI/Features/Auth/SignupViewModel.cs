@@ -88,23 +88,12 @@ namespace TDFMAUI.Features.Auth
                         HasError = true;
                     });
 
-                    // Create default departments as fallback
                     await MainThread.InvokeOnMainThreadAsync(() => {
-                        Debug.WriteLine("[SignupViewModel] Creating default departments as fallback");
-                        _logger?.LogInformation("DIAGNOSTIC: Creating default departments as fallback");
-
+                        Debug.WriteLine("[SignupViewModel] No network connection available");
+                        _logger?.LogWarning("DIAGNOSTIC: No network connection available for loading departments");
+                        ErrorMessage = "No network connection available. Please check your internet connection and try again.";
+                        HasError = true;
                         Departments.Clear();
-                        Departments.Add(new LookupItem("IT", "IT"));
-                        Departments.Add(new LookupItem("HR", "HR"));
-                        Departments.Add(new LookupItem("Finance", "Finance"));
-                        Departments.Add(new LookupItem("Marketing", "Marketing"));
-                        Departments.Add(new LookupItem("Operations", "Operations"));
-                        Departments.Add(new LookupItem("Sales", "Sales"));
-
-                        if (Departments.Count > 0)
-                        {
-                            SelectedDepartment = Departments[0];
-                        }
                     });
 
                     return;
@@ -130,23 +119,10 @@ namespace TDFMAUI.Features.Auth
                             HasError = true;
                         });
 
-                        // Create default departments as fallback
                         await MainThread.InvokeOnMainThreadAsync(() => {
-                            Debug.WriteLine("[SignupViewModel] Creating default departments as fallback");
-                            _logger?.LogInformation("DIAGNOSTIC: Creating default departments as fallback");
-
+                            Debug.WriteLine("[SignupViewModel] API connectivity test failed");
+                            _logger?.LogWarning("DIAGNOSTIC: API connectivity test failed, cannot load departments");
                             Departments.Clear();
-                            Departments.Add(new LookupItem("IT", "IT"));
-                            Departments.Add(new LookupItem("HR", "HR"));
-                            Departments.Add(new LookupItem("Finance", "Finance"));
-                            Departments.Add(new LookupItem("Marketing", "Marketing"));
-                            Departments.Add(new LookupItem("Operations", "Operations"));
-                            Departments.Add(new LookupItem("Sales", "Sales"));
-
-                            if (Departments.Count > 0)
-                            {
-                                SelectedDepartment = Departments[0];
-                            }
                         });
 
                         return;
@@ -234,21 +210,18 @@ namespace TDFMAUI.Features.Auth
                     }
                 }
 
-                // If both services failed, use default departments
+                // If both services failed, show error
                 if (departments == null || !departments.Any())
                 {
-                    Debug.WriteLine("[SignupViewModel] Both services failed to return departments. Using defaults.");
-                    _logger?.LogWarning("DIAGNOSTIC: Both services failed to return departments. Using defaults.");
+                    Debug.WriteLine("[SignupViewModel] Both services failed to return departments.");
+                    _logger?.LogError("DIAGNOSTIC: Both services failed to return departments. No fallback provided.");
 
-                    departments = new List<LookupItem>
-                    {
-                        new LookupItem("IT", "IT"),
-                        new LookupItem("HR", "HR"),
-                        new LookupItem("Finance", "Finance"),
-                        new LookupItem("Marketing", "Marketing"),
-                        new LookupItem("Operations", "Operations"),
-                        new LookupItem("Sales", "Sales")
-                    };
+                    await MainThread.InvokeOnMainThreadAsync(() => {
+                        ErrorMessage = "Unable to load departments. Please check your connection and try again.";
+                        HasError = true;
+                        Departments.Clear();
+                    });
+                    return;
                 }
 
                 // Ensure we're on the main thread for UI updates
@@ -298,25 +271,9 @@ namespace TDFMAUI.Features.Auth
                 _logger?.LogError(ex, "DIAGNOSTIC: Error loading departments.");
 
                 await MainThread.InvokeOnMainThreadAsync(() => {
-                    ErrorMessage = "An error occurred while loading necessary data.";
+                    ErrorMessage = "An error occurred while loading departments. Please try again.";
                     HasError = true;
-
-                    // Create default departments as fallback
-                    Debug.WriteLine("[SignupViewModel] Creating default departments as fallback after exception");
-                    _logger?.LogInformation("DIAGNOSTIC: Creating default departments as fallback after exception");
-
                     Departments.Clear();
-                    Departments.Add(new LookupItem("IT", "IT"));
-                    Departments.Add(new LookupItem("HR", "HR"));
-                    Departments.Add(new LookupItem("Finance", "Finance"));
-                    Departments.Add(new LookupItem("Marketing", "Marketing"));
-                    Departments.Add(new LookupItem("Operations", "Operations"));
-                    Departments.Add(new LookupItem("Sales", "Sales"));
-
-                    if (Departments.Count > 0)
-                    {
-                        SelectedDepartment = Departments[0];
-                    }
                 });
             }
         }

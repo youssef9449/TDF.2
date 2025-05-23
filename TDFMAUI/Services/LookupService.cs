@@ -51,20 +51,7 @@ namespace TDFMAUI.Services
             {
                 System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE Error] Error in GetDepartmentsAsync: {ex.Message}");
                 _logger.LogError(ex, "DIAGNOSTIC: Error in GetDepartmentsAsync: {Message}", ex.Message);
-
-                // Return default departments instead of throwing
-                var defaultDepartments = new List<LookupItem>
-                {
-                    new LookupItem("IT", "IT"),
-                    new LookupItem("HR", "HR"),
-                    new LookupItem("Finance", "Finance"),
-                    new LookupItem("Marketing", "Marketing"),
-                    new LookupItem("Operations", "Operations"),
-                    new LookupItem("Sales", "Sales")
-                };
-
-                _logger.LogInformation("DIAGNOSTIC: Returning {Count} default departments after error", defaultDepartments.Count);
-                return defaultDepartments;
+                throw; // Re-throw to let calling code handle the error
             }
         }
 
@@ -156,71 +143,31 @@ namespace TDFMAUI.Services
                         }
                     }
 
-                    if (departments != null) { // Allow empty list as a valid response (previous fix)
+                    if (departments != null) { // Allow empty list as a valid response
                         _logger.LogInformation("DIAGNOSTIC: Successfully processed departments list (Count: {Count})", departments.Count);
                         _departments = departments;
 
                         System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE] Final State: Departments loaded: {_departments?.Count ?? 0}");
                         _logger.LogInformation("DIAGNOSTIC: Final loaded state - Departments: {DeptCount}", _departments?.Count ?? 0);
                     }
-                    else { // This block will now only be hit if 'departments' is explicitly null
-                        _logger.LogWarning("DIAGNOSTIC: Department data was null after API call, treating as failure to load.");
-
-                        // Instead of throwing, let's create a default list with some common departments
-                        _logger.LogInformation("DIAGNOSTIC: Creating default department list as fallback");
-                        _departments = new List<LookupItem>
-                        {
-                            new LookupItem("IT", "IT"),
-                            new LookupItem("HR", "HR"),
-                            new LookupItem("Finance", "Finance"),
-                            new LookupItem("Marketing", "Marketing"),
-                            new LookupItem("Operations", "Operations"),
-                            new LookupItem("Sales", "Sales")
-                        };
-
-                        _logger.LogInformation("DIAGNOSTIC: Created default department list with {Count} items", _departments.Count);
+                    else {
+                        _logger.LogError("DIAGNOSTIC: Department data was null after API call. No fallback departments will be provided.");
+                        _departments = new List<LookupItem>(); // Empty list, no fallback
                     }
                 }
                 catch (Exception apiEx)
                 {
                     _logger.LogError(apiEx, "DIAGNOSTIC: Error calling GetDepartmentsAsync API: {Message}", apiEx.Message);
-
-                    // Create default departments as fallback
-                    _logger.LogInformation("DIAGNOSTIC: Creating default department list as fallback after API error");
-                    _departments = new List<LookupItem>
-                    {
-                        new LookupItem("IT", "IT"),
-                        new LookupItem("HR", "HR"),
-                        new LookupItem("Finance", "Finance"),
-                        new LookupItem("Marketing", "Marketing"),
-                        new LookupItem("Operations", "Operations"),
-                        new LookupItem("Sales", "Sales")
-                    };
-
-                    _logger.LogInformation("DIAGNOSTIC: Created default department list with {Count} items", _departments.Count);
+                    _departments = new List<LookupItem>(); // Empty list, no fallback
+                    throw; // Re-throw to let calling code handle the error
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE Error] Failed to load data: {ex.Message}\n\nStack: {ex.StackTrace}");
                 _logger.LogError(ex, "DIAGNOSTIC: Failed to load lookup data");
-
-                // Create default departments as fallback
-                _logger.LogInformation("DIAGNOSTIC: Creating default department list as fallback after exception");
-                _departments = new List<LookupItem>
-                {
-                    new LookupItem("IT", "IT"),
-                    new LookupItem("HR", "HR"),
-                    new LookupItem("Finance", "Finance"),
-                    new LookupItem("Marketing", "Marketing"),
-                    new LookupItem("Operations", "Operations"),
-                    new LookupItem("Sales", "Sales")
-                };
-
-                _logger.LogInformation("DIAGNOSTIC: Created default department list with {Count} items", _departments.Count);
-
-                // Don't throw, just log the error and continue with default data
-                _logger.LogWarning("DIAGNOSTIC: Using default department data due to error: {Message}", ex.Message);
+                _departments = new List<LookupItem>(); // Empty list, no fallback
+                throw; // Re-throw to let calling code handle the error
             }
         }
 

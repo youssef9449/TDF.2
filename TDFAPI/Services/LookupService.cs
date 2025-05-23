@@ -102,16 +102,18 @@ namespace TDFAPI.Services
                 {
                     foreach (var departmentName in departmentNames)
                     {
-                        if (!string.IsNullOrEmpty(departmentName) && !departments.Any(d => d.Value == departmentName))
+                        if (!string.IsNullOrEmpty(departmentName) && !departments.Any(d => d.Name == departmentName))
                         {
-                            // Use department name for id, name, and value
-                            var dept = new LookupItem(departmentName, departmentName)
+                            // Create department with name only, no ID needed
+                            var dept = new LookupItem
                             {
-                                Value = departmentName // Also set the Value property
+                                Id = string.Empty, // No ID for departments
+                                Name = departmentName,
+                                Value = departmentName
                             };
                             departments.Add(dept);
-                            _logger.LogInformation("DIAGNOSTIC: Added department from Departments table: Id={Id}, Name={Name}, Value={Value}",
-                                dept.Id, dept.Name, dept.Value);
+                            _logger.LogInformation("DIAGNOSTIC: Added department from Departments table: Name={Name}, Value={Value}",
+                                dept.Name, dept.Value);
                         }
                     }
                 }

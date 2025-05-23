@@ -101,9 +101,10 @@ namespace TDFAPI.Data
                 entity.Property(e => e.RequestNumberOfDays).HasColumnName("request_number_of_days");
                 entity.Property(e => e.RequestHRCloser).HasMaxLength(255);
                 entity.Property(e => e.RequestHRStatus)
+                    .IsRequired()
                     .HasMaxLength(50)
                     .HasConversion<string>() // Convert enum to string for DB
-                    .IsRequired(false); // Assuming RequestHRStatus can be null
+                    .HasDefaultValue(RequestStatus.Pending); // Set default using enum
                 entity.Property(e => e.CreatedAt).HasColumnName("request_created_at");
                 entity.Property(e => e.ApprovedAt);
                 entity.Property(e => e.RejectedAt);
@@ -220,29 +221,29 @@ namespace TDFAPI.Data
             builder.Entity<RevokedToken>(entity =>
             {
                 entity.ToTable("RevokedTokens");
-                
+
                 entity.Property(e => e.Jti)
                     .IsRequired()
                     .HasMaxLength(100)
                     .IsUnicode(false);
-                    
+
                 entity.Property(e => e.ExpiryDate)
                     .IsRequired()
                     .HasColumnType("datetime2");
-                    
+
                 entity.Property(e => e.RevocationDate)
                     .IsRequired()
                     .HasColumnType("datetime2")
                     .HasDefaultValueSql("getutcdate()");
-                    
+
                 entity.Property(e => e.Reason)
                     .HasMaxLength(255)
                     .IsUnicode(false);
-                    
+
                 // Index for faster lookups by JTI
                 entity.HasIndex(e => e.Jti)
                     .HasDatabaseName("IX_RevokedTokens_Jti");
-                    
+
                 // Index for cleanup of expired tokens
                 entity.HasIndex(e => e.ExpiryDate)
                     .HasDatabaseName("IX_RevokedTokens_ExpiryDate");

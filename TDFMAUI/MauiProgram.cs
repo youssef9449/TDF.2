@@ -97,7 +97,7 @@ namespace TDFMAUI
                     System.Diagnostics.Debug.WriteLine("Warning: appsettings.json not found, using default configuration");
 
                     // Set default API configuration
-                    ApiConfig.BaseUrl = $"https://192.168.100.3:5001/{ApiRoutes.Base}/";
+                    ApiConfig.BaseUrl = $"https://192.168.100.3:5001/";
                     ApiConfig.WebSocketUrl = $"wss://192.168.100.3:5001{ApiRoutes.WebSocket.Base}";
                     ApiConfig.Timeout = 30;
                     ApiConfig.DevelopmentMode = true;
@@ -119,7 +119,7 @@ namespace TDFMAUI
                     options.BaseUrl = builder.Configuration[$"{section}:BaseUrl"];
                     if (string.IsNullOrEmpty(options.BaseUrl))
                     {
-                        options.BaseUrl = $"https://192.168.100.3:5001/{ApiRoutes.Base}/"; // Default fallback
+                        options.BaseUrl = $"https://192.168.100.3:5001/"; // Default fallback
                         System.Diagnostics.Debug.WriteLine($"Warning: {section}:BaseUrl not found in configuration. Using default DI BaseUrl: {options.BaseUrl}");
                     }
                     options.WebSocketUrl = builder.Configuration[$"{section}:WebSocketUrl"];

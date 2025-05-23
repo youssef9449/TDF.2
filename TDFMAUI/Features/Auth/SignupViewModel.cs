@@ -37,6 +37,16 @@ namespace TDFMAUI.Features.Auth
         [ObservableProperty]
         private ObservableCollection<LookupItem> _departments = new();
 
+        // Override the generated property to add debugging
+        partial void OnDepartmentsChanged(ObservableCollection<LookupItem> value)
+        {
+            Debug.WriteLine($"[SignupViewModel] Departments property changed. New count: {value?.Count ?? 0}");
+            if (value != null && value.Count > 0)
+            {
+                Debug.WriteLine($"[SignupViewModel] First department in new collection: {value[0].Name}");
+            }
+        }
+
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(Titles))]
         private LookupItem _selectedDepartment;
@@ -119,8 +129,28 @@ namespace TDFMAUI.Features.Auth
                     Debug.WriteLine("[SignupViewModel] Calling departments API endpoint directly");
                     _logger?.LogInformation("DIAGNOSTIC: Calling departments API endpoint directly using ApiRoutes");
 
+                    // Debug the route construction
+                    string originalRoute = ApiRoutes.Lookups.GetDepartments;
+                    string processedRoute = ApiRoutes.RemoveBasePrefix(originalRoute);
+                    Debug.WriteLine($"[SignupViewModel] Original route: {originalRoute}");
+                    Debug.WriteLine($"[SignupViewModel] Processed route: {processedRoute}");
+                    _logger?.LogInformation("DIAGNOSTIC: Original route: {OriginalRoute}, Processed route: {ProcessedRoute}", originalRoute, processedRoute);
+
                     // Use ApiRoutes directly like the LookupService does
                     var response = await _apiService.GetAsync<ApiResponse<List<LookupItem>>>(ApiRoutes.Lookups.GetDepartments);
+
+                    // Debug the response details
+                    Debug.WriteLine($"[SignupViewModel] Response received. Response null: {response == null}");
+                    if (response != null)
+                    {
+                        Debug.WriteLine($"[SignupViewModel] Response.Success: {response.Success}");
+                        Debug.WriteLine($"[SignupViewModel] Response.Data null: {response.Data == null}");
+                        Debug.WriteLine($"[SignupViewModel] Response.Message: {response.Message}");
+                        Debug.WriteLine($"[SignupViewModel] Response.ErrorMessage: {response.ErrorMessage}");
+                        Debug.WriteLine($"[SignupViewModel] Response.StatusCode: {response.StatusCode}");
+                        _logger?.LogInformation("DIAGNOSTIC: Response details - Success: {Success}, Data null: {DataNull}, Message: {Message}, ErrorMessage: {ErrorMessage}, StatusCode: {StatusCode}",
+                            response.Success, response.Data == null, response.Message, response.ErrorMessage, response.StatusCode);
+                    }
 
                     if (response != null && response.Success && response.Data != null)
                     {
@@ -159,12 +189,23 @@ namespace TDFMAUI.Features.Auth
                     Debug.WriteLine("[SignupViewModel] Failed to load departments - list is null or empty.");
                     _logger?.LogError("DIAGNOSTIC: Failed to load departments. Departments list is null or empty. Count: {Count}", departments?.Count ?? -1);
 
-                    await MainThread.InvokeOnMainThreadAsync(() => {
-                        ErrorMessage = "Unable to load departments. Please check your connection and try again.";
-                        HasError = true;
-                        Departments.Clear();
-                    });
-                    return;
+                    // Add fallback test departments to verify UI binding works
+                    Debug.WriteLine("[SignupViewModel] Adding fallback test departments to verify UI binding");
+                    departments = new List<LookupItem>
+                    {
+                        new LookupItem { Name = "Test Department 1", Id = "test1" },
+                        new LookupItem { Name = "Test Department 2", Id = "test2" },
+                        new LookupItem { Name = "Test Department 3", Id = "test3" }
+                    };
+                    Debug.WriteLine($"[SignupViewModel] Created {departments.Count} fallback test departments");
+
+                    // Continue with the fallback departments instead of returning
+                    // await MainThread.InvokeOnMainThreadAsync(() => {
+                    //     ErrorMessage = "Unable to load departments. Please check your connection and try again.";
+                    //     HasError = true;
+                    //     Departments.Clear();
+                    // });
+                    // return;
                 }
 
                 Debug.WriteLine($"[SignupViewModel] Successfully loaded {departments.Count} departments");
@@ -186,7 +227,14 @@ namespace TDFMAUI.Features.Auth
                         foreach (var dept in departments)
                         {
                             Departments.Add(dept);
-                            Debug.WriteLine($"[SignupViewModel] Added department: {dept.Name}");
+                            Debug.WriteLine($"[SignupViewModel] Added department: Name='{dept.Name}', Id='{dept.Id}', Description='{dept.Description}'");
+                        }
+
+                        // Verify the ObservableCollection after adding
+                        Debug.WriteLine($"[SignupViewModel] ObservableCollection verification - Count: {Departments.Count}");
+                        for (int i = 0; i < Departments.Count; i++)
+                        {
+                            Debug.WriteLine($"[SignupViewModel] Departments[{i}]: Name='{Departments[i].Name}', Id='{Departments[i].Id}'");
                         }
 
                         Debug.WriteLine($"[SignupViewModel] UI updated - Departments.Count: {Departments.Count}");

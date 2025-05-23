@@ -33,6 +33,12 @@
 
             <Label Text="Department" />
 
+            <!-- Debug label to show department count -->
+            <Label Text="{Binding Departments.Count, StringFormat='Debug: {0} departments loaded'}"
+                   FontSize="Small"
+                   TextColor="Blue"
+                   HorizontalOptions="Center" />
+
             <!-- Loading indicator for departments -->
             <ActivityIndicator IsVisible="{Binding IsLoading}"
                              IsRunning="{Binding IsLoading}"

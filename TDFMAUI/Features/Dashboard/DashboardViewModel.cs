@@ -93,8 +93,8 @@ namespace TDFMAUI.Features.Dashboard
                 // Add sample data for design-time preview
                 RecentRequests.Add(new RequestResponseDto
                 {
-                    RequestID = Guid.NewGuid(),
-                    LeaveType = "Annual Leave",
+                    RequestID = 1,
+                    LeaveType = TDFShared.Enums.LeaveType.Annual,
                     RequestStartDate = DateTime.Today.AddDays(7),
                     Status = TDFShared.Enums.RequestStatus.Pending
                 });

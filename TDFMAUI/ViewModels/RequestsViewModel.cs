@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Common;
+using TDFShared.DTOs.Users;
 using TDFShared.Services;
 using TDFMAUI.Services;
 using TDFMAUI.Features.Requests; // For AddRequestPage navigation

@@ -1,5 +1,6 @@
 using TDFMAUI.Services;
 using TDFMAUI.ViewModels;
+using TDFShared.Services;
 using System;
 
 namespace TDFMAUI.Pages
@@ -9,13 +10,13 @@ namespace TDFMAUI.Pages
         private readonly ReportsViewModel _viewModel;
 
         // Inject ViewModel and IRequestService via constructor
-        public ReportsPage(IRequestService requestService)
+        public ReportsPage(IRequestService requestService, IErrorHandlingService errorHandlingService)
         {
             InitializeComponent();
-            
+
             // Create the ViewModel, passing dependencies
-            _viewModel = new ReportsViewModel(requestService, Navigation);
-            
+            _viewModel = new ReportsViewModel(requestService, Navigation, errorHandlingService);
+
             // Set the binding context for the page
             BindingContext = _viewModel;
         }
@@ -28,8 +29,8 @@ namespace TDFMAUI.Pages
             await Task.Run(() => _viewModel.InitializeAsync());
         }
 
-        // Remove all other methods like LoadLeaveRequests, OnAddClicked, 
-        // OnRefreshing, OnFilterChanged, OnItemTapped as this logic 
+        // Remove all other methods like LoadLeaveRequests, OnAddClicked,
+        // OnRefreshing, OnFilterChanged, OnItemTapped as this logic
         // is now handled by the ViewModel through commands and bindings.
     }
-} 
+}

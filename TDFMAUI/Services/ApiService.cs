@@ -1386,7 +1386,7 @@ namespace TDFMAUI.Services
 
                 // Log API endpoint details
                 string endpoint = ApiRoutes.Lookups.GetDepartments;
-                string fullUrl = _httpClientService.GetFullUrl(endpoint);
+                string fullUrl = $"{_httpClientService.BaseUrl?.TrimEnd('/')}/{endpoint.TrimStart('/')}";
                 _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Starting API request to endpoint: {Endpoint}, full URL: {FullUrl}", endpoint, fullUrl);
 
                 // Make the API call with detailed logging

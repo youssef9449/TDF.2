@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Controls;
 using TDFMAUI.Features.Requests;
-// Using TDFShared.Services instead of TDFMAUI.Services to resolve ambiguous references
+using TDFMAUI.Services;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Users;
 using TDFShared.Enums;
@@ -17,8 +17,8 @@ namespace TDFMAUI.ViewModels
     [QueryProperty(nameof(RequestId), "RequestId")]
     public partial class RequestDetailsViewModel : ObservableObject
     {
-        private readonly IApiService _apiService;
-        private readonly IAuthService _authService;
+        private readonly TDFMAUI.Services.IApiService _apiService;
+        private readonly TDFShared.Services.IAuthService _authService;
         private readonly ILogger<RequestDetailsViewModel> _logger;
 
         [ObservableProperty]
@@ -38,7 +38,7 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty] private bool _canEdit;
         [ObservableProperty] private bool _canDelete;
 
-        public RequestDetailsViewModel(IApiService apiService, IAuthService authService, ILogger<RequestDetailsViewModel> logger)
+        public RequestDetailsViewModel(TDFMAUI.Services.IApiService apiService, TDFShared.Services.IAuthService authService, ILogger<RequestDetailsViewModel> logger)
         {
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
@@ -76,9 +76,9 @@ namespace TDFMAUI.ViewModels
                         var userDto = new UserDto
                         {
                             UserID = currentUser.UserID,
-                            IsAdmin = currentUser.IsAdmin ?? false,
-                            IsHR = currentUser.IsHR ?? false,
-                            IsManager = currentUser.IsManager ?? false,
+                            IsAdmin = currentUser.IsAdmin,
+                            IsHR = currentUser.IsHR,
+                            IsManager = currentUser.IsManager,
                             Department = currentUser.Department
                         };
 
@@ -129,9 +129,9 @@ namespace TDFMAUI.ViewModels
             var userDto = new UserDto
             {
                 UserID = currentUser.UserID,
-                IsAdmin = currentUser.IsAdmin ?? false,
-                IsHR = currentUser.IsHR ?? false,
-                IsManager = currentUser.IsManager ?? false,
+                IsAdmin = currentUser.IsAdmin,
+                IsHR = currentUser.IsHR,
+                IsManager = currentUser.IsManager,
                 Department = currentUser.Department
             };
 

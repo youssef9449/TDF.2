@@ -59,9 +59,9 @@ namespace TDFMAUI.ViewModels
                 var userDto = new UserDto
                 {
                     UserID = currentUser.UserID,
-                    IsAdmin = currentUser.IsAdmin ?? false,
-                    IsHR = currentUser.IsHR ?? false,
-                    IsManager = currentUser.IsManager ?? false,
+                    IsAdmin = currentUser.IsAdmin,
+                    IsHR = currentUser.IsHR,
+                    IsManager = currentUser.IsManager,
                     Department = currentUser.Department
                 };
 

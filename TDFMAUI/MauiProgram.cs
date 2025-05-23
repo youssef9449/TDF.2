@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TDFMAUI.Config;
 using TDFMAUI.Converters;
 using TDFMAUI.Pages;
@@ -13,7 +14,6 @@ using TDFMAUI.Features.Admin;
 using CommunityToolkit.Maui;
 using System.Diagnostics;
 using TDFShared.Constants;
-using TDFShared.DependencyInjection;
 
 
 namespace TDFMAUI
@@ -181,7 +181,7 @@ namespace TDFMAUI
 #endif
 
             // Register MAUI-specific services
-            builder.Services.AddMauiServices();
+            // Note: MAUI services are automatically registered by the framework
 
             // Register core services
             builder.Services.AddSingleton<WebSocketService>();
@@ -232,7 +232,7 @@ namespace TDFMAUI
             });
 
             // Register platform-specific connectivity service
-            builder.Services.AddSingleton<TDFShared.Services.IConnectivityService, ConnectivityService>();
+            builder.Services.AddSingleton<TDFMAUI.Services.IConnectivityService, ConnectivityService>();
 
             // Register shared validation services
             builder.Services.AddSingleton<TDFShared.Validation.IValidationService, TDFShared.Validation.ValidationService>();

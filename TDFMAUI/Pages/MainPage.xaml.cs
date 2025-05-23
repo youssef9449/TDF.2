@@ -30,12 +30,12 @@ public partial class MainPage : ContentPage
         {
             var userNameLabel = this.FindByName("userNameLabel") as Label;
             var adminFrame = this.FindByName("adminFrame") as Frame;
-            
+
             if (userNameLabel != null)
             {
                 userNameLabel.Text = App.CurrentUser.FullName;
             }
-            
+
             if (adminFrame != null)
             {
                 adminFrame.IsVisible = App.CurrentUser.IsAdmin;
@@ -79,7 +79,8 @@ public partial class MainPage : ContentPage
         {
             var requestService = App.Services.GetRequiredService<IRequestService>();
             var apiService = App.Services.GetRequiredService<ApiService>();
-            await Navigation.PushAsync(new AdminPage(requestService, apiService));
+            var errorHandlingService = App.Services.GetRequiredService<TDFShared.Services.IErrorHandlingService>();
+            await Navigation.PushAsync(new AdminPage(requestService, apiService, errorHandlingService));
         }
     }
 

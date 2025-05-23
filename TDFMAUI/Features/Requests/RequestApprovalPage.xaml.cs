@@ -1,8 +1,9 @@
 using System.Collections.ObjectModel;
-using System.Windows.Input;
+using System.Threading.Tasks;
 using TDFMAUI.Helpers;
 using TDFMAUI.Services;
 using Microsoft.Maui.Controls;
+using Microsoft.Extensions.Logging;
 using TDFMAUI.ViewModels;
 using System;
 using System.Globalization;
@@ -72,12 +73,12 @@ namespace TDFMAUI.Pages
         public RequestApprovalPage(
             TDFMAUI.Services.INotificationService notificationService,
             TDFMAUI.Services.IRequestService requestService,
-            TDFShared.Services.IAuthService authService)
+            TDFShared.Services.IAuthService authService,
+            ILogger<RequestApprovalViewModel> logger)
         {
             InitializeComponent();
             _notificationService = notificationService;
             _requestService = requestService;
-            _authService = authService;
             _authService = authService;
 
             // Add converters as resources
@@ -85,7 +86,7 @@ namespace TDFMAUI.Pages
             this.Resources.Add("StatusTextColorConverter", new StatusTextColorConverter(this));
 
             // Set the binding context
-            _viewModel = new RequestApprovalViewModel(_requestService, _notificationService, _authService);
+            _viewModel = new RequestApprovalViewModel(_requestService, _notificationService, _authService, logger);
             BindingContext = _viewModel;
 
             // Device-specific config and events
@@ -98,7 +99,7 @@ namespace TDFMAUI.Pages
 
         private async void LoadRequestsAsync()
         {
-            await _viewModel.LoadRequestsAsync();
+            await _viewModel.LoadRequestsCommand.ExecuteAsync(null);
         }
 
         private void ApplyPlatformSpecificUI()
@@ -185,14 +186,14 @@ namespace TDFMAUI.Pages
             ApplyPlatformSpecificUI();
         }
 
-        protected override void OnAppearing()
+        protected override async void OnAppearing()
         {
             base.OnAppearing();
             ConfigureForCurrentDevice();
             _viewModel.PropertyChanged += ViewModel_PropertyChanged;
             if (_viewModel.Requests == null || !_viewModel.Requests.Any())
             {
-                _viewModel.LoadRequestsAsync();
+                await _viewModel.LoadRequestsCommand.ExecuteAsync(null);
             }
         }
 
@@ -207,6 +208,14 @@ namespace TDFMAUI.Pages
             if (e.PropertyName == nameof(RequestApprovalViewModel.Requests))
             {
                 // Update UI based on ViewModel changes
+            }
+        }
+
+        private void OnToggleFiltersClicked(object sender, EventArgs e)
+        {
+            if (FiltersPanel != null)
+            {
+                FiltersPanel.IsVisible = !FiltersPanel.IsVisible;
             }
         }
     }

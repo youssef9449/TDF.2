@@ -27,7 +27,6 @@ using TDFShared.Models.Message;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.AspNetCore.HttpOverrides;
 using TDFShared.Constants;
-using TDFShared.DependencyInjection;
 using TDFShared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -552,8 +551,7 @@ builder.Services.AddSingleton<WebSocketConnectionManager>();
 // Add EventMediator as a singleton
 builder.Services.AddSingleton<TDFAPI.Messaging.Interfaces.IEventMediator, EventMediator>();
 
-// Register API-specific services
-builder.Services.AddApiServices();
+// API-specific services are registered individually below
 
 // Register SecurityService
 builder.Services.AddScoped<TDFShared.Services.ISecurityService, TDFShared.Services.SecurityService>();

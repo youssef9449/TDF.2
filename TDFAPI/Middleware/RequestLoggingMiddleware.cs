@@ -87,8 +87,9 @@ namespace TDFAPI.Middleware
                  path.StartsWith($"/{ApiRoutes.Documents.Base.Replace(ApiRoutes.Base + "/", "")}/") ||
                  path.StartsWith($"/{ApiRoutes.Reports.Base.Replace(ApiRoutes.Base + "/", "")}/")))
             {
-                _logger.LogWarning("Detected request to {Path} without /{ApiBase} prefix. Rewriting path to /{ApiBase}{OriginalPath}.", path, ApiRoutes.Base, path);
-                context.Request.Path = $"/{ApiRoutes.Base}{path}";
+                string rewrittenPath = $"/{ApiRoutes.Base}{path}";
+                _logger.LogWarning("Detected request to {OriginalPath} without /{ApiBase} prefix. Rewriting path to {RewrittenPath}.", path, ApiRoutes.Base, rewrittenPath);
+                context.Request.Path = rewrittenPath;
                 // Let the request continue with the rewritten path and original method
             }
 

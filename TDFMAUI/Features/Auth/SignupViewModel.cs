@@ -99,74 +99,60 @@ namespace TDFMAUI.Features.Auth
                     return;
                 }
 
-                // Test API connectivity
-                bool connected = false;
-                try {
-                    Debug.WriteLine("[SignupViewModel] Testing API connectivity");
-                    _logger?.LogInformation("DIAGNOSTIC: Testing API connectivity");
+                // Skip separate connectivity test - the departments API call will handle connectivity issues
+                Debug.WriteLine("[SignupViewModel] Skipping separate connectivity test, will test connectivity via departments API call");
+                _logger?.LogInformation("DIAGNOSTIC: Skipping separate connectivity test, will test connectivity via departments API call");
 
-                    connected = await _apiService.TestConnectivityAsync();
-                    Debug.WriteLine($"[SignupViewModel] API connectivity test result: {connected}");
-                    _logger?.LogInformation("DIAGNOSTIC: API connectivity test result: {Connected}", connected);
-
-                    if (!connected)
-                    {
-                        Debug.WriteLine("[SignupViewModel] API connectivity test failed");
-                        _logger?.LogWarning("DIAGNOSTIC: API connectivity test failed");
-
-                        await MainThread.InvokeOnMainThreadAsync(() => {
-                            ErrorMessage = "Could not connect to the server. Please try again later.";
-                            HasError = true;
-                        });
-
-                        await MainThread.InvokeOnMainThreadAsync(() => {
-                            Debug.WriteLine("[SignupViewModel] API connectivity test failed");
-                            _logger?.LogWarning("DIAGNOSTIC: API connectivity test failed, cannot load departments");
-                            Departments.Clear();
-                        });
-
-                        return;
-                    }
-                } catch (Exception connEx) {
-                    Debug.WriteLine($"[SignupViewModel] API connectivity test error: {connEx.Message}");
-                    _logger?.LogError(connEx, "DIAGNOSTIC: API connectivity test failed");
-
-                    // Continue anyway, the GetDepartmentsAsync call might still work
-                }
-
-                // Load departments using LookupService
-                Debug.WriteLine("[SignupViewModel] Loading departments");
-                _logger?.LogInformation("DIAGNOSTIC: Loading departments");
+                // Load departments directly from API service to bypass LookupService
+                Debug.WriteLine("[SignupViewModel] Loading departments directly from API");
+                _logger?.LogInformation("DIAGNOSTIC: Loading departments directly from API");
 
                 List<LookupItem> departments = null;
 
                 try
                 {
-                    Debug.WriteLine("[SignupViewModel] Calling _lookupService.GetDepartmentsAsync()");
-                    _logger?.LogInformation("DIAGNOSTIC: Calling _lookupService.GetDepartmentsAsync()");
+                    Debug.WriteLine("[SignupViewModel] Calling departments API endpoint directly");
+                    _logger?.LogInformation("DIAGNOSTIC: Calling departments API endpoint directly using ApiRoutes");
 
-                    departments = await _lookupService.GetDepartmentsAsync();
-                    Debug.WriteLine($"[SignupViewModel] _lookupService.GetDepartmentsAsync() returned. Count: {departments?.Count ?? 0}");
-                    _logger?.LogInformation("DIAGNOSTIC: _lookupService.GetDepartmentsAsync() returned. Count: {Count}", departments?.Count ?? 0);
+                    // Use ApiRoutes directly like the LookupService does
+                    var response = await _apiService.GetAsync<ApiResponse<List<LookupItem>>>(ApiRoutes.Lookups.GetDepartments);
 
-                    if (departments != null && departments.Count > 0)
+                    if (response != null && response.Success && response.Data != null)
                     {
-                        Debug.WriteLine($"[SignupViewModel] First department: {departments[0].Name}");
-                        _logger?.LogInformation("DIAGNOSTIC: First department: Name={Name}",
-                            departments[0].Name);
+                        departments = response.Data;
+                        Debug.WriteLine($"[SignupViewModel] API call successful. Count: {departments?.Count ?? 0}");
+                        _logger?.LogInformation("DIAGNOSTIC: API call successful. Count: {Count}", departments?.Count ?? 0);
+
+                        if (departments != null && departments.Count > 0)
+                        {
+                            Debug.WriteLine($"[SignupViewModel] First department: {departments[0].Name}");
+                            _logger?.LogInformation("DIAGNOSTIC: First department: Name={Name}",
+                                departments[0].Name);
+                        }
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[SignupViewModel] API call failed. Success: {response?.Success}, Data null: {response?.Data == null}");
+                        _logger?.LogError("DIAGNOSTIC: API call failed. Success: {Success}, ErrorMessage: {ErrorMessage}",
+                            response?.Success ?? false, response?.ErrorMessage ?? "N/A");
+                        departments = new List<LookupItem>();
                     }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[SignupViewModel] Error calling _lookupService.GetDepartmentsAsync(): {ex.Message}");
-                    _logger?.LogError(ex, "DIAGNOSTIC: Error calling _lookupService.GetDepartmentsAsync(): {Message}", ex.Message);
+                    Debug.WriteLine($"[SignupViewModel] Error calling departments API: {ex.Message}");
+                    Debug.WriteLine($"[SignupViewModel] Exception details: {ex}");
+                    _logger?.LogError(ex, "DIAGNOSTIC: Error calling departments API: {Message}. Full exception: {Exception}", ex.Message, ex.ToString());
+
+                    // Set departments to empty list to ensure we handle the error properly
+                    departments = new List<LookupItem>();
                 }
 
-                // If service failed, show error
+                // Check if departments were loaded successfully
                 if (departments == null || !departments.Any())
                 {
-                    Debug.WriteLine("[SignupViewModel] Failed to load departments.");
-                    _logger?.LogError("DIAGNOSTIC: Failed to load departments. No fallback provided.");
+                    Debug.WriteLine("[SignupViewModel] Failed to load departments - list is null or empty.");
+                    _logger?.LogError("DIAGNOSTIC: Failed to load departments. Departments list is null or empty. Count: {Count}", departments?.Count ?? -1);
 
                     await MainThread.InvokeOnMainThreadAsync(() => {
                         ErrorMessage = "Unable to load departments. Please check your connection and try again.";
@@ -175,6 +161,9 @@ namespace TDFMAUI.Features.Auth
                     });
                     return;
                 }
+
+                Debug.WriteLine($"[SignupViewModel] Successfully loaded {departments.Count} departments");
+                _logger?.LogInformation("DIAGNOSTIC: Successfully loaded {Count} departments", departments.Count);
 
                 // Ensure we're on the main thread for UI updates
                 await MainThread.InvokeOnMainThreadAsync(() => {

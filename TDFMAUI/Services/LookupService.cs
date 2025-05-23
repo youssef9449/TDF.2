@@ -116,7 +116,9 @@ namespace TDFMAUI.Services
 
                 try
                 {
+                    _logger.LogInformation("DIAGNOSTIC: About to call _apiService.GetDepartmentsAsync()");
                     var departments = await _apiService.GetDepartmentsAsync();
+                    _logger.LogInformation("DIAGNOSTIC: _apiService.GetDepartmentsAsync() completed successfully");
 
                     // Enhanced logging for department data received by LookupService
                     if (departments == null)
@@ -143,6 +145,7 @@ namespace TDFMAUI.Services
                         }
                     }
 
+                    _logger.LogInformation("DIAGNOSTIC: About to assign departments to _departments field");
                     if (departments != null) { // Allow empty list as a valid response
                         _logger.LogInformation("DIAGNOSTIC: Successfully processed departments list (Count: {Count})", departments.Count);
                         _departments = departments;
@@ -154,10 +157,11 @@ namespace TDFMAUI.Services
                         _logger.LogError("DIAGNOSTIC: Department data was null after API call. No fallback departments will be provided.");
                         _departments = new List<LookupItem>(); // Empty list, no fallback
                     }
+                    _logger.LogInformation("DIAGNOSTIC: LoadDataAsync completed successfully");
                 }
                 catch (Exception apiEx)
                 {
-                    _logger.LogError(apiEx, "DIAGNOSTIC: Error calling GetDepartmentsAsync API: {Message}", apiEx.Message);
+                    _logger.LogError(apiEx, "DIAGNOSTIC: Error calling GetDepartmentsAsync API: {Message}. Full exception: {Exception}", apiEx.Message, apiEx.ToString());
                     _departments = new List<LookupItem>(); // Empty list, no fallback
                     throw; // Re-throw to let calling code handle the error
                 }

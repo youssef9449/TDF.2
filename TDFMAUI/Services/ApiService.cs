@@ -1380,8 +1380,8 @@ namespace TDFMAUI.Services
 
                 if (networkAccess != NetworkAccess.Internet)
                 {
-                    _logger.LogWarning("DIAGNOSTIC: GetDepartmentsAsync - No internet connectivity. Returning default departments.");
-                    return GetDefaultDepartments();
+                    _logger.LogError("DIAGNOSTIC: GetDepartmentsAsync - No internet connectivity.");
+                    throw new InvalidOperationException("No internet connectivity available.");
                 }
 
                 // Log API endpoint details
@@ -1416,32 +1416,25 @@ namespace TDFMAUI.Services
                 // Log the result
                 if (result == null)
                 {
-                    _logger.LogWarning("DIAGNOSTIC: GetDepartmentsAsync - API request returned null result");
-                    return GetDefaultDepartments();
+                    _logger.LogError("DIAGNOSTIC: GetDepartmentsAsync - API request returned null result");
+                    throw new InvalidOperationException("API request returned null result");
                 }
 
                 if (!result.Success)
                 {
-                    _logger.LogWarning("DIAGNOSTIC: GetDepartmentsAsync - API request failed with status code {StatusCode}: {ErrorMessage}",
+                    _logger.LogError("DIAGNOSTIC: GetDepartmentsAsync - API request failed with status code {StatusCode}: {ErrorMessage}",
                         result.StatusCode, result.ErrorMessage);
-                    return GetDefaultDepartments();
+                    throw new InvalidOperationException($"API request failed: {result.ErrorMessage}");
                 }
 
                 if (result.Data == null)
                 {
-                    _logger.LogWarning("DIAGNOSTIC: GetDepartmentsAsync - API request succeeded but returned null data");
-                    return GetDefaultDepartments();
+                    _logger.LogError("DIAGNOSTIC: GetDepartmentsAsync - API request succeeded but returned null data");
+                    throw new InvalidOperationException("API request succeeded but returned null data");
                 }
 
                 // Log successful result
                 _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - API request completed successfully, returned {Count} items", result.Data.Count);
-
-                // If we got an empty list, return default departments
-                if (result.Data.Count == 0)
-                {
-                    _logger.LogWarning("DIAGNOSTIC: GetDepartmentsAsync - API returned empty list. Using defaults.");
-                    return GetDefaultDepartments();
-                }
 
                 // Log the first few departments for debugging
                 for (int i = 0; i < Math.Min(result.Data.Count, 5); i++)
@@ -1456,25 +1449,8 @@ namespace TDFMAUI.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "DIAGNOSTIC ERROR: Error getting departments: {Message}", ex.Message);
-                return GetDefaultDepartments();
+                throw;
             }
-        }
-
-        private List<LookupItem> GetDefaultDepartments()
-        {
-            _logger.LogInformation("DIAGNOSTIC: Creating default department list as fallback");
-            var defaultDepartments = new List<LookupItem>
-            {
-                new LookupItem("IT", "IT"),
-                new LookupItem("HR", "HR"),
-                new LookupItem("Finance", "Finance"),
-                new LookupItem("Marketing", "Marketing"),
-                new LookupItem("Operations", "Operations"),
-                new LookupItem("Sales", "Sales")
-            };
-
-            _logger.LogInformation("DIAGNOSTIC: Created default department list with {Count} items", defaultDepartments.Count);
-            return defaultDepartments;
         }
 
         public async Task<List<LookupItem>> GetLeaveTypesAsync(bool queueIfUnavailable = true)

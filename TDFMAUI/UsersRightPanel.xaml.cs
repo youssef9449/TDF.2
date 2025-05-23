@@ -146,11 +146,11 @@ namespace TDFMAUI
             // Skip updates for the current user - they should not be displayed in the panel
             if (App.CurrentUser != null && e.UserId == App.CurrentUser.UserID)
             {
-                _logger.LogInformation($"Ignoring status change for current user (ID: {e.UserId})");
+                _logger.LogInformation("Ignoring status change for current user (ID: {UserId})", e.UserId);
                 return;
             }
 
-            _logger.LogInformation($"User status changed: UserID {e.UserId}, Status {e.Status}. Updating panel.");
+            _logger.LogInformation("User status changed: UserID {UserId}, Status {Status}. Updating panel.", e.UserId, e.Status);
 
             MainThread.BeginInvokeOnMainThread(async () =>
             {
@@ -162,7 +162,7 @@ namespace TDFMAUI
                     {
                         // Update the user's status
                         existingUser.Status = e.Status;
-                        _logger.LogInformation($"Updated user {e.Username} (ID: {e.UserId}) status to {e.Status} in UsersRightPanel");
+                        _logger.LogInformation("Updated user {Username} (ID: {UserId}) status to {Status} in UsersRightPanel", e.Username, e.UserId, e.Status);
                     }
                     else
                     {
@@ -170,18 +170,18 @@ namespace TDFMAUI
                         // This handles cases where a user comes online that wasn't in our list before
                         if (e.Status != UserPresenceStatus.Offline)
                         {
-                            _logger.LogInformation($"User {e.Username} (ID: {e.UserId}) not found in collection, refreshing panel");
+                            _logger.LogInformation("User {Username} (ID: {UserId}) not found in collection, refreshing panel", e.Username, e.UserId);
                             await RefreshUsersAsync();
                         }
                         else
                         {
-                            _logger.LogInformation($"Ignoring offline status for user not in collection: {e.Username} (ID: {e.UserId})");
+                            _logger.LogInformation("Ignoring offline status for user not in collection: {Username} (ID: {UserId})", e.Username, e.UserId);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Error updating user status in UsersRightPanel: {ex.Message}");
+                    _logger.LogError(ex, "Error updating user status in UsersRightPanel: {Message}", ex.Message);
                 }
             });
         }
@@ -191,11 +191,11 @@ namespace TDFMAUI
             // Skip updates for the current user - they should not be displayed in the panel
             if (App.CurrentUser != null && e.UserId == App.CurrentUser.UserID)
             {
-                _logger.LogInformation($"Ignoring availability change for current user (ID: {e.UserId})");
+                _logger.LogInformation("Ignoring availability change for current user (ID: {UserId})", e.UserId);
                 return;
             }
 
-            _logger.LogInformation($"User availability changed: UserID {e.UserId}, Available: {e.IsAvailableForChat}");
+            _logger.LogInformation("User availability changed: UserID {UserId}, Available: {IsAvailableForChat}", e.UserId, e.IsAvailableForChat);
 
             MainThread.BeginInvokeOnMainThread(() =>
             {
@@ -205,13 +205,13 @@ namespace TDFMAUI
                     if (existingUser != null)
                     {
                         existingUser.IsAvailableForChat = e.IsAvailableForChat;
-                        _logger.LogInformation($"Updated user {e.Username} (ID: {e.UserId}) availability to {e.IsAvailableForChat} in UsersRightPanel");
+                        _logger.LogInformation("Updated user {Username} (ID: {UserId}) availability to {IsAvailableForChat} in UsersRightPanel", e.Username, e.UserId, e.IsAvailableForChat);
                     }
                     // No need to refresh the full list for availability changes
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Error updating user availability in UsersRightPanel: {ex.Message}");
+                    _logger.LogError(ex, "Error updating user availability in UsersRightPanel: {Message}", ex.Message);
                 }
             });
         }
@@ -259,7 +259,7 @@ namespace TDFMAUI
                 }
                 else
                 {
-                    _logger.LogInformation($"UsersRightPanel: Will exclude current user ID: {currentAppUserId}");
+                    _logger.LogInformation("UsersRightPanel: Will exclude current user ID: {CurrentAppUserId}", currentAppUserId);
                 }
 
                 MainThread.BeginInvokeOnMainThread(() =>
@@ -291,7 +291,7 @@ namespace TDFMAUI
 
                         int userCount = currentUsers.Count;
                         int totalUsers = onlineUsersDetails.Count;
-                        _logger.LogInformation($"UsersRightPanel: Displaying {userCount} users (filtered from {totalUsers} total users).");
+                        _logger.LogInformation("UsersRightPanel: Displaying {UserCount} users (filtered from {TotalUsers} total users).", userCount, totalUsers);
                     }
                     else
                     {

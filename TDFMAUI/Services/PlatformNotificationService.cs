@@ -22,7 +22,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                _logger.LogInformation($"Showing notification: {title} - {message} (Type: {notificationType})");
+                _logger.LogInformation("Showing notification: {Title} - {Message} (Type: {NotificationType})", title, message, notificationType);
 
                 // Log notification for history
                 await LogNotificationAsync(title, message, notificationType, data);
@@ -66,7 +66,7 @@ namespace TDFMAUI.Services
                 else if (DeviceHelper.IsMacOS)
                 {
                     // macOS-specific notification code
-                    await Task.Run(() => 
+                    await Task.Run(() =>
                     {
                         _logger.LogDebug("Showing macOS desktop notification");
                     });
@@ -167,10 +167,10 @@ namespace TDFMAUI.Services
             {
                 // Request notification permission (this would use platform APIs)
                 // For a complete implementation, this should use Permissions.RequestAsync<Permissions.Notification>()
-                
+
                 // Simulating permission request for now
                 status = PermissionStatus.Granted;
-                
+
                 // Save the new status
                 await _localStorage.SetItemAsync("notification_permission", status.ToString());
             }
@@ -183,9 +183,9 @@ namespace TDFMAUI.Services
             try
             {
                 // Retrieve existing notification history from local storage
-                var history = await _localStorage.GetItemAsync<List<NotificationRecord>>("notification_history") 
+                var history = await _localStorage.GetItemAsync<List<NotificationRecord>>("notification_history")
                     ?? new List<NotificationRecord>();
-                
+
                 // Add the new notification to history
                 history.Add(new NotificationRecord
                 {
@@ -196,13 +196,13 @@ namespace TDFMAUI.Services
                     Timestamp = DateTime.Now,
                     Data = data
                 });
-                
+
                 // Only keep the last 100 notifications to avoid excessive storage
                 if (history.Count > 100)
                 {
                     history = history.OrderByDescending(n => n.Timestamp).Take(100).ToList();
                 }
-                
+
                 // Save updated history
                 await _localStorage.SetItemAsync("notification_history", history);
             }
@@ -245,7 +245,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                MainThread.BeginInvokeOnMainThread(async () => 
+                MainThread.BeginInvokeOnMainThread(async () =>
                 {
                     await Application.Current.MainPage.DisplayAlert(title, message, "OK");
                 });
@@ -257,29 +257,29 @@ namespace TDFMAUI.Services
                 return Task.FromResult(false);
             }
         }
-        
+
         public Task<bool> ScheduleNotificationAsync(string title, string message, DateTime deliveryTime, string? data = null)
         {
             _logger.LogInformation("Scheduling notification: {Title} for {DeliveryTime}", title, deliveryTime);
             // Scheduled notifications would require platform-specific implementation
             return Task.FromResult(false);
         }
-        
+
         public Task<bool> CancelScheduledNotificationAsync(string id)
         {
             _logger.LogInformation("Cancelling scheduled notification: {Id}", id);
             return Task.FromResult(false);
         }
-        
+
         public Task<IEnumerable<string>> GetScheduledNotificationIdsAsync()
         {
             return Task.FromResult<IEnumerable<string>>(new List<string>());
         }
-        
+
         public Task<bool> ClearAllScheduledNotificationsAsync()
         {
             _logger.LogInformation("Clearing all scheduled notifications");
             return Task.FromResult(false);
         }
     }
-} 
+}

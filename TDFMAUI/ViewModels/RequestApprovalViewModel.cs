@@ -344,7 +344,7 @@ namespace TDFMAUI.ViewModels
             var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
             if (request == null)
             {
-                _logger.LogWarning($"Attempted to reject non-existent request with ID {requestId}");
+                _logger.LogWarning("Attempted to reject non-existent request with ID {RequestId}", requestId);
                 return;
             }
 
@@ -360,7 +360,7 @@ namespace TDFMAUI.ViewModels
             {
                 if (reason != null) // User didn't cancel
                 {
-                    _logger.LogInformation($"User attempted to reject request {requestId} without providing a reason");
+                    _logger.LogInformation("User attempted to reject request {RequestId} without providing a reason", requestId);
                     await _notificationService.ShowErrorAsync("A rejection reason is required");
                 }
                 return;

@@ -104,16 +104,14 @@ namespace TDFAPI.Services
                     {
                         if (!string.IsNullOrEmpty(departmentName) && !departments.Any(d => d.Name == departmentName))
                         {
-                            // Create department with name only, no ID needed
+                            // Create department with name only
                             var dept = new LookupItem
                             {
-                                Id = string.Empty, // No ID for departments
-                                Name = departmentName,
-                                Value = departmentName
+                                Name = departmentName
                             };
                             departments.Add(dept);
-                            _logger.LogInformation("DIAGNOSTIC: Added department from Departments table: Name={Name}, Value={Value}",
-                                dept.Name, dept.Value);
+                            _logger.LogInformation("DIAGNOSTIC: Added department from Departments table: Name={Name}",
+                                dept.Name);
                         }
                     }
                 }
@@ -126,8 +124,8 @@ namespace TDFAPI.Services
                     for (int i = 0; i < Math.Min(departments.Count, 5); i++)
                     {
                         var dept = departments[i];
-                        _logger.LogInformation("DIAGNOSTIC: Department[{Index}] - Id: {Id}, Value: {Value}",
-                            i, dept.Id, dept.Value);
+                        _logger.LogInformation("DIAGNOSTIC: Department[{Index}] - Name: {Name}",
+                            i, dept.Name);
                     }
                 }
 
@@ -212,9 +210,9 @@ namespace TDFAPI.Services
                 // Get titles for each department
                 foreach (var department in response.Departments)
                 {
-                    if (!string.IsNullOrEmpty(department.Value))
+                    if (!string.IsNullOrEmpty(department.Name))
                     {
-                        response.TitlesByDepartment[department.Value] = await GetTitlesByDepartmentAsync(department.Value);
+                        response.TitlesByDepartment[department.Name] = await GetTitlesByDepartmentAsync(department.Name);
                     }
                 }
 

@@ -23,7 +23,7 @@ namespace TDFMAUI
         /// <summary>        /// Gets the previous route that was navigated from before the current route
         /// </summary>
         public string PreviousRoute => _previousRoute;
-        
+
         public bool IsAdmin => App.CurrentUser?.IsAdmin ?? false;
         public bool IsHR => App.CurrentUser?.IsHR ?? false;
         public bool IsManager => App.CurrentUser?.IsManager ?? false;
@@ -142,7 +142,8 @@ namespace TDFMAUI
 
         private void OnShellNavigated(object sender, ShellNavigatedEventArgs e)
         {
-            _logger?.LogInformation($"Navigated to: {e.Current?.Location?.OriginalString}, Previous: {e.Previous?.Location?.OriginalString}, Source: {e.Source}");
+            _logger?.LogInformation("Navigated to: {Current}, Previous: {Previous}, Source: {Source}",
+                e.Current?.Location?.OriginalString, e.Previous?.Location?.OriginalString, e.Source);
 
             // Store the previous route if we are not coming from the users flyout itself
             if (e.Previous?.Location?.OriginalString != null && !e.Previous.Location.OriginalString.EndsWith("//users"))

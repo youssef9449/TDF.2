@@ -36,9 +36,9 @@ namespace TDFMAUI.Services
                 string debugInfo = $"Returning {_departments?.Count ?? 0} departments";
                 if (_departments != null && _departments.Count > 0)
                 {
-                    debugInfo += $"\nFirst department: {_departments[0].Id} - {_departments[0].Name}";
-                    _logger.LogInformation("DIAGNOSTIC: First department in result: Id={Id}, Name={Name}, Value={Value}",
-                        _departments[0].Id, _departments[0].Name, _departments[0].Value);
+                    debugInfo += $"\nFirst department: {_departments[0].Name}";
+                    _logger.LogInformation("DIAGNOSTIC: First department in result: Name={Name}",
+                        _departments[0].Name);
                 }
 
                 System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE] Departments Result: {debugInfo}");
@@ -130,15 +130,15 @@ namespace TDFMAUI.Services
                         {
                             // Log details of the first department to inspect deserialized values
                             var firstDept = departments[0];
-                            _logger.LogInformation("DIAGNOSTIC: First department received by LookupService - Id: {Id}, Name: {Name}, Value (from JSON 'category'): {Value}, Description: {Description}, SortOrder: {SortOrder}",
-                                                   firstDept.Id, firstDept.Name, firstDept.Value, firstDept.Description, firstDept.SortOrder);
+                            _logger.LogInformation("DIAGNOSTIC: First department received by LookupService - Name: {Name}",
+                                                   firstDept.Name);
 
                             // Log all departments for debugging
                             for (int i = 0; i < departments.Count; i++)
                             {
                                 var dept = departments[i];
-                                _logger.LogDebug("DIAGNOSTIC: Department[{Index}] - Id: {Id}, Value: {Value}",
-                                    i, dept.Id, dept.Value);
+                                _logger.LogDebug("DIAGNOSTIC: Department[{Index}] - Name: {Name}",
+                                    i, dept.Name);
                             }
                         }
                     }

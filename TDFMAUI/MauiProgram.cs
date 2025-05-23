@@ -238,8 +238,12 @@ namespace TDFMAUI
             builder.Services.AddSingleton<TDFShared.Validation.IValidationService, TDFShared.Validation.ValidationService>();
             builder.Services.AddSingleton<TDFShared.Validation.IBusinessRulesService, TDFShared.Validation.BusinessRulesService>();
 
-            // Register AuthService with fully qualified interface name
-            builder.Services.AddSingleton<TDFShared.Services.IAuthService, AuthService>();
+            // Register AuthService with shared HTTP client service
+            builder.Services.AddSingleton<AuthService>();
+            builder.Services.AddSingleton<TDFShared.Services.IAuthService>(sp => sp.GetRequiredService<AuthService>());
+
+            // Register MessageService with shared HTTP client service
+            builder.Services.AddSingleton<MessageService>();
 
 
             // Register NotificationService hierarchy

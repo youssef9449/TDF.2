@@ -25,7 +25,7 @@ public class AuthService : IAuthService
 {
     private readonly SecureStorageService _secureStorageService;
     private readonly IUserProfileService _userProfileService;
-    private readonly HttpClient _httpClient;
+    private readonly IHttpClientService _httpClientService;
     private readonly ILogger<AuthService> _logger;
     private readonly ISecurityService _securityService;
     private readonly JsonSerializerOptions _serializerOptions;
@@ -34,7 +34,7 @@ public class AuthService : IAuthService
     public AuthService(
         SecureStorageService secureStorageService,
         IUserProfileService userProfileService,
-        HttpClient httpClient,
+        IHttpClientService httpClientService,
         ISecurityService securityService,
         ILogger<AuthService> logger)
     {
@@ -52,9 +52,9 @@ public class AuthService : IAuthService
             _userProfileService = userProfileService ?? throw new ArgumentNullException(nameof(userProfileService));
             logger?.LogInformation("UserProfileService resolved successfully.");
 
-            logger?.LogInformation("Checking HttpClient...");
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            logger?.LogInformation("HttpClient resolved successfully.");
+            logger?.LogInformation("Checking HttpClientService...");
+            _httpClientService = httpClientService ?? throw new ArgumentNullException(nameof(httpClientService));
+            logger?.LogInformation("HttpClientService resolved successfully.");
 
             logger?.LogInformation("Checking SecurityService...");
             _securityService = securityService ?? throw new ArgumentNullException(nameof(securityService));
@@ -84,27 +84,24 @@ public class AuthService : IAuthService
     public async Task<TokenResponse?> LoginAsync(string username, string password)
     {
         var loginRequest = new { UserName = username, Password = password };
-        var uri = $"{_baseApiUrl}/auth/login";
-        _logger.LogInformation("Attempting login for user {Username} via {Uri}", username, uri);
+        var endpoint = "auth/login";
+        _logger.LogInformation("Attempting login for user {Username} via {Endpoint}", username, endpoint);
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync(uri, loginRequest, _serializerOptions);
+            // Use shared service to post the login request and get raw response
+            var apiResponseContent = await _httpClientService.PostAsync<object, string>(endpoint, loginRequest);
+            _logger.LogDebug("Login API response: {Content}", apiResponseContent);
 
-            if (response.IsSuccessStatusCode)
+            var options = new JsonSerializerOptions
             {
-                var apiResponseContent = await response.Content.ReadAsStringAsync();
-                _logger.LogDebug("Login API response: {Content}", apiResponseContent);
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
 
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                };
-
-                try
-                {
-                    var apiResponse = JsonSerializer.Deserialize<ApiResponse<TokenResponse>>(apiResponseContent, options);
+            try
+            {
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<TokenResponse>>(apiResponseContent, options);
 
                     if (apiResponse?.Data != null && !string.IsNullOrEmpty(apiResponse.Data.Token))
                     {
@@ -200,33 +197,12 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
                     }
                 }
 
-                _logger.LogError("Login API call successful but response format could not be parsed. Response: {Response}", apiResponseContent);
-                return null;
-            }
-            else
-            {
-                string errorContent = await response.Content.ReadAsStringAsync();
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-                {
-                    _logger.LogWarning("Login failed for user {Username}. Status: {StatusCode}. Reason: {ReasonPhrase}. Content: {Content}",
-                        username, response.StatusCode, response.ReasonPhrase, errorContent);
-                }
-                else
-                {
-                    _logger.LogError("Login API call failed for user {Username}. Status: {StatusCode}. Reason: {ReasonPhrase}. Content: {Content}",
-                        username, response.StatusCode, response.ReasonPhrase, errorContent);
-                }
-                return null;
-            }
-        }
-        catch (HttpRequestException httpEx)
-        {
-            _logger.LogError(httpEx, "HTTP error during login for {Username} to {Uri}", username, uri);
+            _logger.LogError("Login API call successful but response format could not be parsed. Response: {Response}", apiResponseContent);
             return null;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error during login for {Username}", username);
+            _logger.LogError(ex, "Error during login for {Username}", username);
             return null;
         }
     }
@@ -482,31 +458,19 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
                 return null;
             }
 
-            var uri = $"{_baseApiUrl}/users/{userId}";
+            var endpoint = $"users/{userId}";
             _logger.LogInformation("Getting user details for user {UserId}", userId);
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            // Set authentication token if available
             var (token, _) = await _secureStorageService.GetTokenAsync().ConfigureAwait(false);
             if (!string.IsNullOrEmpty(token))
             {
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                await _httpClientService.SetAuthenticationTokenAsync(token);
             }
 
-            var response = await _httpClient.SendAsync(request);
-            if (response.IsSuccessStatusCode)
-            {
-                var user = await response.Content.ReadFromJsonAsync<UserDto>(_serializerOptions);
-                _logger.LogInformation("Successfully retrieved user details for {UserId}", userId);
-                return user;
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Failed to retrieve user details for {UserId}. Status: {StatusCode}",
-                    userId,
-                    response.StatusCode);
-                return null;
-            }
+            var user = await _httpClientService.GetAsync<UserDto>(endpoint);
+            _logger.LogInformation("Successfully retrieved user details for {UserId}", userId);
+            return user;
         }
         catch (Exception ex)
         {
@@ -522,12 +486,9 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
         try
         {
             var refreshRequest = new { Token = token, RefreshToken = refreshToken };
-            var uri = $"{_baseApiUrl}/auth/refresh-token";
+            var endpoint = "auth/refresh-token";
 
-            var response = await _httpClient.PostAsJsonAsync(uri, refreshRequest, _serializerOptions);
-            response.EnsureSuccessStatusCode();
-
-            var tokenResponse = await response.Content.ReadFromJsonAsync<ApiResponse<TokenResponse>>(_serializerOptions);
+            var tokenResponse = await _httpClientService.PostAsync<object, ApiResponse<TokenResponse>>(endpoint, refreshRequest);
 
             if (tokenResponse?.Data != null)
             {
@@ -621,11 +582,10 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
 
         try
         {
-            var uri = $"{_baseApiUrl}/auth/revoke-token";
+            var endpoint = "auth/revoke-token";
             var request = new { Jti = jti, ExpiryDateUtc = expiryDateUtc };
 
-            var response = await _httpClient.PostAsJsonAsync(uri, request, _serializerOptions);
-            response.EnsureSuccessStatusCode();
+            await _httpClientService.PostAsync(endpoint, request);
 
             _logger.LogInformation("Token revoked successfully");
         }
@@ -642,12 +602,9 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
 
         try
         {
-            var uri = $"{_baseApiUrl}/auth/is-token-revoked/{Uri.EscapeDataString(jti)}";
+            var endpoint = $"auth/is-token-revoked/{Uri.EscapeDataString(jti)}";
 
-            var response = await _httpClient.GetAsync(uri);
-            response.EnsureSuccessStatusCode();
-
-            var result = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(_serializerOptions);
+            var result = await _httpClientService.GetAsync<ApiResponse<bool>>(endpoint);
 
             if (result?.Data == true)
             {

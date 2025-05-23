@@ -1133,7 +1133,7 @@ namespace TDFMAUI.Services
                 {
                     DateTime expiration = DateTime.UtcNow.AddHours(24);
                     await _secureStorage.SaveTokenAsync(response.Token, expiration);
-                    _httpClientService.SetAuthorizationHeader(response.Token);
+                    await _httpClientService.SetAuthenticationTokenAsync(response.Token);
                 }
 
                 return response;

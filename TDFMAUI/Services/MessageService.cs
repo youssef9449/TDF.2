@@ -5,23 +5,19 @@ using TDFShared.Constants;
 using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Messages;
 using TDFShared.Models.Message;
+using TDFShared.Services;
 
 namespace TDFMAUI.Services
 {
     public class MessageService
     {
-        private readonly HttpClient _httpClient;
-        private readonly JsonSerializerOptions _serializerOptions;
+        private readonly IHttpClientService _httpClientService;
         private readonly ILogger<MessageService> _logger;
 
-        public MessageService(HttpClient httpClient, ILogger<MessageService> logger)
+        public MessageService(IHttpClientService httpClientService, ILogger<MessageService> logger)
         {
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _httpClientService = httpClientService ?? throw new ArgumentNullException(nameof(httpClientService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _serializerOptions = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            };
         }
 
         public async Task<List<MessageDto>> GetAllMessagesAsync()
@@ -29,7 +25,7 @@ namespace TDFMAUI.Services
             try
             {
                 _logger.LogInformation("Getting all messages");
-                var response = await _httpClient.GetFromJsonAsync<ApiResponse<List<MessageDto>>>(ApiRoutes.Messages.Base);
+                var response = await _httpClientService.GetAsync<ApiResponse<List<MessageDto>>>(ApiRoutes.Messages.Base);
                 return response?.Data ?? new List<MessageDto>();
             }
             catch (Exception ex)
@@ -45,7 +41,7 @@ namespace TDFMAUI.Services
             {
                 _logger.LogInformation("Getting message with ID {MessageId}", id);
                 var uri = string.Format(ApiRoutes.Messages.GetById, id);
-                var response = await _httpClient.GetFromJsonAsync<ApiResponse<MessageDto>>(uri);
+                var response = await _httpClientService.GetAsync<ApiResponse<MessageDto>>(uri);
                 return response?.Data;
             }
             catch (Exception ex)
@@ -60,8 +56,7 @@ namespace TDFMAUI.Services
             try
             {
                 _logger.LogInformation("Creating new message");
-                var response = await _httpClient.PostAsJsonAsync(ApiRoutes.Messages.Base, message, _serializerOptions);
-                response.EnsureSuccessStatusCode();
+                await _httpClientService.PostAsync(ApiRoutes.Messages.Base, message);
                 return true;
             }
             catch (Exception ex)
@@ -77,7 +72,7 @@ namespace TDFMAUI.Services
             {
                 _logger.LogInformation("Getting {Count} recent chat messages", count);
                 var uri = $"{ApiRoutes.Messages.RecentChat}?count={count}";
-                var response = await _httpClient.GetFromJsonAsync<ApiResponse<List<ChatMessageDto>>>(uri);
+                var response = await _httpClientService.GetAsync<ApiResponse<List<ChatMessageDto>>>(uri);
                 return response?.Data ?? new List<ChatMessageDto>();
             }
             catch (Exception ex)
@@ -93,8 +88,8 @@ namespace TDFMAUI.Services
             {
                 _logger.LogInformation("Marking message {MessageId} as read", messageId);
                 var uri = string.Format(ApiRoutes.Messages.MarkRead, messageId);
-                var response = await _httpClient.PostAsync(uri, null);
-                return response.IsSuccessStatusCode;
+                await _httpClientService.PostAsync<object>(uri, null);
+                return true;
             }
             catch (Exception ex)
             {
@@ -108,8 +103,7 @@ namespace TDFMAUI.Services
             try
             {
                 _logger.LogInformation("Creating new chat message");
-                var response = await _httpClient.PostAsJsonAsync(ApiRoutes.Messages.Chat, message, _serializerOptions);
-                response.EnsureSuccessStatusCode();
+                await _httpClientService.PostAsync(ApiRoutes.Messages.Chat, message);
                 return true;
             }
             catch (Exception ex)

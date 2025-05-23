@@ -209,6 +209,20 @@ public class MyService
 - **Fix:** Modified TestApiConnectivityAsync to accept shared HTTP client service parameter with fallback
 - **Result:** All HTTP client usage now goes through shared service when available, with diagnostic fallback
 
+### 9. **CRITICAL BUG FIX: Authentication Method Call** ✅
+- **Issue:** TDFMAUI/Services/ApiService.cs was calling non-existent `SetAuthorizationHeader()` method
+- **Fix:** Updated to use correct `SetAuthenticationTokenAsync()` method from shared service
+- **Result:** Authentication token setting now works correctly with shared HTTP client service
+
+### 10. **CRITICAL: Services Using Direct HttpClient Fixed** ✅
+- **Issue:** MessageService and AuthService were using HttpClient directly instead of shared patterns
+- **Fix:**
+  - Updated MessageService to use TDFShared.Services.IHttpClientService
+  - **COMPLETELY MIGRATED AuthService** to use TDFShared.Services.IHttpClientService
+  - Updated all AuthService HTTP methods (LoginAsync, RefreshTokenAsync, GetCurrentUserAsync, etc.)
+  - Simplified service registrations to use shared HTTP client service
+- **Result:** All HTTP client usage now follows shared patterns with enhanced retry policies and error handling
+
 ## Success Metrics
 
 ✅ **100% Legacy Code Removed:** No deprecated HTTP client code remains

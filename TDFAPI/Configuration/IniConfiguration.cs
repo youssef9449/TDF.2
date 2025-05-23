@@ -68,7 +68,7 @@ namespace TDFAPI.Configuration
                             // Create default configuration with server URLs
                             _iniFile = new IniFile(iniFilePath);
                             _iniFile.Write("Server", "Urls", "http://localhost:5000,https://localhost:5001");
-                            _iniFile.Write("Jwt", "SecretKey", Guid.NewGuid().ToString());
+                            // JWT SecretKey should be provided via environment variable JWT_SECRET_KEY
                             _iniFile.Write("Jwt", "Issuer", "TDFAPI");
                             _iniFile.Write("Jwt", "Audience", "TDFClient");
                             _iniFile.Write("App", "AllowedOrigins", "");
@@ -89,7 +89,7 @@ namespace TDFAPI.Configuration
                             // Create an in-memory IniFile with default values
                             _iniFile = new IniFile(":memory:");
                             _iniFile.Write("Server", "Urls", "http://localhost:5000,https://localhost:5001");
-                            _iniFile.Write("Jwt", "SecretKey", Guid.NewGuid().ToString());
+                            // JWT SecretKey should be provided via environment variable JWT_SECRET_KEY
                             _iniFile.Write("Jwt", "Issuer", "TDFAPI");
                             _iniFile.Write("Jwt", "Audience", "TDFClient");
                             _iniFile.Write("Security", "MaxFailedLoginAttempts", "5");
@@ -106,7 +106,20 @@ namespace TDFAPI.Configuration
 
                 // Validate required settings
                 _connectionString = BuildConnectionString(); // Build connection string first
-                _jwtSecretKey = _iniFile.Read("Jwt", "SecretKey", Guid.NewGuid().ToString()); // Use a secure default if missing
+                _jwtSecretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ??
+                               _iniFile.Read("Jwt", "SecretKey", ""); // No default - must be provided via environment variable
+
+                // Validate JWT secret key
+                if (string.IsNullOrEmpty(_jwtSecretKey))
+                {
+                    throw new InvalidOperationException("JWT Secret Key must be provided via JWT_SECRET_KEY environment variable or configuration file");
+                }
+
+                if (_jwtSecretKey.Length < 32)
+                {
+                    throw new InvalidOperationException("JWT Secret Key must be at least 32 characters long for security");
+                }
+
                 _tokenValidityInMinutes = int.TryParse(_iniFile.Read("Jwt", "TokenValidityInMinutes", "60"), out int tokenValidity) ? tokenValidity : 60;
                 _refreshTokenValidityInDays = int.TryParse(_iniFile.Read("Jwt", "RefreshTokenValidityInDays", "7"), out int refreshTokenValidity) ? refreshTokenValidity : 7;
                 _jwtIssuer = _iniFile.Read("Jwt", "Issuer", "TDFAPI");

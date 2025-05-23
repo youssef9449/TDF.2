@@ -86,9 +86,9 @@ namespace TDFMAUI.ViewModels
         public List<string> TypeOptions => RequestOptions.TypeOptions;
         public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
 
-        public bool CanManageRequests => RequestAuthorizationService.CanManageRequests(IsAdmin, IsManager, IsHR);
-        public bool CanEditDeleteAny => RequestAuthorizationService.CanEditDeleteAny(IsAdmin);
-        public bool CanFilterByDepartment => RequestAuthorizationService.CanFilterByDepartment(IsManager);
+        public bool CanManageRequests => CanManageRequestsHelper(IsAdmin, IsManager, IsHR);
+        public bool CanEditDeleteAny => CanEditDeleteAnyHelper(IsAdmin);
+        public bool CanFilterByDepartment => CanFilterByDepartmentHelper(IsManager);
 
         public RequestApprovalViewModel(TDFMAUI.Services.IRequestService requestService, TDFMAUI.Services.INotificationService notificationService, TDFShared.Services.IAuthService authService)
         {
@@ -134,13 +134,13 @@ namespace TDFMAUI.ViewModels
             RefreshCommand = new Command(async () => await LoadRequestsAsync());
         }
 
-        // Authorization checks using RequestAuthorizationService
-        private bool CanApprove(RequestResponseDto request) 
+        // Authorization checks using helper methods
+        private bool CanApprove(RequestResponseDto request)
         {
             if (request == null) return false;
             if (request.Status != RequestStatus.Pending) return false;
 
-            var canManage = RequestAuthorizationService.CanManageRequests(IsAdmin, IsManager, IsHR);
+            var canManage = CanManageRequestsHelper(IsAdmin, IsManager, IsHR);
             if (!canManage) return false;
 
             // Additional check for managers - can only approve requests from their department
@@ -155,10 +155,10 @@ namespace TDFMAUI.ViewModels
 
         private bool CanReject(RequestResponseDto request) => CanApprove(request); // Same logic as approve
 
-        public bool CanExecuteApprove(int id) => 
+        public bool CanExecuteApprove(int id) =>
             Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanApprove(req);
 
-        public bool CanExecuteReject(int id) => 
+        public bool CanExecuteReject(int id) =>
             Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanReject(req);
 
         partial void OnRequestsChanged(ObservableCollection<RequestResponseDto> value)
@@ -181,7 +181,7 @@ namespace TDFMAUI.ViewModels
                     Status = RequestStatus.Approved,
                     Comment = "Approved via approval page"
                 };
-                
+
                 bool success = await _requestService.ApproveRequestAsync(requestId, approvalDto);
                 if (success)
                 {
@@ -227,7 +227,7 @@ namespace TDFMAUI.ViewModels
             {
                 IsLoading = true;
                 var rejectDto = new RequestRejectDto { RejectReason = reason };
-                
+
                 bool success = await _requestService.RejectRequestAsync(requestId, rejectDto);
                 if (success)
                 {
@@ -263,11 +263,11 @@ namespace TDFMAUI.ViewModels
                     PageSize = 20,
                     FromDate = FromDate,
                     ToDate = ToDate,
-                    FilterStatus = (string.IsNullOrEmpty(SelectedStatus) || SelectedStatus == "All") 
-                        ? (RequestStatus?)null 
+                    FilterStatus = (string.IsNullOrEmpty(SelectedStatus) || SelectedStatus == "All")
+                        ? (RequestStatus?)null
                         : Enum.TryParse<RequestStatus>(SelectedStatus, true, out var parsedStatus) ? parsedStatus : (RequestStatus?)null,
-                    FilterType = (string.IsNullOrEmpty(SelectedType) || SelectedType == "All") 
-                        ? (LeaveType?)null 
+                    FilterType = (string.IsNullOrEmpty(SelectedType) || SelectedType == "All")
+                        ? (LeaveType?)null
                         : Enum.TryParse<LeaveType>(SelectedType, true, out var parsedType) ? parsedType : (LeaveType?)null
                 };
 
@@ -330,5 +330,33 @@ namespace TDFMAUI.ViewModels
         {
             LoadRequestsAsync().ConfigureAwait(false);
         }
+
+        #region Authorization Helper Methods
+
+        /// <summary>
+        /// Determines if a user can manage requests based on their role flags
+        /// </summary>
+        private static bool CanManageRequestsHelper(bool? isAdmin, bool? isManager, bool? isHR)
+        {
+            return isAdmin == true || isManager == true || isHR == true;
+        }
+
+        /// <summary>
+        /// Determines if a user can edit/delete any request (admin only)
+        /// </summary>
+        private static bool CanEditDeleteAnyHelper(bool? isAdmin)
+        {
+            return isAdmin == true;
+        }
+
+        /// <summary>
+        /// Determines if a user can filter by department (managers and above)
+        /// </summary>
+        private static bool CanFilterByDepartmentHelper(bool? isManager)
+        {
+            return isManager == true;
+        }
+
+        #endregion
     }
 }

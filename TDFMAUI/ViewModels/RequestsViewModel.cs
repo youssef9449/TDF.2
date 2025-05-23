@@ -49,10 +49,10 @@ namespace TDFMAUI.ViewModels
         private bool? _isHR;
 
         // Computed Properties
-        public bool CanManageRequests => RequestAuthorizationService.CanManageRequests(IsAdmin, IsManager, IsHR);
-        public bool CanApproveReject => RequestAuthorizationService.CanManageRequests(IsAdmin, IsManager, IsHR);
-        public bool CanEditDeleteAny => RequestAuthorizationService.CanEditDeleteAny(IsAdmin);
-        public bool CanFilterByDepartment => RequestAuthorizationService.CanFilterByDepartment(IsManager);
+        public bool CanManageRequests => CanManageRequestsHelper(IsAdmin, IsManager, IsHR);
+        public bool CanApproveReject => CanManageRequestsHelper(IsAdmin, IsManager, IsHR);
+        public bool CanEditDeleteAny => CanEditDeleteAnyHelper(IsAdmin);
+        public bool CanFilterByDepartment => CanFilterByDepartmentHelper(IsManager);
 
         public List<string> StatusOptions => RequestOptions.StatusOptions;
         public List<string> TypeOptions => RequestOptions.TypeOptions;
@@ -74,6 +74,7 @@ namespace TDFMAUI.ViewModels
             // Get and store the current user ID to avoid repeated async calls
             _currentUserId = await _authService.GetCurrentUserIdAsync();
             _logger.LogInformation("Current user ID loaded: {UserId}", _currentUserId);
+            OnPropertyChanged(nameof(CurrentUserId));
 
             // Notify commands that their CanExecute status might have changed
             NotifyCommandsCanExecuteChanged();
@@ -92,6 +93,7 @@ namespace TDFMAUI.ViewModels
                     IsManager = currentUser.IsManager;
                     IsHR = currentUser.IsHR;
                     _logger.LogInformation("User roles loaded: Admin={IsAdmin}, Manager={IsManager}, HR={IsHR}", IsAdmin, IsManager, IsHR);
+                    OnPropertyChanged(nameof(IsCurrentUserAdmin));
                     SetTitleBasedOnRole();
                 }
             }
@@ -223,6 +225,7 @@ namespace TDFMAUI.ViewModels
             // Refresh the current user ID
             _currentUserId = await _authService.GetCurrentUserIdAsync();
             _logger.LogInformation("Current user ID refreshed: {UserId}", _currentUserId);
+            OnPropertyChanged(nameof(CurrentUserId));
 
             // Notify commands that their CanExecute status might have changed
             NotifyCommandsCanExecuteChanged();
@@ -235,11 +238,15 @@ namespace TDFMAUI.ViewModels
         // Store the current user ID to avoid repeated async calls
         private int _currentUserId;
 
+        // Properties for UI binding
+        public int CurrentUserId => _currentUserId;
+        public bool IsCurrentUserAdmin => IsAdmin == true;
+
         // Helper to check if current user can edit/delete a specific request
         private bool CanEditDeleteRequest(RequestResponseDto? request)
         {
             if (request == null) return false;
-            return RequestAuthorizationService.CanEditRequest(request, _currentUserId, IsAdmin);
+            return CanEditRequestHelper(request, _currentUserId, IsAdmin);
         }
 
         // Helper to check if current user can approve/reject a specific request
@@ -249,7 +256,7 @@ namespace TDFMAUI.ViewModels
             if (request.RequestUserID == _currentUserId) return false; // Can't approve/reject own requests
             if (request.Status != RequestStatus.Pending) return false;
 
-            var canManage = RequestAuthorizationService.CanManageRequests(IsAdmin, IsManager, IsHR);
+            var canManage = CanManageRequestsHelper(IsAdmin, IsManager, IsHR);
             if (!canManage) return false;
 
             // If manager (not admin/HR), check department match
@@ -261,6 +268,49 @@ namespace TDFMAUI.ViewModels
 
             return true;
         }
+
+        #region Authorization Helper Methods
+
+        /// <summary>
+        /// Determines if a user can manage requests based on their role flags
+        /// </summary>
+        private static bool CanManageRequestsHelper(bool? isAdmin, bool? isManager, bool? isHR)
+        {
+            return isAdmin == true || isManager == true || isHR == true;
+        }
+
+        /// <summary>
+        /// Determines if a user can edit/delete any request (admin only)
+        /// </summary>
+        private static bool CanEditDeleteAnyHelper(bool? isAdmin)
+        {
+            return isAdmin == true;
+        }
+
+        /// <summary>
+        /// Determines if a user can filter by department (managers and above)
+        /// </summary>
+        private static bool CanFilterByDepartmentHelper(bool? isManager)
+        {
+            return isManager == true;
+        }
+
+        /// <summary>
+        /// Determines if a user can edit a specific request
+        /// </summary>
+        private static bool CanEditRequestHelper(RequestResponseDto request, int currentUserId, bool? isAdmin)
+        {
+            if (request == null) return false;
+
+            // Admins can edit any request
+            if (isAdmin == true) return true;
+
+            // Users can only edit their own pending requests
+            return request.RequestUserID == currentUserId &&
+                   request.Status == RequestStatus.Pending;
+        }
+
+        #endregion
 
         [RelayCommand(CanExecute = nameof(CanApproveRejectRequest))]
         private async Task ApproveRequestAsync(RequestResponseDto? request)

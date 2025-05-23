@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
+using System.Security.Cryptography;
 using System.Text;
 using TDFAPI.Configuration;
 
@@ -57,12 +58,12 @@ namespace TDFAPI.Utilities
                 }
             }
 
-            // Generate and persist a new key
-            string newKey = Guid.NewGuid().ToString("N");
+            // Generate a cryptographically secure key for development
+            string newKey = GenerateSecureDevelopmentKey();
             try
             {
                 File.WriteAllText(devKeyPath, newKey);
-                logger.LogInformation("Generated and persisted a new development JWT key.");
+                logger.LogInformation("Generated and persisted a new secure development JWT key.");
             }
             catch (Exception ex)
             {
@@ -70,6 +71,15 @@ namespace TDFAPI.Utilities
             }
 
             return newKey;
+        }
+
+        private static string GenerateSecureDevelopmentKey()
+        {
+            // Generate a cryptographically secure 256-bit key for development
+            using var rng = RandomNumberGenerator.Create();
+            byte[] keyBytes = new byte[32]; // 256 bits
+            rng.GetBytes(keyBytes);
+            return Convert.ToBase64String(keyBytes);
         }
     }
 }

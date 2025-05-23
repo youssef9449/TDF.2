@@ -203,16 +203,8 @@ namespace TDFMAUI
             builder.Services.AddSingleton<LookupService>();
             builder.Services.AddSingleton<ILookupService>(sp => sp.GetRequiredService<LookupService>());
 
-            // Always register DevelopmentHttpClientHandler since we need to bypass cert validation for the IP address in all modes.
+            // Register DevelopmentHttpClientHandler for use with AddHttpClient
             builder.Services.AddSingleton<DevelopmentHttpClientHandler>();
-            builder.Services.AddSingleton<HttpClient>(sp =>
-            {
-                var handler = sp.GetRequiredService<DevelopmentHttpClientHandler>();
-                var logger = sp.GetRequiredService<ILogger<HttpClient>>();
-                logger.LogInformation("Creating HttpClient with DevelopmentHttpClientHandler (for IP address target)");
-                return new HttpClient(handler);
-                // BaseAddress and Timeout will be set by HttpClientService using IOptions<ApiSettings>
-            });
 
             // Register RequestService
             builder.Services.AddTransient<IRequestService, RequestService>();
@@ -220,17 +212,31 @@ namespace TDFMAUI
             // Register SecurityService
             builder.Services.AddSingleton<TDFShared.Services.ISecurityService, TDFShared.Services.SecurityService>();
 
-            // Register shared HTTP client services directly
+            // Register shared error handling service
+            builder.Services.AddSingleton<TDFShared.Services.IErrorHandlingService, TDFShared.Services.ErrorHandlingService>();
+
+            // Register shared HTTP client services with DevelopmentHttpClientHandler
             builder.Services.AddHttpClient<TDFShared.Services.IHttpClientService, TDFShared.Services.HttpClientService>((serviceProvider, client) =>
             {
                 var apiSettings = serviceProvider.GetRequiredService<IOptions<ApiSettings>>().Value;
                 client.BaseAddress = new Uri(apiSettings.BaseUrl);
                 client.Timeout = TimeSpan.FromSeconds(apiSettings.Timeout);
                 client.DefaultRequestHeaders.Add("User-Agent", "TDF-MAUI/1.0");
+            })
+            .ConfigurePrimaryHttpMessageHandler(serviceProvider =>
+            {
+                var handler = serviceProvider.GetRequiredService<DevelopmentHttpClientHandler>();
+                var logger = serviceProvider.GetRequiredService<ILogger<TDFShared.Services.HttpClientService>>();
+                logger.LogInformation("Configuring HttpClient with DevelopmentHttpClientHandler for SSL bypass");
+                return handler;
             });
 
             // Register platform-specific connectivity service
             builder.Services.AddSingleton<TDFShared.Services.IConnectivityService, ConnectivityService>();
+
+            // Register shared validation services
+            builder.Services.AddSingleton<TDFShared.Validation.IValidationService, TDFShared.Validation.ValidationService>();
+            builder.Services.AddSingleton<TDFShared.Validation.IBusinessRulesService, TDFShared.Validation.BusinessRulesService>();
 
             // Register AuthService with fully qualified interface name
             builder.Services.AddSingleton<TDFShared.Services.IAuthService, AuthService>();
@@ -293,11 +299,8 @@ namespace TDFMAUI
             // Register AppShell
             builder.Services.AddTransient<AppShell>();
 
-            // Register new HttpClientService
-            builder.Services.AddSingleton<IHttpClientService, HttpClientService>();
-
-            // Register ConnectivityService
-            builder.Services.AddSingleton<IConnectivityService, ConnectivityService>();
+            // HTTP client service already registered above with TDFShared.Services.IHttpClientService
+            // ConnectivityService already registered above with TDFShared.Services.IConnectivityService
 
             MauiApp app = null; // Declare app outside try block
             try // Wrap builder.Build() and subsequent initialization

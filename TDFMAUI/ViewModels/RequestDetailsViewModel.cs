@@ -21,7 +21,7 @@ namespace TDFMAUI.ViewModels
         private readonly IAuthService _authService;
         private readonly ILogger<RequestDetailsViewModel> _logger;
 
-        [ObservableProperty] 
+        [ObservableProperty]
         private int _requestId;
 
         [ObservableProperty]
@@ -30,7 +30,7 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsNotLoading))]
         private bool _isLoading;
-        
+
         public bool IsNotLoading => !IsLoading;
 
         [ObservableProperty] private bool _canApprove;
@@ -44,12 +44,12 @@ namespace TDFMAUI.ViewModels
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
-        
+
         public async Task Initialize()
         {
             await LoadRequestDetailsAsync();
         }
-        
+
         partial void OnRequestIdChanged(int value)
         {
             if (value > 0)
@@ -62,7 +62,7 @@ namespace TDFMAUI.ViewModels
         private async Task LoadRequestDetailsAsync()
         {
             if (RequestId <= 0) return;
-            
+
             IsLoading = true;
             try
             {
@@ -91,7 +91,7 @@ namespace TDFMAUI.ViewModels
 
         private async void SetActionVisibility()
         {
-            if (Request == null) 
+            if (Request == null)
             {
                 CanApprove = CanReject = CanEdit = CanDelete = false;
                 return;
@@ -109,18 +109,18 @@ namespace TDFMAUI.ViewModels
             bool isHR = currentUser.IsHR == true;
             bool isManager = currentUser.IsManager == true;
 
-            // Use shared business rule service for state checks
-            CanEdit = isOwner && RequestBusinessRuleService.CanEdit(Request.Status, Request.HRStatus);
-            CanDelete = isOwner && RequestBusinessRuleService.CanDelete(Request.Status, Request.HRStatus);
-            CanApprove = !isOwner && RequestBusinessRuleService.CanApprove(Request.Status, Request.HRStatus, isHR);
-            CanReject = !isOwner && RequestBusinessRuleService.CanReject(Request.Status, Request.HRStatus, isHR);
+            // Use local business rule checks for state validation
+            CanEdit = isOwner && CanEditRequest(Request.Status, Request.HRStatus);
+            CanDelete = isOwner && CanDeleteRequest(Request.Status, Request.HRStatus);
+            CanApprove = !isOwner && CanApproveRequest(Request.Status, Request.HRStatus, isHR);
+            CanReject = !isOwner && CanRejectRequest(Request.Status, Request.HRStatus, isHR);
         }
 
         [RelayCommand]
         private async Task EditRequestAsync()
         {
             if (Request == null || !CanEdit) return;
-            
+
             await Shell.Current.GoToAsync($"{nameof(AddRequestPage)}", new Dictionary<string, object>
             {
                 {"ExistingRequest", Request}
@@ -167,7 +167,7 @@ namespace TDFMAUI.ViewModels
             {
                 var approvalDto = new RequestApprovalDto { Comment = comment };
                 bool success = await _apiService.ApproveRequestAsync(Request.RequestID, approvalDto);
-                
+
                 if (success)
                 {
                     await Shell.Current.DisplayAlert("Success", "Request approved.", "OK");
@@ -207,7 +207,7 @@ namespace TDFMAUI.ViewModels
             {
                 var rejectDto = new RequestRejectDto { RejectReason = reason };
                 bool success = await _apiService.RejectRequestAsync(Request.RequestID, rejectDto);
-                
+
                 if (success)
                 {
                     await Shell.Current.DisplayAlert("Success", "Request rejected.", "OK");
@@ -234,5 +234,45 @@ namespace TDFMAUI.ViewModels
         {
             await Shell.Current.GoToAsync("..");
         }
+
+        #region Helper Methods
+
+        /// <summary>
+        /// Checks if a request can be edited based on its status
+        /// </summary>
+        private static bool CanEditRequest(RequestStatus status, RequestStatus hrStatus)
+        {
+            return status == RequestStatus.Pending && hrStatus == RequestStatus.Pending;
+        }
+
+        /// <summary>
+        /// Checks if a request can be deleted based on its status
+        /// </summary>
+        private static bool CanDeleteRequest(RequestStatus status, RequestStatus hrStatus)
+        {
+            return status == RequestStatus.Pending && hrStatus == RequestStatus.Pending;
+        }
+
+        /// <summary>
+        /// Checks if a request can be approved
+        /// </summary>
+        private static bool CanApproveRequest(RequestStatus currentStatus, RequestStatus hrStatus, bool isHR)
+        {
+            return isHR ?
+                currentStatus == RequestStatus.Approved && hrStatus == RequestStatus.Pending :
+                currentStatus == RequestStatus.Pending;
+        }
+
+        /// <summary>
+        /// Checks if a request can be rejected
+        /// </summary>
+        private static bool CanRejectRequest(RequestStatus currentStatus, RequestStatus hrStatus, bool isHR)
+        {
+            return isHR ?
+                currentStatus == RequestStatus.Approved && hrStatus == RequestStatus.Pending :
+                currentStatus == RequestStatus.Pending;
+        }
+
+        #endregion
     }
 }

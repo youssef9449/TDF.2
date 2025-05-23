@@ -11,6 +11,7 @@ using TDFShared.DTOs.Requests; // Added
 using TDFShared.DTOs.Common; // Added for pagination
 using TDFShared.Enums;
 using TDFMAUI.Features.Requests;
+using TDFShared.Services;
 
 namespace TDFMAUI.ViewModels
 {
@@ -18,6 +19,7 @@ namespace TDFMAUI.ViewModels
     {
         private readonly IRequestService _requestService;
         private readonly INavigation _navigation; // Assuming navigation is passed from the page
+        private readonly IErrorHandlingService _errorHandlingService;
 
         [ObservableProperty]
         private bool _isLoading;
@@ -36,17 +38,18 @@ namespace TDFMAUI.ViewModels
 
         [ObservableProperty]
         private DateTime? _toDate;
-        
+
         [ObservableProperty]
         private string _requestCountText;
 
         [ObservableProperty]
         private RequestResponseDto _selectedRequest;
 
-        public ReportsViewModel(IRequestService requestService, INavigation navigation)
+        public ReportsViewModel(IRequestService requestService, INavigation navigation, IErrorHandlingService errorHandlingService)
         {
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
+            _errorHandlingService = errorHandlingService ?? throw new ArgumentNullException(nameof(errorHandlingService));
         }
 
         // Command to load/refresh data based on filters
@@ -62,7 +65,7 @@ namespace TDFMAUI.ViewModels
             {
                 // Determine userId based on role (pass null if admin/not needed by API for 'my' requests)
                 int? userIdToFetch = App.CurrentUser?.IsAdmin == false ? App.CurrentUser.UserID : null;
-                
+
                 // Adapt filter values before sending to API if needed (e.g., "All" might mean null)
                 string statusFilter = SelectedStatus == "All" ? null : SelectedStatus;
 
@@ -75,7 +78,7 @@ namespace TDFMAUI.ViewModels
                     Page = 1,
                     PageSize = 50
                 };
-                
+
                 // Call GetRequestsAsync with the proper parameters
                 // Ensure pagination.UserId is set correctly before this call
                 var fetchedRequests = await _requestService.GetAllRequestsAsync(pagination);
@@ -91,9 +94,8 @@ namespace TDFMAUI.ViewModels
             }
             catch (Exception ex)
             {
-                // Use ApiService helper for user-friendly messages
-                // TODO: Consider a common error helper or handle more generically if ApiService.GetFriendlyErrorMessage is not accessible.
-                await Shell.Current.DisplayAlert("Error", $"Failed to load requests: {ex.Message}", "OK");
+                // Use shared error handling service for consistent error messages
+                await _errorHandlingService.ShowErrorAsync(ex, "loading requests");
                 RequestCountText = "Error loading requests";
             }
             finally
@@ -109,7 +111,7 @@ namespace TDFMAUI.ViewModels
             // Simply call LoadRequestsAsync again
             return LoadRequestsAsync();
         }
-        
+
         // Command to navigate to the Add Request page
         [RelayCommand]
         private async Task NavigateToAddRequestAsync()
@@ -123,14 +125,14 @@ namespace TDFMAUI.ViewModels
         private async Task NavigateToDetailsAsync(RequestResponseDto request)
         {
             if (request == null) return;
-            
+
             // Use Shell navigation instead
             await Shell.Current.GoToAsync($"{nameof(RequestDetailsPage)}", new Dictionary<string, object>
             {
                 {"RequestId", request.RequestID}
             });
         }
-        
+
         // This method might be called when the page appears
         public Task InitializeAsync()
         {
@@ -140,4 +142,4 @@ namespace TDFMAUI.ViewModels
             return LoadRequestsAsync();
         }
     }
-} 
+}

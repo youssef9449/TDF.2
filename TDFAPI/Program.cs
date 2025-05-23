@@ -564,6 +564,13 @@ builder.Services.AddHttpClient<TDFShared.Services.IHttpClientService, TDFShared.
 // Register connectivity service
 builder.Services.AddSingleton<TDFShared.Services.IConnectivityService, TDFShared.Services.ConnectivityService>();
 
+// Register shared validation services
+builder.Services.AddScoped<TDFShared.Validation.IValidationService, TDFShared.Validation.ValidationService>();
+builder.Services.AddScoped<TDFShared.Validation.IBusinessRulesService, TDFShared.Validation.BusinessRulesService>();
+
+// Register shared error handling service
+builder.Services.AddScoped<TDFShared.Services.IErrorHandlingService, TDFShared.Services.ErrorHandlingService>();
+
 // Register AuthService with the shared interface
 builder.Services.AddScoped<TDFShared.Services.IAuthService, AuthService>();
 

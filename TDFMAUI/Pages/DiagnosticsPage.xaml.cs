@@ -1,6 +1,7 @@
 using Microsoft.Maui.Networking;
 using TDFMAUI.Config;
 using TDFMAUI.Services;
+using TDFShared.Services;
 
 namespace TDFMAUI.Pages
 {
@@ -8,13 +9,15 @@ namespace TDFMAUI.Pages
     {
         private readonly IConnectivity _connectivity;
         private readonly IApiService _apiService;
+        private readonly IHttpClientService _httpClientService;
 
-        public DiagnosticsPage(IConnectivity connectivity, IApiService apiService)
+        public DiagnosticsPage(IConnectivity connectivity, IApiService apiService, IHttpClientService httpClientService)
         {
             InitializeComponent();
 
             _connectivity = connectivity;
             _apiService = apiService;
+            _httpClientService = httpClientService;
 
             // Load initial data
             LoadConfigInfo();
@@ -123,7 +126,7 @@ namespace TDFMAUI.Pages
 
             try
             {
-                bool isConnected = await ApiConfig.TestApiConnectivityAsync();
+                bool isConnected = await ApiConfig.TestApiConnectivityAsync(_httpClientService);
                 ApiStatusLabel.Text = isConnected
                     ? "Connected to API successfully"
                     : "Failed to connect to API";
@@ -204,7 +207,7 @@ namespace TDFMAUI.Pages
                     DebugService.LogInfo("DiagnosticsPage", "App cache cleared by user");
 
                     // Restart the app (this is a simple way to simulate a restart)
-                    Application.Current.MainPage = new NavigationPage(new DiagnosticsPage(_connectivity, _apiService));
+                    Application.Current.MainPage = new NavigationPage(new DiagnosticsPage(_connectivity, _apiService, _httpClientService));
                 }
                 catch (Exception ex)
                 {

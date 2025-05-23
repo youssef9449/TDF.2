@@ -62,8 +62,8 @@ namespace TDFMAUI.Config
         // Flag to track if initialization was attempted
         private static bool _initialized = false;
 
-        // Static certificate validation callback for use across the app
-        public static readonly RemoteCertificateValidationCallback TrustAllCertificatesCallback =
+        // Secure certificate validation callback for development mode only
+        public static readonly RemoteCertificateValidationCallback DevelopmentCertificateValidationCallback =
             (sender, certificate, chain, sslPolicyErrors) => {
                 // Log the certificate details for debugging
                 var cert = certificate as X509Certificate2;
@@ -74,7 +74,21 @@ namespace TDFMAUI.Config
                 }
 
                 DebugService.LogWarning("CertValidation", $"SSL Policy Errors: {sslPolicyErrors}");
-                return true; // Trust all certificates in development mode
+
+                // Only allow self-signed certificates in development mode for localhost/development servers
+                if (DevelopmentMode && cert != null)
+                {
+                    // Allow localhost and development server certificates
+                    var subject = cert.Subject.ToLowerInvariant();
+                    if (subject.Contains("localhost") || subject.Contains("127.0.0.1") || subject.Contains("192.168."))
+                    {
+                        DebugService.LogWarning("CertValidation", "Allowing development certificate for local/development server");
+                        return true;
+                    }
+                }
+
+                // Use default validation for all other cases
+                return sslPolicyErrors == SslPolicyErrors.None;
             };
 
         // Diagnostic information
@@ -97,9 +111,9 @@ namespace TDFMAUI.Config
                 {
                     // Set ServicePointManager default settings
                     ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
-                    ServicePointManager.ServerCertificateValidationCallback = TrustAllCertificatesCallback;
+                    ServicePointManager.ServerCertificateValidationCallback = DevelopmentCertificateValidationCallback;
 
-                    DebugService.LogWarning("ApiConfig", "Configured global SSL settings to trust all certificates in development mode");
+                    DebugService.LogWarning("ApiConfig", "Configured global SSL settings with secure development certificate validation");
                 }
                 else
                 {
@@ -305,7 +319,7 @@ namespace TDFMAUI.Config
         /// <summary>
         /// Run a simple API connectivity test with detailed diagnostics
         /// </summary>
-        public static async Task<bool> TestApiConnectivityAsync()
+        public static async Task<bool> TestApiConnectivityAsync(TDFShared.Services.IHttpClientService httpClientService = null)
         {
             if (string.IsNullOrEmpty(BaseUrl))
             {
@@ -366,68 +380,113 @@ namespace TDFMAUI.Config
                 {
                     DebugService.LogInfo("ApiConfig", $"Trying endpoint: {healthCheckUrl}");
 
-                    var handler = new HttpClientHandler();
-
-                    // Always enable these settings for better compatibility
-                    handler.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13;
-                    handler.CheckCertificateRevocationList = false;
-                    handler.AllowAutoRedirect = true;
-
-                    if (DevelopmentMode)
+                    // Use shared HTTP client service if available, otherwise fall back to custom implementation
+                    if (httpClientService != null)
                     {
-                        // Use our global certificate validation callback
-                        handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => TrustAllCertificatesCallback(message, cert, chain, errors);
-                        DebugService.LogWarning("ApiConfig", "Connectivity test using Development certificate validation (ALLOW ALL).");
-                    }
+                        DebugService.LogInfo("ApiConfig", "Using shared HTTP client service for connectivity test");
 
-                    using var client = new HttpClient(handler);
-                    client.Timeout = TimeSpan.FromSeconds(30); // Longer timeout for thorough testing
+                        // Add diagnostic headers to the shared service
+                        httpClientService.AddDefaultHeader("User-Agent", $"TDFMAUI-DiagnosticTest/{AppInfo.VersionString}");
+                        httpClientService.AddDefaultHeader("X-Diagnostic-Mode", "true");
 
-                    // Add headers to help with debugging
-                    client.DefaultRequestHeaders.Add("User-Agent", $"TDFMAUI-Android-DiagnosticTest/{AppInfo.VersionString}");
-                    client.DefaultRequestHeaders.Add("X-Diagnostic-Mode", "true");
+                        // Use DeviceHelper to determine platform
+                        string platform = "Unknown";
+                        if (DeviceHelper.IsWindows) platform = "Windows";
+                        else if (DeviceHelper.IsMacOS) platform = "MacOS";
+                        else if (DeviceHelper.IsIOS) platform = "iOS";
+                        else if (DeviceHelper.IsAndroid) platform = "Android";
 
-                    // Use DeviceHelper to determine platform
-                    string platform = "Unknown";
-                    if (DeviceHelper.IsWindows) platform = "Windows";
-                    else if (DeviceHelper.IsMacOS) platform = "MacOS";
-                    else if (DeviceHelper.IsIOS) platform = "iOS";
-                    else if (DeviceHelper.IsAndroid) platform = "Android";
+                        httpClientService.AddDefaultHeader("X-Device-Platform", platform);
+                        httpClientService.AddDefaultHeader("X-Device-Model", DeviceInfo.Model);
 
-                    client.DefaultRequestHeaders.Add("X-Device-Platform", platform);
-                    client.DefaultRequestHeaders.Add("X-Device-Model", DeviceInfo.Model);
+                        // Log the request details
+                        DebugService.LogInfo("ApiConfig", $"Sending GET request to {healthCheckUrl}");
+                        DebugService.LogInfo("ApiConfig", $"User-Agent: TDFMAUI-DiagnosticTest/{AppInfo.VersionString}");
 
-                    // Log the request details
-                    DebugService.LogInfo("ApiConfig", $"Sending GET request to {healthCheckUrl}");
-                    DebugService.LogInfo("ApiConfig", $"User-Agent: TDFMAUI-Android-DiagnosticTest/{AppInfo.VersionString}");
+                        // Make the request using shared service
+                        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                        var responseContent = await httpClientService.GetRawAsync(healthCheckUrl, cts.Token);
 
-                    // Make the request with a cancellation token
-                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
-                    var response = await client.GetAsync(healthCheckUrl, cts.Token);
-
-                    // Log detailed response information
-                    DebugService.LogInfo("ApiConfig", $"Response status: {(int)response.StatusCode} {response.StatusCode}");
-                    DebugService.LogInfo("ApiConfig", $"Response headers: {string.Join(", ", response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value)}"))}");
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        // Try to read the response content for additional diagnostics
-                        try
-                        {
-                            var content = await response.Content.ReadAsStringAsync();
-                            DebugService.LogInfo("ApiConfig", $"Response content: {(content.Length > 100 ? content.Substring(0, 100) + "..." : content)}");
-                        }
-                        catch (Exception contentEx)
-                        {
-                            DebugService.LogWarning("ApiConfig", $"Could not read response content: {contentEx.Message}");
-                        }
-
+                        // If we get here, the request was successful
+                        DebugService.LogInfo("ApiConfig", $"Response content: {(responseContent.Length > 100 ? responseContent.Substring(0, 100) + "..." : responseContent)}");
                         DebugService.LogInfo("ApiConfig", $"Connectivity test SUCCESSFUL for {healthCheckUrl}");
+
+                        // Clean up diagnostic headers
+                        httpClientService.RemoveDefaultHeader("User-Agent");
+                        httpClientService.RemoveDefaultHeader("X-Diagnostic-Mode");
+                        httpClientService.RemoveDefaultHeader("X-Device-Platform");
+                        httpClientService.RemoveDefaultHeader("X-Device-Model");
+
                         return true;
                     }
                     else
                     {
-                        DebugService.LogWarning("ApiConfig", $"Received non-success status code: {response.StatusCode}");
+                        // Fallback to custom HttpClient for diagnostic purposes when shared service is not available
+                        DebugService.LogWarning("ApiConfig", "Shared HTTP client service not available, using fallback diagnostic client");
+
+                        var handler = new HttpClientHandler();
+
+                        // Always enable these settings for better compatibility
+                        handler.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13;
+                        handler.CheckCertificateRevocationList = false;
+                        handler.AllowAutoRedirect = true;
+
+                        if (DevelopmentMode)
+                        {
+                            // Use our global certificate validation callback
+                            handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => DevelopmentCertificateValidationCallback(message, cert, chain, errors);
+                            DebugService.LogWarning("ApiConfig", "Connectivity test using secure development certificate validation.");
+                        }
+
+                        using var client = new HttpClient(handler);
+                        client.Timeout = TimeSpan.FromSeconds(30); // Longer timeout for thorough testing
+
+                        // Add headers to help with debugging
+                        client.DefaultRequestHeaders.Add("User-Agent", $"TDFMAUI-FallbackDiagnosticTest/{AppInfo.VersionString}");
+                        client.DefaultRequestHeaders.Add("X-Diagnostic-Mode", "true");
+
+                        // Use DeviceHelper to determine platform
+                        string platform = "Unknown";
+                        if (DeviceHelper.IsWindows) platform = "Windows";
+                        else if (DeviceHelper.IsMacOS) platform = "MacOS";
+                        else if (DeviceHelper.IsIOS) platform = "iOS";
+                        else if (DeviceHelper.IsAndroid) platform = "Android";
+
+                        client.DefaultRequestHeaders.Add("X-Device-Platform", platform);
+                        client.DefaultRequestHeaders.Add("X-Device-Model", DeviceInfo.Model);
+
+                        // Log the request details
+                        DebugService.LogInfo("ApiConfig", $"Sending GET request to {healthCheckUrl}");
+                        DebugService.LogInfo("ApiConfig", $"User-Agent: TDFMAUI-FallbackDiagnosticTest/{AppInfo.VersionString}");
+
+                        // Make the request with a cancellation token
+                        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                        var response = await client.GetAsync(healthCheckUrl, cts.Token);
+
+                        // Log detailed response information
+                        DebugService.LogInfo("ApiConfig", $"Response status: {(int)response.StatusCode} {response.StatusCode}");
+                        DebugService.LogInfo("ApiConfig", $"Response headers: {string.Join(", ", response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value)}"))}");
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            // Try to read the response content for additional diagnostics
+                            try
+                            {
+                                var content = await response.Content.ReadAsStringAsync();
+                                DebugService.LogInfo("ApiConfig", $"Response content: {(content.Length > 100 ? content.Substring(0, 100) + "..." : content)}");
+                            }
+                            catch (Exception contentEx)
+                            {
+                                DebugService.LogWarning("ApiConfig", $"Could not read response content: {contentEx.Message}");
+                            }
+
+                            DebugService.LogInfo("ApiConfig", $"Connectivity test SUCCESSFUL for {healthCheckUrl}");
+                            return true;
+                        }
+                        else
+                        {
+                            DebugService.LogWarning("ApiConfig", $"Received non-success status code: {response.StatusCode}");
+                        }
                     }
                 }
                 catch (HttpRequestException hex)

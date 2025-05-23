@@ -7,28 +7,37 @@
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              xmlns:vm="clr-namespace:TDFMAUI.ViewModels"
              xmlns:dtos="clr-namespace:TDFShared.DTOs.Requests;assembly=TDFShared"
+             xmlns:converters="clr-namespace:TDFShared.Converters;assembly=TDFShared"
              x:Class="TDFMAUI.Pages.RequestsPage"
              x:DataType="viewModels:RequestsViewModel"
              Title="{Binding Title}">
 
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:RequestButtonVisibilityConverter x:Key="RequestButtonVisibilityConverter" />
+            <converters:CanEditDeleteConverter x:Key="CanEditDeleteConverter" />
+            <converters:CanApproveRejectConverter x:Key="CanApproveRejectConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
     <Grid RowDefinitions="Auto,Auto,*,Auto" Padding="{OnIdiom Phone='10', Default='15'}">
-        <ActivityIndicator Grid.Row="0" Grid.RowSpan="4" 
-                           IsRunning="{Binding IsBusy}" 
-                           IsVisible="{Binding IsBusy}" 
-                           Color="{StaticResource Primary}" 
-                           HorizontalOptions="Center" 
-                           VerticalOptions="Center" 
+        <ActivityIndicator Grid.Row="0" Grid.RowSpan="4"
+                           IsRunning="{Binding IsBusy}"
+                           IsVisible="{Binding IsBusy}"
+                           Color="{StaticResource Primary}"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
                            ZIndex="10"/> <!-- Ensure indicator is on top -->
 
         <!-- Row 0: Title and New Request Button -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
             <Label Text="{Binding Title}"
-                   FontSize="{OnIdiom Phone=20, Default=24}" 
+                   FontSize="{OnIdiom Phone=20, Default=24}"
                    FontAttributes="Bold"
                    VerticalOptions="Center" />
-                   
+
             <Button Grid.Column="1"
-                    Text="New Request" 
+                    Text="New Request"
                     Command="{Binding GoToAddRequestCommand}"
                     BackgroundColor="{StaticResource Primary}"
                     TextColor="White"
@@ -44,9 +53,9 @@
              <Switch IsToggled="{Binding ShowPendingOnly}" VerticalOptions="Center"/>
              <!-- Add more filters here if needed (e.g., Type Picker) -->
          </StackLayout>
-        
+
         <!-- Row 2: Requests List -->
-        <RefreshView Grid.Row="2" 
+        <RefreshView Grid.Row="2"
                      Command="{Binding RefreshRequestsCommand}"
                      IsRefreshing="{Binding IsBusy}">
             <ScrollView>
@@ -64,12 +73,12 @@
                                     EmptyView="No requests found.">
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="dtos:RequestResponseDto">
-                                <Frame Padding="{OnIdiom Phone='10', Default='15'}" 
-                                       Margin="0,5" 
-                                       CornerRadius="5" 
+                                <Frame Padding="{OnIdiom Phone='10', Default='15'}"
+                                       Margin="0,5"
+                                       CornerRadius="5"
                                        BorderColor="LightGray">
                                     <!-- Removed TapGestureRecognizer - Actions will be explicit buttons -->
-                                    
+
                                     <!-- Layout for Request Info -->
                                      <VerticalStackLayout Spacing="5">
                                          <!-- User Info (Visible for Admins/Managers/HR) -->
@@ -77,7 +86,7 @@
                                                IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanManageRequests}"
                                                FontAttributes="Italic"
                                                FontSize="Small"/>
-                                        
+
                                         <!-- Main Request Details -->
                                          <Label Text="{Binding LeaveType}" FontAttributes="Bold" FontSize="Medium" />
                                          <Label Text="{Binding RequestStartDate, StringFormat='From: {0:d}'}" FontSize="Small" />
@@ -85,54 +94,77 @@
                                          <Label Text="{Binding RequestReason, StringFormat='Reason: {0}'}" FontSize="Small" LineBreakMode="WordWrap" IsVisible="{Binding RequestReason, Converter={StaticResource StringNotEmptyConverter}}"/>
                                          <Label Text="{Binding Status, StringFormat='Status: {0}'}" FontAttributes="Bold" FontSize="Small" />
                                          <Label Text="{Binding Remarks, StringFormat='Remarks: {0}'}" FontSize="Small" IsVisible="{Binding Remarks, Converter={StaticResource StringNotEmptyConverter}}"/>
-                                    
+
                                         <!-- Action Buttons -->
                                         <HorizontalStackLayout Spacing="5" Margin="0,5,0,0">
-                                            <!-- Edit Button -->
+                                            <!-- Edit Button - Only visible for pending requests owned by current user -->
                                              <Button Text="Edit"
                                                      FontSize="Micro"
                                                      Padding="8,4"
                                                      Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=EditRequestCommand}"
-                                                     CommandParameter="{Binding .}"
-                                                     IsVisible="{Binding Status, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Pending'}" 
-                                                     />
-                                                     <!-- TODO: Add finer IsVisible logic based on user ownership vs admin role -->
+                                                     CommandParameter="{Binding .}">
+                                                <Button.IsVisible>
+                                                    <MultiBinding Converter="{StaticResource CanEditDeleteConverter}">
+                                                        <Binding Path="Status" />
+                                                        <Binding Path="Source.CurrentUserId" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
+                                                        <Binding Path="UserID" />
+                                                    </MultiBinding>
+                                                </Button.IsVisible>
+                                            </Button>
 
-                                            <!-- Delete Button -->
+                                            <!-- Delete Button - Visible for pending requests (owner or admin) -->
                                             <Button Text="Delete"
                                                     FontSize="Micro"
                                                     Padding="8,4"
                                                     BackgroundColor="Red"
                                                     TextColor="White"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=DeleteRequestCommand}"
-                                                    CommandParameter="{Binding .}"
-                                                    IsVisible="{Binding Status, Converter={StaticResource StringEqualsConverter}, ConverterParameter='Pending'}"
-                                                    /> 
-                                                     <!-- TODO: Add finer IsVisible logic based on user ownership vs admin role -->
+                                                    CommandParameter="{Binding .}">
+                                                <Button.IsVisible>
+                                                    <MultiBinding Converter="{StaticResource RequestButtonVisibilityConverter}" ConverterParameter="delete">
+                                                        <Binding Path="Status" />
+                                                        <Binding Path="Source.CurrentUserId" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
+                                                        <Binding Path="UserID" />
+                                                        <Binding Path="Source.IsCurrentUserAdmin" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
+                                                    </MultiBinding>
+                                                </Button.IsVisible>
+                                            </Button>
 
-                                            <!-- Approve Button -->
+                                            <!-- Approve Button - Only visible for admins on pending requests they don't own -->
                                             <Button Text="Approve"
                                                     FontSize="Micro"
                                                     Padding="8,4"
                                                     BackgroundColor="Green"
                                                     TextColor="White"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=ApproveRequestCommand}"
-                                                    CommandParameter="{Binding .}"
-                                                     IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanApproveReject}"
-                                                     />
-                                                    <!-- TODO: Add finer IsVisible check based on status == Pending and user not being owner -->
-                                            
-                                            <!-- Reject Button -->
+                                                    CommandParameter="{Binding .}">
+                                                <Button.IsVisible>
+                                                    <MultiBinding Converter="{StaticResource CanApproveRejectConverter}">
+                                                        <Binding Path="Status" />
+                                                        <Binding Path="Source.CurrentUserId" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
+                                                        <Binding Path="UserID" />
+                                                        <Binding Path="Source.IsCurrentUserAdmin" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
+                                                    </MultiBinding>
+                                                </Button.IsVisible>
+                                            </Button>
+
+                                            <!-- Reject Button - Only visible for admins on pending requests they don't own -->
                                             <Button Text="Reject"
                                                     FontSize="Micro"
                                                     Padding="8,4"
                                                     BackgroundColor="OrangeRed"
                                                     TextColor="White"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=RejectRequestCommand}"
-                                                    CommandParameter="{Binding .}"
-                                                     IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanApproveReject}"
-                                                    /> 
-                                                    <!-- TODO: Add finer IsVisible check based on status == Pending and user not being owner -->
+                                                    CommandParameter="{Binding .}">
+                                                <Button.IsVisible>
+                                                    <MultiBinding Converter="{StaticResource CanApproveRejectConverter}">
+                                                        <Binding Path="Status" />
+                                                        <Binding Path="Source.CurrentUserId" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
+                                                        <Binding Path="UserID" />
+                                                        <Binding Path="Source.IsCurrentUserAdmin" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
+                                                    </MultiBinding>
+                                                </Button.IsVisible>
+                                            </Button>
 
                                             <!-- View Details Button (If needed separate from actions) -->
                                             <Button Text="Details"
@@ -156,4 +188,4 @@
         </StackLayout>
     </Grid>
 
-</ContentPage> 
+</ContentPage>

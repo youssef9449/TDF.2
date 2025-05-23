@@ -18,11 +18,10 @@ namespace TDFShared.DependencyInjection
         {
             if (services == null) throw new ArgumentNullException(nameof(services));
 
-            // Note: Shared utility services like RequestValidationService, RequestBusinessRuleService,
-            // and RequestAuthorizationService are implemented as static classes and don't need DI registration.
-            // They can be called directly using their static methods.
+            // Note: Validation services are now registered as dependency injection services.
+            // Use IValidationService and IBusinessRulesService for comprehensive validation.
 
-            
+
             return services;
         }
 

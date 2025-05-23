@@ -74,29 +74,55 @@ namespace TDFMAUI.Features.Dashboard
             // Initialize with a refresh
         }
 
-        // Default parameterless constructor
+        // Default parameterless constructor for design-time support ONLY
         public DashboardViewModel()
         {
-            // TODO: Review default constructor. This line likely needs to resolve IRequestService from a service provider if this constructor is used at runtime.
-            _requestService = _requestService ?? throw new ArgumentNullException(nameof(_requestService)); // This will likely fail if not properly injected
-            _notificationService = _notificationService ?? throw new ArgumentNullException(nameof(_notificationService));
-            _logger = _logger ?? throw new ArgumentNullException(nameof(_logger));
+            // This constructor is ONLY for design-time support (XAML previews, designers)
+            // Production code MUST use the dependency injection constructor above
 
-            Title = "Dashboard";
-
-            // Set personalized welcome message if user is available
-            if (App.CurrentUser != null)
+            if (Microsoft.Maui.Controls.DesignMode.IsDesignModeEnabled)
             {
-                // Extract first name from FullName (text before the first space)
-                string firstName = App.CurrentUser.FullName?.Split(' ').FirstOrDefault() ?? "User";
-                WelcomeMessage = $"Welcome back, {firstName}!";
+                // Design-time initialization only
+                Title = "Dashboard";
+                WelcomeMessage = "Welcome to TDF!";
+
+                // Initialize collections with sample data for design-time
+                RecentRequests = new ObservableCollection<RequestResponseDto>();
+                RecentNotifications = new ObservableCollection<NotificationDto>();
+
+                // Add sample data for design-time preview
+                RecentRequests.Add(new RequestResponseDto
+                {
+                    RequestID = Guid.NewGuid(),
+                    LeaveType = "Annual Leave",
+                    RequestStartDate = DateTime.Today.AddDays(7),
+                    Status = TDFShared.Enums.RequestStatus.Pending
+                });
+
+                RecentNotifications.Add(new NotificationDto
+                {
+                    NotificationId = 1,
+                    Message = "Sample notification",
+                    Timestamp = DateTime.Now
+                });
+
+                // Set sample stats for design-time
+                PendingRequestsCount = 3;
+                UnreadNotificationsCount = 2;
+                UnreadMessagesCount = 1;
+                HasRecentRequests = true;
+                HasRecentNotifications = true;
+                IsDataLoaded = true;
             }
-
-            // Subscribe to user changed event to update welcome message
-            App.UserChanged += OnUserChanged;
-
-            // Initialize with a refresh
-            RefreshCommand.Execute(null);
+            else
+            {
+                // Production runtime - this should NEVER be called
+                // If this is reached, it indicates a dependency injection configuration error
+                throw new InvalidOperationException(
+                    "DashboardViewModel parameterless constructor should only be used for design-time support. " +
+                    "In production, use dependency injection with the constructor that accepts IRequestService, " +
+                    "INotificationService, and ILogger parameters. Check your service registration in MauiProgram.cs.");
+            }
         }
 
 

@@ -553,54 +553,23 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
         }
     }
 
-    public static string GenerateRefreshToken()
+    public string GenerateRefreshToken()
     {
-        var randomNumber = new byte[32];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomNumber);
-        return Convert.ToBase64String(randomNumber);
+        // Use shared SecurityService for refresh token generation
+        return _securityService.GenerateSecureToken(32);
     }
 
     public string GenerateJwtToken(UserDto user)
     {
         ArgumentNullException.ThrowIfNull(user);
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.ASCII.GetBytes(_jwtSecretKey);
 
-        var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
-            new Claim(ClaimTypes.Name, user.Username ?? string.Empty),
-            new Claim("fullName", user.FullName ?? string.Empty),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
-
-        // Add roles to claims
-        if (user.Roles != null)
-        {
-            claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
-        }
-
-        // Add boolean claims for quick access
-        if (user.IsAdmin) claims.Add(new Claim("isAdmin", "true"));
-        if (user.IsManager) claims.Add(new Claim("isManager", "true"));
-        if (user.IsHR) claims.Add(new Claim("isHR", "true"));
-
-        var creds = new SigningCredentials(
-            new SymmetricSecurityKey(key),
-            SecurityAlgorithms.HmacSha256Signature);
-
-        var tokenDescriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddMinutes(_jwtTokenExpirationMinutes),
-            SigningCredentials = creds,
-            Issuer = _configuration["Jwt:Issuer"],
-            Audience = _configuration["Jwt:Audience"]
-        };
-
-        var token = tokenHandler.CreateToken(tokenDescriptor);
-        return tokenHandler.WriteToken(token);
+        // Use shared SecurityService for JWT token generation
+        return _securityService.GenerateJwtToken(
+            user,
+            _jwtSecretKey,
+            _configuration["Jwt:Issuer"] ?? "tdfapi",
+            _configuration["Jwt:Audience"] ?? "tdfapp",
+            _jwtTokenExpirationMinutes);
     }
 
     /// <summary>

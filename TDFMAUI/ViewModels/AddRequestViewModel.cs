@@ -21,6 +21,7 @@ namespace TDFMAUI.ViewModels
         private readonly TDFMAUI.Services.IRequestService _requestService;
         private readonly TDFShared.Services.IAuthService _authService;
         private readonly ILogger<AddRequestViewModel> _logger;
+        private readonly TDFShared.Validation.IValidationService _validationService;
 
         private bool _isEditMode;
         private int _requestId;
@@ -137,7 +138,7 @@ namespace TDFMAUI.ViewModels
 
         public bool IsNotBusy => !IsBusy;
 
-        public RequestCreateDto RequestCreateDto => 
+        public RequestCreateDto RequestCreateDto =>
             Enum.TryParse<LeaveType>(SelectedLeaveType, true, out LeaveType leaveType)
                 ? RequestDtoFactory.CreateRequestDto(
                     leaveType,
@@ -163,11 +164,12 @@ namespace TDFMAUI.ViewModels
         public ICommand SubmitRequestCommand { get; }
         public ICommand CancelCommand { get; }
 
-        public AddRequestViewModel(IRequestService requestService, TDFShared.Services.IAuthService authService, ILogger<AddRequestViewModel> logger, RequestResponseDto? existingRequest = null)
+        public AddRequestViewModel(IRequestService requestService, TDFShared.Services.IAuthService authService, ILogger<AddRequestViewModel> logger, TDFShared.Validation.IValidationService validationService, RequestResponseDto? existingRequest = null)
         {
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _validationService = validationService ?? throw new ArgumentNullException(nameof(validationService));
 
             SubmitRequestCommand = new Command(async () => await OnSubmit(), () => IsNotBusy);
             CancelCommand = new Command(async () => await OnCancel(), () => IsNotBusy);
@@ -223,7 +225,7 @@ namespace TDFMAUI.ViewModels
 
         private async Task OnSubmit()
         {
-            if (!Validate()) 
+            if (!Validate())
             {
                 await Shell.Current.DisplayAlert("Validation Errors", string.Join("\n", ValidationErrors), "OK");
                 return;
@@ -234,7 +236,7 @@ namespace TDFMAUI.ViewModels
             {
                 RequestResponseDto? response = null;
                 int currentUserId = await _authService.GetCurrentUserIdAsync();
-                
+
                 if (currentUserId == 0)
                 {
                     _logger.LogWarning("User is not authenticated or User ID could not be retrieved. Aborting submission.");
@@ -298,30 +300,58 @@ namespace TDFMAUI.ViewModels
 
         public bool Validate()
         {
+            var errors = new List<string>();
+
+            // Basic validation
             if (string.IsNullOrWhiteSpace(SelectedLeaveType))
             {
-                ValidationErrors = new List<string> { "Leave type is required." };
+                errors.Add("Leave type is required.");
+                ValidationErrors = errors;
                 return false;
             }
 
-            if (Enum.TryParse<LeaveType>(SelectedLeaveType, true, out LeaveType leaveType))
+            if (!Enum.TryParse<LeaveType>(SelectedLeaveType, true, out LeaveType leaveType))
             {
-                var errors = RequestValidationService.ValidateRequest(
-                    StartDate,
-                    EndDate,
-                    leaveType,
-                    StartTime,
-                    EndTime);
-
-                // Use shared business rule for business days if needed elsewhere
-                // int businessDays = RequestBusinessRuleService.CalculateBusinessDays(StartDate, EndDate);
-
+                errors.Add("Invalid leave type selected.");
                 ValidationErrors = errors;
-                return !errors.Any();
+                return false;
             }
-            
-            ValidationErrors = new List<string> { "Invalid leave type selected." };
-            return false;
+
+            // Use shared validation service for DTO validation
+            var dto = IsEditMode ? (object)RequestUpdateDto : RequestCreateDto;
+            var validationResult = _validationService.ValidateObject(dto);
+
+            if (!validationResult.IsValid)
+            {
+                errors.AddRange(validationResult.Errors);
+            }
+
+            // Additional client-side validation
+            if (StartDate.Date < DateTime.Today)
+            {
+                errors.Add("Start date cannot be in the past.");
+            }
+
+            if (EndDate.HasValue && EndDate.Value.Date < StartDate.Date)
+            {
+                errors.Add("End date must be on or after start date.");
+            }
+
+            // Time validation for specific leave types
+            if (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment)
+            {
+                if (!StartTime.HasValue || !EndTime.HasValue)
+                {
+                    errors.Add($"{leaveType} requires both start and end times.");
+                }
+                else if (EndTime <= StartTime)
+                {
+                    errors.Add("End time must be after start time.");
+                }
+            }
+
+            ValidationErrors = errors;
+            return !errors.Any();
         }
 
         #region INotifyPropertyChanged Implementation

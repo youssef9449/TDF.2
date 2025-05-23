@@ -120,7 +120,8 @@ namespace TDFMAUI.Pages
 
             try
             {
-                bool isConnected = await ApiConfig.TestApiConnectivityAsync();
+                // Use fallback implementation since this page doesn't use dependency injection
+                bool isConnected = await ApiConfig.TestApiConnectivityAsync(null);
                 ApiStatusLabel.Text = isConnected
                     ? "✓ Connected to API successfully"
                     : "✗ Failed to connect to API";

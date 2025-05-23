@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using TDFShared.Models.User;
 using TDFShared.Enums;
+using TDFShared.Validation;
 
 namespace TDFShared.DTOs.Requests
 {
@@ -12,55 +13,68 @@ namespace TDFShared.DTOs.Requests
     public class RequestCreateDto
     {
         /// <summary>User ID of the requester</summary>
-        [Required]
+        [Required(ErrorMessage = "User ID is required")]
+        [Range(1, int.MaxValue, ErrorMessage = "User ID must be a positive number")]
         public int UserId { get; set; }
 
         /// <summary>Type of leave</summary>
-        [Required]
+        [Required(ErrorMessage = "Leave type is required")]
         public LeaveType LeaveType { get; set; }
-        
+
         /// <summary>Start date of the request</summary>
-        [Required]
+        [Required(ErrorMessage = "Start date is required")]
+        [FutureDate(1, ErrorMessage = "Start date must be at least 1 day from today")]
         public DateTime RequestStartDate { get; set; }
-        
+
         /// <summary>End date of the request</summary>
-        public DateTime? RequestEndDate { get; set; } // Nullable if not always required
-        
+        [DateRange(nameof(RequestStartDate), 30)]
+        public DateTime? RequestEndDate { get; set; }
+
         /// <summary>Beginning time for partial day</summary>
+        [RequiredForLeaveType(nameof(LeaveType), LeaveType.Permission, LeaveType.ExternalAssignment)]
         public TimeSpan? RequestBeginningTime { get; set; }
-        
+
         /// <summary>Ending time for partial day</summary>
+        [RequiredForLeaveType(nameof(LeaveType), LeaveType.Permission, LeaveType.ExternalAssignment)]
+        [TimeRange(nameof(RequestBeginningTime))]
         public TimeSpan? RequestEndingTime { get; set; }
-        
+
         /// <summary>Reason for the request</summary>
+        [StringLength(500, ErrorMessage = "Reason cannot exceed 500 characters")]
         public string? RequestReason { get; set; }
     }
 
     /// <summary>
     /// DTO for updating an existing request
     /// </summary>
-    public class RequestUpdateDto 
+    public class RequestUpdateDto
     {
         /// <summary>Type of leave</summary>
-        [Required]
+        [Required(ErrorMessage = "Leave type is required")]
         public LeaveType LeaveType { get; set; }
-        
+
         /// <summary>Start date of the request</summary>
-        [Required]
+        [Required(ErrorMessage = "Start date is required")]
+        [FutureDate(0, ErrorMessage = "Start date cannot be in the past")]
         public DateTime RequestStartDate { get; set; }
-        
+
         /// <summary>End date of the request</summary>
-        public DateTime? RequestEndDate { get; set; } // Nullable if not always required
-        
+        [DateRange(nameof(RequestStartDate), 30)]
+        public DateTime? RequestEndDate { get; set; }
+
         /// <summary>Beginning time for partial day</summary>
+        [RequiredForLeaveType(nameof(LeaveType), LeaveType.Permission, LeaveType.ExternalAssignment)]
         public TimeSpan? RequestBeginningTime { get; set; }
-        
+
         /// <summary>Ending time for partial day</summary>
+        [RequiredForLeaveType(nameof(LeaveType), LeaveType.Permission, LeaveType.ExternalAssignment)]
+        [TimeRange(nameof(RequestBeginningTime))]
         public TimeSpan? RequestEndingTime { get; set; }
-        
+
         /// <summary>Reason for the request</summary>
+        [StringLength(500, ErrorMessage = "Reason cannot exceed 500 characters")]
         public string? RequestReason { get; set; }
-        
+
         /// <summary>Row version for concurrency</summary>
         [JsonPropertyName("rowVersion")]
         public byte[]? RowVersion { get; set; }
@@ -152,11 +166,11 @@ namespace TDFShared.DTOs.Requests
         /// <summary>Unique ID of the request</summary>
         [Required]
         public int RequestID { get; set; }
-        
+
         /// <summary>User ID of the requester</summary>
         [Required]
         public int RequestUserID { get; set; }
-        
+
         /// <summary>Name of the requester</summary>
         public string? UserName { get; set; } // Added for display
 
@@ -164,20 +178,20 @@ namespace TDFShared.DTOs.Requests
         [Required]
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public LeaveType LeaveType { get; set; }
-        
+
         /// <summary>Start date of the request</summary>
         [Required]
         public DateTime RequestStartDate { get; set; }
-        
+
         /// <summary>End date of the request</summary>
         public DateTime? RequestEndDate { get; set; }
-        
+
         /// <summary>Beginning time for partial day</summary>
         public TimeSpan? RequestBeginningTime { get; set; }
-        
+
         /// <summary>Ending time for partial day</summary>
         public TimeSpan? RequestEndingTime { get; set; }
-        
+
         /// <summary>Reason for the request</summary>
         public string? RequestReason { get; set; }
 
@@ -190,22 +204,22 @@ namespace TDFShared.DTOs.Requests
 
         /// <summary>HR status of the request</summary>
         public RequestStatus HRStatus { get; set; } = Enums.RequestStatus.Pending;
-        
+
         /// <summary>Remarks from approver/admin</summary>
         public string? Remarks { get; set; } // Approver/Admin remarks
-        
+
         /// <summary>Name of the approver</summary>
         public string? ApproverName { get; set; } // Added for display
-        
+
         /// <summary>Date the request was created</summary>
         public DateTime CreatedDate { get; set; }
-        
+
         /// <summary>Date the request was last modified</summary>
         public DateTime? LastModifiedDate { get; set; }
-        
+
         /// <summary>Number of days requested</summary>
         public int? RequestNumberOfDays { get; set; }
-        
+
         /// <summary>Remaining balance of leave</summary>
         public int? RemainingBalance { get; set; }
 
@@ -221,7 +235,7 @@ namespace TDFShared.DTOs.Requests
     {
         /// <summary>New status of the request</summary>
         public RequestStatus Status { get; set; } // e.g., Approved, Rejected, Cancelled
-        
+
         /// <summary>Remarks for the status update</summary>
         public string? Remarks { get; set; }
     }

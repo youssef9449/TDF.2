@@ -1,8 +1,8 @@
-using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
+using System.ComponentModel.DataAnnotations;
 using TDFAPI.Exceptions;
 using TDFAPI.CQRS.Core;
 using TDFShared.DTOs.Users;
@@ -17,18 +17,9 @@ namespace TDFAPI.CQRS.Queries
     /// </summary>
     public class GetUserQuery : IQuery<UserDto>
     {
+        [Required(ErrorMessage = "UserId is required")]
+        [Range(1, int.MaxValue, ErrorMessage = "UserId must be greater than 0")]
         public int UserId { get; set; }
-    }
-
-    /// <summary>
-    /// Validator for GetUserQuery
-    /// </summary>
-    public class GetUserQueryValidator : AbstractValidator<GetUserQuery>
-    {
-        public GetUserQueryValidator()
-        {
-            RuleFor(x => x.UserId).GreaterThan(0).WithMessage("UserId must be greater than 0");
-        }
     }
 
     /// <summary>
@@ -54,19 +45,19 @@ namespace TDFAPI.CQRS.Queries
         {
             // Try to get from cache first
             string cacheKey = $"user:{request.UserId}";
-            
+
             return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
             {
                 _logger.LogInformation("Cache miss for user {UserId}, loading from database", request.UserId);
-                
+
                 var user = await _userRepository.GetByIdAsync(request.UserId);
                 if (user == null)
                 {
                     throw new EntityNotFoundException("User", request.UserId);
                 }
-                
+
                 return user; // UserDto is already returned from the repository
             }, 30, 10); // Cache for 30 minutes with 10 minute sliding expiration
         }
     }
-} 
+}

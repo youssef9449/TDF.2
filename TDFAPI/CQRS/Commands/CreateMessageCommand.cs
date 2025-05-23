@@ -1,9 +1,9 @@
-using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 using TDFAPI.CQRS.Core;
 using TDFShared.Exceptions;
 using TDFShared.DTOs.Messages;
@@ -21,30 +21,22 @@ namespace TDFAPI.CQRS.Commands
     /// </summary>
     public class CreateMessageCommand : ICommand<MessageResponseDto>
     {
+        [Required(ErrorMessage = "SenderId is required")]
+        [Range(1, int.MaxValue, ErrorMessage = "SenderId must be greater than 0")]
         public int SenderId { get; set; }
-        public int RecipientId { get; set; }
-        public string Content { get; set; }
-        public bool IsPrivate { get; set; }
-        public string CorrelationId { get; set; }
-    }
 
-    /// <summary>
-    /// Validator for CreateMessageCommand
-    /// </summary>
-    public class CreateMessageCommandValidator : AbstractValidator<CreateMessageCommand>
-    {
-        public CreateMessageCommandValidator()
-        {
-            RuleFor(x => x.SenderId).GreaterThan(0)
-                .WithMessage("SenderId must be greater than 0");
-            
-            RuleFor(x => x.RecipientId).GreaterThan(0)
-                .WithMessage("RecipientId must be greater than 0");
-            
-            RuleFor(x => x.Content).NotEmpty()
-                .MaximumLength(4000)
-                .WithMessage("Content is required and must be less than 4000 characters");
-        }
+        [Required(ErrorMessage = "RecipientId is required")]
+        [Range(1, int.MaxValue, ErrorMessage = "RecipientId must be greater than 0")]
+        public int RecipientId { get; set; }
+
+        [Required(ErrorMessage = "Content is required")]
+        [StringLength(4000, ErrorMessage = "Content must be less than 4000 characters")]
+        public string Content { get; set; }
+
+        public bool IsPrivate { get; set; }
+
+        [Required(ErrorMessage = "CorrelationId is required")]
+        public string CorrelationId { get; set; }
     }
 
     /// <summary>
@@ -130,12 +122,12 @@ namespace TDFAPI.CQRS.Commands
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating message from {SenderId} to {RecipientId}", 
+                _logger.LogError(ex, "Error creating message from {SenderId} to {RecipientId}",
                     request.SenderId, request.RecipientId);
-                
+
                 await _unitOfWork.RollbackAsync();
                 throw;
             }
         }
     }
-} 
+}

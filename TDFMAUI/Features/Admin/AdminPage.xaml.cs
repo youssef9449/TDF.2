@@ -2,22 +2,25 @@ using System;
 using TDFMAUI.Services;
 using TDFShared.DTOs.Requests;
 using TDFMAUI.Pages;
-using TDFShared.DTOs.Users; 
+using TDFShared.DTOs.Users;
+using TDFShared.Services;
 
-namespace TDFMAUI.Features.Admin 
+namespace TDFMAUI.Features.Admin
 {
     public partial class AdminPage : ContentPage
     {
         private readonly IRequestService _requestService;
-        private readonly ApiService _apiService; // For user-related calls until UserApiService is used
-        private List<UserDto> _users; 
-        private List<RequestResponseDto> _requests; 
+        private readonly ApiService _apiService;
+        private readonly IErrorHandlingService _errorHandlingService;
+        private List<UserDto> _users;
+        private List<RequestResponseDto> _requests;
 
-        public AdminPage(IRequestService requestService, ApiService apiService) 
+        public AdminPage(IRequestService requestService, ApiService apiService, IErrorHandlingService errorHandlingService)
         {
             InitializeComponent();
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _errorHandlingService = errorHandlingService ?? throw new ArgumentNullException(nameof(errorHandlingService));
             LoadData();
         }
 
@@ -25,7 +28,7 @@ namespace TDFMAUI.Features.Admin
         {
             var loadingIndicator = this.FindByName<ActivityIndicator>("loadingIndicator");
             bool hasLoadingIndicator = loadingIndicator != null;
-            
+
             if (hasLoadingIndicator)
             {
                 loadingIndicator.IsVisible = true;
@@ -34,21 +37,21 @@ namespace TDFMAUI.Features.Admin
 
             try
             {
-                // TODO: Replace with calls to new UserApiService and RequestApiService
-                var usersResult = await _apiService.GetAllUsersAsync(); 
+                // Load users data
+                var usersResult = await _apiService.GetAllUsersAsync();
                 _users = usersResult?.Items?.ToList() ?? new List<UserDto>();
-                
-                var pagination = new RequestPaginationDto { Page = 1, PageSize = 100 }; 
-                // TODO: Replace with call to new RequestApiService
-                var requestsResult = await _requestService.GetAllRequestsAsync(pagination); 
+
+                // Load requests data
+                var pagination = new RequestPaginationDto { Page = 1, PageSize = 100 };
+                var requestsResult = await _requestService.GetAllRequestsAsync(pagination);
                 _requests = requestsResult?.Items?.ToList() ?? new List<RequestResponseDto>();
 
-                // Remove UI update logic - should be handled by ViewModel or removed if sections are simplified
+                // Data loaded successfully - UI updates would be handled by ViewModel in MVVM pattern
             }
             catch (Exception ex)
             {
-                // TODO: Consider a common error helper or handle more generically if ApiService.GetFriendlyErrorMessage is not accessible.
-                await DisplayAlert("Error", $"Failed to load data: {ex.Message}", "OK");
+                // Use shared error handling service for consistent error messages
+                await _errorHandlingService.ShowErrorAsync(ex, "loading admin data");
             }
             finally
             {
@@ -69,7 +72,7 @@ namespace TDFMAUI.Features.Admin
                 ((CollectionView)sender).SelectedItem = null;
                 // Navigate to the user edit page within the Users feature
                 // Assuming EditUserPage is moved and namespace updated
-                await Navigation.PushAsync(new TDFMAUI.Features.Users.EditUserPage(selectedUser, _apiService)); 
+                await Navigation.PushAsync(new TDFMAUI.Features.Users.EditUserPage(selectedUser, _apiService));
             }
         }
 
@@ -80,7 +83,7 @@ namespace TDFMAUI.Features.Admin
                 ((CollectionView)sender).SelectedItem = null;
                 // Navigate to the request details page within the Requests feature
                 // Assuming RequestDetailsPage is moved and namespace updated
-                await Navigation.PushAsync(new TDFMAUI.Features.Requests.RequestDetailsPage(_apiService, selectedRequest)); 
+                await Navigation.PushAsync(new TDFMAUI.Features.Requests.RequestDetailsPage(_apiService, selectedRequest));
             }
         }
         */
@@ -91,7 +94,7 @@ namespace TDFMAUI.Features.Admin
              // Assuming AddUserPage is moved and namespace updated
             await Navigation.PushAsync(new AddUserPage());
         }
-        
+
         private async void OnManageRequestsClicked(object sender, EventArgs e)
         {
             // Navigate to RequestApprovalPage within Requests feature
@@ -109,4 +112,4 @@ namespace TDFMAUI.Features.Admin
                 await Navigation.PopAsync();
         }
     }
-} 
+}

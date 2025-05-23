@@ -20,6 +20,8 @@ namespace TDFAPI.Services
         private readonly IUserRepository _userRepository;
         private readonly INotificationService _notificationService;
         private readonly ILogger<RequestService> _logger;
+        private readonly TDFShared.Validation.IValidationService _validationService;
+        private readonly TDFShared.Validation.IBusinessRulesService _businessRulesService;
 
         // Known leave request types (now using enum)
         private static readonly LeaveType[] _supportedLeaveTypes =
@@ -33,15 +35,19 @@ namespace TDFAPI.Services
         };
 
         public RequestService(
-            IRequestRepository requestRepository, 
+            IRequestRepository requestRepository,
             IUserRepository userRepository,
             INotificationService notificationService,
-            ILogger<RequestService> logger)
+            ILogger<RequestService> logger,
+            TDFShared.Validation.IValidationService validationService,
+            TDFShared.Validation.IBusinessRulesService businessRulesService)
         {
             _requestRepository = requestRepository;
             _userRepository = userRepository;
             _notificationService = notificationService;
             _logger = logger;
+            _validationService = validationService ?? throw new ArgumentNullException(nameof(validationService));
+            _businessRulesService = businessRulesService ?? throw new ArgumentNullException(nameof(businessRulesService));
         }
 
         /// <summary>
@@ -64,7 +70,7 @@ namespace TDFAPI.Services
         public async Task<PaginatedResult<RequestResponseDto>> GetByUserIdAsync(int userId, RequestPaginationDto pagination)
         {
             var paginatedResult = await _requestRepository.GetByUserIdAsync(userId, pagination);
-            return await MapToPaginatedResponseDto(paginatedResult); 
+            return await MapToPaginatedResponseDto(paginatedResult);
         }
 
         /// <summary>
@@ -98,35 +104,33 @@ namespace TDFAPI.Services
                 if (user == null)
                     throw new EntityNotFoundException("User", userId);
 
-                // Validate using shared service
-                RequestValidationService.ValidateCreateDto(createDto);
+                // Validate using shared validation service
+                _validationService.ValidateAndThrow(createDto);
 
-                // Check for conflicting requests
-                await RequestBusinessRuleService.ValidateConflicts(
-                    userId,
-                    createDto.RequestStartDate,
-                    createDto.RequestEndDate,
-                    _requestRepository.HasConflictingRequestsAsync);
+                // Create business rule context
+                var context = new TDFShared.Validation.BusinessRuleContext
+                {
+                    GetLeaveBalanceAsync = async (uid, leaveType) =>
+                    {
+                        var balances = await _requestRepository.GetLeaveBalancesAsync(uid);
+                        return balances.TryGetValue(leaveType.ToString().ToLower(), out var balance) ? balance : 0;
+                    },
+                    HasConflictingRequestsAsync = _requestRepository.HasConflictingRequestsAsync,
+                    MinAdvanceNoticeDays = 1,
+                    MaxRequestDurationDays = 30
+                };
 
-                // Calculate business days
-                int numberOfDays = RequestBusinessRuleService.CalculateBusinessDays(
+                // Validate business rules
+                var businessRuleResult = await _businessRulesService.ValidateLeaveRequestAsync(createDto, userId, context);
+                if (!businessRuleResult.IsValid)
+                {
+                    throw new BusinessRuleException(string.Join("; ", businessRuleResult.Errors));
+                }
+
+                // Calculate business days (still needed for entity creation)
+                int numberOfDays = CalculateBusinessDays(
                     createDto.RequestStartDate,
                     createDto.RequestEndDate ?? createDto.RequestStartDate);
-
-                // Check leave balance if needed
-                var leaveBalances = await _requestRepository.GetLeaveBalancesAsync(userId);
-                var leaveTypeKey = createDto.LeaveType.ToString().ToLower();
-                if (leaveBalances.TryGetValue(leaveTypeKey, out var currentBalance))
-                {
-                    if (currentBalance < numberOfDays)
-                    {
-                        throw new BusinessRuleException("Insufficient leave balance for the requested leave type.");
-                    }
-                }
-                else
-                {
-                    throw new BusinessRuleException($"No leave balance found for {createDto.LeaveType}.");
-                }
 
                 var request = new RequestEntity
                 {
@@ -147,14 +151,14 @@ namespace TDFAPI.Services
 
                 int requestId = await _requestRepository.CreateAsync(request);
                 var createdRequestEntity = await _requestRepository.GetByIdAsync(requestId);
-                
+
                 if (createdRequestEntity == null)
                 {
                     _logger.LogError("Failed to fetch created request with ID {RequestId}", requestId);
                     throw new BusinessRuleException("Failed to retrieve the created request after saving.");
                 }
 
-                await NotifyDepartmentManagers(request.RequestDepartment, 
+                await NotifyDepartmentManagers(request.RequestDepartment,
                     $"New {request.RequestType} request from {user.FullName}", userId);
 
                 return await MapToResponseDto(createdRequestEntity);
@@ -189,41 +193,35 @@ namespace TDFAPI.Services
 
                 await EnsureUserCanModifyRequest(existingRequest, userId);
 
-                if (!RequestBusinessRuleService.CanEdit(existingRequest.RequestStatus, existingRequest.RequestHRStatus))
+                if (!CanEdit(existingRequest.RequestStatus, existingRequest.RequestHRStatus))
                     throw new BusinessRuleException("Request cannot be edited in its current state.");
 
-                // Validate using shared service
-                RequestValidationService.ValidateUpdateDto(updateDto);
+                // Validate using shared validation service
+                _validationService.ValidateAndThrow(updateDto);
 
-                // Check for conflicting requests
-                await RequestBusinessRuleService.ValidateConflicts(
-                    userId,
-                    updateDto.RequestStartDate,
-                    updateDto.RequestEndDate,
-                    _requestRepository.HasConflictingRequestsAsync,
-                    id);
+                // Create business rule context
+                var context = new TDFShared.Validation.BusinessRuleContext
+                {
+                    GetLeaveBalanceAsync = async (uid, leaveType) =>
+                    {
+                        var balances = await _requestRepository.GetLeaveBalancesAsync(uid);
+                        return balances.TryGetValue(leaveType.ToString().ToLower(), out var balance) ? balance : 0;
+                    },
+                    HasConflictingRequestsAsync = _requestRepository.HasConflictingRequestsAsync,
+                    MinAdvanceNoticeDays = 0, // Allow same-day updates for existing requests
+                    MaxRequestDurationDays = 30
+                };
 
-                int numberOfDays = RequestBusinessRuleService.CalculateBusinessDays(
+                // Validate business rules for update
+                var businessRuleResult = await _businessRulesService.ValidateLeaveRequestUpdateAsync(updateDto, id, userId, context);
+                if (!businessRuleResult.IsValid)
+                {
+                    throw new BusinessRuleException(string.Join("; ", businessRuleResult.Errors));
+                }
+
+                int numberOfDays = CalculateBusinessDays(
                     updateDto.RequestStartDate,
                     updateDto.RequestEndDate ?? updateDto.RequestStartDate);
-
-                // Check leave balance if type changed or days increased
-                if (updateDto.LeaveType != existingRequest.RequestType || numberOfDays > existingRequest.RequestNumberOfDays)
-                {
-                    var leaveBalances = await _requestRepository.GetLeaveBalancesAsync(userId);
-                    var leaveTypeKey = updateDto.LeaveType.ToString().ToLower();
-                    if (leaveBalances.TryGetValue(leaveTypeKey, out var currentBalance))
-                    {
-                        if (currentBalance < numberOfDays)
-                        {
-                            throw new BusinessRuleException("Insufficient leave balance for the requested leave type.");
-                        }
-                    }
-                    else
-                    {
-                        throw new BusinessRuleException($"No leave balance found for {updateDto.LeaveType}.");
-                    }
-                }
 
                 // Update the request
                 existingRequest.RequestType = updateDto.LeaveType;
@@ -244,7 +242,7 @@ namespace TDFAPI.Services
                     throw new BusinessRuleException("Failed to retrieve the updated request after saving.");
                 }
 
-                await NotifyDepartmentManagers(updatedRequestEntity.RequestDepartment, 
+                await NotifyDepartmentManagers(updatedRequestEntity.RequestDepartment,
                     $"Request from {updatedRequestEntity.RequestUserFullName} was updated", userId);
 
                 return await MapToResponseDto(updatedRequestEntity);
@@ -279,7 +277,7 @@ namespace TDFAPI.Services
 
                 await EnsureUserCanModifyRequest(existingRequest, userId);
 
-                if (!RequestBusinessRuleService.CanDelete(existingRequest.RequestStatus, existingRequest.RequestHRStatus))
+                if (!CanDelete(existingRequest.RequestStatus, existingRequest.RequestHRStatus))
                     throw new BusinessRuleException("Only requests that are pending both manager and HR approval can be deleted.");
 
                 bool deleted = await _requestRepository.DeleteAsync(id);
@@ -316,11 +314,11 @@ namespace TDFAPI.Services
                 if (request == null)
                     throw new EntityNotFoundException("Request", requestId);
 
-                if (!RequestBusinessRuleService.CanApprove(request.RequestStatus, request.RequestHRStatus, isHR))
+                if (!CanApprove(request.RequestStatus, request.RequestHRStatus, isHR))
                     throw new BusinessRuleException($"Request is not pending {(isHR ? "HR" : "Manager")} approval. Current status: {(isHR ? request.RequestHRStatus : request.RequestStatus)}");
 
-                bool fullyApproved = RequestBusinessRuleService.WillBeFullyApproved(request.RequestStatus, request.RequestHRStatus, isHR);
-                string? balanceType = RequestBusinessRuleService.GetBalanceType(request.RequestType);
+                bool fullyApproved = WillBeFullyApproved(request.RequestStatus, request.RequestHRStatus, isHR);
+                string? balanceType = GetBalanceType(request.RequestType);
 
                 if (balanceType != null && fullyApproved)
                 {
@@ -389,7 +387,7 @@ namespace TDFAPI.Services
                 if (request == null)
                     throw new EntityNotFoundException("Request", requestId);
 
-                if (!RequestBusinessRuleService.CanReject(request.RequestStatus, request.RequestHRStatus, isHR))
+                if (!CanReject(request.RequestStatus, request.RequestHRStatus, isHR))
                     throw new BusinessRuleException($"Request is not pending {(isHR ? "HR" : "Manager")} approval. Current status: {(isHR ? request.RequestHRStatus : request.RequestStatus)}");
 
                 bool updated = await UpdateRequestStatusAsync(
@@ -442,7 +440,7 @@ namespace TDFAPI.Services
                 throw new EntityNotFoundException("Request", requestId);
 
             // Validate approver's authorization
-            bool canApprove = RequestAuthorizationService.CanManageDepartment(
+            bool canApprove = CanManageDepartment(
                 approver.IsAdmin,
                 approver.IsManager,
                 approver.IsHR,
@@ -458,7 +456,7 @@ namespace TDFAPI.Services
 
             // Perform the approval
             var now = DateTime.UtcNow;
-            
+
             // Update request status
             if (approver.IsHR == true)
             {
@@ -496,7 +494,7 @@ namespace TDFAPI.Services
             LeaveType leaveType = ParseLeaveType(requestType);
             return await _requestRepository.GetPendingDaysCountAsync(userId, leaveType);
         }
-        
+
         public async Task<bool> HasConflictingRequestsAsync(int userId, DateTime startDate, DateTime endDate, int requestId = 0)
         {
              return await _requestRepository.HasConflictingRequestsAsync(userId, startDate, endDate, requestId);
@@ -517,18 +515,18 @@ namespace TDFAPI.Services
                 throw new UnauthorizedAccessException("User is not authorized to modify this request.");
             }
         }
-        
+
         private async Task NotifyDepartmentManagers(string department, string message, int excludedUserId = 0)
         {
             // Get users by department, then filter by role
             var usersInDepartment = await _userRepository.GetUsersByDepartmentAsync(department);
-            var managers = usersInDepartment.Where(u => u.Role == "Manager"); 
-            
+            var managers = usersInDepartment.Where(u => u.Role == "Manager");
+
             foreach (var manager in managers.Where(m => m.UserID != excludedUserId))
             {
                 // Use CreateNotificationAsync instead of SendNotification
                 await _notificationService.CreateNotificationAsync(
-                    receiverId: manager.UserID, 
+                    receiverId: manager.UserID,
                     message: message); // Sender context might vary, using null for now
             }
         }
@@ -540,11 +538,11 @@ namespace TDFAPI.Services
             {
                  // Use CreateNotificationAsync instead of SendNotification
                  await _notificationService.CreateNotificationAsync(
-                     receiverId: hr.UserID, 
+                     receiverId: hr.UserID,
                      message: message); // Sender context might vary, using null for now
             }
         }
-        
+
         // --- Centralized Validation Helpers ---
         private LeaveType ParseLeaveType(string leaveType)
         {
@@ -561,9 +559,9 @@ namespace TDFAPI.Services
                 return LeaveType.WorkFromHome;
             throw new ValidationException($"Unsupported leave type: {leaveType}");
         }
-        
-        // ----- Mappers ----- 
-        
+
+        // ----- Mappers -----
+
         private async Task<RequestResponseDto> MapToResponseDto(RequestEntity? request)
         {
             if (request == null)
@@ -571,7 +569,7 @@ namespace TDFAPI.Services
 
             // Fetch balances using the potentially updated method returning int dictionary
             Dictionary<string, int> balances = await GetLeaveBalancesAsync(request.RequestUserID);
-            string? balanceType = RequestBusinessRuleService.GetBalanceType(request.RequestType);
+            string? balanceType = GetBalanceType(request.RequestType);
             int? remainingBalance = null;
 
             if (balanceType != null && balances.TryGetValue(balanceType, out int balanceValue))
@@ -601,11 +599,11 @@ namespace TDFAPI.Services
                 RowVersion = request.RowVersion
             };
         }
-        
+
          private async Task<PaginatedResult<RequestResponseDto>> MapToPaginatedResponseDto(PaginatedResult<RequestEntity> paginatedRequests)
         {
             if (paginatedRequests == null) throw new EntityNotFoundException("Request", "null");
-            
+
             // Map items asynchronously if MapToResponseDto becomes async (due to balance fetch)
             var mappedItems = new List<RequestResponseDto>();
             if (paginatedRequests.Items != null)
@@ -615,19 +613,117 @@ namespace TDFAPI.Services
                      mappedItems.Add(await MapToResponseDto(item));
                  }
             }
-            
+
             return new PaginatedResult<RequestResponseDto>
             {
                 Items = mappedItems,
-                TotalCount = paginatedRequests.TotalCount, 
-                PageNumber = paginatedRequests.PageNumber, 
-                PageSize = paginatedRequests.PageSize     
+                TotalCount = paginatedRequests.TotalCount,
+                PageNumber = paginatedRequests.PageNumber,
+                PageSize = paginatedRequests.PageSize
             };
         }
 
         #endregion
 
         #region Private Methods
+
+        /// <summary>
+        /// Calculates business days between two dates
+        /// </summary>
+        private static int CalculateBusinessDays(DateTime startDate, DateTime endDate)
+        {
+            if (startDate > endDate) return 0;
+
+            int businessDays = 0;
+            DateTime current = startDate.Date;
+
+            while (current <= endDate.Date)
+            {
+                if (current.DayOfWeek != DayOfWeek.Saturday && current.DayOfWeek != DayOfWeek.Sunday)
+                {
+                    businessDays++;
+                }
+                current = current.AddDays(1);
+            }
+
+            return businessDays;
+        }
+
+        /// <summary>
+        /// Checks if a request can be edited based on its status
+        /// </summary>
+        private static bool CanEdit(RequestStatus status, RequestStatus hrStatus)
+        {
+            return status == RequestStatus.Pending && hrStatus == RequestStatus.Pending;
+        }
+
+        /// <summary>
+        /// Checks if a request can be deleted based on its status
+        /// </summary>
+        private static bool CanDelete(RequestStatus status, RequestStatus hrStatus)
+        {
+            return status == RequestStatus.Pending && hrStatus == RequestStatus.Pending;
+        }
+
+        /// <summary>
+        /// Checks if a request can be approved
+        /// </summary>
+        private static bool CanApprove(RequestStatus currentStatus, RequestStatus hrStatus, bool isHR)
+        {
+            return isHR ?
+                currentStatus == RequestStatus.Approved && hrStatus == RequestStatus.Pending :
+                currentStatus == RequestStatus.Pending;
+        }
+
+        /// <summary>
+        /// Checks if a request can be rejected
+        /// </summary>
+        private static bool CanReject(RequestStatus currentStatus, RequestStatus hrStatus, bool isHR)
+        {
+            return isHR ?
+                currentStatus == RequestStatus.Approved && hrStatus == RequestStatus.Pending :
+                currentStatus == RequestStatus.Pending;
+        }
+
+        /// <summary>
+        /// Checks if a request will be fully approved after this action
+        /// </summary>
+        private static bool WillBeFullyApproved(RequestStatus currentStatus, RequestStatus hrStatus, bool isHR)
+        {
+            return (isHR && currentStatus == RequestStatus.Approved) ||
+                   (!isHR && hrStatus == RequestStatus.Approved);
+        }
+
+        /// <summary>
+        /// Gets the balance type for a leave type
+        /// </summary>
+        private static string? GetBalanceType(LeaveType leaveType)
+        {
+            return leaveType switch
+            {
+                LeaveType.Annual => "annual",
+                LeaveType.Emergency => "emergency",
+                LeaveType.Unpaid => null, // Unpaid leave doesn't affect balance
+                LeaveType.Permission => null, // Permission doesn't affect balance
+                LeaveType.ExternalAssignment => null, // External assignment doesn't affect balance
+                LeaveType.WorkFromHome => null, // WFH doesn't affect balance
+                _ => null
+            };
+        }
+
+        /// <summary>
+        /// Checks if a user can manage a department
+        /// </summary>
+        private static bool CanManageDepartment(bool? isAdmin, bool? isManager, bool? isHR, string? userDepartment, string? requestDepartment)
+        {
+            // Admins and HR can manage all departments
+            if (isAdmin == true || isHR == true) return true;
+
+            // Managers can only manage their own department
+            if (isManager != true || string.IsNullOrEmpty(userDepartment) || string.IsNullOrEmpty(requestDepartment)) return false;
+
+            return userDepartment.Equals(requestDepartment, StringComparison.OrdinalIgnoreCase);
+        }
 
         private async Task<bool> UpdateRequestStatusAsync(
             RequestEntity request,
@@ -652,7 +748,7 @@ namespace TDFAPI.Services
                 }
                 request.UpdatedAt = DateTime.UtcNow;
                 await _requestRepository.UpdateAsync(request);
-                
+
                 return true;
             }
             catch (Exception ex)

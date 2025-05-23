@@ -41,7 +41,7 @@ namespace TDFAPI.Utilities
                 _data["Database"]["Trusted_Connection"] = "true";
                 _data["Database"]["TrustServerCertificate"] = "true";
 
-                _data["Jwt"]["SecretKey"] = "default_dev_key_" + Guid.NewGuid().ToString("N");
+                // JWT SecretKey should be provided via environment variable JWT_SECRET_KEY
                 _data["Jwt"]["Issuer"] = "tdfapi";
                 _data["Jwt"]["Audience"] = "tdfapp";
 
@@ -75,7 +75,7 @@ namespace TDFAPI.Utilities
                             writer.WriteLine();
 
                             writer.WriteLine("[Jwt]");
-                            writer.WriteLine("SecretKey=default_dev_key_" + Guid.NewGuid().ToString("N"));
+                            writer.WriteLine("# SecretKey should be provided via environment variable JWT_SECRET_KEY");
                             writer.WriteLine("Issuer=tdfapi");
                             writer.WriteLine("Audience=tdfapp");
                             writer.WriteLine();
@@ -109,7 +109,7 @@ namespace TDFAPI.Utilities
                     _data["Database"]["Trusted_Connection"] = "true";
                     _data["Database"]["TrustServerCertificate"] = "true";
 
-                    _data["Jwt"]["SecretKey"] = "default_dev_key_" + Guid.NewGuid().ToString("N");
+                    // JWT SecretKey should be provided via environment variable JWT_SECRET_KEY
                     _data["Jwt"]["Issuer"] = "tdfapi";
                     _data["Jwt"]["Audience"] = "tdfapp";
 
@@ -197,7 +197,7 @@ namespace TDFAPI.Utilities
                 _data["Database"]["Trusted_Connection"] = "true";
                 _data["Database"]["TrustServerCertificate"] = "true";
 
-                _data["Jwt"]["SecretKey"] = "default_dev_key_" + Guid.NewGuid().ToString("N");
+                // JWT SecretKey should be provided via environment variable JWT_SECRET_KEY
                 _data["Jwt"]["Issuer"] = "tdfapi";
                 _data["Jwt"]["Audience"] = "tdfapp";
 

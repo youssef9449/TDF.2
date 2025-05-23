@@ -1,29 +1,29 @@
-using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using TDFShared.Validation;
 
 namespace TDFAPI.CQRS.Behaviors
 {
     /// <summary>
-    /// Pipeline behavior for validating requests using FluentValidation
+    /// Pipeline behavior for validating requests using shared validation service
     /// </summary>
     /// <typeparam name="TRequest">Request type</typeparam>
     /// <typeparam name="TResponse">Response type</typeparam>
     public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
         where TRequest : IRequest<TResponse>
     {
-        private readonly IEnumerable<IValidator<TRequest>> _validators;
+        private readonly IValidationService _validationService;
         private readonly ILogger<ValidationBehavior<TRequest, TResponse>> _logger;
 
         public ValidationBehavior(
-            IEnumerable<IValidator<TRequest>> validators,
+            IValidationService validationService,
             ILogger<ValidationBehavior<TRequest, TResponse>> logger)
         {
-            _validators = validators;
+            _validationService = validationService;
             _logger = logger;
         }
 
@@ -36,14 +36,10 @@ namespace TDFAPI.CQRS.Behaviors
 
             _logger.LogDebug("Validating request {RequestType}", typeName);
 
-            var context = new ValidationContext<TRequest>(request);
-            var failures = _validators
-                .Select(v => v.Validate(context))
-                .SelectMany(result => result.Errors)
-                .Where(f => f != null)
-                .ToList();
+            // Use shared validation service for data annotation validation
+            var validationResult = _validationService.ValidateObject(request);
 
-            if (failures.Count == 0)
+            if (validationResult.IsValid)
             {
                 _logger.LogDebug("Validation successful for request {RequestType}", typeName);
                 return await next();
@@ -52,10 +48,10 @@ namespace TDFAPI.CQRS.Behaviors
             _logger.LogWarning(
                 "Validation failed for {RequestType} with {ErrorCount} error(s): {Errors}",
                 typeName,
-                failures.Count,
-                string.Join(", ", failures.Select(f => $"{f.PropertyName}: {f.ErrorMessage}")));
+                validationResult.Errors.Count,
+                string.Join(", ", validationResult.Errors));
 
-            throw new ValidationException(failures);
+            throw new TDFShared.Exceptions.ValidationException(string.Join("; ", validationResult.Errors));
         }
     }
-} 
+}

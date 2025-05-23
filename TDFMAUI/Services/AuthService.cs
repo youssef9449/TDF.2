@@ -21,21 +21,21 @@ using TDFShared.Services;
 
 namespace TDFMAUI.Services;
 
-public class AuthService : IAuthService
+public class AuthService : TDFShared.Services.IAuthService
 {
     private readonly SecureStorageService _secureStorageService;
     private readonly IUserProfileService _userProfileService;
-    private readonly IHttpClientService _httpClientService;
+    private readonly TDFShared.Services.IHttpClientService _httpClientService;
     private readonly ILogger<AuthService> _logger;
-    private readonly ISecurityService _securityService;
+    private readonly TDFShared.Services.ISecurityService _securityService;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly string _baseApiUrl;
 
     public AuthService(
         SecureStorageService secureStorageService,
         IUserProfileService userProfileService,
-        IHttpClientService httpClientService,
-        ISecurityService securityService,
+        TDFShared.Services.IHttpClientService httpClientService,
+        TDFShared.Services.ISecurityService securityService,
         ILogger<AuthService> logger)
     {
         try
@@ -380,10 +380,17 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
 
         try
         {
-            // In MAUI client, we'll just remove the token from secure storage
-            // The actual token revocation will be handled by the API
+            // Call the API to revoke the token on the server
+            _logger.LogInformation("Revoking token with JTI: {Jti}", jti);
+            var endpoint = "auth/revoke-token";
+            var request = new { Jti = jti, ExpiryDateUtc = expiryDateUtc, UserId = userId };
+
+            await _httpClientService.PostAsync(endpoint, request);
+            _logger.LogInformation("Token revoked successfully on server");
+
+            // Also remove the token from local secure storage
             await _secureStorageService.RemoveTokenAsync();
-            _logger.LogInformation("Token revoked (JTI: {Jti}, UserId: {UserId})", jti, userId);
+            _logger.LogInformation("Token removed from local storage (JTI: {Jti}, UserId: {UserId})", jti, userId);
         }
         catch (Exception ex)
         {
@@ -570,26 +577,6 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
         {
             _logger.LogError(ex, "Error verifying password");
             return false;
-        }
-    }
-
-    public async Task RevokeTokenAsync(string jti, DateTime expiryDateUtc)
-    {
-        _logger.LogInformation("Revoking token with JTI: {Jti}", jti);
-
-        try
-        {
-            var endpoint = "auth/revoke-token";
-            var request = new { Jti = jti, ExpiryDateUtc = expiryDateUtc };
-
-            await _httpClientService.PostAsync(endpoint, request);
-
-            _logger.LogInformation("Token revoked successfully");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error revoking token with JTI: {Jti}", jti);
-            throw;
         }
     }
 

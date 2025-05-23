@@ -26,10 +26,10 @@ namespace TDFMAUI.ViewModels
         private ObservableCollection<UserDto> _teamMembers;
 
         private readonly ApiService _apiService;
-        private readonly IAuthService _authService;
+        private readonly TDFShared.Services.IAuthService _authService;
 
         // Constructor injection
-        public MyTeamViewModel(ApiService apiService, IAuthService authService)
+        public MyTeamViewModel(ApiService apiService, TDFShared.Services.IAuthService authService)
         {
              _apiService = apiService;
              _authService = authService;

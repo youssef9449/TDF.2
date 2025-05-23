@@ -231,8 +231,9 @@ namespace TDFMAUI
                 return handler;
             });
 
-            // Register platform-specific connectivity service
-            builder.Services.AddSingleton<TDFMAUI.Services.IConnectivityService, ConnectivityService>();
+            // Register platform-specific connectivity service with shared interface
+            builder.Services.AddSingleton<ConnectivityService>();
+            builder.Services.AddSingleton<TDFShared.Services.IConnectivityService>(sp => sp.GetRequiredService<ConnectivityService>());
 
             // Register shared validation services
             builder.Services.AddSingleton<TDFShared.Validation.IValidationService, TDFShared.Validation.ValidationService>();

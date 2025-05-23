@@ -26,13 +26,13 @@ namespace TDFShared.Services
         public ConnectivityService(ILogger<ConnectivityService> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             // Initialize with current state
             _lastKnownState = IsConnected();
-            
+
             // Start periodic monitoring
             StartPeriodicMonitoring();
-            
+
             _logger.LogInformation("ConnectivityService initialized. Initial state: {IsConnected}", _lastKnownState);
         }
 
@@ -68,7 +68,7 @@ namespace TDFShared.Services
         public virtual async Task<ConnectivityInfo> GetConnectivityInfoAsync()
         {
             var isConnected = await IsConnectedAsync();
-            
+
             return new ConnectivityInfo
             {
                 IsConnected = isConnected,
@@ -92,10 +92,10 @@ namespace TDFShared.Services
                 using var ping = new Ping();
                 var reply = await ping.SendPingAsync(host, (int)timeout.TotalMilliseconds);
                 var isReachable = reply.Status == IPStatus.Success;
-                
-                _logger.LogDebug("Ping test to {Host}: {Status} ({RoundtripTime}ms)", 
+
+                _logger.LogDebug("Ping test to {Host}: {Status} ({RoundtripTime}ms)",
                     host, reply.Status, reply.RoundtripTime);
-                
+
                 return isReachable;
             }
             catch (Exception ex)
@@ -114,7 +114,7 @@ namespace TDFShared.Services
                 return true;
 
             var tcs = new TaskCompletionSource<bool>();
-            
+
             void OnConnectivityChanged(object? sender, TDFConnectivityChangedEventArgs e)
             {
                 if (e.IsConnected)
@@ -124,10 +124,10 @@ namespace TDFShared.Services
             try
             {
                 ConnectivityChanged += OnConnectivityChanged;
-                
+
                 var timeoutTask = Task.Delay(timeout, cancellationToken);
                 var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
-                
+
                 if (completedTask == tcs.Task)
                 {
                     return await tcs.Task;
@@ -154,10 +154,10 @@ namespace TDFShared.Services
                 return;
 
             _isMonitoring = true;
-            
+
             // Check connectivity every 5 seconds
             _connectivityTimer = new Timer(CheckConnectivityCallback, null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
-            
+
             _logger.LogDebug("Started periodic connectivity monitoring");
         }
 
@@ -172,7 +172,7 @@ namespace TDFShared.Services
             _isMonitoring = false;
             _connectivityTimer?.Dispose();
             _connectivityTimer = null;
-            
+
             _logger.LogDebug("Stopped periodic connectivity monitoring");
         }
 
@@ -184,14 +184,14 @@ namespace TDFShared.Services
             try
             {
                 var currentState = IsConnected();
-                
+
                 lock (_stateLock)
                 {
                     if (currentState != _lastKnownState)
                     {
-                        _logger.LogInformation("Network connectivity changed: {PreviousState} -> {CurrentState}", 
+                        _logger.LogInformation("Network connectivity changed: {PreviousState} -> {CurrentState}",
                             _lastKnownState, currentState);
-                        
+
                         var eventArgs = new TDFConnectivityChangedEventArgs
                         {
                             IsConnected = currentState,
@@ -202,16 +202,16 @@ namespace TDFShared.Services
 
                         _lastKnownState = currentState;
 
-                        // Raise events
-                        ConnectivityChanged?.Invoke(this, eventArgs);
-                        
+                        // Raise events using protected methods
+                        OnConnectivityChanged(eventArgs);
+
                         if (currentState)
                         {
-                            NetworkRestored?.Invoke(this, EventArgs.Empty);
+                            OnNetworkRestored();
                         }
                         else
                         {
-                            NetworkLost?.Invoke(this, EventArgs.Empty);
+                            OnNetworkLost();
                         }
                     }
                 }
@@ -231,12 +231,48 @@ namespace TDFShared.Services
         }
 
         /// <summary>
+        /// Protected method to raise ConnectivityChanged event from derived classes
+        /// </summary>
+        protected virtual void OnConnectivityChanged(TDFConnectivityChangedEventArgs eventArgs)
+        {
+            ConnectivityChanged?.Invoke(this, eventArgs);
+        }
+
+        /// <summary>
+        /// Protected method to raise NetworkRestored event from derived classes
+        /// </summary>
+        protected virtual void OnNetworkRestored()
+        {
+            NetworkRestored?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Protected method to raise NetworkLost event from derived classes
+        /// </summary>
+        protected virtual void OnNetworkLost()
+        {
+            NetworkLost?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
         /// Disposes the service and stops monitoring
         /// </summary>
-        public virtual void Dispose()
+        public void Dispose()
         {
-            StopPeriodicMonitoring();
-            _logger.LogDebug("ConnectivityService disposed");
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Protected dispose method for inheritance
+        /// </summary>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                StopPeriodicMonitoring();
+                _logger.LogDebug("ConnectivityService disposed");
+            }
         }
     }
 }

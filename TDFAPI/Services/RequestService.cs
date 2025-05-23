@@ -8,7 +8,7 @@ using TDFShared.Enums;
 using TDFShared.Exceptions;
 using TDFShared.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
+using TDFShared.DTOs.Users;
 using EntityNotFoundException = TDFAPI.Exceptions.EntityNotFoundException;
 using RequestStatusEnum = TDFShared.Enums.RequestStatus;
 

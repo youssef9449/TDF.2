@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using System.Collections.ObjectModel;
 using TDFShared.DTOs.Users;
+using TDFShared.Services;
 using TDFMAUI.Services;
 using System.Threading.Tasks;
 using System.Linq;
@@ -25,15 +26,17 @@ namespace TDFMAUI.ViewModels
         private ObservableCollection<UserDto> _teamMembers;
 
         private readonly ApiService _apiService;
+        private readonly IAuthService _authService;
 
         // Constructor injection
-        public MyTeamViewModel(ApiService apiService)
+        public MyTeamViewModel(ApiService apiService, IAuthService authService)
         {
              _apiService = apiService;
+             _authService = authService;
              TeamMembers = new ObservableCollection<UserDto>();
              // Load data when the view model is created
              // Consider moving to an OnAppearing/NavigatedTo method if more appropriate
-             _ = LoadTeamAsync(); 
+             _ = LoadTeamAsync();
         }
 
         // Example command placeholder
@@ -43,29 +46,57 @@ namespace TDFMAUI.ViewModels
              IsLoading = true;
              try
              {
-                // Assuming App.CurrentUser holds the logged-in user's info
-                if (App.CurrentUser == null)
+                // Get current user from auth service
+                var currentUser = await _authService.GetCurrentUserAsync();
+                if (currentUser == null)
                 {
                     // Handle case where user is not logged in
                     // Maybe display a message or navigate away
                     return;
                 }
-                
-                // Assuming ApiService has a method like GetTeamMembersAsync
-                // This might need adjustment based on the actual ApiService implementation
-                // and the correct API endpoint for fetching team members.
-                var members = await _apiService.GetUsersByDepartmentAsync(App.CurrentUser.Department); // Example: fetch users by dept
-                // Or: var members = await _apiService.GetTeamMembersAsync(App.CurrentUser.Id); // If specific team endpoint exists
-                
+
+                // Convert to UserDto for RequestStateManager
+                var userDto = new UserDto
+                {
+                    UserID = currentUser.UserID,
+                    IsAdmin = currentUser.IsAdmin ?? false,
+                    IsHR = currentUser.IsHR ?? false,
+                    IsManager = currentUser.IsManager ?? false,
+                    Department = currentUser.Department
+                };
+
+                // Check if user can manage requests (managers, HR, admin can see team members)
+                if (!RequestStateManager.CanManageRequests(userDto))
+                {
+                    // Regular users shouldn't see team page - this should be handled by navigation logic
+                    return;
+                }
+
+                // For managers, only show users from departments they can manage
+                // For HR/Admin, show all users from the specified department
+                var members = await _apiService.GetUsersByDepartmentAsync(currentUser.Department);
+
                 TeamMembers.Clear();
                 if (members != null)
-                {                  
+                {
                     foreach(var member in members)
-                    {                       
+                    {
                          // Filter out the current user if needed
-                         if (member.UserID != App.CurrentUser.UserID)
+                         if (member.UserID != currentUser.UserID)
                          {
-                            TeamMembers.Add(member);
+                            // For managers, validate they can manage this user's department
+                            if (userDto.IsManager && !userDto.IsAdmin && !userDto.IsHR)
+                            {
+                                if (RequestStateManager.CanManageDepartment(userDto, member.Department))
+                                {
+                                    TeamMembers.Add(member);
+                                }
+                            }
+                            else
+                            {
+                                // HR and Admin can see all users
+                                TeamMembers.Add(member);
+                            }
                          }
                     }
                 }
@@ -82,4 +113,4 @@ namespace TDFMAUI.ViewModels
              }
         }
     }
-} 
+}

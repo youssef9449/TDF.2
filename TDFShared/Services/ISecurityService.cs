@@ -42,6 +42,13 @@ namespace TDFShared.Services
         string GenerateSalt();
 
         /// <summary>
+        /// Generates a cryptographically secure token of specified length
+        /// </summary>
+        /// <param name="lengthInBytes">The length of the token in bytes</param>
+        /// <returns>A base64-encoded secure token</returns>
+        string GenerateSecureToken(int lengthInBytes);
+
+        /// <summary>
         /// Validates password strength according to security requirements
         /// </summary>
         /// <param name="password">The password to validate</param>

@@ -104,6 +104,24 @@ namespace TDFShared.Services
         }
 
         /// <summary>
+        /// Generates a cryptographically secure token of specified length
+        /// </summary>
+        /// <param name="lengthInBytes">The length of the token in bytes</param>
+        /// <returns>A base64-encoded secure token</returns>
+        public string GenerateSecureToken(int lengthInBytes)
+        {
+            if (lengthInBytes <= 0)
+                throw new ArgumentException("Token length must be greater than zero", nameof(lengthInBytes));
+
+            byte[] tokenBytes = new byte[lengthInBytes];
+            using (var rng = RandomNumberGenerator.Create())
+            {
+                rng.GetBytes(tokenBytes);
+            }
+            return Convert.ToBase64String(tokenBytes);
+        }
+
+        /// <summary>
         /// Validates password strength according to security requirements
         /// </summary>
         public bool IsPasswordStrong(string password, out string validationMessage)

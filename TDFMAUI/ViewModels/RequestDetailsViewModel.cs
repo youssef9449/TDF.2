@@ -69,6 +69,27 @@ namespace TDFMAUI.ViewModels
                 Request = await _apiService.GetRequestByIdAsync(RequestId);
                 if (Request != null)
                 {
+                    // Validate if user can view this request using RequestStateManager
+                    var currentUser = await _authService.GetCurrentUserAsync();
+                    if (currentUser != null)
+                    {
+                        var userDto = new UserDto
+                        {
+                            UserID = currentUser.UserID,
+                            IsAdmin = currentUser.IsAdmin ?? false,
+                            IsHR = currentUser.IsHR ?? false,
+                            IsManager = currentUser.IsManager ?? false,
+                            Department = currentUser.Department
+                        };
+
+                        if (!RequestStateManager.CanViewRequest(Request, userDto))
+                        {
+                            await Shell.Current.DisplayAlert("Access Denied", "You do not have permission to view this request.", "OK");
+                            await Shell.Current.GoToAsync("..");
+                            return;
+                        }
+                    }
+
                     SetActionVisibility();
                 }
                 else
@@ -104,16 +125,23 @@ namespace TDFMAUI.ViewModels
                 return;
             }
 
-            bool isOwner = Request.RequestUserID == currentUser.UserID;
-            bool isAdmin = currentUser.IsAdmin == true;
-            bool isHR = currentUser.IsHR == true;
-            bool isManager = currentUser.IsManager == true;
+            // Convert to UserDto for RequestStateManager
+            var userDto = new UserDto
+            {
+                UserID = currentUser.UserID,
+                IsAdmin = currentUser.IsAdmin ?? false,
+                IsHR = currentUser.IsHR ?? false,
+                IsManager = currentUser.IsManager ?? false,
+                Department = currentUser.Department
+            };
 
-            // Use local business rule checks for state validation
-            CanEdit = isOwner && CanEditRequest(Request.Status, Request.HRStatus);
-            CanDelete = isOwner && CanDeleteRequest(Request.Status, Request.HRStatus);
-            CanApprove = !isOwner && CanApproveRequest(Request.Status, Request.HRStatus, isHR);
-            CanReject = !isOwner && CanRejectRequest(Request.Status, Request.HRStatus, isHR);
+            bool isOwner = Request.RequestUserID == currentUser.UserID;
+
+            // Use RequestStateManager for consistent authorization logic
+            CanEdit = RequestStateManager.CanEdit(Request, userDto.IsAdmin, isOwner);
+            CanDelete = RequestStateManager.CanDelete(Request, userDto.IsAdmin, isOwner);
+            CanApprove = RequestStateManager.CanApproveOrRejectRequest(Request, userDto);
+            CanReject = RequestStateManager.CanApproveOrRejectRequest(Request, userDto);
         }
 
         [RelayCommand]
@@ -235,44 +263,6 @@ namespace TDFMAUI.ViewModels
             await Shell.Current.GoToAsync("..");
         }
 
-        #region Helper Methods
 
-        /// <summary>
-        /// Checks if a request can be edited based on its status
-        /// </summary>
-        private static bool CanEditRequest(RequestStatus status, RequestStatus hrStatus)
-        {
-            return status == RequestStatus.Pending && hrStatus == RequestStatus.Pending;
-        }
-
-        /// <summary>
-        /// Checks if a request can be deleted based on its status
-        /// </summary>
-        private static bool CanDeleteRequest(RequestStatus status, RequestStatus hrStatus)
-        {
-            return status == RequestStatus.Pending && hrStatus == RequestStatus.Pending;
-        }
-
-        /// <summary>
-        /// Checks if a request can be approved
-        /// </summary>
-        private static bool CanApproveRequest(RequestStatus currentStatus, RequestStatus hrStatus, bool isHR)
-        {
-            return isHR ?
-                currentStatus == RequestStatus.Approved && hrStatus == RequestStatus.Pending :
-                currentStatus == RequestStatus.Pending;
-        }
-
-        /// <summary>
-        /// Checks if a request can be rejected
-        /// </summary>
-        private static bool CanRejectRequest(RequestStatus currentStatus, RequestStatus hrStatus, bool isHR)
-        {
-            return isHR ?
-                currentStatus == RequestStatus.Approved && hrStatus == RequestStatus.Pending :
-                currentStatus == RequestStatus.Pending;
-        }
-
-        #endregion
     }
 }

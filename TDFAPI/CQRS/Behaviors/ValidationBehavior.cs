@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
+using TDFShared.Services;
 using TDFShared.Validation;
 
 namespace TDFAPI.CQRS.Behaviors
@@ -14,7 +14,7 @@ namespace TDFAPI.CQRS.Behaviors
     /// <typeparam name="TRequest">Request type</typeparam>
     /// <typeparam name="TResponse">Response type</typeparam>
     public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-        where TRequest : IRequest<TResponse>
+        where TRequest : class, IRequest<TResponse>
     {
         private readonly IValidationService _validationService;
         private readonly ILogger<ValidationBehavior<TRequest, TResponse>> _logger;

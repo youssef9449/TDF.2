@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using TDFShared.DTOs.Requests;
+using TDFShared.DTOs.Users;
 using TDFShared.Exceptions;
 using TDFShared.Services;
 using TDFShared.Factories;
@@ -201,6 +202,9 @@ namespace TDFMAUI.ViewModels
                 _requestFromDay = existingRequest.RequestStartDate;
                 _requestToDay = existingRequest.RequestEndDate;
                 // _requestBeginningTime and _requestEndingTime are directly bound to StartTime and EndTime properties
+
+                // Validate access control for editing using RequestStateManager
+                _ = ValidateEditAccessAsync(existingRequest);
             }
             else
             {
@@ -296,6 +300,49 @@ namespace TDFMAUI.ViewModels
         private async Task OnCancel()
         {
             await Shell.Current.GoToAsync("..");
+        }
+
+        /// <summary>
+        /// Validates if the current user can edit the specified request using RequestStateManager
+        /// </summary>
+        private async Task ValidateEditAccessAsync(RequestResponseDto request)
+        {
+            try
+            {
+                var currentUser = await _authService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    _logger.LogWarning("Cannot validate edit access: User not authenticated");
+                    return;
+                }
+
+                // Convert to UserDto for RequestStateManager
+                var userDto = new UserDto
+                {
+                    UserID = currentUser.UserID,
+                    IsAdmin = currentUser.IsAdmin ?? false,
+                    IsHR = currentUser.IsHR ?? false,
+                    IsManager = currentUser.IsManager ?? false,
+                    Department = currentUser.Department
+                };
+
+                bool isOwner = request.RequestUserID == currentUser.UserID;
+
+                // Use RequestStateManager for consistent authorization logic
+                if (!RequestStateManager.CanEdit(request, userDto.IsAdmin, isOwner))
+                {
+                    _logger.LogWarning("User {UserId} attempted to edit request {RequestId} but lacks permission",
+                        currentUser.UserID, request.RequestID);
+
+                    await Shell.Current.DisplayAlert("Access Denied",
+                        "You do not have permission to edit this request.", "OK");
+                    await Shell.Current.GoToAsync("..");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating edit access for request {RequestId}", request.RequestID);
+            }
         }
 
         public bool Validate()

@@ -75,10 +75,12 @@ builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Warning);
 AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
 {
     var ex = args.ExceptionObject as Exception;
+    // Sanitize exception message to prevent format string conflicts
+    var sanitizedMessage = (ex?.Message ?? "Unknown error").Replace("{", "{{").Replace("}", "}}");
     logger.LogCritical(
         ex,
         "UNHANDLED EXCEPTION CAUSING APPLICATION CRASH: {Message}. IsTerminating: {IsTerminating}",
-        ex?.Message ?? "Unknown error",
+        sanitizedMessage,
         args.IsTerminating
     );
 
@@ -144,10 +146,12 @@ AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
 TaskScheduler.UnobservedTaskException += (sender, args) =>
 {
     var exception = args.Exception;
+    // Sanitize exception message to prevent format string conflicts
+    var sanitizedMessage = exception.Message.Replace("{", "{{").Replace("}", "}}");
     logger.LogError(
         exception,
         "UNOBSERVED TASK EXCEPTION: {Message}",
-        exception.Message
+        sanitizedMessage
     );
 
     // Log unobserved task exceptions to file too

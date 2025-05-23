@@ -121,12 +121,12 @@ namespace TDFAPI.Controllers
             }
             catch (ArgumentException ex)
             {
-                _logger.LogWarning(ex, "Invalid argument in CreateChatMessage");
+                _logger.LogWarning(ex, "Invalid argument in CreateChatMessage: {Message}", ex.Message.Replace("{", "{{").Replace("}", "}}"));
                 return BadRequest(ApiResponse<ChatMessageDto>.ErrorResponse(ex.Message));
             }
             catch (ConcurrencyException ex)
             {
-                _logger.LogWarning(ex, "Concurrency issue when creating chat message");
+                _logger.LogWarning(ex, "Concurrency issue when creating chat message: {Message}", ex.Message.Replace("{", "{{").Replace("}", "}}"));
                 return Conflict(ApiResponse<ChatMessageDto>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)

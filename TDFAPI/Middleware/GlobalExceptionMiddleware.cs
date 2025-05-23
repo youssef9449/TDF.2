@@ -57,12 +57,14 @@ namespace TDFAPI.Middleware
         private void LogDetailedCrashInformation(HttpContext context, Exception ex)
         {
             // Basic exception logging - keep it simple
+            // Sanitize the exception message to prevent format string conflicts
+            var sanitizedMessage = SanitizeLogMessage(ex.Message);
             _logger.LogError(ex,
                 "API Error: {Path} {Method} - {ExceptionType}: {Message}",
                 context.Request.Path,
                 context.Request.Method,
                 ex.GetType().Name,
-                ex.Message);
+                sanitizedMessage);
         }
 
         private void LogToFile(HttpContext context, Exception ex)
@@ -108,7 +110,9 @@ namespace TDFAPI.Middleware
             catch (Exception logEx)
             {
                 // If we can't log to file, at least try to log the failure reason
-                _logger.LogError(logEx, "Failed to write error details to log file: {Message}", logEx.Message);
+                // Sanitize the exception message to prevent format string conflicts
+                var sanitizedMessage = SanitizeLogMessage(logEx.Message);
+                _logger.LogError(logEx, "Failed to write error details to log file: {Message}", sanitizedMessage);
             }
         }
 
@@ -119,8 +123,10 @@ namespace TDFAPI.Middleware
             var statusCode = GetStatusCode(exception);
 
             // Log the error with the error ID for correlation
+            // Sanitize the exception message to prevent format string conflicts
+            var sanitizedMessage = SanitizeLogMessage(exception.Message);
             _logger.LogError(exception, "Error ID: {ErrorId} - {ExceptionType}: {Message}",
-                errorId, exception.GetType().Name, exception.Message);
+                errorId, exception.GetType().Name, sanitizedMessage);
 
             // Create RFC 7807 Problem Details response with extended properties
             var problemDetails = new ExtendedProblemDetails
@@ -208,6 +214,18 @@ namespace TDFAPI.Middleware
                 // Add more mappings as needed
                 _ => $"{baseUrl}500"
             };
+        }
+
+        /// <summary>
+        /// Sanitizes log messages to prevent format string conflicts with structured logging
+        /// </summary>
+        private static string SanitizeLogMessage(string message)
+        {
+            if (string.IsNullOrEmpty(message))
+                return message ?? string.Empty;
+
+            // Replace curly braces that could be interpreted as format placeholders
+            return message.Replace("{", "{{").Replace("}", "}}");
         }
     }
 }

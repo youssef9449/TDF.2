@@ -32,12 +32,28 @@
             <Entry Placeholder="Full Name" Text="{Binding FullName}" Style="{StaticResource EntryStyle}" />
 
             <Label Text="Department" />
+
+            <!-- Loading indicator for departments -->
+            <ActivityIndicator IsVisible="{Binding IsLoading}"
+                             IsRunning="{Binding IsLoading}"
+                             Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}"
+                             HorizontalOptions="Center" />
+
+            <!-- Department picker -->
             <Picker Title="Select Department"
                     ItemsSource="{Binding Departments}"
                     ItemDisplayBinding="{Binding Name}"
                     SelectedItem="{Binding SelectedDepartment}"
                     Style="{StaticResource PickerStyle}"
-                    IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}" />
+                    IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}"
+                    IsVisible="{Binding IsLoading, Converter={StaticResource BooleanInverter}}" />
+
+            <!-- Loading message -->
+            <Label Text="Loading departments..."
+                   IsVisible="{Binding IsLoading}"
+                   HorizontalOptions="Center"
+                   FontSize="Small"
+                   TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" />
 
             <Label Text="Title" />
             <Picker Title="Select Title"

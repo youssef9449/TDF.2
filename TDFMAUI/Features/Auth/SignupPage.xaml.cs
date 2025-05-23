@@ -35,36 +35,31 @@ public partial class SignupPage : ContentPage
         {
             Debug.WriteLine($"[SignupPage] OnAppearing - ViewModel is available, Departments count: {_viewModel.Departments?.Count ?? 0}");
 
-            // Only load departments if they're not already loaded
-            if (_viewModel.Departments == null || _viewModel.Departments.Count == 0)
-            {
-                Debug.WriteLine("[SignupPage] OnAppearing - No departments loaded yet, will load them now");
+            // Always load departments when page appears to ensure fresh data
+            Debug.WriteLine("[SignupPage] OnAppearing - Loading departments");
 
-                // Use MainThread.BeginInvokeOnMainThread to avoid blocking the UI
-                MainThread.BeginInvokeOnMainThread(async () => {
-                    try
+            // Use MainThread.BeginInvokeOnMainThread to avoid blocking the UI
+            MainThread.BeginInvokeOnMainThread(async () => {
+                try
+                {
+                    // Use the command if available
+                    if (_viewModel.LoadDepartmentsCommand?.CanExecute(null) ?? false)
                     {
-                        // Use the command if available
-                        if (_viewModel.LoadDepartmentsCommand?.CanExecute(null) ?? false)
-                        {
-                            Debug.WriteLine("[SignupPage] OnAppearing - Executing LoadDepartmentsCommand");
-                            await _viewModel.LoadDepartmentsCommand.ExecuteAsync(null);
-                        }
-                        else
-                        {
-                            Debug.WriteLine("[SignupPage] OnAppearing - LoadDepartmentsCommand is null or cannot execute. Check ViewModel state.");
-                        }
+                        Debug.WriteLine("[SignupPage] OnAppearing - Executing LoadDepartmentsCommand");
+                        await _viewModel.LoadDepartmentsCommand.ExecuteAsync(null);
+                        Debug.WriteLine("[SignupPage] OnAppearing - LoadDepartmentsCommand completed");
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Debug.WriteLine($"[SignupPage] OnAppearing - Error executing LoadDepartmentsCommand: {ex.Message}");
+                        Debug.WriteLine("[SignupPage] OnAppearing - LoadDepartmentsCommand is null or cannot execute. Check ViewModel state.");
                     }
-                });
-            }
-            else
-            {
-                Debug.WriteLine("[SignupPage] OnAppearing - Departments already loaded, skipping reload");
-            }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[SignupPage] OnAppearing - Error executing LoadDepartmentsCommand: {ex.Message}");
+                    Debug.WriteLine($"[SignupPage] OnAppearing - Exception details: {ex}");
+                }
+            });
         }
         else
         {

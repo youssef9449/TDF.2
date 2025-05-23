@@ -53,6 +53,9 @@ namespace TDFMAUI.Features.Auth
         [ObservableProperty]
         private bool _hasError;
 
+        [ObservableProperty]
+        private bool _isLoading;
+
         public SignupViewModel(IApiService apiService, ILookupService lookupService, ILogger<SignupViewModel> logger)
         {
             Debug.WriteLine("[SignupViewModel] Constructor - Start");
@@ -61,16 +64,17 @@ namespace TDFMAUI.Features.Auth
             _lookupService = lookupService ?? throw new ArgumentNullException(nameof(lookupService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            Debug.WriteLine("[SignupViewModel] Dependencies injected. Calling LoadLookupsAsync...");
-            // Load lookups asynchronously without blocking the constructor
-            _ = LoadLookupsAsync();
-            Debug.WriteLine("[SignupViewModel] Constructor - End (LoadLookupsAsync started)");
+            Debug.WriteLine("[SignupViewModel] Dependencies injected. Constructor complete - departments will be loaded when page appears.");
+            Debug.WriteLine("[SignupViewModel] Constructor - End");
         }
 
         private async Task LoadLookupsAsync()
         {
             Debug.WriteLine("[SignupViewModel] LoadLookupsAsync - Start");
             _logger?.LogInformation("DIAGNOSTIC: LoadLookupsAsync - Starting to load departments");
+
+            // Set loading state
+            IsLoading = true;
 
             try
             {
@@ -168,11 +172,14 @@ namespace TDFMAUI.Features.Auth
 
                 // Ensure we're on the main thread for UI updates
                 await MainThread.InvokeOnMainThreadAsync(() => {
-                    if (departments != null && departments.Any())
+                    try
                     {
-                        Debug.WriteLine($"[SignupViewModel] Departments received. First item: {departments[0].Name}");
-                        _logger?.LogInformation("DIAGNOSTIC: Departments received. First item: {Name}",
-                            departments[0].Name);
+                        Debug.WriteLine($"[SignupViewModel] Updating UI with {departments.Count} departments");
+                        _logger?.LogInformation("DIAGNOSTIC: Updating UI with {Count} departments", departments.Count);
+
+                        // Clear any previous errors first
+                        HasError = false;
+                        ErrorMessage = string.Empty;
 
                         // Clear and add each department individually to ensure the ObservableCollection is updated
                         Departments.Clear();
@@ -182,8 +189,8 @@ namespace TDFMAUI.Features.Auth
                             Debug.WriteLine($"[SignupViewModel] Added department: {dept.Name}");
                         }
 
-                        _logger?.LogInformation("DIAGNOSTIC: Loaded {Count} departments", departments.Count);
-                        Debug.WriteLine($"[SignupViewModel] Loaded {departments.Count} departments successfully");
+                        Debug.WriteLine($"[SignupViewModel] UI updated - Departments.Count: {Departments.Count}");
+                        _logger?.LogInformation("DIAGNOSTIC: UI updated - Departments.Count: {Count}", Departments.Count);
 
                         // Auto-select the first department
                         if (Departments.Count > 0)
@@ -194,15 +201,14 @@ namespace TDFMAUI.Features.Auth
                                 SelectedDepartment.Name);
                         }
 
-                        // Clear any previous errors
-                        HasError = false;
-                        ErrorMessage = string.Empty;
+                        Debug.WriteLine("[SignupViewModel] Department loading completed successfully");
+                        _logger?.LogInformation("DIAGNOSTIC: Department loading completed successfully");
                     }
-                    else
+                    catch (Exception uiEx)
                     {
-                        Debug.WriteLine("[SignupViewModel] No departments were returned");
-                        _logger?.LogWarning("DIAGNOSTIC: Failed to load departments.");
-                        ErrorMessage = "Failed to load departments.";
+                        Debug.WriteLine($"[SignupViewModel] Error updating UI: {uiEx.Message}");
+                        _logger?.LogError(uiEx, "DIAGNOSTIC: Error updating UI with departments");
+                        ErrorMessage = "Error updating department list. Please try again.";
                         HasError = true;
                     }
                 });
@@ -217,6 +223,13 @@ namespace TDFMAUI.Features.Auth
                     HasError = true;
                     Departments.Clear();
                 });
+            }
+            finally
+            {
+                // Always reset loading state
+                IsLoading = false;
+                Debug.WriteLine("[SignupViewModel] LoadLookupsAsync - End");
+                _logger?.LogInformation("DIAGNOSTIC: LoadLookupsAsync - End");
             }
         }
 

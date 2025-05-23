@@ -42,6 +42,10 @@ namespace TDFShared.DTOs.Requests
         /// <summary>Reason for the request</summary>
         [StringLength(500, ErrorMessage = "Reason cannot exceed 500 characters")]
         public string? RequestReason { get; set; }
+
+        /// <summary>Remarks for the request</summary>
+        [StringLength(500, ErrorMessage = "Remarks cannot exceed 500 characters")]
+        public string? RequestRemarks { get; set; }
     }
 
     /// <summary>
@@ -74,6 +78,10 @@ namespace TDFShared.DTOs.Requests
         /// <summary>Reason for the request</summary>
         [StringLength(500, ErrorMessage = "Reason cannot exceed 500 characters")]
         public string? RequestReason { get; set; }
+
+        /// <summary>Remarks for the request</summary>
+        [StringLength(500, ErrorMessage = "Remarks cannot exceed 500 characters")]
+        public string? RequestRemarks { get; set; }
 
         /// <summary>Row version for concurrency</summary>
         [JsonPropertyName("rowVersion")]

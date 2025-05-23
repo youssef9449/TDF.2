@@ -93,11 +93,8 @@ public class AuthService : IAuthService
             var apiResponseContent = await _httpClientService.PostAsync<object, string>(endpoint, loginRequest);
             _logger.LogDebug("Login API response: {Content}", apiResponseContent);
 
-            var options = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
+            // Use centralized JSON options for consistency
+            var options = TDFShared.Helpers.JsonSerializationHelper.BasicOptions;
 
             try
             {

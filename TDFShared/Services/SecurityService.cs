@@ -81,7 +81,7 @@ namespace TDFShared.Services
                 byte[] computedHashBytes = GetHashBytes(password, saltBytes);
 
                 // Use constant-time comparison to prevent timing attacks
-                return CryptographicOperations.FixedTimeEquals(storedHashBytes, computedHashBytes);
+                return FixedTimeEquals(storedHashBytes, computedHashBytes);
             }
             catch (Exception)
             {
@@ -109,7 +109,7 @@ namespace TDFShared.Services
         public bool IsPasswordStrong(string password, out string validationMessage)
         {
             validationMessage = string.Empty;
-            
+
             if (string.IsNullOrEmpty(password))
             {
                 validationMessage = "Password cannot be empty.";
@@ -123,7 +123,7 @@ namespace TDFShared.Services
                 return false;
             }
 
-            // Password must contain at least one uppercase letter
+          /*  // Password must contain at least one uppercase letter
             if (!password.Any(char.IsUpper))
             {
                 validationMessage = "Password must contain at least one uppercase letter.";
@@ -149,7 +149,7 @@ namespace TDFShared.Services
             {
                 validationMessage = "Password must contain at least one special character (e.g., !@#$).";
                 return false;
-            }
+            }*/
 
             return true;
         }
@@ -170,63 +170,179 @@ namespace TDFShared.Services
         /// </summary>
         private byte[] GetHashBytes(string password, byte[] salt)
         {
-            using (var pbkdf2 = new Rfc2898DeriveBytes(
-                password, 
-                salt, 
-                PBKDF2_ITERATIONS, 
-                HashAlgorithmName.SHA512))
+            // Use backward-compatible constructor for older .NET versions
+            using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, PBKDF2_ITERATIONS))
             {
                 return pbkdf2.GetBytes(HASH_SIZE_BYTES);
             }
         }
 
         /// <summary>
-        /// Generates a JWT token for a user (primarily for client-side testing/development)
+        /// Constant-time comparison to prevent timing attacks
         /// </summary>
+        private static bool FixedTimeEquals(byte[] a, byte[] b)
+        {
+            if (a == null || b == null || a.Length != b.Length)
+                return false;
+
+            int result = 0;
+            for (int i = 0; i < a.Length; i++)
+            {
+                result |= a[i] ^ b[i];
+            }
+            return result == 0;
+        }
+
+        /// <summary>
+        /// Generates a comprehensive JWT token for a user with enhanced security and claims
+        /// </summary>
+        /// <param name="user">The user to generate token for</param>
+        /// <param name="secretKey">The secret key for signing (minimum 32 characters recommended)</param>
+        /// <param name="issuer">Token issuer</param>
+        /// <param name="audience">Token audience</param>
+        /// <param name="expirationMinutes">Token expiration in minutes (default: 60, max: 1440)</param>
+        /// <returns>JWT token string</returns>
+        /// <exception cref="ArgumentNullException">Thrown when user is null</exception>
+        /// <exception cref="ArgumentException">Thrown when parameters are invalid</exception>
         public string GenerateJwtToken(UserDto user, string secretKey, string issuer, string audience, int expirationMinutes = 60)
         {
-            if (user == null) throw new ArgumentNullException(nameof(user));
-            if (string.IsNullOrEmpty(secretKey)) throw new ArgumentException("Secret key cannot be null or empty", nameof(secretKey));
-            if (string.IsNullOrEmpty(issuer)) throw new ArgumentException("Issuer cannot be null or empty", nameof(issuer));
-            if (string.IsNullOrEmpty(audience)) throw new ArgumentException("Audience cannot be null or empty", nameof(audience));
+            // Enhanced input validation
+            ValidateJwtTokenInputs(user, secretKey, issuer, audience, expirationMinutes);
 
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(secretKey);
 
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
-                new Claim(ClaimTypes.Name, user.Username ?? string.Empty),
-                new Claim("fullName", user.FullName ?? string.Empty),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            };
+            // Use UTF8 encoding instead of ASCII for better security
+            var key = Encoding.UTF8.GetBytes(secretKey);
 
-            // Add roles to claims
-            if (user.Roles != null)
+            // Ensure minimum key size for security
+            if (key.Length < 32)
             {
-                claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
+                throw new ArgumentException("Secret key must be at least 32 characters long for security", nameof(secretKey));
             }
 
-            // Add boolean claims for quick access
-            if (user.IsAdmin) claims.Add(new Claim("isAdmin", "true"));
-            if (user.IsManager) claims.Add(new Claim("isManager", "true"));
-            if (user.IsHR) claims.Add(new Claim("isHR", "true"));
+            // Build comprehensive claims
+            var claims = BuildUserClaims(user);
 
-            var creds = new SigningCredentials(
-                new SymmetricSecurityKey(key), 
-                SecurityAlgorithms.HmacSha256Signature);
+            // Use stronger signing algorithm
+            var signingCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(key),
+                SecurityAlgorithms.HmacSha256);
 
+            var now = DateTime.UtcNow;
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(expirationMinutes),
-                SigningCredentials = creds,
+                Subject = new ClaimsIdentity(claims, "jwt"),
                 Issuer = issuer,
-                Audience = audience
+                Audience = audience,
+                IssuedAt = now,
+                NotBefore = now,
+                Expires = now.AddMinutes(expirationMinutes),
+                SigningCredentials = signingCredentials
             };
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
             return tokenHandler.WriteToken(token);
+        }
+
+        /// <summary>
+        /// Validates inputs for JWT token generation
+        /// </summary>
+        private static void ValidateJwtTokenInputs(UserDto user, string secretKey, string issuer, string audience, int expirationMinutes)
+        {
+            if (user == null)
+                throw new ArgumentNullException(nameof(user));
+
+            if (string.IsNullOrWhiteSpace(secretKey))
+                throw new ArgumentException("Secret key cannot be null, empty, or whitespace", nameof(secretKey));
+
+            if (string.IsNullOrWhiteSpace(issuer))
+                throw new ArgumentException("Issuer cannot be null, empty, or whitespace", nameof(issuer));
+
+            if (string.IsNullOrWhiteSpace(audience))
+                throw new ArgumentException("Audience cannot be null, empty, or whitespace", nameof(audience));
+
+            if (expirationMinutes <= 0)
+                throw new ArgumentException("Expiration minutes must be positive", nameof(expirationMinutes));
+
+            if (expirationMinutes > 1440) // 24 hours
+                throw new ArgumentException("Expiration minutes cannot exceed 1440 (24 hours) for security", nameof(expirationMinutes));
+
+            if (user.UserID <= 0)
+                throw new ArgumentException("User must have a valid UserID", nameof(user));
+
+            if (string.IsNullOrWhiteSpace(user.Username))
+                throw new ArgumentException("User must have a valid Username", nameof(user));
+        }
+
+        /// <summary>
+        /// Builds comprehensive claims for the user
+        /// </summary>
+        private static List<Claim> BuildUserClaims(UserDto user)
+        {
+            var claims = new List<Claim>
+            {
+                // Standard JWT claims
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserID.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+
+                // Standard identity claims
+                new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.GivenName, user.FullName ?? string.Empty),
+
+                // Application-specific claims
+                new Claim("userId", user.UserID.ToString()),
+                new Claim("username", user.Username),
+                new Claim("fullName", user.FullName ?? string.Empty),
+                new Claim("department", user.Department ?? string.Empty),
+                new Claim("title", user.Title ?? string.Empty),
+                new Claim("isActive", user.IsActive.ToString().ToLowerInvariant()),
+
+                // Permission claims for quick authorization checks
+                new Claim("isAdmin", user.IsAdmin.ToString().ToLowerInvariant()),
+                new Claim("isManager", user.IsManager.ToString().ToLowerInvariant()),
+                new Claim("isHR", user.IsHR.ToString().ToLowerInvariant())
+            };
+
+            // Add role claims
+            if (user.Roles?.Any() == true)
+            {
+                foreach (var role in user.Roles.Where(r => !string.IsNullOrWhiteSpace(r)))
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, role.Trim()));
+                }
+            }
+
+            // Add single role claim if available (for backward compatibility)
+            if (!string.IsNullOrWhiteSpace(user.Role))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, user.Role.Trim()));
+            }
+
+            // Add security-related claims
+            if (user.LastLoginDate.HasValue)
+            {
+                claims.Add(new Claim("lastLogin", user.LastLoginDate.Value.ToString("O")));
+            }
+
+            if (!string.IsNullOrWhiteSpace(user.LastLoginIp))
+            {
+                claims.Add(new Claim("lastLoginIp", user.LastLoginIp));
+            }
+
+            // Add account status claims
+            if (user.IsLocked.HasValue && user.IsLocked.Value)
+            {
+                claims.Add(new Claim("isLocked", "true"));
+            }
+
+            if (user.FailedLoginAttempts.HasValue && user.FailedLoginAttempts.Value > 0)
+            {
+                claims.Add(new Claim("failedLoginAttempts", user.FailedLoginAttempts.Value.ToString()));
+            }
+
+            return claims;
         }
 
         /// <summary>

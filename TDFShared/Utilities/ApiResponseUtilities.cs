@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text.Json;
+using System.Threading.Tasks;
 using TDFShared.DTOs.Common;
 using TDFShared.Exceptions;
 
@@ -34,7 +37,7 @@ namespace TDFShared.Utilities
         /// <param name="errorDetails">Additional error details</param>
         /// <param name="validationErrors">Validation errors</param>
         /// <returns>Error API response</returns>
-        public static ApiResponse<T> Error<T>(string message, HttpStatusCode statusCode = HttpStatusCode.BadRequest, 
+        public static ApiResponse<T> Error<T>(string message, HttpStatusCode statusCode = HttpStatusCode.BadRequest,
             string? errorDetails = null, Dictionary<string, List<string>>? validationErrors = null)
         {
             return ApiResponse<T>.ErrorResponse(message, statusCode, errorDetails, validationErrors);
@@ -51,26 +54,26 @@ namespace TDFShared.Utilities
         {
             return exception switch
             {
-                ApiException apiEx => Error<T>(apiEx.Message, apiEx.StatusCode, 
-                    includeStackTrace ? apiEx.StackTrace : null, 
+                ApiException apiEx => Error<T>(apiEx.Message, apiEx.StatusCode,
+                    includeStackTrace ? apiEx.StackTrace : null,
                     apiEx.ValidationErrors?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.ToList())),
-                
-                ValidationException valEx => Error<T>(valEx.Message, HttpStatusCode.BadRequest, 
+
+                ValidationException valEx => Error<T>(valEx.Message, HttpStatusCode.BadRequest,
                     includeStackTrace ? valEx.StackTrace : null),
-                
+
                 UnauthorizedAccessException => Error<T>("Access denied", HttpStatusCode.Unauthorized),
-                
-                ArgumentException argEx => Error<T>(argEx.Message, HttpStatusCode.BadRequest, 
+
+                ArgumentException argEx => Error<T>(argEx.Message, HttpStatusCode.BadRequest,
                     includeStackTrace ? argEx.StackTrace : null),
-                
-                InvalidOperationException invOpEx => Error<T>(invOpEx.Message, HttpStatusCode.Conflict, 
+
+                InvalidOperationException invOpEx => Error<T>(invOpEx.Message, HttpStatusCode.Conflict,
                     includeStackTrace ? invOpEx.StackTrace : null),
-                
+
                 NotImplementedException => Error<T>("Feature not implemented", HttpStatusCode.NotImplemented),
-                
+
                 TimeoutException => Error<T>("Request timed out", HttpStatusCode.RequestTimeout),
-                
-                _ => Error<T>("An unexpected error occurred", HttpStatusCode.InternalServerError, 
+
+                _ => Error<T>("An unexpected error occurred", HttpStatusCode.InternalServerError,
                     includeStackTrace ? exception.ToString() : exception.Message)
             };
         }
@@ -89,11 +92,8 @@ namespace TDFShared.Utilities
 
             try
             {
-                options ??= new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                };
+                // Use centralized JSON options for consistency, fallback to basic options if custom options provided
+                options ??= TDFShared.Helpers.JsonSerializationHelper.BasicOptions;
 
                 return JsonSerializer.Deserialize<ApiResponse<T>>(jsonContent, options);
             }
@@ -129,14 +129,14 @@ namespace TDFShared.Utilities
 
                 // Look for common error message properties
                 var messageProperties = new[] { "message", "error", "errorMessage", "detail", "title" };
-                
+
                 foreach (var prop in messageProperties)
                 {
                     if (root.TryGetProperty(prop, out var element) && element.ValueKind == JsonValueKind.String)
                     {
                         var message = element.GetString();
                         if (!string.IsNullOrEmpty(message))
-                            return message;
+                            return message!;
                     }
                 }
 
@@ -166,8 +166,8 @@ namespace TDFShared.Utilities
                 HttpStatusCode.NotFound => "The requested resource was not found.",
                 HttpStatusCode.MethodNotAllowed => "This operation is not allowed.",
                 HttpStatusCode.Conflict => "The request conflicts with the current state of the resource.",
-                HttpStatusCode.UnprocessableEntity => "The request contains invalid data.",
-                HttpStatusCode.TooManyRequests => "Too many requests. Please wait before trying again.",
+                (HttpStatusCode)422 => "The request contains invalid data.", // UnprocessableEntity
+                (HttpStatusCode)429 => "Too many requests. Please wait before trying again.", // TooManyRequests
                 HttpStatusCode.InternalServerError => "A server error occurred. Please try again later.",
                 HttpStatusCode.BadGateway => "Service temporarily unavailable. Please try again later.",
                 HttpStatusCode.ServiceUnavailable => "Service temporarily unavailable. Please try again later.",
@@ -178,7 +178,7 @@ namespace TDFShared.Utilities
             // Try to extract more specific error message from response content
             if (!string.IsNullOrEmpty(responseContent))
             {
-                var extractedMessage = ExtractErrorMessage(responseContent, baseMessage);
+                var extractedMessage = ExtractErrorMessage(responseContent!, baseMessage);
                 if (extractedMessage != baseMessage && !string.IsNullOrEmpty(extractedMessage))
                 {
                     return extractedMessage;
@@ -198,7 +198,7 @@ namespace TDFShared.Utilities
             return statusCode switch
             {
                 HttpStatusCode.RequestTimeout => true,
-                HttpStatusCode.TooManyRequests => true,
+                (HttpStatusCode)429 => true, // TooManyRequests
                 HttpStatusCode.InternalServerError => true,
                 HttpStatusCode.BadGateway => true,
                 HttpStatusCode.ServiceUnavailable => true,

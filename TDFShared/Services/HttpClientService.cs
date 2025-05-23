@@ -52,13 +52,8 @@ namespace TDFShared.Services
             _defaultHeaders = new Dictionary<string, string>();
             _semaphore = new SemaphoreSlim(10, 10); // Limit concurrent requests
 
-            // Configure JSON serialization options
-            _jsonOptions = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                WriteIndented = false
-            };
+            // Use centralized JSON serialization options for consistency
+            _jsonOptions = TDFShared.Helpers.JsonSerializationHelper.CompactOptions;
 
             // Configure retry policy with exponential backoff
             _retryPolicy = Policy
@@ -71,7 +66,7 @@ namespace TDFShared.Services
                     onRetry: (outcome, timespan, retryCount, context) =>
                     {
                         _logger.LogWarning("Retry attempt {RetryCount} for {Endpoint} in {Delay}ms",
-                            retryCount, context.GetValueOrDefault("endpoint", "unknown"), timespan.TotalMilliseconds);
+                            retryCount, context.TryGetValue("endpoint", out var endpointValue) ? endpointValue.ToString() : "unknown", timespan.TotalMilliseconds);
 
                         lock (_statisticsLock)
                         {
@@ -183,7 +178,7 @@ namespace TDFShared.Services
             {
                 var json = JsonSerializer.Serialize(data, _jsonOptions);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var request = new HttpRequestMessage(HttpMethod.Patch, BuildUrl(endpoint)) { Content = content };
+                var request = new HttpRequestMessage(new HttpMethod("PATCH"), BuildUrl(endpoint)) { Content = content };
                 var response = await _httpClient.SendAsync(request, cancellationToken);
                 return await ProcessResponseAsync<TResponse>(response, endpoint);
             }, endpoint);
@@ -282,30 +277,47 @@ namespace TDFShared.Services
                 var context = new Context(endpoint);
                 context["endpoint"] = endpoint;
 
-                var result = await _retryPolicy.ExecuteAsync(async (ctx) =>
+                // Create a wrapper that returns HttpResponseMessage for the retry policy
+                var httpResponseOperation = async (Context ctx) =>
                 {
                     try
                     {
-                        if (typeof(T) == typeof(HttpResponseMessage))
+                        var result = await operation();
+
+                        // If T is HttpResponseMessage, return it directly
+                        if (result is HttpResponseMessage httpResponse)
                         {
-                            return await operation();
+                            return httpResponse;
                         }
-                        else
-                        {
-                            var response = await operation();
-                            return response;
-                        }
+
+                        // For other types, create a successful response
+                        var response = new HttpResponseMessage(HttpStatusCode.OK);
+                        return response;
                     }
                     catch (Exception ex)
                     {
                         _logger.LogWarning(ex, "Request to {Endpoint} failed: {Message}", endpoint, ex.Message);
                         throw;
                     }
-                }, context);
+                };
+
+                // Execute the operation with retry policy
+                var httpResult = await _retryPolicy.ExecuteAsync(httpResponseOperation, context);
+
+                // If we're expecting HttpResponseMessage, return the actual result
+                if (typeof(T) == typeof(HttpResponseMessage))
+                {
+                    stopwatch.Stop();
+                    UpdateStatistics(true, stopwatch.Elapsed, null);
+                    return (T)(object)httpResult;
+                }
+
+                // For other types, execute the original operation again to get the actual result
+                var actualResult = await operation();
 
                 stopwatch.Stop();
                 UpdateStatistics(true, stopwatch.Elapsed, null);
-                return result;
+                return actualResult;
             }
             catch (Exception ex)
             {
@@ -388,8 +400,9 @@ namespace TDFShared.Services
 
             lock (_statisticsLock)
             {
-                _statistics.StatusCodeCounts[(int)response.StatusCode] =
-                    _statistics.StatusCodeCounts.GetValueOrDefault((int)response.StatusCode, 0) + 1;
+                var statusCode = (int)response.StatusCode;
+                _statistics.StatusCodeCounts[statusCode] =
+                    _statistics.StatusCodeCounts.TryGetValue(statusCode, out var count) ? count + 1 : 1;
             }
 
             throw new ApiException(response.StatusCode, errorMessage, errorContent);
@@ -408,7 +421,7 @@ namespace TDFShared.Services
         private static bool IsRetryableStatusCode(HttpStatusCode statusCode)
         {
             return statusCode == HttpStatusCode.RequestTimeout ||
-                   statusCode == HttpStatusCode.TooManyRequests ||
+                   statusCode == (HttpStatusCode)429 || // TooManyRequests
                    statusCode == HttpStatusCode.InternalServerError ||
                    statusCode == HttpStatusCode.BadGateway ||
                    statusCode == HttpStatusCode.ServiceUnavailable ||
@@ -423,7 +436,7 @@ namespace TDFShared.Services
                 HttpStatusCode.Forbidden => "You don't have permission to access this resource.",
                 HttpStatusCode.NotFound => "The requested resource was not found.",
                 HttpStatusCode.RequestTimeout => "The request timed out. Please try again.",
-                HttpStatusCode.TooManyRequests => "Too many requests. Please wait before trying again.",
+                (HttpStatusCode)429 => "Too many requests. Please wait before trying again.", // TooManyRequests
                 HttpStatusCode.InternalServerError => "A server error occurred. Please try again later.",
                 HttpStatusCode.BadGateway => "Service temporarily unavailable. Please try again later.",
                 HttpStatusCode.ServiceUnavailable => "Service temporarily unavailable. Please try again later.",
@@ -451,7 +464,7 @@ namespace TDFShared.Services
                     {
                         var errorType = exception.GetType().Name;
                         _statistics.ErrorCounts[errorType] =
-                            _statistics.ErrorCounts.GetValueOrDefault(errorType, 0) + 1;
+                            _statistics.ErrorCounts.TryGetValue(errorType, out var count) ? count + 1 : 1;
                     }
                 }
 

@@ -484,7 +484,7 @@ namespace TDFMAUI.Features.Auth
                         // Check if ResponseContent is a JSON ApiResponse
                         try
                         {
-                            var errorResponse = System.Text.Json.JsonSerializer.Deserialize<TDFShared.DTOs.Common.ApiResponse<object>>(apiEx.ResponseContent, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                            var errorResponse = TDFShared.Helpers.JsonSerializationHelper.Deserialize<TDFShared.DTOs.Common.ApiResponse<object>>(apiEx.ResponseContent);
                             if (errorResponse != null)
                             {
                                 if (errorResponse.Errors != null && errorResponse.Errors.Any())

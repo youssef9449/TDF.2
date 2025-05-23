@@ -31,7 +31,7 @@ namespace TDFAPI.Services
             if (_sockets.TryAdd(connection.ConnectionId, socket))
             {
                 _connections.TryAdd(connection.ConnectionId, connection);
-                
+
                 // Add to user connections collection
                 _userConnections.AddOrUpdate(
                     connection.UserId,
@@ -41,10 +41,10 @@ namespace TDFAPI.Services
                         existingConnections.Add(connection.ConnectionId);
                         return existingConnections;
                     });
-                
-                _logger.LogInformation("Connection {ConnectionId} added for user {UserId}", 
+
+                _logger.LogInformation("Connection {ConnectionId} added for user {UserId}",
                     connection.ConnectionId, connection.UserId);
-                
+
                 // Notify about new connection
                 await SendToAsync(connection.UserId, new
                 {
@@ -56,7 +56,7 @@ namespace TDFAPI.Services
             }
             else
             {
-                _logger.LogWarning("Failed to add connection {ConnectionId} for user {UserId}", 
+                _logger.LogWarning("Failed to add connection {ConnectionId} for user {UserId}",
                     connection.ConnectionId, connection.UserId);
             }
         }
@@ -69,20 +69,20 @@ namespace TDFAPI.Services
                 if (_userConnections.TryGetValue(connection.UserId, out var userConnections))
                 {
                     userConnections.Remove(connectionId);
-                    
+
                     // If this was the last connection for this user, remove the entry
                     if (userConnections.Count == 0)
                     {
                         _userConnections.TryRemove(connection.UserId, out _);
                     }
                 }
-                
+
                 // Remove from all groups
                 foreach (var group in _groups.Values)
                 {
                     group.Remove(connectionId);
                 }
-                
+
                 // Remove socket
                 if (_sockets.TryRemove(connectionId, out var socket))
                 {
@@ -101,8 +101,8 @@ namespace TDFAPI.Services
                         _logger.LogWarning(ex, "Error closing WebSocket for connection {ConnectionId}", connectionId);
                     }
                 }
-                
-                _logger.LogInformation("Connection {ConnectionId} removed for user {UserId}", 
+
+                _logger.LogInformation("Connection {ConnectionId} removed for user {UserId}",
                     connectionId, connection.UserId);
             }
         }
@@ -119,8 +119,8 @@ namespace TDFAPI.Services
 
         public IEnumerable<string> GetUserConnections(int userId)
         {
-            return _userConnections.TryGetValue(userId, out var connections) 
-                ? connections 
+            return _userConnections.TryGetValue(userId, out var connections)
+                ? connections
                 : Enumerable.Empty<string>();
         }
 
@@ -134,9 +134,9 @@ namespace TDFAPI.Services
                     existingConnections.Add(connectionId);
                     return existingConnections;
                 });
-            
+
             _logger.LogDebug("Connection {ConnectionId} added to group {Group}", connectionId, groupName);
-            
+
             // Notify the user they joined the group
             await SendToConnectionAsync(connectionId, new
             {
@@ -151,15 +151,15 @@ namespace TDFAPI.Services
             if (_groups.TryGetValue(groupName, out var connections))
             {
                 connections.Remove(connectionId);
-                
+
                 // If group is now empty, remove it
                 if (connections.Count == 0)
                 {
                     _groups.TryRemove(groupName, out _);
                 }
-                
+
                 _logger.LogDebug("Connection {ConnectionId} removed from group {Group}", connectionId, groupName);
-                
+
                 // Notify the user they left the group
                 await SendToConnectionAsync(connectionId, new
                 {
@@ -178,12 +178,12 @@ namespace TDFAPI.Services
                 {
                     try
                     {
-                        var messageJson = JsonSerializer.Serialize(message);
+                        var messageJson = TDFShared.Helpers.JsonSerializationHelper.SerializeCompact(message);
                         var messageBytes = Encoding.UTF8.GetBytes(messageJson);
                         await socket.SendAsync(
-                            new ArraySegment<byte>(messageBytes), 
-                            WebSocketMessageType.Text, 
-                            true, 
+                            new ArraySegment<byte>(messageBytes),
+                            WebSocketMessageType.Text,
+                            true,
                             CancellationToken.None);
                     }
                     catch (Exception ex)
@@ -207,7 +207,7 @@ namespace TDFAPI.Services
         public async Task SendToAsync(int userId, object message)
         {
             var userConnectionIds = GetUserConnections(userId).ToList();
-            
+
             if (userConnectionIds.Any())
             {
                 var tasks = userConnectionIds.Select(connectionId => SendToConnectionAsync(connectionId, message));
@@ -225,8 +225,8 @@ namespace TDFAPI.Services
             {
                 var tasks = connections.Select(connectionId => SendToConnectionAsync(connectionId, message));
                 await Task.WhenAll(tasks);
-                
-                _logger.LogDebug("Message sent to {Count} connections in group {Group}", 
+
+                _logger.LogDebug("Message sent to {Count} connections in group {Group}",
                     connections.Count, groupName);
             }
             else
@@ -239,7 +239,7 @@ namespace TDFAPI.Services
         {
             var allConnections = _sockets.Keys.ToList();
             var tasks = new List<Task>();
-            
+
             foreach (var connectionId in allConnections)
             {
                 if (excludedConnections?.Contains(connectionId) != true)
@@ -247,9 +247,9 @@ namespace TDFAPI.Services
                     tasks.Add(SendToConnectionAsync(connectionId, message));
                 }
             }
-            
+
             await Task.WhenAll(tasks);
-            
+
             _logger.LogDebug("Message sent to {Count} connections", tasks.Count);
         }
     }

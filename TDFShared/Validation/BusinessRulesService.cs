@@ -2,6 +2,11 @@ using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Users;
 using TDFShared.Enums;
 using TDFShared.Services;
+using TDFShared.Utilities;
+using System;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace TDFShared.Validation
 {
@@ -19,8 +24,8 @@ namespace TDFShared.Validation
         }
 
         public async Task<BusinessRuleValidationResult> ValidateLeaveRequestAsync(
-            RequestCreateDto request, 
-            int userId, 
+            RequestCreateDto request,
+            int userId,
             BusinessRuleContext context)
         {
             context.ValidateForLeaveRequest();
@@ -39,14 +44,14 @@ namespace TDFShared.Validation
             errors.AddRange(dateErrors);
 
             // Time validation for specific leave types
-            var timeErrors = ValidateRequestTimes(request.LeaveType, request.RequestStartDate, 
+            var timeErrors = ValidateRequestTimes(request.LeaveType, request.RequestStartDate,
                 request.RequestEndDate, request.RequestBeginningTime, request.RequestEndingTime);
             errors.AddRange(timeErrors);
 
             // Leave balance validation
             if (RequiresBalanceCheck(request.LeaveType))
             {
-                var balanceResult = await ValidateLeaveBalanceAsync(userId, request.LeaveType, 
+                var balanceResult = await ValidateLeaveBalanceAsync(userId, request.LeaveType,
                     CalculateRequestDays(request.RequestStartDate, request.RequestEndDate), context);
                 if (!balanceResult.IsValid)
                 {
@@ -55,22 +60,22 @@ namespace TDFShared.Validation
             }
 
             // Conflict validation
-            var conflictResult = await ValidateRequestConflictsAsync(userId, request.RequestStartDate, 
+            var conflictResult = await ValidateRequestConflictsAsync(userId, request.RequestStartDate,
                 request.RequestEndDate, 0, context);
             if (!conflictResult.IsValid)
             {
                 errors.AddRange(conflictResult.Errors);
             }
 
-            return errors.Any() 
+            return errors.Any()
                 ? BusinessRuleValidationResult.Failure(errors)
                 : BusinessRuleValidationResult.Success();
         }
 
         public async Task<BusinessRuleValidationResult> ValidateLeaveRequestUpdateAsync(
-            RequestUpdateDto request, 
+            RequestUpdateDto request,
             int requestId,
-            int userId, 
+            int userId,
             BusinessRuleContext context)
         {
             context.ValidateForLeaveRequest();
@@ -87,7 +92,8 @@ namespace TDFShared.Validation
             // Get existing request to check if it can be modified
             if (context.GetRequestAsync != null)
             {
-                var existingRequest = await context.GetRequestAsync(requestId);
+                var getRequestAsync = context.GetRequestAsync;
+                var existingRequest = await getRequestAsync(requestId);
                 if (existingRequest == null)
                 {
                     errors.Add("Request not found.");
@@ -103,20 +109,20 @@ namespace TDFShared.Validation
             errors.AddRange(dateErrors);
 
             // Conflict validation (excluding current request)
-            var conflictResult = await ValidateRequestConflictsAsync(userId, request.RequestStartDate, 
+            var conflictResult = await ValidateRequestConflictsAsync(userId, request.RequestStartDate,
                 request.RequestEndDate, requestId, context);
             if (!conflictResult.IsValid)
             {
                 errors.AddRange(conflictResult.Errors);
             }
 
-            return errors.Any() 
+            return errors.Any()
                 ? BusinessRuleValidationResult.Failure(errors)
                 : BusinessRuleValidationResult.Success();
         }
 
         public async Task<BusinessRuleValidationResult> ValidateUserCreationAsync(
-            CreateUserRequest user, 
+            CreateUserRequest user,
             BusinessRuleContext context)
         {
             context.ValidateForUserCreation();
@@ -133,7 +139,8 @@ namespace TDFShared.Validation
             // Username uniqueness
             if (context.UsernameExistsAsync != null)
             {
-                bool usernameExists = await context.UsernameExistsAsync(user.Username);
+                var usernameExistsAsync = context.UsernameExistsAsync;
+                bool usernameExists = await usernameExistsAsync(user.Username);
                 if (usernameExists)
                 {
                     errors.Add($"Username '{user.Username}' is already taken.");
@@ -147,14 +154,14 @@ namespace TDFShared.Validation
                 errors.AddRange(passwordResult.Errors);
             }
 
-            return errors.Any() 
+            return errors.Any()
                 ? BusinessRuleValidationResult.Failure(errors)
                 : BusinessRuleValidationResult.Success();
         }
 
         public async Task<BusinessRuleValidationResult> ValidateRequestApprovalAsync(
-            int requestId, 
-            int approverId, 
+            int requestId,
+            int approverId,
             BusinessRuleContext context)
         {
             context.ValidateForRequestApproval();
@@ -162,7 +169,8 @@ namespace TDFShared.Validation
             var errors = new List<string>();
 
             // Get request details
-            var request = await context.GetRequestAsync!(requestId);
+            var getRequestAsync = context.GetRequestAsync;
+            var request = await getRequestAsync(requestId);
             if (request == null)
             {
                 return BusinessRuleValidationResult.Failure("Request not found.");
@@ -175,7 +183,8 @@ namespace TDFShared.Validation
             }
 
             // Get approver details
-            var approver = await context.GetUserAsync!(approverId);
+            var getUserAsync = context.GetUserAsync;
+            var approver = await getUserAsync(approverId);
             if (approver == null)
             {
                 errors.Add("Approver not found.");
@@ -189,21 +198,21 @@ namespace TDFShared.Validation
                 }
 
                 // Check if approver is not the same as requester
-                if (request.UserId == approverId)
+                if (request.RequestUserID == approverId)
                 {
                     errors.Add("Users cannot approve their own requests.");
                 }
             }
 
-            return errors.Any() 
+            return errors.Any()
                 ? BusinessRuleValidationResult.Failure(errors)
                 : BusinessRuleValidationResult.Success();
         }
 
         public async Task<BusinessRuleValidationResult> ValidateLeaveBalanceAsync(
-            int userId, 
-            LeaveType leaveType, 
-            int requestedDays, 
+            int userId,
+            LeaveType leaveType,
+            int requestedDays,
             BusinessRuleContext context)
         {
             if (!RequiresBalanceCheck(leaveType))
@@ -216,8 +225,9 @@ namespace TDFShared.Validation
                 return BusinessRuleValidationResult.Failure("Leave balance validation not available.");
             }
 
-            int availableBalance = await context.GetLeaveBalanceAsync(userId, leaveType);
-            
+            var getLeaveBalanceAsync = context.GetLeaveBalanceAsync;
+            int availableBalance = await getLeaveBalanceAsync(userId, leaveType);
+
             if (availableBalance < requestedDays)
             {
                 return BusinessRuleValidationResult.Failure(
@@ -225,7 +235,7 @@ namespace TDFShared.Validation
             }
 
             var result = BusinessRuleValidationResult.Success();
-            
+
             // Add warning if balance will be low after this request
             int remainingBalance = availableBalance - requestedDays;
             if (remainingBalance <= 2)
@@ -237,10 +247,10 @@ namespace TDFShared.Validation
         }
 
         public async Task<BusinessRuleValidationResult> ValidateRequestConflictsAsync(
-            int userId, 
-            DateTime startDate, 
-            DateTime? endDate, 
-            int excludeRequestId, 
+            int userId,
+            DateTime startDate,
+            DateTime? endDate,
+            int excludeRequestId,
             BusinessRuleContext context)
         {
             if (context.HasConflictingRequestsAsync == null)
@@ -249,18 +259,19 @@ namespace TDFShared.Validation
             }
 
             DateTime effectiveEndDate = endDate ?? startDate;
-            
-            bool hasConflicts = await context.HasConflictingRequestsAsync(userId, startDate, effectiveEndDate, excludeRequestId);
-            
-            return hasConflicts 
+
+            var hasConflictingRequestsAsync = context.HasConflictingRequestsAsync;
+            bool hasConflicts = await hasConflictingRequestsAsync(userId, startDate, effectiveEndDate, excludeRequestId);
+
+            return hasConflicts
                 ? BusinessRuleValidationResult.Failure("There is a conflicting request during the selected dates.")
                 : BusinessRuleValidationResult.Success();
         }
 
         public async Task<BusinessRuleValidationResult> ValidateDepartmentRulesAsync(
-            string departmentId, 
-            DateTime startDate, 
-            DateTime? endDate, 
+            string departmentId,
+            DateTime startDate,
+            DateTime? endDate,
             BusinessRuleContext context)
         {
             if (context.GetDepartmentRequestCountAsync == null)
@@ -269,8 +280,9 @@ namespace TDFShared.Validation
             }
 
             DateTime effectiveEndDate = endDate ?? startDate;
-            int concurrentRequests = await context.GetDepartmentRequestCountAsync(departmentId, startDate, effectiveEndDate);
-            
+            var getDepartmentRequestCountAsync = context.GetDepartmentRequestCountAsync;
+            int concurrentRequests = await getDepartmentRequestCountAsync(departmentId, startDate, effectiveEndDate);
+
             if (concurrentRequests >= context.MaxConcurrentDepartmentRequests)
             {
                 return BusinessRuleValidationResult.Failure(
@@ -280,16 +292,70 @@ namespace TDFShared.Validation
             return BusinessRuleValidationResult.Success();
         }
 
+        public async Task<BusinessRuleValidationResult> ValidateRequestAccessAsync(
+            int requestId,
+            int userId,
+            BusinessRuleContext context)
+        {
+            if (context.GetRequestAsync == null || context.GetUserAsync == null)
+            {
+                return BusinessRuleValidationResult.Failure("Required validation dependencies not available.");
+            }
+
+            var getRequestAsync = context.GetRequestAsync;
+            var request = await getRequestAsync(requestId);
+            if (request == null)
+            {
+                return BusinessRuleValidationResult.Failure("Request not found.");
+            }
+
+            var getUserAsync = context.GetUserAsync;
+            var user = await getUserAsync(userId);
+            if (user == null)
+            {
+                return BusinessRuleValidationResult.Failure("User not found.");
+            }
+
+            bool canAccess = RequestStateManager.CanViewRequest(request, user);
+
+            return canAccess
+                ? BusinessRuleValidationResult.Success()
+                : BusinessRuleValidationResult.Failure("You do not have permission to access this request.");
+        }
+
+        public async Task<BusinessRuleValidationResult> ValidateDepartmentAccessAsync(
+            string department,
+            int userId,
+            BusinessRuleContext context)
+        {
+            if (context.GetUserAsync == null)
+            {
+                return BusinessRuleValidationResult.Failure("Required validation dependencies not available.");
+            }
+
+            var getUserAsync = context.GetUserAsync;
+            var user = await getUserAsync(userId);
+            if (user == null)
+            {
+                return BusinessRuleValidationResult.Failure("User not found.");
+            }
+
+            bool canAccess = AuthorizationUtilities.CanAccessDepartment(user, department);
+
+            return canAccess
+                ? BusinessRuleValidationResult.Success()
+                : BusinessRuleValidationResult.Failure($"You do not have permission to access department '{department}'.");
+        }
+
         // Helper methods
         private List<string> ValidateRequestDates(DateTime startDate, DateTime? endDate, BusinessRuleContext context)
         {
             var errors = new List<string>();
 
-            // Check minimum advance notice
-            if (startDate.Date < DateTime.Today.AddDays(context.MinAdvanceNoticeDays))
-            {
-                errors.Add($"Requests must be submitted at least {context.MinAdvanceNoticeDays} day(s) in advance.");
-            }
+            // Use ValidationService for consistent date validation
+            var dateValidationErrors = _validationService.ValidateDateRange(
+                startDate, endDate, "Request date", context.MinAdvanceNoticeDays);
+            errors.AddRange(dateValidationErrors);
 
             // Check maximum duration
             DateTime effectiveEndDate = endDate ?? startDate;
@@ -312,7 +378,7 @@ namespace TDFShared.Validation
             return errors;
         }
 
-        private List<string> ValidateRequestTimes(LeaveType leaveType, DateTime startDate, DateTime? endDate, 
+        private List<string> ValidateRequestTimes(LeaveType leaveType, DateTime startDate, DateTime? endDate,
             TimeSpan? startTime, TimeSpan? endTime)
         {
             var errors = new List<string>();
@@ -345,7 +411,7 @@ namespace TDFShared.Validation
 
         private static bool RequiresBalanceCheck(LeaveType leaveType)
         {
-            return leaveType == LeaveType.Annual || leaveType == LeaveType.Casual;
+            return leaveType == LeaveType.Annual || leaveType == LeaveType.Emergency;
         }
 
         private static int CalculateRequestDays(DateTime startDate, DateTime? endDate)

@@ -265,14 +265,18 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // Configure JSON serialization options to handle property name collisions
-        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        // Use centralized JSON serialization options for consistency across the application
+        var centralizedOptions = TDFShared.Helpers.JsonSerializationHelper.DefaultOptions;
+        options.JsonSerializerOptions.PropertyNamingPolicy = centralizedOptions.PropertyNamingPolicy;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = centralizedOptions.PropertyNameCaseInsensitive;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = centralizedOptions.DefaultIgnoreCondition;
+        options.JsonSerializerOptions.ReferenceHandler = centralizedOptions.ReferenceHandler;
 
-        // This helps with cyclic references which can occur in Entity Framework relationships
-        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        // Copy converters from centralized options
+        foreach (var converter in centralizedOptions.Converters)
+        {
+            options.JsonSerializerOptions.Converters.Add(converter);
+        }
     });
 
 // Register HttpContextAccessor for accessing the current HTTP context
@@ -963,8 +967,7 @@ app.MapHealthChecks($"/{ApiRoutes.Health.GetDefault}", new HealthCheckOptions
             })
         };
 
-        await context.Response.WriteAsync(JsonSerializer.Serialize(response,
-            new JsonSerializerOptions { WriteIndented = true }));
+        await context.Response.WriteAsync(TDFShared.Helpers.JsonSerializationHelper.SerializePretty(response));
     }
 });
 

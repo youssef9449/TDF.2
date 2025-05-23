@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Microsoft.Extensions.Logging;
+using TDFShared.Helpers;
 
 namespace TDFMAUI.Services
 {
@@ -26,11 +26,11 @@ namespace TDFMAUI.Services
                 throw new ArgumentNullException(nameof(key));
 
             string serializedData = await SecureStorage.GetAsync(key);
-            
+
             if (string.IsNullOrEmpty(serializedData))
                 return default;
 
-            return JsonConvert.DeserializeObject<T>(serializedData);
+            return JsonSerializationHelper.Deserialize<T>(serializedData);
         }
 
         public async Task SetItemAsync<T>(string key, T value)
@@ -38,7 +38,7 @@ namespace TDFMAUI.Services
             if (string.IsNullOrEmpty(key))
                 throw new ArgumentNullException(nameof(key));
 
-            string serializedData = JsonConvert.SerializeObject(value);
+            string serializedData = JsonSerializationHelper.Serialize(value);
             await SecureStorage.SetAsync(key, serializedData);
         }
 
@@ -57,4 +57,4 @@ namespace TDFMAUI.Services
             await Task.CompletedTask;
         }
     }
-} 
+}

@@ -513,7 +513,7 @@ namespace TDFMAUI.Services
 
         private async Task SaveScheduledNotificationsAsync(List<Helpers.NotificationRecord> notifications)
         {
-            var json = JsonSerializer.Serialize(notifications);
+            var json = TDFShared.Helpers.JsonSerializationHelper.Serialize(notifications);
             await _localStorage.SetItemAsync("scheduled_notifications", json);
         }
 
@@ -526,7 +526,7 @@ namespace TDFMAUI.Services
                 {
                     return new List<Helpers.NotificationRecord>();
                 }
-                return JsonSerializer.Deserialize<List<Helpers.NotificationRecord>>(json) ?? new List<Helpers.NotificationRecord>();
+                return TDFShared.Helpers.JsonSerializationHelper.Deserialize<List<Helpers.NotificationRecord>>(json) ?? new List<Helpers.NotificationRecord>();
             }
             catch
             {
@@ -536,7 +536,7 @@ namespace TDFMAUI.Services
 
         private async Task SaveNotificationHistoryAsync(List<Helpers.NotificationRecord> history)
         {
-            var json = JsonSerializer.Serialize(history);
+            var json = TDFShared.Helpers.JsonSerializationHelper.Serialize(history);
             await _localStorage.SetItemAsync("notification_history", json);
         }
         #endregion

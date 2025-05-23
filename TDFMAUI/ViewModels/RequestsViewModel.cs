@@ -14,6 +14,7 @@ using TDFMAUI.Services;
 using TDFMAUI.Features.Requests; // For AddRequestPage navigation
 using TDFShared.Exceptions;
 using TDFShared.Enums;
+using TDFShared.Utilities;
 
 namespace TDFMAUI.ViewModels
 {
@@ -22,6 +23,7 @@ namespace TDFMAUI.ViewModels
         private readonly TDFMAUI.Services.IRequestService _requestService;
         private readonly TDFShared.Services.IAuthService _authService;
         private readonly ILogger<RequestsViewModel> _logger;
+        private readonly TDFShared.Services.IErrorHandlingService _errorHandlingService;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsNotBusy))]
@@ -48,21 +50,26 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private bool? _isHR;
 
-        // Computed Properties
-        public bool CanManageRequests => CanManageRequestsHelper(IsAdmin, IsManager, IsHR);
-        public bool CanApproveReject => CanManageRequestsHelper(IsAdmin, IsManager, IsHR);
-        public bool CanEditDeleteAny => CanEditDeleteAnyHelper(IsAdmin);
-        public bool CanFilterByDepartment => CanFilterByDepartmentHelper(IsManager);
+        // Computed Properties - Use TDFShared RequestStateManager for consistency
+        public bool CanManageRequests => GetCurrentUserDto() is UserDto user && RequestStateManager.CanManageRequests(user);
+        public bool CanApproveReject => GetCurrentUserDto() is UserDto user && RequestStateManager.CanManageRequests(user);
+        public bool CanEditDeleteAny => IsAdmin == true;
+        public bool CanFilterByDepartment => IsManager == true;
 
         public List<string> StatusOptions => RequestOptions.StatusOptions;
         public List<string> TypeOptions => RequestOptions.TypeOptions;
         public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
 
-        public RequestsViewModel(TDFMAUI.Services.IRequestService requestService, TDFShared.Services.IAuthService authService, ILogger<RequestsViewModel> logger)
+        public RequestsViewModel(
+            TDFMAUI.Services.IRequestService requestService,
+            TDFShared.Services.IAuthService authService,
+            ILogger<RequestsViewModel> logger,
+            TDFShared.Services.IErrorHandlingService errorHandlingService)
         {
             _requestService = requestService;
             _authService = authService;
             _logger = logger;
+            _errorHandlingService = errorHandlingService;
             _requests = new ObservableCollection<RequestResponseDto>();
             // Title will be set after loading roles
         }
@@ -113,7 +120,7 @@ namespace TDFMAUI.ViewModels
             }
             else if (IsManager == true)
             {
-                Title = "Team Requests"; // Or manage own + team?
+                Title = "Team Requests"; // Manager can see own + department requests
             }
             else
             {
@@ -126,6 +133,10 @@ namespace TDFMAUI.ViewModels
         {
             IsBusy = true;
             Requests.Clear();
+
+            // Start performance monitoring
+            TDFMAUI.Services.DebugService.StartTimer("LoadRequests");
+
             try
             {
                 if (_currentUserId == 0 && !(IsAdmin == true || IsHR == true || IsManager == true))
@@ -145,31 +156,9 @@ namespace TDFMAUI.ViewModels
 
                 PaginatedResult<RequestResponseDto>? result = null;
 
-                if (IsAdmin == true || IsHR == true)
-                {
-                    _logger.LogInformation("Loading all requests (Admin/HR view) with filter: {Filter}", pagination.FilterStatus);
-                    result = await _requestService.GetAllRequestsAsync(pagination);
-                }
-                else if (IsManager == true)
-                {
-                    string? department = await _authService.GetCurrentUserDepartmentAsync();
-                    if (!string.IsNullOrEmpty(department))
-                    {
-                        _logger.LogInformation("Loading requests for department '{Department}' (Manager view) with filter: {Filter}", department, pagination.FilterStatus);
-                        pagination.Department = department;
-                        result = await _requestService.GetRequestsByDepartmentAsync(department, pagination);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Manager detected, but department claim not found in token. Loading own requests instead.");
-                        result = await _requestService.GetMyRequestsAsync(pagination);
-                    }
-                }
-                else
-                {
-                    _logger.LogInformation("Loading requests for user {UserId} with filter: {Filter}", _currentUserId, pagination.FilterStatus);
-                    result = await _requestService.GetMyRequestsAsync(pagination);
-                }
+                // Use the unified endpoint that handles access control server-side
+                _logger.LogInformation("Loading requests with unified access control for user {UserId} with filter: {Filter}", _currentUserId, pagination.FilterStatus);
+                result = await _requestService.GetAllRequestsAsync(pagination);
 
                 if (result?.Items != null)
                 {
@@ -187,15 +176,19 @@ namespace TDFMAUI.ViewModels
             catch (ApiException apiEx)
             {
                 _logger.LogError(apiEx, "API Error loading requests: {ErrorMessage}", apiEx.Message);
-                await Shell.Current.DisplayAlert("API Error", $"Failed to load requests: {apiEx.Message}", "OK");
+                var friendlyMessage = _errorHandlingService.GetFriendlyErrorMessage(apiEx, "loading requests");
+                await Shell.Current.DisplayAlert("API Error", friendlyMessage, "OK");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error loading requests.");
-                await Shell.Current.DisplayAlert("Error", "Failed to load requests.", "OK");
+                var friendlyMessage = _errorHandlingService.GetFriendlyErrorMessage(ex, "loading requests");
+                await Shell.Current.DisplayAlert("Error", friendlyMessage, "OK");
             }
             finally
             {
+                // Stop performance monitoring
+                TDFMAUI.Services.DebugService.StopTimer("LoadRequests");
                 IsBusy = false;
             }
         }
@@ -246,68 +239,64 @@ namespace TDFMAUI.ViewModels
         private bool CanEditDeleteRequest(RequestResponseDto? request)
         {
             if (request == null) return false;
-            return CanEditRequestHelper(request, _currentUserId, IsAdmin);
+
+            // Use async helper for proper authorization checking
+            return Task.Run(async () => await CanEditRequestHelperAsync(request)).Result;
         }
 
         // Helper to check if current user can approve/reject a specific request
         private bool CanApproveRejectRequest(RequestResponseDto? request)
         {
             if (request == null) return false;
-            if (request.RequestUserID == _currentUserId) return false; // Can't approve/reject own requests
-            if (request.Status != RequestStatus.Pending) return false;
 
-            var canManage = CanManageRequestsHelper(IsAdmin, IsManager, IsHR);
-            if (!canManage) return false;
-
-            // If manager (not admin/HR), check department match
-            if (IsManager == true && IsAdmin != true && IsHR != true)
-            {
-                var currentUserDepartment = Task.Run(async () => await _authService.GetCurrentUserDepartmentAsync()).Result;
-                return request.RequestDepartment == currentUserDepartment;
-            }
-
-            return true;
+            // Use async helper for proper authorization checking
+            return Task.Run(async () => await CanApproveRejectRequestHelperAsync(request)).Result;
         }
 
         #region Authorization Helper Methods
 
         /// <summary>
-        /// Determines if a user can manage requests based on their role flags
+        /// Gets the current user as a UserDto for authorization checks
         /// </summary>
-        private static bool CanManageRequestsHelper(bool? isAdmin, bool? isManager, bool? isHR)
+        private async Task<TDFShared.DTOs.Users.UserDto?> GetCurrentUserDtoAsync()
         {
-            return isAdmin == true || isManager == true || isHR == true;
+            var currentUser = await _authService.GetCurrentUserAsync();
+            return currentUser;
         }
 
         /// <summary>
-        /// Determines if a user can edit/delete any request (admin only)
+        /// Gets the current user as UserDto synchronously for property bindings
         /// </summary>
-        private static bool CanEditDeleteAnyHelper(bool? isAdmin)
+        private UserDto? GetCurrentUserDto()
         {
-            return isAdmin == true;
+            return Task.Run(async () => await GetCurrentUserDtoAsync()).Result;
         }
 
         /// <summary>
-        /// Determines if a user can filter by department (managers and above)
+        /// Determines if a user can edit a specific request using RequestStateManager
         /// </summary>
-        private static bool CanFilterByDepartmentHelper(bool? isManager)
-        {
-            return isManager == true;
-        }
-
-        /// <summary>
-        /// Determines if a user can edit a specific request
-        /// </summary>
-        private static bool CanEditRequestHelper(RequestResponseDto request, int currentUserId, bool? isAdmin)
+        private async Task<bool> CanEditRequestHelperAsync(RequestResponseDto request)
         {
             if (request == null) return false;
 
-            // Admins can edit any request
-            if (isAdmin == true) return true;
+            var currentUser = await GetCurrentUserDtoAsync();
+            if (currentUser == null) return false;
 
-            // Users can only edit their own pending requests
-            return request.RequestUserID == currentUserId &&
-                   request.Status == RequestStatus.Pending;
+            bool isOwner = request.RequestUserID == _currentUserId;
+            return RequestStateManager.CanEdit(request, currentUser.IsAdmin, isOwner);
+        }
+
+        /// <summary>
+        /// Determines if a user can approve/reject a specific request using RequestStateManager
+        /// </summary>
+        private async Task<bool> CanApproveRejectRequestHelperAsync(RequestResponseDto request)
+        {
+            if (request == null) return false;
+
+            var currentUser = await GetCurrentUserDtoAsync();
+            if (currentUser == null) return false;
+
+            return RequestStateManager.CanApproveOrRejectRequest(request, currentUser);
         }
 
         #endregion

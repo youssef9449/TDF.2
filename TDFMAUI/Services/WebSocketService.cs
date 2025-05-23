@@ -1057,7 +1057,7 @@ namespace TDFMAUI.Services
 
             try
             {
-                var json = JsonSerializer.Serialize(message);
+                var json = TDFShared.Helpers.JsonSerializationHelper.SerializeCompact(message);
                 var bytes = Encoding.UTF8.GetBytes(json);
                 await _webSocket.SendAsync(
                     new ArraySegment<byte>(bytes),

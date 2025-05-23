@@ -56,16 +56,16 @@ namespace TDFMAUI.Services
         {
             // Use the base service to create the notification on the server
             var result = await _notificationService.CreateNotificationAsync(receiverId, message, senderId);
-            
+
             // If the notification is for the current user, show a platform notification
             if (result && App.CurrentUser != null && receiverId == App.CurrentUser.UserID)
             {
                 try
                 {
-                    string senderName = senderId.HasValue ? 
-                        await GetUserNameAsync(senderId.Value) : 
+                    string senderName = senderId.HasValue ?
+                        await GetUserNameAsync(senderId.Value) :
                         "System";
-                        
+
                     await _platformService.ShowNotificationAsync(
                         $"New notification from {senderName}",
                         message,
@@ -76,7 +76,7 @@ namespace TDFMAUI.Services
                     _logger.LogError(ex, "Error showing platform notification");
                 }
             }
-            
+
             return result;
         }
 
@@ -84,10 +84,10 @@ namespace TDFMAUI.Services
         {
             // Use the base service to broadcast the notification
             var result = await _notificationService.BroadcastNotificationAsync(message, department);
-            
+
             // For broadcasts, we don't need to show a platform notification since the server
             // will send it to the current user through the WebSocket if appropriate
-            
+
             return result;
         }
 
@@ -95,9 +95,9 @@ namespace TDFMAUI.Services
         {
             // Use the base service to send the chat message
             var result = await _notificationService.SendChatMessageAsync(receiverId, message, queueIfOffline);
-            
+
             // If successful, we don't need to show a platform notification for sent messages
-            
+
             return result;
         }
 
@@ -115,24 +115,24 @@ namespace TDFMAUI.Services
         {
             return await _notificationService.MarkMessagesAsDeliveredAsync(messageIds);
         }
-        
+
         public async Task<int> GetUnreadMessagesCountAsync()
         {
             return await _notificationService.GetUnreadMessagesCountAsync();
         }
-        
+
         // Implement IExtendedNotificationService methods
-        
+
         // Added the missing overload with string data parameter
         public async Task<bool> ShowLocalNotificationAsync(string title, string message, string data = null)
         {
             return await ShowLocalNotificationAsync(title, message, NotificationType.Info, data);
         }
-        
+
         public async Task<bool> ShowLocalNotificationAsync(string title, string message, NotificationType type, string data = null)
         {
             _logger.LogInformation("Showing local notification: {Title}, {Type}", title, type);
-            
+
             try
             {
                 var result = await _platformService.ShowLocalNotificationAsync(title, message, type, data);
@@ -145,7 +145,7 @@ namespace TDFMAUI.Services
                 return false;
             }
         }
-        
+
         private async Task AddNotificationToHistoryAsync(string title, string message, NotificationType type, string data = null)
         {
             try
@@ -160,7 +160,7 @@ namespace TDFMAUI.Services
                     Timestamp = DateTime.Now,
                     Data = data
                 });
-                
+
                 await SaveNotificationHistoryAsync(history);
             }
             catch (Exception ex)
@@ -168,12 +168,12 @@ namespace TDFMAUI.Services
                 _logger.LogError(ex, "Error adding notification to history");
             }
         }
-        
+
         // This method is for internal use
         public async Task<List<Helpers.NotificationRecord>> GetNotificationHistoryAsync()
         {
             _logger.LogInformation("Getting notification history");
-            
+
             try
             {
                 var historyJson = Preferences.Get("NotificationHistory", "[]");
@@ -185,16 +185,16 @@ namespace TDFMAUI.Services
                 return new List<Helpers.NotificationRecord>();
             }
         }
-        
+
         // This method implements the interface
         async Task<List<NotificationRecord>> IExtendedNotificationService.GetNotificationHistoryAsync()
         {
             _logger.LogInformation("Getting notification history for interface");
-            
+
             try
             {
                 var helperRecords = await GetNotificationHistoryAsync();
-                
+
                 // Convert from helper records to shared DTO records
                 return helperRecords.Select(hr => new NotificationRecord
                 {
@@ -225,7 +225,7 @@ namespace TDFMAUI.Services
                     history = history.Skip(history.Count - maxHistorySize).ToList();
                 }
 
-                var historyJson = JsonSerializer.Serialize(history);
+                var historyJson = TDFShared.Helpers.JsonSerializationHelper.Serialize(history);
                 Preferences.Set("NotificationHistory", historyJson);
             }
             catch (Exception ex)
@@ -239,7 +239,7 @@ namespace TDFMAUI.Services
         public async Task ClearNotificationHistoryAsync()
         {
             _logger.LogInformation("Clearing notification history");
-            
+
             try
             {
                 await SaveNotificationHistoryAsync(new List<Helpers.NotificationRecord>());
@@ -249,9 +249,9 @@ namespace TDFMAUI.Services
                 _logger.LogError(ex, "Error clearing notification history");
             }
         }
-        
+
         // Helper methods
-        
+
         private async Task<string> GetUserNameAsync(int userId)
         {
             try
@@ -297,7 +297,7 @@ namespace TDFMAUI.Services
         public async Task<bool> ScheduleNotificationAsync(string title, string message, DateTime deliveryTime, string data = null)
         {
             _logger.LogInformation("Scheduling notification: {Title} for {DeliveryTime}", title, deliveryTime);
-            
+
             try
             {
                 return await _platformService.ScheduleNotificationAsync(title, message, deliveryTime, data);
@@ -393,15 +393,15 @@ namespace TDFMAUI.Services
 
              // Optionally show a platform notification immediately
              ShowLocalNotificationAsync(
-                notification.Title ?? "Notification", 
+                notification.Title ?? "Notification",
                 notification.Message,
                 notificationEnumType // Use mapped enum type
              ).ConfigureAwait(false);
 
              // Add to local history
             AddNotificationToHistoryAsync(
-                notification.Title ?? "Notification", 
-                notification.Message, 
+                notification.Title ?? "Notification",
+                notification.Message,
                 notificationEnumType // Use mapped enum type
             ).ConfigureAwait(false);
         }
@@ -428,4 +428,4 @@ namespace TDFMAUI.Services
         }
 
     }
-} 
+}

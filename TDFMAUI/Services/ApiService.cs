@@ -79,11 +79,7 @@ namespace TDFMAUI.Services
             _httpClientService = httpClientService;
             _secureStorage = secureStorage ?? new SecureStorageService();
             _logger = logger;
-            _jsonOptions = new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
+            _jsonOptions = TDFShared.Helpers.JsonSerializationHelper.DefaultOptions;
 
             _logger?.LogInformation("ApiService: Initialized");
             InitializeAuthenticationAsync().ConfigureAwait(false);

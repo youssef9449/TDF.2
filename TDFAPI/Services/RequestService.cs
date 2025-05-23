@@ -92,6 +92,15 @@ namespace TDFAPI.Services
         }
 
         /// <summary>
+        /// Gets paginated requests for a manager (their own requests + requests from users in their department).
+        /// </summary>
+        public async Task<PaginatedResult<RequestResponseDto>> GetRequestsForManagerAsync(int managerId, string department, RequestPaginationDto pagination)
+        {
+             var paginatedResult = await _requestRepository.GetRequestsForManagerAsync(managerId, department, pagination);
+             return await MapToPaginatedResponseDto(paginatedResult);
+        }
+
+        /// <summary>
         /// Creates a new request for a user.
         /// </summary>
         /// <exception cref="ValidationException">Thrown if validation fails.</exception>
@@ -719,10 +728,13 @@ namespace TDFAPI.Services
             // Admins and HR can manage all departments
             if (isAdmin == true || isHR == true) return true;
 
-            // Managers can only manage their own department
+            // Managers can manage their own department (including constituent departments for hyphenated departments)
             if (isManager != true || string.IsNullOrEmpty(userDepartment) || string.IsNullOrEmpty(requestDepartment)) return false;
 
-            return userDepartment.Equals(requestDepartment, StringComparison.OrdinalIgnoreCase);
+            // Use RequestStateManager for consistent department access logic
+            return RequestStateManager.CanManageDepartment(
+                new UserDto { IsAdmin = isAdmin ?? false, IsHR = isHR ?? false, IsManager = isManager ?? false, Department = userDepartment },
+                requestDepartment);
         }
 
         private async Task<bool> UpdateRequestStatusAsync(

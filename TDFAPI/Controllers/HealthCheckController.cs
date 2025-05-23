@@ -109,7 +109,6 @@ namespace TDFAPI.Controllers
         /// Echo endpoint for testing request/response
         /// </summary>
         [HttpPost("echo")]
-        [Route(ApiRoutes.Health.Echo)]
         [AllowAnonymous]
         public IActionResult Echo([FromBody] object data)
         {

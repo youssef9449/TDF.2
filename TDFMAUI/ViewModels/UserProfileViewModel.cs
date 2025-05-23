@@ -12,7 +12,6 @@ using TDFMAUI.Services;
 using TDFShared.Models.User;
 using TDFShared.DTOs.Users;
 using Microsoft.Maui.ApplicationModel;
-using Newtonsoft.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Maui.Storage;
@@ -23,49 +22,49 @@ namespace TDFMAUI.ViewModels
     {
         private readonly ApiService _apiService;
         private readonly ILocalStorageService _localStorageService;
-        
+
         [ObservableProperty]
         private UserDto _currentUser;
-        
+
         [ObservableProperty]
         private UserDto _editingUser;
-        
+
         [ObservableProperty]
         private bool _isLoading;
-        
+
         [ObservableProperty]
         private bool _hasError;
-        
+
         [ObservableProperty]
         private string _errorMessage;
-        
+
         [ObservableProperty]
         private bool _isDataLoaded;
-        
+
         [ObservableProperty]
         private bool _isEditing;
-        
+
         [ObservableProperty]
         private bool _isSaving;
-        
+
         [ObservableProperty]
         private ImageSource _profileImage;
-        
+
         public UserProfileViewModel(ApiService apiService, ILocalStorageService localStorageService)
         {
             _apiService = apiService;
             _localStorageService = localStorageService;
-            
+
             CurrentUser = new UserDto();
             EditingUser = new UserDto();
         }
-        
+
         // Update propertychanged logic for CurrentUser to also update ProfileImage
         partial void OnCurrentUserChanged(UserDto value)
         {
             UpdateProfileImageSource();
         }
-        
+
         private void UpdateProfileImageSource()
         {
             if (CurrentUser?.ProfilePictureData != null && CurrentUser.ProfilePictureData.Length > 0)
@@ -79,7 +78,7 @@ namespace TDFMAUI.ViewModels
                  ProfileImage = ImageSource.FromFile("default_profile.png"); // Ensure this file exists in Resources/Images
             }
         }
-        
+
         [RelayCommand]
         public async Task LoadUserByIdAsync(int userId)
         {
@@ -88,14 +87,14 @@ namespace TDFMAUI.ViewModels
                 IsLoading = true;
                 HasError = false;
                 IsDataLoaded = false;
-                
+
                 // Load the specific user by ID
                 var user = await _apiService.GetUserAsync(userId);
                 if (user != null)
                 {
                     CurrentUser = user;
                     EditingUser = (UserDto)user.Clone();
-                    
+
                     IsDataLoaded = true;
                 }
                 else
@@ -114,7 +113,7 @@ namespace TDFMAUI.ViewModels
                 IsLoading = false;
             }
         }
-        
+
         [RelayCommand]
         public async Task LoadUserProfile()
         {
@@ -122,7 +121,7 @@ namespace TDFMAUI.ViewModels
             {
                 IsLoading = true;
                 HasError = false;
-                
+
                 // Try to load from local storage first for quick display
                 var cachedUser = await _localStorageService.GetItemAsync<UserDto>("CurrentUser");
                 if (cachedUser != null)
@@ -130,7 +129,7 @@ namespace TDFMAUI.ViewModels
                     CurrentUser = cachedUser;
                     IsDataLoaded = true;
                 }
-                
+
                 // Then load fresh data from API
                 if (CurrentUser?.UserID > 0)
                 {
@@ -141,7 +140,7 @@ namespace TDFMAUI.ViewModels
                         await _localStorageService.SetItemAsync("CurrentUser", CurrentUser);
                     }
                 }
-                
+
                 IsDataLoaded = true;
             }
             catch (Exception ex)
@@ -154,7 +153,7 @@ namespace TDFMAUI.ViewModels
                 IsLoading = false;
             }
         }
-        
+
         [RelayCommand]
         public void EditProfile()
         {
@@ -162,7 +161,7 @@ namespace TDFMAUI.ViewModels
             EditingUser = (UserDto)CurrentUser.Clone();
             IsEditing = true;
         }
-        
+
         [RelayCommand]
         public async Task SaveProfile()
         {
@@ -172,12 +171,12 @@ namespace TDFMAUI.ViewModels
                 ErrorMessage = "Name is a required field";
                 return;
             }
-            
+
             try
             {
                 IsSaving = true;
                 HasError = false;
-                
+
                 // Create UpdateMyProfileRequest from EditingUser
                 var profileRequest = new UpdateMyProfileRequest
                 {
@@ -185,18 +184,18 @@ namespace TDFMAUI.ViewModels
                     Department = EditingUser.Department,
                     Title = EditingUser.Title
                 };
-                
+
                 // Call API to update profile
                 var success = await _apiService.UpdateUserProfileAsync(profileRequest);
-                
+
                 if (success)
                 {
                     // Update the current user with edited values
                     CurrentUser = EditingUser;
-                    
+
                     // Update local storage
                     await _localStorageService.SetItemAsync("CurrentUser", CurrentUser);
-                    
+
                     IsEditing = false;
                 }
                 else
@@ -215,21 +214,21 @@ namespace TDFMAUI.ViewModels
                 IsSaving = false;
             }
         }
-        
+
         [RelayCommand]
         public void CancelEdit()
         {
             IsEditing = false;
             HasError = false;
         }
-        
+
         [RelayCommand]
         public async Task ChangeImage()
         {
             try
             {
                 HasError = false;
-                
+
                 // Request permission
                 var status = await Permissions.RequestAsync<Permissions.Photos>();
                 if (status != PermissionStatus.Granted)
@@ -238,14 +237,14 @@ namespace TDFMAUI.ViewModels
                     ErrorMessage = "Permission to access photos was denied";
                     return;
                 }
-                
+
                 // Pick photo
                 var photo = await MediaPicker.PickPhotoAsync();
                 if (photo != null)
                 {
                     // Load the photo as a stream
                     using var stream = await photo.OpenReadAsync();
-                    if (stream == null) 
+                    if (stream == null)
                     {
                          HasError = true;
                          ErrorMessage = "Could not open the selected image.";
@@ -269,7 +268,7 @@ namespace TDFMAUI.ViewModels
                     {
                         HasError = false; // Clear any previous errors
                         // Reload profile to get the updated byte data from the server
-                        await LoadUserProfile(); 
+                        await LoadUserProfile();
                     }
                     else
                     {
@@ -291,4 +290,4 @@ namespace TDFMAUI.ViewModels
             }
         }
     }
-} 
+}

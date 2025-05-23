@@ -94,7 +94,7 @@ namespace TDFAPI.Services
         public async Task<bool> MarkNotificationsAsSeenAsync(IEnumerable<int> notificationIds, int? userId = null)
         {
             if (!userId.HasValue || notificationIds == null) return false;
-            
+
             bool allMarked = true;
             foreach (var id in notificationIds)
             {
@@ -128,7 +128,7 @@ namespace TDFAPI.Services
                         timestamp = DateTime.UtcNow
                     });
                 }
-                
+
                 return true;
             }
             catch (Exception ex)
@@ -171,7 +171,7 @@ namespace TDFAPI.Services
                 var isOnline = await IsUserOnline(receiverId);
                 if (!isOnline && !queueIfOffline) return false;
 
-                var senderId = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value is string userIdStr && 
+                var senderId = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value is string userIdStr &&
                               int.TryParse(userIdStr, out var userId) ? userId : 0;
 
                 if (senderId <= 0)
@@ -280,11 +280,11 @@ namespace TDFAPI.Services
         public async Task<IEnumerable<MessageDto>> GetUnreadMessagesAsync(int? userId = null)
         {
             if (!userId.HasValue) return Enumerable.Empty<MessageDto>();
-            
+
             // Get unread messages for the user
             var messages = (await _messageRepository.GetByUserIdAsync(userId.Value))
                 .Where(m => !m.IsRead && m.ReceiverID == userId.Value);
-                
+
             // Convert to DTOs
             return messages.Select(m => new MessageDto
             {
@@ -347,7 +347,7 @@ namespace TDFAPI.Services
                     message.MarkAsRead();
                 }
             }
-            
+
             await _unitOfWork.SaveChangesAsync();
             return true;
         }
@@ -375,7 +375,7 @@ namespace TDFAPI.Services
             {
                 if (await IsUserOnline(userId))
                 {
-                    var json = JsonSerializer.Serialize(message);
+                    var json = TDFShared.Helpers.JsonSerializationHelper.SerializeCompact(message);
                     await _webSocketManager.SendToAsync(userId, message);
                 }
             }
@@ -389,7 +389,7 @@ namespace TDFAPI.Services
         {
             try
             {
-                var json = JsonSerializer.Serialize(message);
+                var json = TDFShared.Helpers.JsonSerializationHelper.SerializeCompact(message);
                 await _webSocketManager.SendToGroupAsync(group, json);
             }
             catch (Exception ex)
@@ -402,7 +402,7 @@ namespace TDFAPI.Services
         {
             try
             {
-                var json = JsonSerializer.Serialize(message);
+                var json = TDFShared.Helpers.JsonSerializationHelper.SerializeCompact(message);
                 await _webSocketManager.SendToAllAsync(json, excludedConnections);
             }
             catch (Exception ex)
@@ -449,13 +449,13 @@ namespace TDFAPI.Services
             try
             {
                 var cutoff = DateTime.UtcNow.AddHours(-1);
-                
+
                 // Clean up message rate limits
                 var rateLimitKeys = _messageRateLimits
                     .Where(x => x.Value.LastMessage < cutoff)
                     .Select(x => x.Key)
                     .ToList();
-                
+
                 foreach (var key in rateLimitKeys)
                 {
                     _messageRateLimits.TryRemove(key, out _);
@@ -466,7 +466,7 @@ namespace TDFAPI.Services
                     .Where(x => x.Value < cutoff)
                     .Select(x => x.Key)
                     .ToList();
-                
+
                 foreach (var key in messageTimeKeys)
                 {
                     _lastMessageTime.TryRemove(key, out _);

@@ -105,12 +105,17 @@ namespace TDFAPI.Controllers
             var isManager = User.IsInRole("Manager");
             var isAdminOrHR = User.IsInRole("Admin") || User.IsInRole("HR");
 
-            // Allow Admins/HR to see any department. Managers can only see their own.
-            if (isManager && !isAdminOrHR && !string.Equals(currentUserDept, department, StringComparison.OrdinalIgnoreCase))
+            // Allow Admins/HR to see any department. Managers can access their own department (including constituent departments for hyphenated departments).
+            if (isManager && !isAdminOrHR)
             {
-                _logger.LogWarning("Manager {UserId} in department {UserDept} attempted to access users for department {TargetDept}",
-                    currentUserId, currentUserDept, department);
-                return Forbid(); // Or return empty list depending on policy
+                var currentUser = new UserDto { IsManager = true, Department = currentUserDept };
+                bool canAccessDepartment = RequestStateManager.CanManageDepartment(currentUser, department);
+                if (!canAccessDepartment)
+                {
+                    _logger.LogWarning("Manager {UserId} in department {UserDept} attempted to access users for department {TargetDept} but lacks permission",
+                        currentUserId, currentUserDept, department);
+                    return Forbid(); // Or return empty list depending on policy
+                }
             }
 
             try

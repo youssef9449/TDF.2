@@ -3,7 +3,7 @@ using System.Globalization;
 using Microsoft.Maui.Controls;
 using TDFShared.Enums;
 
-namespace TDFShared.Converters
+namespace TDFMAUI.Converters
 {
     /// <summary>
     /// Converter to determine button visibility based on request status, user role, and ownership

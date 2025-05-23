@@ -17,6 +17,7 @@ namespace TDFAPI.Repositories
         Task<PaginatedResult<RequestEntity>> GetByUserIdAsync(int userId, RequestPaginationDto pagination);
         Task<IEnumerable<RequestEntity>> GetByDepartmentAsync(string department);
         Task<PaginatedResult<RequestEntity>> GetByDepartmentAsync(string department, RequestPaginationDto pagination);
+        Task<PaginatedResult<RequestEntity>> GetRequestsForManagerAsync(int managerId, string department, RequestPaginationDto pagination);
         Task<int> CreateAsync(RequestEntity request);
         Task<bool> UpdateAsync(RequestEntity request);
         Task<bool> DeleteAsync(int requestId);

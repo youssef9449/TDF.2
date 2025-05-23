@@ -79,7 +79,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet("leave-types")]
-        [Route(ApiRoutes.Lookups.GetLeaveTypes)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
         public async Task<ActionResult<ApiResponse<List<LookupItem>>>> GetLeaveTypes()
         {
@@ -97,7 +96,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet("requesttypes")]
-        [Route(ApiRoutes.Lookups.GetRequestTypes)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
         public async Task<ActionResult<ApiResponse<List<string>>>> GetRequestTypes()
         {
@@ -115,7 +113,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet("status-codes")]
-        [Route(ApiRoutes.Lookups.GetStatusCodes)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
         public async Task<ActionResult<ApiResponse<List<LookupItem>>>> GetStatusCodes()
         {

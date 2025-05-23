@@ -10,6 +10,8 @@ using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using System.Linq;
 using TDFAPI.Exceptions;
+using TDFShared.Services;
+using TDFShared.Utilities;
 
 namespace TDFAPI.Controllers
 {
@@ -22,33 +24,89 @@ namespace TDFAPI.Controllers
         private readonly IRequestService _requestService;
         private readonly IUserService _userService;
         private readonly ILogger<RequestController> _logger;
+        private readonly TDFShared.Validation.IBusinessRulesService _businessRulesService;
+        private readonly TDFShared.Services.IErrorHandlingService _errorHandlingService;
+        private readonly ICacheService _cacheService;
+        private readonly TDFShared.Validation.IValidationService _validationService;
 
         public RequestController(
             IRequestService requestService,
             IUserService userService,
-            ILogger<RequestController> logger)
+            ILogger<RequestController> logger,
+            TDFShared.Validation.IBusinessRulesService businessRulesService,
+            TDFShared.Services.IErrorHandlingService errorHandlingService,
+            ICacheService cacheService,
+            TDFShared.Validation.IValidationService validationService)
         {
             _requestService = requestService;
             _userService = userService;
             _logger = logger;
+            _businessRulesService = businessRulesService;
+            _errorHandlingService = errorHandlingService;
+            _cacheService = cacheService;
+            _validationService = validationService;
         }
 
         // GET: api/requests
         [HttpGet("")]
-        [Route(ApiRoutes.Requests.GetAll)]
-        [Authorize(Roles = "Admin,HR")]
+        [Authorize]
         public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetAllRequests([FromQuery] RequestPaginationDto pagination)
         {
             try
             {
-                _logger.LogInformation("Admin/HR getting all requests with pagination: {@Pagination}", pagination);
-                var result = await _requestService.GetAllAsync(pagination);
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                _logger.LogInformation("User {UserId} (Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Dept: {Department}) getting requests with pagination: {@Pagination}",
+                    currentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department, pagination);
+
+                // Use RequestStateManager to check if user can manage requests
+                bool canManage = RequestStateManager.CanManageRequests(currentUser);
+                if (!canManage && currentUserId != 0)
+                {
+                    // If user can't manage requests, they can only see their own
+                    _logger.LogInformation("Loading requests for regular user {UserId}", currentUserId);
+                    var userResult = await _requestService.GetByUserIdAsync(currentUserId, pagination);
+                    return Ok(userResult);
+                }
+
+                // Use shared authorization utilities to determine access level
+                var accessLevel = AuthorizationUtilities.GetRequestAccessLevel(currentUser);
+                PaginatedResult<RequestResponseDto> result;
+
+                switch (accessLevel)
+                {
+                    case RequestAccessLevel.All:
+                        // Admin and HR can see all requests
+                        _logger.LogInformation("Loading all requests for Admin/HR user {UserId}", currentUserId);
+                        result = await _requestService.GetAllAsync(pagination);
+                        break;
+
+                    case RequestAccessLevel.Department:
+                        // Managers can see their own requests + requests from users in their department
+                        _logger.LogInformation("Loading requests for Manager {UserId} in department '{Department}'", currentUserId, currentUser.Department);
+                        result = await _requestService.GetRequestsForManagerAsync(currentUserId, currentUser.Department, pagination);
+                        break;
+
+                    case RequestAccessLevel.Own:
+                        // Regular users can only see their own requests
+                        _logger.LogInformation("Loading requests for regular user {UserId}", currentUserId);
+                        result = await _requestService.GetByUserIdAsync(currentUserId, pagination);
+                        break;
+
+                    default:
+                        _logger.LogWarning("User {UserId} has no request access", currentUserId);
+                        return Forbid("You do not have permission to view requests.");
+                }
+
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving all requests");
-                return StatusCode(500, new { message = "Internal server error retrieving all requests." });
+                _logger.LogError(ex, "Error retrieving requests");
+                var apiResponse = TDFShared.Utilities.ApiResponseUtilities.FromException<PaginatedResult<RequestResponseDto>>(ex, includeStackTrace: false);
+                return StatusCode((int)apiResponse.StatusCode, apiResponse);
             }
         }
 
@@ -60,14 +118,37 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                _logger.LogInformation("Getting requests for department '{Department}' with pagination: {@Pagination}", department, pagination);
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                // Use RequestStateManager to check if current user can manage requests
+                bool canManage = RequestStateManager.CanManageRequests(currentUser);
+                if (!canManage)
+                {
+                    _logger.LogWarning("User {UserId} tried to access department '{Department}' but lacks management permissions",
+                        currentUserId, department);
+                    return Forbid("You do not have permission to view department requests.");
+                }
+
+                // Use RequestStateManager to check department access
+                bool canAccessDepartment = RequestStateManager.CanManageDepartment(currentUser, department);
+                if (!canAccessDepartment)
+                {
+                    _logger.LogWarning("User {UserId} from department '{UserDept}' tried to access department '{Department}' but lacks permission",
+                        currentUserId, currentUser.Department, department);
+                    return Forbid($"You do not have permission to view requests for department '{department}'.");
+                }
+
+                _logger.LogInformation("User {UserId} getting requests for department '{Department}' with pagination: {@Pagination}", currentUserId, department, pagination);
                 var result = await _requestService.GetByDepartmentAsync(department, pagination);
                 return Ok(result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving requests for department {Department}", department);
-                return StatusCode(500, new { message = $"Internal server error retrieving requests for department {department}." });
+                var friendlyMessage = _errorHandlingService.GetFriendlyErrorMessage(ex, $"retrieving requests for department {department}");
+                return StatusCode(500, new { message = friendlyMessage });
             }
         }
 
@@ -103,14 +184,44 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                _logger.LogInformation("Admin/HR/Manager getting requests for user {TargetUserId} with pagination: {@Pagination}", userId, pagination);
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                // Get the target user to check department authorization
+                var targetUser = await _userService.GetUserByIdAsync(userId);
+                if (targetUser == null) return NotFound($"User with ID {userId} not found.");
+
+                // Use RequestStateManager to check if current user can manage requests for the target user
+                bool canManage = RequestStateManager.CanManageRequests(currentUser);
+                if (!canManage)
+                {
+                    _logger.LogWarning("User {CurrentUserId} tried to access requests for user {TargetUserId} but lacks management permissions",
+                        currentUserId, userId);
+                    return Forbid("You do not have permission to view requests for other users.");
+                }
+
+                // For managers, ensure they can only access their department (including constituent departments for hyphenated departments)
+                if (currentUser.IsManager && !currentUser.IsAdmin && !currentUser.IsHR)
+                {
+                    bool canAccessDepartment = RequestStateManager.CanManageDepartment(currentUser, targetUser.Department);
+                    if (!canAccessDepartment)
+                    {
+                        _logger.LogWarning("Manager {CurrentUserId} from department '{CurrentDept}' tried to access requests for user {TargetUserId} from department '{TargetDept}' but lacks permission",
+                            currentUserId, currentUser.Department, userId, targetUser.Department);
+                        return Forbid("You can only view requests for users in your department.");
+                    }
+                }
+
+                _logger.LogInformation("User {CurrentUserId} getting requests for user {TargetUserId} with pagination: {@Pagination}", currentUserId, userId, pagination);
                 var result = await _requestService.GetByUserIdAsync(userId, pagination);
                 return Ok(result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving requests for user ID {UserId}", userId);
-                return StatusCode(500, "Internal server error");
+                var friendlyMessage = _errorHandlingService.GetFriendlyErrorMessage(ex, "retrieving user requests");
+                return StatusCode(500, new { message = friendlyMessage });
             }
         }
 
@@ -131,25 +242,16 @@ namespace TDFAPI.Controllers
                 }
 
                 int currentUserId = GetCurrentUserId();
-                var currentUser = await _userService.GetUserByIdAsync(currentUserId);
+                var currentUser = await GetCachedUserAsync(currentUserId);
                 if (currentUser == null) return Unauthorized("User not found.");
 
-                bool isAdmin = User.IsInRole("Admin");
-                bool isHR = User.IsInRole("HR");
-                bool isManager = User.IsInRole("Manager");
-
-                if (requestDto.RequestUserID != currentUserId && !isAdmin && !isHR)
+                // Use RequestStateManager for authorization validation
+                bool canView = RequestStateManager.CanViewRequest(requestDto, currentUser);
+                if (!canView)
                 {
-                    if (isManager && currentUser.Department == requestDto.RequestDepartment)
-                    {
-                        // Manager in the same department can view
-                    }
-                    else
-                    {
-                        _logger.LogWarning("User {UserId} (Roles: {Roles}, Dept: {Dept}) tried to access request {RequestId} belonging to {OwnerId} in dept {RequestDept}",
-                            currentUserId, string.Join(',', User.FindAll(ClaimTypes.Role).Select(c => c.Value)), currentUser.Department, id, requestDto.RequestUserID, requestDto.RequestDepartment);
-                        return Forbid();
-                    }
+                    _logger.LogWarning("User {UserId} (Roles: {Roles}, Dept: {Dept}) tried to access request {RequestId} belonging to {OwnerId} in dept {RequestDept}",
+                        currentUserId, string.Join(',', User.FindAll(ClaimTypes.Role).Select(c => c.Value)), currentUser.Department, id, requestDto.RequestUserID, requestDto.RequestDepartment);
+                    return Forbid("You do not have permission to view this request.");
                 }
 
                 return Ok(requestDto);
@@ -168,7 +270,6 @@ namespace TDFAPI.Controllers
 
         // POST: api/requests
         [HttpPost("")]
-        [Route(ApiRoutes.Requests.Create)]
         public async Task<ActionResult<RequestResponseDto>> CreateRequest([FromBody] RequestCreateDto createDto)
         {
             if (!ModelState.IsValid)
@@ -180,6 +281,17 @@ namespace TDFAPI.Controllers
             {
                 int userId = GetCurrentUserId();
                 if (userId == 0) return Unauthorized("User ID could not be determined.");
+
+                // Validate and sanitize input using shared validation service
+                if (_validationService.ContainsDangerousPatterns(createDto.RequestReason) ||
+                    _validationService.ContainsDangerousPatterns(createDto.RequestRemarks))
+                {
+                    _logger.LogWarning("User {UserId} attempted to create request with potentially dangerous input", userId);
+                    return BadRequest("Invalid input detected. Please check your request details.");
+                }
+
+                createDto.RequestReason = _validationService.SanitizeInput(createDto.RequestReason);
+                createDto.RequestRemarks = _validationService.SanitizeInput(createDto.RequestRemarks);
 
                 _logger.LogInformation("User {UserId} attempting to create request: {@CreateDto}", userId, createDto);
 
@@ -216,7 +328,6 @@ namespace TDFAPI.Controllers
 
         // PUT: api/requests/{id}
         [HttpPut("{id:int}")]
-        [Route(ApiRoutes.Requests.Update)]
         public async Task<ActionResult<RequestResponseDto>> UpdateRequest(int id, [FromBody] RequestUpdateDto updateDto)
         {
             if (!ModelState.IsValid)
@@ -228,6 +339,31 @@ namespace TDFAPI.Controllers
             {
                 int userId = GetCurrentUserId();
                 if (userId == 0) return Unauthorized("User ID could not be determined.");
+
+                // Check if the request exists and if user can edit it
+                var existingRequest = await _requestService.GetByIdAsync(id);
+                if (existingRequest == null)
+                {
+                    _logger.LogWarning("Attempted to update non-existent request {RequestId}", id);
+                    return NotFound($"Request with ID {id} not found.");
+                }
+
+                var currentUser = await _userService.GetUserByIdAsync(userId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                // Use RequestStateManager to check edit rights
+                bool isOwner = existingRequest.RequestUserID == userId;
+                bool canEdit = RequestStateManager.CanEdit(existingRequest, currentUser.IsAdmin, isOwner);
+                if (!canEdit)
+                {
+                    _logger.LogWarning("User {UserId} tried to update request {RequestId} belonging to {OwnerId} but lacks permission",
+                        userId, id, existingRequest.RequestUserID);
+                    return Forbid("You do not have permission to edit this request.");
+                }
+
+                // Sanitize input using shared validation service
+                updateDto.RequestReason = _validationService.SanitizeInput(updateDto.RequestReason);
+                updateDto.RequestRemarks = _validationService.SanitizeInput(updateDto.RequestRemarks);
 
                 _logger.LogInformation("User {UserId} attempting to update request ID {RequestId} with data: {@UpdateDto}", userId, id, updateDto);
 
@@ -286,17 +422,21 @@ namespace TDFAPI.Controllers
             try
             {
                 int currentUserId = GetCurrentUserId();
+                var currentUser = await _userService.GetUserByIdAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
 
                 var requestDto = await _requestService.GetByIdAsync(id);
                 if (requestDto == null)
                     return NotFound();
 
-                bool isAdmin = User.IsInRole("Admin");
-
-                if (requestDto.RequestUserID != currentUserId && !isAdmin)
+                // Use RequestStateManager to check delete rights
+                bool isOwner = requestDto.RequestUserID == currentUserId;
+                bool canDelete = RequestStateManager.CanDelete(requestDto, currentUser.IsAdmin, isOwner);
+                if (!canDelete)
                 {
-                    _logger.LogWarning("User {UserId} tried to delete request {RequestId} belonging to {OwnerId}", currentUserId, id, requestDto.RequestUserID);
-                    return Forbid();
+                    _logger.LogWarning("User {UserId} tried to delete request {RequestId} belonging to {OwnerId} but lacks permission",
+                        currentUserId, id, requestDto.RequestUserID);
+                    return Forbid("You do not have permission to delete this request.");
                 }
 
                 if (await _requestService.DeleteAsync(id, currentUserId))
@@ -340,19 +480,35 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                int approverId = GetCurrentUserId();                var approver = await _userService.GetUserByIdAsync(approverId);
+                int approverId = GetCurrentUserId();
+                var approver = await _userService.GetUserByIdAsync(approverId);
                 if (approver == null) return Unauthorized("Approver not found.");
 
-                bool isHR = approver.IsHR;
-                _logger.LogInformation("{Role} {ApproverName} ({ApproverId}) attempting to approve request {RequestId}: {@ApprovalDto}",
-                    (isHR ? "HR" : "Manager"), approver.FullName, approverId, id, approvalDto);
+                // Get the request to check authorization
+                var request = await _requestService.GetByIdAsync(id);
+                if (request == null) return NotFound($"Request with ID {id} not found.");
 
-                bool success = await _requestService.ApproveRequestAsync(id, approvalDto, approverId, approver.FullName, isHR);
+                // Use shared authorization utilities to check approval rights
+                bool canApprove = RequestStateManager.CanApproveOrRejectRequest(request, approver);
+                if (!canApprove)
+                {
+                    _logger.LogWarning("User {ApproverId} from department '{ApproverDept}' tried to approve request {RequestId} from department '{RequestDept}' but lacks permission",
+                        approverId, approver.Department, id, request.RequestDepartment);
+                    return Forbid("You do not have permission to approve this request.");
+                }
+
+                // Sanitize input using shared validation service
+                approvalDto.Comment = _validationService.SanitizeInput(approvalDto.Comment);
+
+                _logger.LogInformation("{Role} {ApproverName} ({ApproverId}) attempting to approve request {RequestId}: {@ApprovalDto}",
+                    (approver.IsHR ? "HR" : "Manager"), approver.FullName, approverId, id, approvalDto);
+
+                bool success = await _requestService.ApproveRequestAsync(id, approvalDto, approverId, approver.FullName, approver.IsHR);
 
                 if (!success)
                 {
-                    var request = await _requestService.GetByIdAsync(id);
-                    if (request == null)
+                    var requestCheck = await _requestService.GetByIdAsync(id);
+                    if (requestCheck == null)
                     {
                         _logger.LogWarning("Attempted to approve non-existent request {RequestId}", id);
                         return NotFound($"Request with ID {id} not found.");
@@ -401,19 +557,35 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                int rejecterId = GetCurrentUserId();                var rejecter = await _userService.GetUserByIdAsync(rejecterId);
+                int rejecterId = GetCurrentUserId();
+                var rejecter = await _userService.GetUserByIdAsync(rejecterId);
                 if (rejecter == null) return Unauthorized("Rejecter not found.");
 
-                bool isHR = rejecter.IsHR;
-                _logger.LogInformation("{Role} {RejecterName} ({RejecterId}) attempting to reject request {RequestId}: {@RejectDto}",
-                    (isHR ? "HR" : "Manager"), rejecter.FullName, rejecterId, id, rejectDto);
+                // Get the request to check authorization
+                var request = await _requestService.GetByIdAsync(id);
+                if (request == null) return NotFound($"Request with ID {id} not found.");
 
-                bool success = await _requestService.RejectRequestAsync(id, rejectDto, rejecterId, rejecter.FullName, isHR);
+                // Use shared authorization utilities to check rejection rights
+                bool canReject = RequestStateManager.CanApproveOrRejectRequest(request, rejecter);
+                if (!canReject)
+                {
+                    _logger.LogWarning("User {RejecterId} from department '{RejecterDept}' tried to reject request {RequestId} from department '{RequestDept}' but lacks permission",
+                        rejecterId, rejecter.Department, id, request.RequestDepartment);
+                    return Forbid("You do not have permission to reject this request.");
+                }
+
+                // Sanitize input using shared validation service
+                rejectDto.RejectReason = _validationService.SanitizeInput(rejectDto.RejectReason);
+
+                _logger.LogInformation("{Role} {RejecterName} ({RejecterId}) attempting to reject request {RequestId}: {@RejectDto}",
+                    (rejecter.IsHR ? "HR" : "Manager"), rejecter.FullName, rejecterId, id, rejectDto);
+
+                bool success = await _requestService.RejectRequestAsync(id, rejectDto, rejecterId, rejecter.FullName, rejecter.IsHR);
 
                 if (!success)
                 {
-                    var request = await _requestService.GetByIdAsync(id);
-                    if (request == null)
+                    var requestCheck = await _requestService.GetByIdAsync(id);
+                    if (requestCheck == null)
                     {
                         _logger.LogWarning("Attempted to reject non-existent request {RequestId}", id);
                         return NotFound($"Request with ID {id} not found.");
@@ -465,6 +637,28 @@ namespace TDFAPI.Controllers
             }
             _logger.LogWarning("Could not find valid User ID claim in token.");
             return 0;
+        }
+
+        /// <summary>
+        /// Gets user data with caching for better performance
+        /// </summary>
+        private async Task<TDFShared.DTOs.Users.UserDto?> GetCachedUserAsync(int userId)
+        {
+            var cacheKey = $"user_{userId}";
+            return await _cacheService.GetOrCreateAsync(cacheKey,
+                async () => await _userService.GetUserByIdAsync(userId),
+                absoluteExpirationMinutes: 15, // Cache for 15 minutes
+                slidingExpirationMinutes: 5);   // Extend if accessed within 5 minutes
+        }
+
+        /// <summary>
+        /// Creates authorization context with caching for better performance
+        /// </summary>
+        private TDFShared.Validation.BusinessRuleContext CreateCachedAuthorizationContext()
+        {
+            return AuthorizationUtilities.CreateAuthorizationContext(
+                async (requestId) => await _requestService.GetByIdAsync(requestId),
+                async (userId) => await GetCachedUserAsync(userId));
         }
 
         #endregion

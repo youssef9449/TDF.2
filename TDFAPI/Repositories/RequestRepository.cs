@@ -128,6 +128,17 @@ namespace TDFAPI.Repositories
             return await ExecutePaginatedQueryAsync(baseQuery, pagination);
         }
 
+        public async Task<PaginatedResult<RequestEntity>> GetRequestsForManagerAsync(int managerId, string department, RequestPaginationDto pagination)
+        {
+            var baseQuery = _context.Requests
+                .Where(r => r.RequestUserID == managerId || r.RequestDepartment == department)
+                .Include(r => r.User)
+                .ThenInclude(u => u.AnnualLeave)
+                .AsQueryable();
+
+            return await ExecutePaginatedQueryAsync(baseQuery, pagination);
+        }
+
         public async Task<int> CreateAsync(RequestEntity request)
         {
             try

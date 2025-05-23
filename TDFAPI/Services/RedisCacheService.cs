@@ -38,7 +38,7 @@ namespace TDFAPI.Services
                 _logger.LogDebug("Cache hit for key: {Key}", key);
                 try
                 {
-                    return JsonSerializer.Deserialize<T>(cachedValue);
+                    return TDFShared.Helpers.JsonSerializationHelper.Deserialize<T>(cachedValue);
                 }
                 catch (Exception ex)
                 {
@@ -53,14 +53,14 @@ namespace TDFAPI.Services
 
             try
             {
-                var serializedResult = JsonSerializer.Serialize(result);
-                
+                var serializedResult = TDFShared.Helpers.JsonSerializationHelper.Serialize(result);
+
                 // Calculate the cache expiration based on the absolute expiration
                 var expiry = TimeSpan.FromMinutes(absoluteExpirationMinutes);
-                
+
                 // Store the value in Redis
                 await _db.StringSetAsync(key, serializedResult, expiry);
-                
+
                 // We don't handle sliding expiration directly as Redis doesn't have native support,
                 // but we could implement it with additional key tracking if needed
             }
@@ -84,9 +84,9 @@ namespace TDFAPI.Services
         {
             try
             {
-                var serializedValue = JsonSerializer.Serialize(value);
+                var serializedValue = TDFShared.Helpers.JsonSerializationHelper.Serialize(value);
                 var expiry = TimeSpan.FromMinutes(absoluteExpirationMinutes);
-                
+
                 bool result = await _db.StringSetAsync(key, serializedValue, expiry);
                 _logger.LogDebug("Item with key {Key} set in Redis cache", key);
                 return result;
@@ -111,7 +111,7 @@ namespace TDFAPI.Services
                     _logger.LogDebug("Cache hit for key: {Key}", key);
                     return JsonSerializer.Deserialize<T>(cachedValue);
                 }
-                
+
                 _logger.LogDebug("Cache miss for key: {Key}", key);
                 return null;
             }
@@ -149,7 +149,7 @@ namespace TDFAPI.Services
                     _logger.LogError(ex, "Error deserializing cached value for key: {Key}", key);
                 }
             }
-            
+
             value = default;
             return false;
         }
@@ -162,9 +162,9 @@ namespace TDFAPI.Services
         {
             if (string.IsNullOrEmpty(key))
                 return;
-        
+
             _db.KeyDelete(key);
             _logger.LogDebug("Removed item from Redis cache with key: {Key}", key);
         }
     }
-} 
+}

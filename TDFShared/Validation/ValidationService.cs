@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
 using TDFShared.Services;
 using TDFShared.Exceptions;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace TDFShared.Validation
 {
@@ -13,7 +16,7 @@ namespace TDFShared.Validation
     {
         private readonly ISecurityService _securityService;
         private static readonly Regex EmailRegex = new(
-            @"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", 
+            @"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         public ValidationService(ISecurityService securityService)
@@ -28,9 +31,9 @@ namespace TDFShared.Validation
 
             var validationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
             var validationContext = new System.ComponentModel.DataAnnotations.ValidationContext(obj);
-            
+
             bool isValid = Validator.TryValidateObject(obj, validationContext, validationResults, true);
-            
+
             if (isValid)
                 return ValidationResult<T>.Success(obj);
 
@@ -47,7 +50,7 @@ namespace TDFShared.Validation
             var result = ValidateObject(obj);
             if (!result.IsValid)
             {
-                throw new ValidationException(string.Join("; ", result.Errors));
+                throw new System.ComponentModel.DataAnnotations.ValidationException(string.Join("; ", result.Errors));
             }
         }
 
@@ -60,7 +63,7 @@ namespace TDFShared.Validation
             };
 
             var validationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
-            
+
             // Get validation attributes for the property
             var property = objectType.GetProperty(propertyName);
             if (property != null)
@@ -138,14 +141,17 @@ namespace TDFShared.Validation
             return null;
         }
 
-        public List<string> ValidateDateRange(DateTime startDate, DateTime? endDate, string fieldName = "Date")
+        public List<string> ValidateDateRange(DateTime startDate, DateTime? endDate, string fieldName = "Date", int minDaysFromNow = 0)
         {
             var errors = new List<string>();
 
-            // Validate start date is not in the past (for future dates)
-            if (startDate.Date < DateTime.Today)
+            // Use the same logic as FutureDateAttribute for consistency
+            if (startDate.Date < DateTime.Today.AddDays(minDaysFromNow))
             {
-                errors.Add($"{fieldName} cannot be in the past.");
+                var message = minDaysFromNow > 0
+                    ? $"{fieldName} must be at least {minDaysFromNow} day(s) from today."
+                    : $"{fieldName} cannot be in the past.";
+                errors.Add(message);
             }
 
             // Validate end date is after start date
@@ -171,7 +177,7 @@ namespace TDFShared.Validation
 
             // Use the security service for password validation
             bool isStrong = _securityService.IsPasswordStrong(password, out string validationMessage);
-            
+
             var result = new PasswordValidationResult
             {
                 IsValid = isStrong,
@@ -246,6 +252,56 @@ namespace TDFShared.Validation
             }
 
             return true;
+        }
+
+        public string SanitizeInput(string? input, bool allowHtml = false)
+        {
+            if (string.IsNullOrEmpty(input))
+                return string.Empty;
+
+            var sanitized = input.Trim();
+
+            if (!allowHtml)
+            {
+                // Remove HTML tags
+                sanitized = Regex.Replace(sanitized, @"<[^>]*>", string.Empty);
+            }
+
+            // Remove potentially dangerous characters for SQL injection
+            sanitized = sanitized.Replace("'", "''"); // Escape single quotes
+            sanitized = Regex.Replace(sanitized, @"--.*$", string.Empty, RegexOptions.Multiline); // Remove SQL comments
+            sanitized = Regex.Replace(sanitized, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline); // Remove SQL block comments
+
+            // Remove script injection attempts
+            sanitized = Regex.Replace(sanitized, @"<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>", string.Empty, RegexOptions.IgnoreCase);
+            sanitized = Regex.Replace(sanitized, @"javascript:", string.Empty, RegexOptions.IgnoreCase);
+            sanitized = Regex.Replace(sanitized, @"vbscript:", string.Empty, RegexOptions.IgnoreCase);
+            sanitized = Regex.Replace(sanitized, @"onload", string.Empty, RegexOptions.IgnoreCase);
+            sanitized = Regex.Replace(sanitized, @"onerror", string.Empty, RegexOptions.IgnoreCase);
+
+            return sanitized;
+        }
+
+        public bool ContainsDangerousPatterns(string? input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return false;
+
+            var dangerousPatterns = new[]
+            {
+                @"<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>", // Script tags
+                @"javascript:", // JavaScript protocol
+                @"vbscript:", // VBScript protocol
+                @"data:text/html", // Data URLs with HTML
+                @"(?:'|--|\b(select|union|insert|drop|alter|declare|xp_)\b)", // SQL injection patterns
+                @"(\b(exec|execute|sp_|xp_)\b)", // SQL stored procedure calls
+                @"(\b(cmd|command|shell|system)\b)", // Command injection patterns
+                @"(\.\./|\.\.\\)", // Directory traversal
+                @"(%2e%2e%2f|%2e%2e%5c)", // URL encoded directory traversal
+            };
+
+            return dangerousPatterns.Any(pattern =>
+                Regex.IsMatch(input, pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled));
         }
     }
 }

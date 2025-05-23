@@ -46,10 +46,10 @@ namespace TDFAPI.Middleware
             {
                 // Log detailed crash information
                 LogDetailedCrashInformation(context, ex);
-                
+
                 // Also log to file to ensure we capture it
                 LogToFile(context, ex);
-                
+
                 await HandleExceptionAsync(context, ex);
             }
         }
@@ -57,7 +57,7 @@ namespace TDFAPI.Middleware
         private void LogDetailedCrashInformation(HttpContext context, Exception ex)
         {
             // Basic exception logging - keep it simple
-            _logger.LogError(ex, 
+            _logger.LogError(ex,
                 "API Error: {Path} {Method} - {ExceptionType}: {Message}",
                 context.Request.Path,
                 context.Request.Method,
@@ -75,25 +75,25 @@ namespace TDFAPI.Middleware
                 {
                     Directory.CreateDirectory(logsPath);
                 }
-                
+
                 // Create crash log file with timestamp
                 var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 var crashLogPath = Path.Combine(logsPath, $"error_{timestamp}.txt");
-                
+
                 // Keep it simple with just the essential crash details
                 var crashDetails = new System.Text.StringBuilder();
                 crashDetails.AppendLine($"API Error: {DateTime.Now}");
                 crashDetails.AppendLine($"Request: {context.Request.Method} {context.Request.Path}{context.Request.QueryString}");
                 crashDetails.AppendLine($"Remote IP: {context.GetRealIpAddress()}");
                 crashDetails.AppendLine();
-                
+
                 // Exception details
                 crashDetails.AppendLine($"Exception: {ex.GetType().FullName}");
                 crashDetails.AppendLine($"Message: {ex.Message}");
                 crashDetails.AppendLine();
                 crashDetails.AppendLine("Stack Trace:");
                 crashDetails.AppendLine(ex.StackTrace);
-                
+
                 // Inner exception if present
                 if (ex.InnerException != null)
                 {
@@ -101,7 +101,7 @@ namespace TDFAPI.Middleware
                     crashDetails.AppendLine($"Inner Exception: {ex.InnerException.GetType().FullName}");
                     crashDetails.AppendLine($"Inner Message: {ex.InnerException.Message}");
                 }
-                
+
                 // Write to file
                 File.WriteAllText(crashLogPath, crashDetails.ToString());
             }
@@ -117,11 +117,11 @@ namespace TDFAPI.Middleware
         {
             var errorId = Guid.NewGuid().ToString();
             var statusCode = GetStatusCode(exception);
-            
+
             // Log the error with the error ID for correlation
-            _logger.LogError(exception, "Error ID: {ErrorId} - {ExceptionType}: {Message}", 
+            _logger.LogError(exception, "Error ID: {ErrorId} - {ExceptionType}: {Message}",
                 errorId, exception.GetType().Name, exception.Message);
-            
+
             // Create RFC 7807 Problem Details response with extended properties
             var problemDetails = new ExtendedProblemDetails
             {
@@ -133,21 +133,17 @@ namespace TDFAPI.Middleware
                 ErrorId = errorId,
                 Timestamp = DateTime.UtcNow
             };
-            
+
             // Include debug information in development environment
             if (_env.IsDevelopment())
             {
                 problemDetails.Debug = exception.ToString();
             }
-            
+
             context.Response.ContentType = "application/problem+json";
             context.Response.StatusCode = statusCode;
-            
-            await context.Response.WriteAsync(JsonSerializer.Serialize(problemDetails, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            }));
+
+            await context.Response.WriteAsync(TDFShared.Helpers.JsonSerializationHelper.SerializePretty(problemDetails));
         }
 
         private int GetStatusCode(Exception exception)
@@ -188,7 +184,7 @@ namespace TDFAPI.Middleware
             {
                 UnauthorizedAccessException => "Unauthorized",
                 ArgumentException => "Bad Request",
-                InvalidOperationException => "Bad Request", 
+                InvalidOperationException => "Bad Request",
                 KeyNotFoundException => "Not Found",
                 FileNotFoundException => "Not Found",
                 NotImplementedException => "Not Implemented",
@@ -200,7 +196,7 @@ namespace TDFAPI.Middleware
         private string GetProblemType(Exception exception)
         {
             string baseUrl = "https://httpstatuses.com/";
-            
+
             return exception switch
             {
                 UnauthorizedAccessException => $"{baseUrl}401",

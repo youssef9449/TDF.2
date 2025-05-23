@@ -86,9 +86,9 @@ namespace TDFMAUI.ViewModels
         public List<string> TypeOptions => RequestOptions.TypeOptions;
         public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
 
-        public bool CanManageRequests => CanManageRequestsHelper(IsAdmin, IsManager, IsHR);
-        public bool CanEditDeleteAny => CanEditDeleteAnyHelper(IsAdmin);
-        public bool CanFilterByDepartment => CanFilterByDepartmentHelper(IsManager);
+        public bool CanManageRequests => GetCurrentUserDto() is UserDto user && RequestStateManager.CanManageRequests(user);
+        public bool CanEditDeleteAny => IsAdmin == true;
+        public bool CanFilterByDepartment => IsManager == true;
 
         public RequestApprovalViewModel(TDFMAUI.Services.IRequestService requestService, TDFMAUI.Services.INotificationService notificationService, TDFShared.Services.IAuthService authService)
         {
@@ -134,23 +134,16 @@ namespace TDFMAUI.ViewModels
             RefreshCommand = new Command(async () => await LoadRequestsAsync());
         }
 
-        // Authorization checks using helper methods
+        // Authorization checks using TDFShared RequestStateManager
         private bool CanApprove(RequestResponseDto request)
         {
             if (request == null) return false;
             if (request.Status != RequestStatus.Pending) return false;
 
-            var canManage = CanManageRequestsHelper(IsAdmin, IsManager, IsHR);
-            if (!canManage) return false;
+            var currentUser = GetCurrentUserDto();
+            if (currentUser == null) return false;
 
-            // Additional check for managers - can only approve requests from their department
-            if (IsManager == true && IsAdmin != true && IsHR != true)
-            {
-                var currentUserDepartment = Task.Run(async () => await _authService.GetCurrentUserDepartmentAsync()).Result;
-                return request.RequestDepartment == currentUserDepartment;
-            }
-
-            return true;
+            return RequestStateManager.CanApproveOrRejectRequest(request, currentUser);
         }
 
         private bool CanReject(RequestResponseDto request) => CanApprove(request); // Same logic as approve
@@ -271,13 +264,9 @@ namespace TDFMAUI.ViewModels
                         : Enum.TryParse<LeaveType>(SelectedType, true, out var parsedType) ? parsedType : (LeaveType?)null
                 };
 
-                var currentUserDepartment = IsManager == true && IsAdmin != true && IsHR != true
-                    ? await _authService.GetCurrentUserDepartmentAsync()
-                    : null;
-
-                var requests = currentUserDepartment != null
-                    ? await _requestService.GetRequestsByDepartmentAsync(currentUserDepartment, requestPagination)
-                    : await _requestService.GetAllRequestsAsync(requestPagination);
+                // For managers, use GetAllRequestsAsync since the server-side filtering now handles hyphenated departments
+                // For HR/Admin, also use GetAllRequestsAsync to get all requests
+                var requests = await _requestService.GetAllRequestsAsync(requestPagination);
 
                 if (requests?.Items != null)
                 {
@@ -334,27 +323,11 @@ namespace TDFMAUI.ViewModels
         #region Authorization Helper Methods
 
         /// <summary>
-        /// Determines if a user can manage requests based on their role flags
+        /// Gets the current user as UserDto synchronously for property bindings and authorization checks
         /// </summary>
-        private static bool CanManageRequestsHelper(bool? isAdmin, bool? isManager, bool? isHR)
+        private UserDto? GetCurrentUserDto()
         {
-            return isAdmin == true || isManager == true || isHR == true;
-        }
-
-        /// <summary>
-        /// Determines if a user can edit/delete any request (admin only)
-        /// </summary>
-        private static bool CanEditDeleteAnyHelper(bool? isAdmin)
-        {
-            return isAdmin == true;
-        }
-
-        /// <summary>
-        /// Determines if a user can filter by department (managers and above)
-        /// </summary>
-        private static bool CanFilterByDepartmentHelper(bool? isManager)
-        {
-            return isManager == true;
+            return Task.Run(async () => await _authService.GetCurrentUserAsync()).Result;
         }
 
         #endregion

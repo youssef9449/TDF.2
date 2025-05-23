@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Users;
 using TDFShared.Enums;
@@ -101,6 +104,30 @@ namespace TDFShared.Validation
             DateTime startDate,
             DateTime? endDate,
             BusinessRuleContext context);
+
+        /// <summary>
+        /// Validates authorization for request access
+        /// </summary>
+        /// <param name="requestId">Request ID to access</param>
+        /// <param name="userId">User attempting access</param>
+        /// <param name="context">Validation context with dependencies</param>
+        /// <returns>Business rule validation result</returns>
+        Task<BusinessRuleValidationResult> ValidateRequestAccessAsync(
+            int requestId,
+            int userId,
+            BusinessRuleContext context);
+
+        /// <summary>
+        /// Validates authorization for department access
+        /// </summary>
+        /// <param name="department">Department to access</param>
+        /// <param name="userId">User attempting access</param>
+        /// <param name="context">Validation context with dependencies</param>
+        /// <returns>Business rule validation result</returns>
+        Task<BusinessRuleValidationResult> ValidateDepartmentAccessAsync(
+            string department,
+            int userId,
+            BusinessRuleContext context);
     }
 
     /// <summary>
@@ -152,7 +179,6 @@ namespace TDFShared.Validation
         public Func<int, LeaveType, Task<int>>? GetLeaveBalanceAsync { get; set; }
         public Func<int, DateTime, DateTime, int, Task<bool>>? HasConflictingRequestsAsync { get; set; }
         public Func<string, Task<bool>>? UsernameExistsAsync { get; set; }
-        public Func<int, Task<bool>>? UserExistsAsync { get; set; }
         public Func<int, Task<RequestResponseDto?>>? GetRequestAsync { get; set; }
         public Func<string, DateTime, DateTime, Task<int>>? GetDepartmentRequestCountAsync { get; set; }
         public Func<int, Task<UserDto?>>? GetUserAsync { get; set; }

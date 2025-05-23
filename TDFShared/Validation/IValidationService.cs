@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using TDFShared.DTOs.Common;
 
@@ -72,13 +74,14 @@ namespace TDFShared.Validation
         string? ValidateRange(int value, string fieldName, int? min = null, int? max = null);
 
         /// <summary>
-        /// Validates date range
+        /// Validates date range with optional minimum days from now requirement
         /// </summary>
         /// <param name="startDate">Start date</param>
         /// <param name="endDate">End date (optional)</param>
         /// <param name="fieldName">Name of the field</param>
+        /// <param name="minDaysFromNow">Minimum days from today (0 = today allowed, 1 = tomorrow minimum, etc.)</param>
         /// <returns>List of validation errors</returns>
-        List<string> ValidateDateRange(DateTime startDate, DateTime? endDate, string fieldName = "Date");
+        List<string> ValidateDateRange(DateTime startDate, DateTime? endDate, string fieldName = "Date", int minDaysFromNow = 0);
 
         /// <summary>
         /// Validates password strength using security service
@@ -86,6 +89,21 @@ namespace TDFShared.Validation
         /// <param name="password">Password to validate</param>
         /// <returns>Validation result with strength details</returns>
         PasswordValidationResult ValidatePassword(string? password);
+
+        /// <summary>
+        /// Sanitizes input to prevent common injection attacks
+        /// </summary>
+        /// <param name="input">Input string to sanitize</param>
+        /// <param name="allowHtml">Whether to allow HTML tags</param>
+        /// <returns>Sanitized string</returns>
+        string SanitizeInput(string? input, bool allowHtml = false);
+
+        /// <summary>
+        /// Checks if a string contains potentially dangerous patterns
+        /// </summary>
+        /// <param name="input">Input to check</param>
+        /// <returns>True if dangerous patterns are detected</returns>
+        bool ContainsDangerousPatterns(string? input);
     }
 
     /// <summary>

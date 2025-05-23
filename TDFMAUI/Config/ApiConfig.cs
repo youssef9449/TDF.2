@@ -212,8 +212,8 @@ namespace TDFMAUI.Config
 
                 string json = File.ReadAllText(filePath);
 
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var settings = JsonSerializer.Deserialize<AppSettings>(json, options);
+                // Use centralized JSON options for consistency
+                var settings = JsonSerializer.Deserialize<AppSettings>(json, TDFShared.Helpers.JsonSerializationHelper.BasicOptions);
 
                 if (settings?.ApiSettings != null)
                 {

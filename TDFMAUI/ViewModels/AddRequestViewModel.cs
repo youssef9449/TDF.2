@@ -18,8 +18,8 @@ namespace TDFMAUI.ViewModels
 {
     public class AddRequestViewModel : INotifyPropertyChanged
     {
-        private readonly IRequestService _requestService;
-        private readonly IAuthService _authService;
+        private readonly TDFMAUI.Services.IRequestService _requestService;
+        private readonly TDFShared.Services.IAuthService _authService;
         private readonly ILogger<AddRequestViewModel> _logger;
 
         private bool _isEditMode;
@@ -163,7 +163,7 @@ namespace TDFMAUI.ViewModels
         public ICommand SubmitRequestCommand { get; }
         public ICommand CancelCommand { get; }
 
-        public AddRequestViewModel(IRequestService requestService, IAuthService authService, ILogger<AddRequestViewModel> logger, RequestResponseDto? existingRequest = null)
+        public AddRequestViewModel(IRequestService requestService, TDFShared.Services.IAuthService authService, ILogger<AddRequestViewModel> logger, RequestResponseDto? existingRequest = null)
         {
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
@@ -312,6 +312,9 @@ namespace TDFMAUI.ViewModels
                     leaveType,
                     StartTime,
                     EndTime);
+
+                // Use shared business rule for business days if needed elsewhere
+                // int businessDays = RequestBusinessRuleService.CalculateBusinessDays(StartDate, EndDate);
 
                 ValidationErrors = errors;
                 return !errors.Any();

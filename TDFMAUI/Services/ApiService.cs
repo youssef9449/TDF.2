@@ -20,7 +20,7 @@ using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Users;
 using TDFShared.DTOs.Common;
 using TDFShared.Enums;
-using TDFShared.Exceptions;
+using TDFShared.Exceptions; // Updated
 using TDFShared.Models.User;
 using TDFShared.Models.Message;
 using System.Net.NetworkInformation;
@@ -29,14 +29,6 @@ using TDFMAUI.Helpers; // Added for DeviceHelper
 
 namespace TDFMAUI.Services
 {
-    // Adding NetworkUnavailableException class to fix CS0246
-    public class NetworkUnavailableException : Exception
-    {
-        public NetworkUnavailableException() : base("Network is unavailable") { }
-        public NetworkUnavailableException(string message) : base(message) { }
-        public NetworkUnavailableException(string message, Exception innerException) : base(message, innerException) { }
-    }
-
     /// <summary>
     /// Service for communicating with the API.
     ///

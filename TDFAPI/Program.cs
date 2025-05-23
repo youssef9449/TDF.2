@@ -23,12 +23,12 @@ using System.Linq;
 using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
 using MediatR;
-using FluentValidation.AspNetCore;
-using StackExchange.Redis;
 using TDFShared.Models.Message;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.AspNetCore.HttpOverrides;
 using TDFShared.Constants;
+using TDFShared.DependencyInjection;
+using TDFShared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -548,6 +548,12 @@ builder.Services.AddSingleton<WebSocketConnectionManager>();
 // Add EventMediator as a singleton
 builder.Services.AddSingleton<TDFAPI.Messaging.Interfaces.IEventMediator, EventMediator>();
 
+// Register API-specific services
+builder.Services.AddApiServices();
+
+// Register AuthService with the shared interface
+builder.Services.AddScoped<TDFShared.Services.IAuthService, AuthService>();
+
 // Register repositories with connection retry policy
 builder.Services.AddScoped(provider =>
     new SqlConnectionFactory(IniConfiguration.ConnectionString));
@@ -563,13 +569,12 @@ builder.Services.AddScoped<IRequestRepository, RequestRepository>();
 builder.Services.AddScoped<IRevokedTokenRepository, RevokedTokenRepository>();
 
 // Register all services as scoped for consistent lifetime management
-builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IUserPresenceService, UserPresenceService>();
-builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<TDFShared.Services.INotificationService, NotificationService>();
 
 // Add background services
 builder.Services.AddHostedService<UserInactivityBackgroundService>();
@@ -857,7 +862,7 @@ app.Map("/ws", async context =>
 
         // Get required services
         var wsManager = app.Services.GetRequiredService<WebSocketConnectionManager>();
-        var notificationService = app.Services.GetRequiredService<INotificationService>();
+        var notificationService = app.Services.GetRequiredService<TDFShared.Services.INotificationService>();
 
         // Create a connection object
         var connection = new WebSocketConnectionEntity

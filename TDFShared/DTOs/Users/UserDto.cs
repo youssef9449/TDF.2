@@ -43,6 +43,16 @@ namespace TDFShared.DTOs.Users
         public string Title { get; set; } = string.Empty;
         
         /// <summary>
+        /// User's last login date
+        /// </summary>
+        public DateTime? LastLoginDate { get; set; }
+
+        /// <summary>
+        /// User's last login IP address
+        /// </summary>
+        public string? LastLoginIp { get; set; }
+        
+        /// <summary>
         /// Flag indicating if the user account is active
         /// </summary>
         [JsonPropertyName("isActive")]

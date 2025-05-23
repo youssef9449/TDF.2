@@ -7,18 +7,12 @@ using Microsoft.Extensions.Logging;
 
 namespace TDFAPI.Repositories
 {
-    public class RevokedTokenRepository : IRevokedTokenRepository
+    public class RevokedTokenRepository(ApplicationDbContext context, ILogger<RevokedTokenRepository> logger) : IRevokedTokenRepository
     {
-        private readonly ApplicationDbContext _context;
-        private readonly ILogger<RevokedTokenRepository> _logger;
+        private readonly ApplicationDbContext _context = context;
+        private readonly ILogger<RevokedTokenRepository> _logger = logger;
 
-        public RevokedTokenRepository(ApplicationDbContext context, ILogger<RevokedTokenRepository> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
-
-        public async Task AddAsync(string jti, DateTime expiryDateUtc)
+        public async Task AddAsync(string jti, DateTime expiryDateUtc, int? userId = null)
         {
             if (string.IsNullOrWhiteSpace(jti))
             {
@@ -27,17 +21,19 @@ namespace TDFAPI.Repositories
             }
 
             // Check if already exists to prevent duplicate primary key errors
-            var exists = await _context.RevokedTokens.AnyAsync(rt => rt.Jti == jti);
+            var exists = await _context.RevokedTokens.AnyAsync(rt => rt.Jti == jti && rt.ExpiryDate > DateTime.UtcNow);
             if (!exists)
             {
                 var revokedToken = new RevokedToken
                 {
                     Jti = jti,
-                    ExpiryDateUtc = expiryDateUtc
+                    ExpiryDate = expiryDateUtc,
+                    UserId = userId,
+                    RevocationDate = DateTime.UtcNow
                 };
                 await _context.RevokedTokens.AddAsync(revokedToken);
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Added token JTI {Jti} to revocation list.", jti);
+                _logger.LogInformation("Added token JTI {Jti} for user {UserId} to revocation list.", jti, userId?.ToString() ?? "unknown");
             }
             else
             {
@@ -70,7 +66,7 @@ namespace TDFAPI.Repositories
             {
                 var now = DateTime.UtcNow;
                 var expiredTokens = await _context.RevokedTokens
-                                                .Where(rt => rt.ExpiryDateUtc < now)
+                                                .Where(rt => rt.ExpiryDate < now)
                                                 .ToListAsync();
 
                 if (expiredTokens.Any())

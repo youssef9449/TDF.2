@@ -18,6 +18,14 @@ namespace TDFShared.Services
     public delegate Task<bool> ConflictingRequestsDelegate(int userId, DateTime startDate, DateTime endDate, int ignoredRequestId = 0);
 
     /// <summary>
+    /// Delegate for checking leave balance.
+    /// </summary>
+    /// <param name="userId">The ID of the user.</param>
+    /// <param name="leaveType">The type of leave.</param>
+    /// <returns>The leave balance for the specified type.</returns>
+    public delegate Task<int> GetLeaveBalanceDelegate(int userId, LeaveType leaveType);
+
+    /// <summary>
     /// Centralized validation service for requests. Contains all business rules and validation logic.
     /// </summary>
     public static class RequestValidationService
@@ -94,7 +102,23 @@ namespace TDFShared.Services
             }
 
             return errors;
-        }        /// <summary>
+        }
+
+        /// <summary>
+        /// Validates leave balance for a request.
+        /// </summary>
+        public static async Task ValidateLeaveBalance(int userId, LeaveType leaveType, int requestedDays, GetLeaveBalanceDelegate getBalance)
+        {
+            if (leaveType != LeaveType.Annual) return;
+
+            int balance = await getBalance(userId, leaveType);
+            if (balance < requestedDays)
+            {
+                throw new BusinessRuleException($"Insufficient {leaveType} leave balance. Available: {balance}, Requested: {requestedDays}");
+            }
+        }
+
+        /// <summary>
         /// Validates a request creation DTO.
         /// </summary>
         public static void ValidateCreateDto(RequestCreateDto request)

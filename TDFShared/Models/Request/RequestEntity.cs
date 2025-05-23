@@ -54,14 +54,23 @@ namespace TDFShared.Models.Request
         public string? RequestCloser { get; set; }
 
         /// <summary>
+        /// Manager who approved the request
+        /// </summary>
+        public int? ManagerApproverId { get; set; }
+
+        /// <summary>
         /// HR department status for the request
         /// </summary>
-        public RequestStatus RequestHRStatus { get; set; } = Enums.RequestStatus.Pending;
+        public RequestStatus RequestHRStatus { get; set; } = RequestStatus.Pending;
 
         /// <summary>
         /// HR person who closed the request
         /// </summary>
         public string? RequestHRCloser { get; set; }
+
+        public int? HRApproverId { get; set; }
+
+        public string? HRRemarks { get; set; }
 
         /// <summary>
         /// Start date of the request period
@@ -88,6 +97,11 @@ namespace TDFShared.Models.Request
         /// Reason provided if the request was rejected
         /// </summary>
         public string? RequestRejectReason { get; set; }
+
+        /// <summary>
+        /// Manager's remarks when approving/rejecting the request
+        /// </summary>
+        public string? ManagerRemarks { get; set; }
 
         /// <summary>
         /// Department of the requesting user

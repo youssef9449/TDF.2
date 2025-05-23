@@ -61,9 +61,6 @@ namespace TDFShared.DTOs.Requests
         /// <summary>Reason for the request</summary>
         public string? RequestReason { get; set; }
         
-        /// <summary>Remarks from updater/approver</summary>
-        public string? Remarks { get; set; } // Optional remarks from updater/approver
-
         /// <summary>Row version for concurrency</summary>
         [JsonPropertyName("rowVersion")]
         public byte[]? RowVersion { get; set; }
@@ -77,11 +74,13 @@ namespace TDFShared.DTOs.Requests
         /// <summary>New status for the request (typically "Approved")</summary>
         [Required]
         [JsonPropertyName("status")]
-        public RequestStatus Status { get; set; } = Enums.RequestStatus.Approved;
+        public RequestStatus Status { get; set; } = RequestStatus.Approved;
 
         /// <summary>Optional comment about the approval</summary>
         [JsonPropertyName("comment")]
         public string? Comment { get; set; }
+                /// <summary>Remarks from updater/approver</summary>
+        public string? ManagerRemarks { get; set; } // Optional remarks from updater/approver
     }
 
     /// <summary>
@@ -188,6 +187,9 @@ namespace TDFShared.DTOs.Requests
         /// <summary>Status of the request</summary>
         [Required]
         public RequestStatus Status { get; set; } = Enums.RequestStatus.Pending;
+
+        /// <summary>HR status of the request</summary>
+        public RequestStatus HRStatus { get; set; } = Enums.RequestStatus.Pending;
         
         /// <summary>Remarks from approver/admin</summary>
         public string? Remarks { get; set; } // Approver/Admin remarks

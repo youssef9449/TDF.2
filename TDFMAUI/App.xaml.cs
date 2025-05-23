@@ -1,5 +1,6 @@
 using TDFMAUI.Pages;
 using TDFMAUI.Services;
+using TDFShared.Services;
 using TDFMAUI.Helpers;
 using System.Collections.ObjectModel;
 using TDFMAUI.Config;
@@ -435,7 +436,7 @@ namespace TDFMAUI
                 // If we have a notification service, mark as seen if appropriate
                 if (Services != null && e.NotificationId > 0)
                 {
-                    var notificationService = Services.GetService<INotificationService>();
+                    var notificationService = Services.GetService<TDFMAUI.Services.INotificationService>();
                     if (notificationService != null && CurrentUser != null)
                     {
                         // Fire and forget - don't block the UI

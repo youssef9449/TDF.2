@@ -17,6 +17,16 @@ namespace TDFShared.Enums
         /// Request has been approved
         /// </summary>
         Approved,
+
+        /// <summary>
+        /// Request has been approved by manager
+        /// </summary>
+        ManagerApproved,
+
+        /// <summary>
+        /// Request has been approved by HR
+        /// </summary>
+        HRApproved,
         
         /// <summary>
         /// Request has been rejected

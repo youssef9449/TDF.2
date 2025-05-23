@@ -48,6 +48,7 @@ namespace TDFAPI.Repositories
     public class UserAuthData
     {
         public int UserId { get; set; }
+        public int FailedLoginAttempts { get; set; }
         public string PasswordHash { get; set; } = string.Empty;
         public string PasswordSalt { get; set; } = string.Empty;
         public string RefreshToken { get; set; } = string.Empty;

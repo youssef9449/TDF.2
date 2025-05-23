@@ -13,6 +13,7 @@ using TDFMAUI.Features.Admin;
 using CommunityToolkit.Maui;
 using System.Diagnostics;
 using TDFShared.Constants;
+using TDFShared.DependencyInjection;
 
 
 namespace TDFMAUI
@@ -179,7 +180,10 @@ namespace TDFMAUI
             });
 #endif
 
-            // Register services
+            // Register MAUI-specific services
+            builder.Services.AddMauiServices();
+
+            // Register core services
             builder.Services.AddSingleton<WebSocketService>();
             builder.Services.AddSingleton<IWebSocketService>(sp => sp.GetRequiredService<WebSocketService>());
             builder.Services.AddSingleton<ApiService>();
@@ -213,9 +217,10 @@ namespace TDFMAUI
             // Register RequestService
             builder.Services.AddTransient<IRequestService, RequestService>();
 
-            // Register AuthService (Assuming implementation exists)
-            builder.Services.AddSingleton<IAuthService, AuthService>();
+            // Register AuthService with fully qualified interface name
+            builder.Services.AddSingleton<TDFShared.Services.IAuthService, AuthService>();
 
+            
             // Register NotificationService hierarchy
             builder.Services.AddSingleton<IPlatformNotificationService, PlatformNotificationService>();
             builder.Services.AddSingleton<NotificationService>();

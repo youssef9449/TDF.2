@@ -5,17 +5,19 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using TDFShared.DTOs.Auth;
-using TDFShared.DTOs.Users;
-using TDFShared.DTOs.Common;
-using TDFShared.Enums;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.Maui.ApplicationModel;
 using TDFMAUI.Config;
 using TDFMAUI.Helpers;
-using Microsoft.Maui.Controls;
-using Microsoft.Maui.ApplicationModel;
+using TDFShared.DTOs.Auth;
+using TDFShared.DTOs.Common;
+using TDFShared.DTOs.Users;
+using TDFShared.Enums;
+using TDFShared.Services;
 
 namespace TDFMAUI.Services;
 
@@ -73,7 +75,7 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task<UserDetailsDto?> LoginAsync(string username, string password)
+    public async Task<TokenResponse?> LoginAsync(string username, string password)
     {
         var loginRequest = new { UserName = username, Password = password };
         var uri = $"{_baseApiUrl}/auth/login";
@@ -112,7 +114,7 @@ public class AuthService : IAuthService
                             IsAdmin = apiResponse.Data.IsAdmin,
                             IsManager = apiResponse.Data.IsManager,
                             IsHR = apiResponse.Data.IsHR,
-                            Roles = new List<string>()
+                            Roles = new()
                         };
 
                         // Add roles based on bit fields
@@ -121,7 +123,7 @@ public class AuthService : IAuthService
                         if (apiResponse.Data.IsHR) userDetails.Roles.Add("HR");
                         
                         // Add Employee role by default if no other roles are present
-                        if (!userDetails.Roles.Any())
+                        if (userDetails.Roles.Count == 0)
                         {
                             userDetails.Roles.Add("Employee");
                         }
@@ -133,7 +135,7 @@ public class AuthService : IAuthService
                         _logger.LogInformation("User {Username} logged in with roles: {Roles}", 
                             username, string.Join(", ", userDetails.Roles));
 
-                        return userDetails;
+                        return apiResponse.Data;
                     }
 
                     _logger.LogWarning("ApiResponse<TokenResponse> format succeeded but data or token was null/empty");
@@ -153,18 +155,37 @@ public class AuthService : IAuthService
                             // Ensure all properties are properly initialized
                             loginResponse.UserDetails.FullName ??= string.Empty;
                             loginResponse.UserDetails.UserName ??= string.Empty;
-                            loginResponse.UserDetails.Roles ??= new List<string>();
+                            loginResponse.UserDetails.Roles ??= new();
 
                             // Add Employee role by default if no roles are present
-                            if (!loginResponse.UserDetails.Roles.Any())
+                            if (loginResponse.UserDetails.Roles.Count == 0)
                             {
                                 loginResponse.UserDetails.Roles.Add("Employee");
                             }
 
-                            DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
+DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
                             await _secureStorageService.SaveTokenAsync(loginResponse.Token, expiration);
                             _userProfileService.SetUserDetails(loginResponse.UserDetails);
-                            return loginResponse.UserDetails;
+                            
+                            // Create and return TokenResponse
+                            return new TokenResponse
+                            {
+                                Token = loginResponse.Token,
+                                Expiration = expiration,
+                                UserId = loginResponse.UserDetails.UserId,
+                                Username = loginResponse.UserDetails.UserName,
+                                FullName = loginResponse.UserDetails.FullName,
+                                IsAdmin = loginResponse.UserDetails.IsAdmin,
+                                IsManager = loginResponse.UserDetails.IsManager,
+                                IsHR = loginResponse.UserDetails.IsHR,
+                                User = new UserDto
+                                {
+                                    UserID = loginResponse.UserDetails.UserId,
+                                    Username = loginResponse.UserDetails.UserName,
+                                    FullName = loginResponse.UserDetails.FullName,
+                                    Department = loginResponse.UserDetails.Department
+                                }
+                            };
                         }
                     }
                     catch (JsonException innerEx)
@@ -204,14 +225,15 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task LogoutAsync()
+    /// <inheritdoc />
+    public async Task<bool> LogoutAsync()
     {
         _logger.LogInformation("Logging out user.");
+        bool success = true;
 
         try
         {
             // Try to update user status to Offline before clearing credentials
-            // This needs to be done before clearing user details and token
             if (App.CurrentUser != null)
             {
                 try
@@ -231,6 +253,7 @@ public class AuthService : IAuthService
                 catch (Exception statusEx)
                 {
                     _logger.LogError(statusEx, "Failed to update user status to Offline during logout");
+                    success = false;
                     // Continue with logout even if status update fails
                 }
             }
@@ -247,23 +270,32 @@ public class AuthService : IAuthService
             catch (Exception apiEx)
             {
                 _logger.LogError(apiEx, "Failed to call logout API endpoint");
+                success = false;
                 // Continue with local logout even if API call fails
             }
 
-            // Clear local user data
-            _userProfileService.ClearUserDetails();
-            await _secureStorageService.RemoveTokenAsync();
+            try
+            {
+                // Clear local user data
+                _userProfileService.ClearUserDetails();
+                await _secureStorageService.RemoveTokenAsync();
 
-            // Navigate back to the login page after logout
-            // Using Shell navigation, assuming LoginPage is registered with the route "//LoginPage"
-            // The double slash ensures navigation from the root, replacing the current navigation stack.
-            await Shell.Current.GoToAsync("//LoginPage");
-            _logger.LogInformation("Navigated to LoginPage after logout.");
+                // Navigate back to the login page after logout
+                await Shell.Current.GoToAsync("//LoginPage");
+                _logger.LogInformation("Navigated to LoginPage after logout.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to navigate to LoginPage after logout.");
+                success = false;
+            }
+
+            return success;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to navigate to LoginPage after logout.");
-            // Consider alternative actions if navigation fails (e.g., displaying an error)
+            _logger.LogError(ex, "Unexpected error during logout");
+            return false;
         }
     }
 
@@ -286,86 +318,52 @@ public class AuthService : IAuthService
                 }
             }
 
+
             var (token, _) = await _secureStorageService.GetTokenAsync();
             if (string.IsNullOrEmpty(token))
             {
-                _logger.LogWarning("No authentication token found.");
-                return 0; // Indicate no authenticated user
+                _logger.LogWarning("No authentication token found");
+                return 0;
             }
 
             var handler = new JwtSecurityTokenHandler();
             if (handler.CanReadToken(token))
             {
                 var jwtToken = handler.ReadJwtToken(token);
-                var userIdClaim = jwtToken.Claims.FirstOrDefault(claim => claim.Type == ClaimTypes.NameIdentifier || claim.Type == "sub" || claim.Type == "nameid");
+                var userIdClaim = jwtToken.Claims.FirstOrDefault(claim => 
+                    claim.Type == ClaimTypes.NameIdentifier || 
+                    claim.Type == "sub" || 
+                    claim.Type == "nameid");
 
                 if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
                 {
-                     _logger.LogInformation("Successfully retrieved User ID {UserId} from token.", userId);
+                    _logger.LogInformation("Successfully retrieved User ID {UserId} from token", userId);
                     return userId;
                 }
-                else
-                {
-                    _logger.LogWarning("Token does not contain a valid User ID claim (NameIdentifier/sub).");
-                }
+                
+                _logger.LogWarning("Token does not contain a valid user ID claim");
             }
             else
             {
-                 _logger.LogWarning("Stored token is not a valid JWT format.");
+                _logger.LogWarning("Stored token is not a valid JWT format");
             }
         }
         catch (Exception ex)
         {
-             _logger.LogError(ex, "Error retrieving or parsing token for User ID.");
+            _logger.LogError(ex, "Error retrieving or parsing token for user ID");
         }
-
-        return 0; // Indicate failure or no authenticated user
-    }
-
-    public async Task<List<string>> GetUserRolesAsync()
-    {
-        var roles = new List<string>();
-        try
-        {
-            var (token, _) = await _secureStorageService.GetTokenAsync();
-            if (string.IsNullOrEmpty(token))
-            {
-                _logger.LogWarning("No authentication token found for getting roles.");
-                return roles; // Return empty list
-            }
-
-            var handler = new JwtSecurityTokenHandler();
-            if (handler.CanReadToken(token))
-            {
-                var jwtToken = handler.ReadJwtToken(token);
-                // Standard claim type for roles is ClaimTypes.Role, but could be custom
-                roles.AddRange(jwtToken.Claims
-                    .Where(claim => claim.Type == ClaimTypes.Role || claim.Type == "role") // Check common role claim types
-                    .Select(claim => claim.Value));
-
-                _logger.LogInformation("Retrieved roles from token: {Roles}", string.Join(", ", roles));
-            }
-            else
-            {
-                _logger.LogWarning("Stored token is not a valid JWT format for getting roles.");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving or parsing token for User Roles.");
-        }
-        return roles;
+        
+        return 0;
     }
 
     public async Task<string?> GetCurrentUserDepartmentAsync()
     {
-        string? department = null;
         try
         {
             var (token, _) = await _secureStorageService.GetTokenAsync();
             if (string.IsNullOrEmpty(token))
             {
-                _logger.LogWarning("No authentication token found for getting department.");
+                _logger.LogWarning("No authentication token found for getting department");
                 return null;
             }
 
@@ -373,28 +371,83 @@ public class AuthService : IAuthService
             if (handler.CanReadToken(token))
             {
                 var jwtToken = handler.ReadJwtToken(token);
-                // Look for a 'department' claim (this might be custom)
-                department = jwtToken.Claims.FirstOrDefault(claim => claim.Type == "department")?.Value;
-
-                if (!string.IsNullOrEmpty(department))
+                var departmentClaim = jwtToken.Claims
+                    .FirstOrDefault(c => c.Type == "department" || c.Type == "dept");
+                
+                if (departmentClaim != null)
                 {
-                     _logger.LogInformation("Retrieved department from token: {Department}", department);
+                    _logger.LogDebug("Found department claim: {Department}", departmentClaim.Value);
+                    return departmentClaim.Value;
                 }
-                else
-                {
-                    _logger.LogWarning("Token does not contain a 'department' claim.");
-                }
+                
+                _logger.LogWarning("No department claim found in token");
             }
             else
             {
-                _logger.LogWarning("Stored token is not a valid JWT format for getting department.");
+                _logger.LogWarning("Stored token is not a valid JWT format");
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving or parsing token for User Department.");
+            _logger.LogError(ex, "Error retrieving user department from token");
         }
-        return department;
+        
+        return null;
+    }
+
+    public async Task RevokeTokenAsync(string jti, DateTime expiryDateUtc, int? userId = null)
+    {
+        _ = jti ?? throw new ArgumentNullException(nameof(jti));
+        
+        try
+        {
+            // In MAUI client, we'll just remove the token from secure storage
+            // The actual token revocation will be handled by the API
+            await _secureStorageService.RemoveTokenAsync();
+            _logger.LogInformation("Token revoked (JTI: {Jti}, UserId: {UserId})", jti, userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error revoking token (JTI: {Jti})", jti);
+            throw; // Re-throw to allow callers to handle the error
+        }
+    }
+
+    public async Task<IReadOnlyList<string>> GetUserRolesAsync()
+    {
+        var roles = new List<string>();
+        const string roleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role";
+        
+        try
+        {
+            var (token, _) = await _secureStorageService.GetTokenAsync();
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger.LogWarning("No authentication token found for getting roles");
+                return roles.AsReadOnly();
+            }
+
+            var handler = new JwtSecurityTokenHandler();
+            if (handler.CanReadToken(token))
+            {
+                var jwtToken = handler.ReadJwtToken(token);
+                var roleClaims = jwtToken.Claims
+                    .Where(c => c.Type == "role" || c.Type == ClaimTypes.Role || c.Type == roleClaimType);
+                
+                roles = roleClaims.Select(c => c.Value).Distinct().ToList();
+                _logger.LogDebug("Found {RoleCount} roles in token", roles.Count);
+            }
+            else
+            {
+                _logger.LogWarning("Stored token is not a valid JWT format");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving user roles from token");
+        }
+        
+        return roles.AsReadOnly();
     }
 
     public async Task<UserDto> GetCurrentUserAsync()
@@ -427,7 +480,7 @@ public class AuthService : IAuthService
             _logger.LogInformation("Getting user details for user {UserId}", userId);
 
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            var token = (await _secureStorageService.GetTokenAsync()).Item1;
+            var (token, _) = await _secureStorageService.GetTokenAsync().ConfigureAwait(false);
             if (!string.IsNullOrEmpty(token))
             {
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -442,8 +495,10 @@ public class AuthService : IAuthService
             }
             else
             {
-                _logger.LogWarning("Failed to retrieve user details for {UserId}. Status: {StatusCode}",
-                    userId, response.StatusCode);
+                _logger.LogWarning(
+                    "Failed to retrieve user details for {UserId}. Status: {StatusCode}",
+                    userId, 
+                    response.StatusCode);
                 return null;
             }
         }
@@ -454,6 +509,165 @@ public class AuthService : IAuthService
         }
     }
 
-    // Implement other IAuthService methods if they exist
-    // e.g., IsUserAuthenticatedAsync, LoginAsync, LogoutAsync
+    public async Task<TokenResponse?> RefreshTokenAsync(string token, string refreshToken)
+    {
+        _logger.LogInformation("Attempting to refresh token");
+        
+        try
+        {
+            var refreshRequest = new { Token = token, RefreshToken = refreshToken };
+            var uri = $"{_baseApiUrl}/auth/refresh-token";
+            
+            var response = await _httpClient.PostAsJsonAsync(uri, refreshRequest, _serializerOptions);
+            response.EnsureSuccessStatusCode();
+            
+            var tokenResponse = await response.Content.ReadFromJsonAsync<ApiResponse<TokenResponse>>(_serializerOptions);
+            
+            if (tokenResponse?.Data != null)
+            {
+                await _secureStorageService.SaveTokenAsync(tokenResponse.Data.Token, tokenResponse.Data.Expiration);
+                _logger.LogInformation("Token refreshed successfully");
+                return tokenResponse.Data;
+            }
+            
+            _logger.LogWarning("Token refresh response did not contain valid data");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing token");
+            return null;
+        }
+    }
+
+    public string GenerateJwtToken(UserDto user)
+    {
+        _logger.LogInformation("Generating JWT token for user {UserId}", user.UserID);
+        
+        // Note: In a real application, this would generate a JWT token on the client side
+        // This is typically done on the server side, so this is a simplified version
+        // that just returns a mock token for demonstration purposes
+        
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var key = System.Text.Encoding.ASCII.GetBytes("your-secret-key-here"); // Should be stored securely
+        
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
+            new Claim(ClaimTypes.Name, user.Username ?? string.Empty)
+        };
+
+        // Add roles if available
+        if (user.Roles != null)
+        {
+            foreach (var role in user.Roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+        }
+
+        var tokenDescriptor = new Microsoft.IdentityModel.Tokens.SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Expires = DateTime.UtcNow.AddHours(24),
+            SigningCredentials = new Microsoft.IdentityModel.Tokens.SigningCredentials(
+                new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(key), 
+                Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256Signature)
+        };
+        
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
+    }
+
+    public string HashPassword(string password, out string salt)
+    {
+        using var deriveBytes = new System.Security.Cryptography.Rfc2898DeriveBytes(
+            password, 
+            16, // Salt size
+            10000, // Iteration count
+            System.Security.Cryptography.HashAlgorithmName.SHA256);
+            
+        var hash = Convert.ToBase64String(deriveBytes.GetBytes(32)); // 32 bytes = 256 bits
+        salt = Convert.ToBase64String(deriveBytes.Salt);
+        
+        _logger.LogDebug("Password hashed successfully");
+        return hash;
+    }
+
+    public bool VerifyPassword(string password, string storedHash, string salt)
+    {
+        try
+        {
+            var saltBytes = Convert.FromBase64String(salt);
+            
+            using var deriveBytes = new System.Security.Cryptography.Rfc2898DeriveBytes(
+                password,
+                saltBytes,
+                10000, // Must match the iteration count used in HashPassword
+                System.Security.Cryptography.HashAlgorithmName.SHA256);
+                
+            var testHash = Convert.ToBase64String(deriveBytes.GetBytes(32));
+            
+            bool isValid = testHash == storedHash;
+            if (!isValid)
+            {
+                _logger.LogWarning("Password verification failed");
+            }
+            
+            return isValid;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verifying password");
+            return false;
+        }
+    }
+
+    public async Task RevokeTokenAsync(string jti, DateTime expiryDateUtc)
+    {
+        _logger.LogInformation("Revoking token with JTI: {Jti}", jti);
+        
+        try
+        {
+            var uri = $"{_baseApiUrl}/auth/revoke-token";
+            var request = new { Jti = jti, ExpiryDateUtc = expiryDateUtc };
+            
+            var response = await _httpClient.PostAsJsonAsync(uri, request, _serializerOptions);
+            response.EnsureSuccessStatusCode();
+            
+            _logger.LogInformation("Token revoked successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error revoking token with JTI: {Jti}", jti);
+            throw;
+        }
+    }
+
+    public async Task<bool> IsTokenRevokedAsync(string jti)
+    {
+        _logger.LogDebug("Checking if token with JTI is revoked: {Jti}", jti);
+        
+        try
+        {
+            var uri = $"{_baseApiUrl}/auth/is-token-revoked/{Uri.EscapeDataString(jti)}";
+            
+            var response = await _httpClient.GetAsync(uri);
+            response.EnsureSuccessStatusCode();
+            
+            var result = await response.Content.ReadFromJsonAsync<ApiResponse<bool>>(_serializerOptions);
+            
+            if (result?.Data == true)
+            {
+                _logger.LogInformation("Token with JTI {Jti} is revoked", jti);
+            }
+            
+            return result?.Data ?? false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking if token with JTI {Jti} is revoked", jti);
+            return true; // Default to considering token as revoked if there's an error
+        }
+    }
 }

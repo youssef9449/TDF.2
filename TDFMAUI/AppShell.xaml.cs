@@ -1,4 +1,4 @@
-﻿using TDFMAUI.Pages;
+using TDFMAUI.Pages;
 using TDFMAUI.Features.Auth;
 using TDFMAUI.Services;
 using System.ComponentModel;
@@ -9,6 +9,7 @@ using TDFMAUI.Features.Requests;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Devices;
 using TDFMAUI.Helpers;
+using TDFShared.Services;
 
 namespace TDFMAUI
 {

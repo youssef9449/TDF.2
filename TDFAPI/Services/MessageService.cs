@@ -5,6 +5,7 @@ using TDFShared.DTOs.Messages;
 using TDFShared.DTOs.Common;
 using TDFShared.Models.Message;
 using TDFShared.Enums;
+using TDFShared.Services;
 
 namespace TDFAPI.Services
 {

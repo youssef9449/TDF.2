@@ -6,10 +6,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Threading;
+using TDFAPI.Services;
 using TDFShared.Enums;
 using TDFShared.Models.Message;
-using TDFAPI.Services;
 using Microsoft.Extensions.Hosting;
 using TDFAPI.Extensions;
 
@@ -56,7 +55,7 @@ namespace TDFAPI.Middleware
                 {
                     context.Response.StatusCode = 403; // Forbidden
                     await context.Response.WriteAsync("Connection from unknown location detected");
-                    _logger.LogWarning("Blocked suspicious WebSocket connection attempt for user {UserId} from IP {IP}", 
+                    _logger.LogWarning("Blocked suspicious WebSocket connection attempt for user {UserId} from IP {IP}",
                         userId, context.GetRealIpAddress());
                     return;
                 }
@@ -71,8 +70,8 @@ namespace TDFAPI.Middleware
                     UserId = userId,
                     Username = await GetUsernameFromUserIdAsync(userId),
                     ConnectedAt = DateTime.UtcNow,
-                    MachineName = context.Request.Headers.ContainsKey("User-Agent") 
-                        ? context.Request.Headers["User-Agent"].ToString() 
+                    MachineName = context.Request.Headers.ContainsKey("User-Agent")
+                        ? context.Request.Headers["User-Agent"].ToString()
                         : "Unknown"
                 };
 
@@ -93,15 +92,15 @@ namespace TDFAPI.Middleware
             {
                 // Set up a timeout for idle connections
                 cts.CancelAfter(TimeSpan.FromMinutes(30)); // 30 minutes max lifetime
-                
+
                 // Use the notification service to handle the WebSocket connection
                 using (var scope = _serviceProvider.CreateScope())
                 {
-                    var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
-                    
+                    var notificationService = scope.ServiceProvider.GetRequiredService<TDFShared.Services.INotificationService>();
+
                     // Create a task to monitor for unexpected disconnection
                     var connectionTask = notificationService.HandleUserConnectionAsync(connection, webSocket);
-                    
+
                     // Wait for either task completion or cancellation
                     await connectionTask;
                 }
@@ -112,7 +111,7 @@ namespace TDFAPI.Middleware
             }
             catch (WebSocketException ex)
             {
-                _logger.LogWarning(ex, "WebSocket error for user {UserId}: {Message}", 
+                _logger.LogWarning(ex, "WebSocket error for user {UserId}: {Message}",
                     connection.UserId, ex.Message);
             }
             catch (Exception ex)
@@ -136,7 +135,7 @@ namespace TDFAPI.Middleware
                         _logger.LogWarning(ex, "Error closing WebSocket for user {UserId}", connection.UserId);
                     }
                 }
-                
+
                 // Notify services about disconnection
                 try
                 {
@@ -146,7 +145,7 @@ namespace TDFAPI.Middleware
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Error updating user status on WebSocket closure for user {UserId}", 
+                    _logger.LogWarning(ex, "Error updating user status on WebSocket closure for user {UserId}",
                         connection.UserId);
                 }
             }
@@ -157,8 +156,8 @@ namespace TDFAPI.Middleware
             try
             {
                 // Try to get userId from query string only in development environment
-                if (_environment.IsDevelopment() && 
-                    context.Request.Query.TryGetValue("userId", out var userIdStr) && 
+                if (_environment.IsDevelopment() &&
+                    context.Request.Query.TryGetValue("userId", out var userIdStr) &&
                     int.TryParse(userIdStr, out var testUserId))
                 {
                     return (testUserId, true, null);
@@ -169,13 +168,13 @@ namespace TDFAPI.Middleware
                 {
                     return (-1, false, "Authentication required");
                 }
-                
+
                 var userIdClaim = context.User.FindFirst("sub") ?? context.User.FindFirst("userId");
                 if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
                 {
                     return (-1, false, "Invalid user identity");
                 }
-                
+
                 return (userId, true, null);
             }
             catch (Exception ex)
@@ -189,26 +188,26 @@ namespace TDFAPI.Middleware
         {
             if (string.IsNullOrEmpty(ipAddress))
                 return false;
-            
+
             // In development environment, always allow connections
             if (_environment.IsDevelopment())
             {
-                _logger.LogWarning("Allowing WebSocket connection in development mode for user {UserId} from IP {IP}", 
+                _logger.LogWarning("Allowing WebSocket connection in development mode for user {UserId} from IP {IP}",
                     userId, ipAddress);
                 return true;
             }
-            
+
             try
             {
                 using var scope = _serviceProvider.CreateScope();
                 var userRepository = scope.ServiceProvider.GetRequiredService<Repositories.IUserRepository>();
-                
+
                 // Check if this IP has been used by this user recently
                 return await userRepository.IsKnownIpAddressAsync(userId, ipAddress);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error validating user connection for user {UserId} from IP {IP}", 
+                _logger.LogError(ex, "Error validating user connection for user {UserId} from IP {IP}",
                     userId, ipAddress);
                 // Default to DENYING the connection if we can't validate for security
                 return false;
@@ -240,13 +239,13 @@ namespace TDFAPI.Middleware
                 string status = "Online";
                 string statusMessage = null;
 
-                if (root.TryGetProperty("status", out var statusElement) && 
+                if (root.TryGetProperty("status", out var statusElement) &&
                     statusElement.ValueKind == JsonValueKind.String)
                 {
                     status = statusElement.GetString();
                 }
-                
-                if (root.TryGetProperty("statusMessage", out var messageElement) && 
+
+                if (root.TryGetProperty("statusMessage", out var messageElement) &&
                     messageElement.ValueKind == JsonValueKind.String)
                 {
                     statusMessage = messageElement.GetString();
@@ -265,7 +264,7 @@ namespace TDFAPI.Middleware
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error handling presence update for user {UserId}: {Message}", 
+                _logger.LogError(ex, "Error handling presence update for user {UserId}: {Message}",
                     connection.UserId, ex.Message);
             }
         }
@@ -276,8 +275,8 @@ namespace TDFAPI.Middleware
             {
                 bool isAvailable = true;
 
-                if (root.TryGetProperty("isAvailable", out var availableElement) && 
-                    (availableElement.ValueKind == JsonValueKind.True || 
+                if (root.TryGetProperty("isAvailable", out var availableElement) &&
+                    (availableElement.ValueKind == JsonValueKind.True ||
                      availableElement.ValueKind == JsonValueKind.False))
                 {
                     isAvailable = availableElement.GetBoolean();
@@ -288,7 +287,7 @@ namespace TDFAPI.Middleware
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error handling chat availability update for user {UserId}: {Message}", 
+                _logger.LogError(ex, "Error handling chat availability update for user {UserId}: {Message}",
                     connection.UserId, ex.Message);
             }
         }

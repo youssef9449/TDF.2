@@ -215,6 +215,38 @@ namespace TDFAPI.Data
                 // Ignore SortOrder property as it's not in the database
                 entity.Ignore(e => e.SortOrder);
             });
+
+            // Configure RevokedTokens entity
+            builder.Entity<RevokedToken>(entity =>
+            {
+                entity.ToTable("RevokedTokens");
+                
+                entity.Property(e => e.Jti)
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .IsUnicode(false);
+                    
+                entity.Property(e => e.ExpiryDate)
+                    .IsRequired()
+                    .HasColumnType("datetime2");
+                    
+                entity.Property(e => e.RevocationDate)
+                    .IsRequired()
+                    .HasColumnType("datetime2")
+                    .HasDefaultValueSql("getutcdate()");
+                    
+                entity.Property(e => e.Reason)
+                    .HasMaxLength(255)
+                    .IsUnicode(false);
+                    
+                // Index for faster lookups by JTI
+                entity.HasIndex(e => e.Jti)
+                    .HasDatabaseName("IX_RevokedTokens_Jti");
+                    
+                // Index for cleanup of expired tokens
+                entity.HasIndex(e => e.ExpiryDate)
+                    .HasDatabaseName("IX_RevokedTokens_ExpiryDate");
+            });
         }
     }
 }

@@ -6,7 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Controls;
 using TDFMAUI.Features.Requests;
-using TDFMAUI.Services;
+// Using TDFShared.Services instead of TDFMAUI.Services to resolve ambiguous references
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Users;
 using TDFShared.Enums;
@@ -104,26 +104,16 @@ namespace TDFMAUI.ViewModels
                 return;
             }
 
-            // Check if request is pending and if user is the owner
             bool isOwner = Request.RequestUserID == currentUser.UserID;
-            bool isPending = Request.Status == RequestStatus.Pending;
+            bool isAdmin = currentUser.IsAdmin == true;
+            bool isHR = currentUser.IsHR == true;
+            bool isManager = currentUser.IsManager == true;
 
-            // Use RequestAuthorizationService to determine edit/delete permissions
-            CanEdit = isOwner && isPending;  // Only owner can edit their pending requests
-            CanDelete = isOwner && isPending;  // Only owner can delete their pending requests
-            if (currentUser.IsAdmin == true)  // Admin override
-            {
-                CanEdit = CanDelete = true;
-            }
-
-            // Approval/Rejection permissions using RequestAuthorizationService
-            bool isManagerOfRequestDept = currentUser.IsManager == true && currentUser.Department == Request.RequestDepartment;
-            
-            // Base approval/rejection rights on role combination
-            CanApprove = CanReject = !isOwner && isPending &&  // Can't approve/reject own requests, must be pending
-                        (currentUser.IsAdmin == true ||         // Admin can approve/reject any
-                         currentUser.IsHR == true ||           // HR can approve/reject any
-                         (currentUser.IsManager == true && isManagerOfRequestDept)); // Managers only their department
+            // Use shared business rule service for state checks
+            CanEdit = isOwner && RequestBusinessRuleService.CanEdit(Request.Status, Request.HRStatus);
+            CanDelete = isOwner && RequestBusinessRuleService.CanDelete(Request.Status, Request.HRStatus);
+            CanApprove = !isOwner && RequestBusinessRuleService.CanApprove(Request.Status, Request.HRStatus, isHR);
+            CanReject = !isOwner && RequestBusinessRuleService.CanReject(Request.Status, Request.HRStatus, isHR);
         }
 
         [RelayCommand]

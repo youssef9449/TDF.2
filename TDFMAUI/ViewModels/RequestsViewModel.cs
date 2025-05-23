@@ -19,8 +19,8 @@ namespace TDFMAUI.ViewModels
 {
     public partial class RequestsViewModel : ObservableObject
     {
-        private readonly IRequestService _requestService;
-        private readonly IAuthService _authService;
+        private readonly TDFMAUI.Services.IRequestService _requestService;
+        private readonly TDFShared.Services.IAuthService _authService;
         private readonly ILogger<RequestsViewModel> _logger;
 
         [ObservableProperty]
@@ -58,7 +58,7 @@ namespace TDFMAUI.ViewModels
         public List<string> TypeOptions => RequestOptions.TypeOptions;
         public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
 
-        public RequestsViewModel(IRequestService requestService, IAuthService authService, ILogger<RequestsViewModel> logger)
+        public RequestsViewModel(TDFMAUI.Services.IRequestService requestService, TDFShared.Services.IAuthService authService, ILogger<RequestsViewModel> logger)
         {
             _requestService = requestService;
             _authService = authService;

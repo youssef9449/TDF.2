@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using TDFAPI.Services;
+using TDFShared.Services;
 using TDFShared.DTOs.Messages;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
@@ -31,7 +31,8 @@ namespace TDFAPI.Controllers
             {
                 var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
                 var notifications = await _notificationService.GetUnreadNotificationsAsync(userId);
-                return Ok(ApiResponse<IEnumerable<NotificationDto>>.SuccessResponse(notifications));
+                var notificationDtos = notifications.Select(MapToNotificationDto);
+                return Ok(ApiResponse<IEnumerable<NotificationDto>>.SuccessResponse(notificationDtos));
             }
             catch (Exception ex)
             {
@@ -71,6 +72,18 @@ namespace TDFAPI.Controllers
                 _logger.LogError(ex, "Error broadcasting notification");
                 return StatusCode(500, ApiResponse<bool>.ErrorResponse("Error broadcasting notification"));
             }
+        }
+
+        private NotificationDto MapToNotificationDto(TDFShared.Models.Notification.NotificationEntity entity)
+        {
+            return new NotificationDto
+            {
+                NotificationId = entity.NotificationID,
+                UserId = entity.ReceiverID,
+                Message = entity.Message,
+                Timestamp = entity.Timestamp,
+                IsSeen = entity.IsSeen
+            };
         }
     }
 }

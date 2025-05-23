@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using TDFAPI.Extensions;
 using TDFShared.Constants;
+using TDFShared.Services;
 
 namespace TDFAPI.Controllers
 {
@@ -152,9 +153,9 @@ namespace TDFAPI.Controllers
                 }
 
                 // Sanitize inputs
-                request.FullName = request.FullName?.Trim();
-                request.Department = request.Department?.Trim();
-                request.Title = request.Title?.Trim();
+                request.FullName = string.IsNullOrWhiteSpace(request.FullName) ? string.Empty : request.FullName.Trim();
+                request.Department = string.IsNullOrWhiteSpace(request.Department) ? string.Empty : request.Department.Trim();
+                request.Title = string.IsNullOrWhiteSpace(request.Title) ? string.Empty : request.Title.Trim();
 
                 // Prevent self-assignment of admin privileges for regular registrations
                 request.IsAdmin = false; // Force to false for public registrations
@@ -168,6 +169,10 @@ namespace TDFAPI.Controllers
                 var newUser = await _userService.GetUserDtoByIdAsync(userId);
 
                 _logger.LogInformation("New user registered: {Username}", request.Username);
+                if (newUser == null)
+                {
+                    return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("Failed to retrieve user after registration"));
+                }
                 return Ok(ApiResponse<UserDto>.SuccessResponse(newUser, "User registered successfully"));
             }
             catch (Exception ex)
@@ -201,7 +206,7 @@ namespace TDFAPI.Controllers
                     if (!string.IsNullOrEmpty(jti) && long.TryParse(expiryClaim, out var expiryUnixTime))
                     {
                         var expiryDateTime = DateTimeOffset.FromUnixTimeSeconds(expiryUnixTime).UtcDateTime;
-                        await _authService.RevokeTokenAsync(jti, expiryDateTime);
+                        await _authService.RevokeTokenAsync(jti, expiryDateTime, id);
                         _logger.LogInformation("Revoked access token {Jti} for user {UserId}", jti, id);
                     }
                     else

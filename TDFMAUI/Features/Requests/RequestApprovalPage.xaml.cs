@@ -64,22 +64,28 @@ namespace TDFMAUI.Pages
 
     public partial class RequestApprovalPage : ContentPage
     {
-        private readonly INotificationService _notificationService;
+        private readonly TDFMAUI.Services.INotificationService _notificationService;
+        private readonly TDFMAUI.Services.IRequestService _requestService;
+        private readonly TDFShared.Services.IAuthService _authService;
         private RequestApprovalViewModel _viewModel;
 
         public RequestApprovalPage(
-            INotificationService notificationService,
-            IRequestService requestService)
+            TDFMAUI.Services.INotificationService notificationService,
+            TDFMAUI.Services.IRequestService requestService,
+            TDFShared.Services.IAuthService authService)
         {
             InitializeComponent();
             _notificationService = notificationService;
+            _requestService = requestService;
+            _authService = authService;
+            _authService = authService;
 
             // Add converters as resources
             this.Resources.Add("StatusColorConverter", new StatusColorConverter(this));
             this.Resources.Add("StatusTextColorConverter", new StatusTextColorConverter(this));
 
             // Set the binding context
-            _viewModel = new RequestApprovalViewModel(requestService, notificationService);
+            _viewModel = new RequestApprovalViewModel(_requestService, _notificationService, _authService);
             BindingContext = _viewModel;
 
             // Device-specific config and events

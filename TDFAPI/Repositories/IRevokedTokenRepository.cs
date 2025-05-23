@@ -11,7 +11,8 @@ namespace TDFAPI.Repositories
         /// </summary>
         /// <param name="jti">The JWT ID to revoke.</param>
         /// <param name="expiryDateUtc">The expiry date of the original token.</param>
-        Task AddAsync(string jti, DateTime expiryDateUtc);
+        /// <param name="userId">The ID of the user associated with the token.</param>
+        Task AddAsync(string jti, DateTime expiryDateUtc, int? userId = null);
 
         /// <summary>
         /// Checks if a token identifier (JTI) exists in the revocation list.

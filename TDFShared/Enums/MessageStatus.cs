@@ -26,6 +26,11 @@ namespace TDFShared.Enums
         /// <summary>
         /// Message delivery failed
         /// </summary>
-        Failed = 3
+        Failed = 3,
+
+        /// <summary>
+        /// Message delivery failed
+        /// </summary>
+        Pending = 4
     }
 } 

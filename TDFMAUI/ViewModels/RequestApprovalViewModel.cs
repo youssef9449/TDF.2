@@ -23,9 +23,9 @@ namespace TDFMAUI.ViewModels
 
     public partial class RequestApprovalViewModel : ObservableObject
     {
-        private readonly IRequestService _requestService;
-        private readonly INotificationService _notificationService;
-        private readonly IAuthService _authService;
+        private readonly TDFMAUI.Services.IRequestService _requestService;
+        private readonly TDFMAUI.Services.INotificationService _notificationService;
+        private readonly TDFShared.Services.IAuthService _authService;
 
         [ObservableProperty]
         private ObservableCollection<RequestResponseDto> _requests;
@@ -90,7 +90,7 @@ namespace TDFMAUI.ViewModels
         public bool CanEditDeleteAny => RequestAuthorizationService.CanEditDeleteAny(IsAdmin);
         public bool CanFilterByDepartment => RequestAuthorizationService.CanFilterByDepartment(IsManager);
 
-        public RequestApprovalViewModel(IRequestService requestService, INotificationService notificationService, IAuthService authService)
+        public RequestApprovalViewModel(TDFMAUI.Services.IRequestService requestService, TDFMAUI.Services.INotificationService notificationService, TDFShared.Services.IAuthService authService)
         {
             _title = "Request Approval";
             _requestService = requestService;

@@ -4,6 +4,7 @@ using System;
 using TDFShared.DTOs.Users;
 using TDFShared.DTOs.Common;
 using System.ComponentModel.DataAnnotations;
+using TDFShared.Services;
 
 namespace TDFAPI.Services
 {

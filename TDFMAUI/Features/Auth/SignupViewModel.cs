@@ -63,9 +63,6 @@ namespace TDFMAUI.Features.Auth
         [ObservableProperty]
         private bool _hasError;
 
-        [ObservableProperty]
-        private bool _isLoading;
-
         public SignupViewModel(IApiService apiService, ILookupService lookupService, ILogger<SignupViewModel> logger)
         {
             Debug.WriteLine("[SignupViewModel] Constructor - Start");
@@ -83,41 +80,8 @@ namespace TDFMAUI.Features.Auth
             Debug.WriteLine("[SignupViewModel] LoadLookupsAsync - Start");
             _logger?.LogInformation("DIAGNOSTIC: LoadLookupsAsync - Starting to load departments");
 
-            // Set loading state
-            IsLoading = true;
-
             try
             {
-                // Check network connectivity
-                var networkAccess = Connectivity.NetworkAccess;
-                Debug.WriteLine($"[SignupViewModel] Network connectivity status: {networkAccess}");
-                _logger?.LogInformation("DIAGNOSTIC: Network connectivity status: {NetworkStatus}", networkAccess);
-
-                if (networkAccess != NetworkAccess.Internet)
-                {
-                    Debug.WriteLine($"[SignupViewModel] No internet connectivity. Network status: {networkAccess}");
-                    _logger?.LogWarning("DIAGNOSTIC: No internet connectivity. Network status: {NetworkStatus}", networkAccess);
-
-                    await MainThread.InvokeOnMainThreadAsync(() => {
-                        ErrorMessage = $"No internet connection. Please check your network settings and try again.";
-                        HasError = true;
-                    });
-
-                    await MainThread.InvokeOnMainThreadAsync(() => {
-                        Debug.WriteLine("[SignupViewModel] No network connection available");
-                        _logger?.LogWarning("DIAGNOSTIC: No network connection available for loading departments");
-                        ErrorMessage = "No network connection available. Please check your internet connection and try again.";
-                        HasError = true;
-                        Departments.Clear();
-                    });
-
-                    return;
-                }
-
-                // Skip separate connectivity test - the departments API call will handle connectivity issues
-                Debug.WriteLine("[SignupViewModel] Skipping separate connectivity test, will test connectivity via departments API call");
-                _logger?.LogInformation("DIAGNOSTIC: Skipping separate connectivity test, will test connectivity via departments API call");
-
                 // Load departments directly from API service to bypass LookupService
                 Debug.WriteLine("[SignupViewModel] Loading departments directly from API");
                 _logger?.LogInformation("DIAGNOSTIC: Loading departments directly from API");
@@ -129,48 +93,41 @@ namespace TDFMAUI.Features.Auth
                     Debug.WriteLine("[SignupViewModel] Calling departments API endpoint directly");
                     _logger?.LogInformation("DIAGNOSTIC: Calling departments API endpoint directly using ApiRoutes");
 
-                    // Debug the route construction
-                    string originalRoute = ApiRoutes.Lookups.GetDepartments;
-                    string processedRoute = ApiRoutes.RemoveBasePrefix(originalRoute);
-                    Debug.WriteLine($"[SignupViewModel] Original route: {originalRoute}");
-                    Debug.WriteLine($"[SignupViewModel] Processed route: {processedRoute}");
-                    _logger?.LogInformation("DIAGNOSTIC: Original route: {OriginalRoute}, Processed route: {ProcessedRoute}", originalRoute, processedRoute);
 
                     // Use ApiRoutes directly like the LookupService does
-                    var response = await _apiService.GetAsync<ApiResponse<List<LookupItem>>>(ApiRoutes.Lookups.GetDepartments);
+                    departments = await _apiService.GetAsync<List<LookupItem>>(ApiRoutes.Lookups.GetDepartments);
 
                     // Debug the response details
-                    Debug.WriteLine($"[SignupViewModel] Response received. Response null: {response == null}");
-                    if (response != null)
+                    Debug.WriteLine($"[SignupViewModel] Departments received. Null: {departments == null}");
+                    if (departments == null)
                     {
-                        Debug.WriteLine($"[SignupViewModel] Response.Success: {response.Success}");
-                        Debug.WriteLine($"[SignupViewModel] Response.Data null: {response.Data == null}");
-                        Debug.WriteLine($"[SignupViewModel] Response.Message: {response.Message}");
-                        Debug.WriteLine($"[SignupViewModel] Response.ErrorMessage: {response.ErrorMessage}");
-                        Debug.WriteLine($"[SignupViewModel] Response.StatusCode: {response.StatusCode}");
-                        _logger?.LogInformation("DIAGNOSTIC: Response details - Success: {Success}, Data null: {DataNull}, Message: {Message}, ErrorMessage: {ErrorMessage}, StatusCode: {StatusCode}",
-                            response.Success, response.Data == null, response.Message, response.ErrorMessage, response.StatusCode);
+                        Debug.WriteLine("[SignupViewModel] API returned null departments list");
+                        _logger?.LogError("API returned null departments list");
+                        throw new InvalidOperationException("No departments received from the server");
                     }
 
-                    if (response != null && response.Success && response.Data != null)
-                    {
-                        departments = response.Data;
-                        Debug.WriteLine($"[SignupViewModel] API call successful. Count: {departments?.Count ?? 0}");
-                        _logger?.LogInformation("DIAGNOSTIC: API call successful. Count: {Count}", departments?.Count ?? 0);
+                    Debug.WriteLine($"[SignupViewModel] Departments count: {departments.Count}");
+                    _logger?.LogInformation("DIAGNOSTIC: Departments count: {Count}", departments.Count);
 
-                        if (departments != null && departments.Count > 0)
+                    if (departments.Count > 0)
+                    {
+                        await MainThread.InvokeOnMainThreadAsync(() =>
                         {
-                            Debug.WriteLine($"[SignupViewModel] First department: {departments[0].Name}");
-                            _logger?.LogInformation("DIAGNOSTIC: First department: Name={Name}",
-                                departments[0].Name);
-                        }
+                            Departments = new ObservableCollection<LookupItem>(departments);
+                            HasError = false;
+                            ErrorMessage = string.Empty;
+                        });
                     }
                     else
                     {
-                        Debug.WriteLine($"[SignupViewModel] API call failed. Success: {response?.Success}, Data null: {response?.Data == null}");
-                        _logger?.LogError("DIAGNOSTIC: API call failed. Success: {Success}, ErrorMessage: {ErrorMessage}",
-                            response?.Success ?? false, response?.ErrorMessage ?? "N/A");
-                        departments = new List<LookupItem>();
+                        Debug.WriteLine("[SignupViewModel] Failed to load departments - list is null or empty.");
+                        _logger?.LogError("DIAGNOSTIC: Failed to load departments. Departments list is null or empty. Count: {Count}", departments.Count);
+                        await MainThread.InvokeOnMainThreadAsync(() =>
+                        {
+                            Departments.Clear();
+                            ErrorMessage = "No departments found. Please contact support.";
+                            HasError = true;
+                        });
                     }
                 }
                 catch (Exception ex)
@@ -189,23 +146,12 @@ namespace TDFMAUI.Features.Auth
                     Debug.WriteLine("[SignupViewModel] Failed to load departments - list is null or empty.");
                     _logger?.LogError("DIAGNOSTIC: Failed to load departments. Departments list is null or empty. Count: {Count}", departments?.Count ?? -1);
 
-                    // Add fallback test departments to verify UI binding works
-                    Debug.WriteLine("[SignupViewModel] Adding fallback test departments to verify UI binding");
-                    departments = new List<LookupItem>
-                    {
-                        new LookupItem { Name = "Test Department 1", Id = "test1" },
-                        new LookupItem { Name = "Test Department 2", Id = "test2" },
-                        new LookupItem { Name = "Test Department 3", Id = "test3" }
-                    };
-                    Debug.WriteLine($"[SignupViewModel] Created {departments.Count} fallback test departments");
-
-                    // Continue with the fallback departments instead of returning
-                    // await MainThread.InvokeOnMainThreadAsync(() => {
-                    //     ErrorMessage = "Unable to load departments. Please check your connection and try again.";
-                    //     HasError = true;
-                    //     Departments.Clear();
-                    // });
-                    // return;
+                    await MainThread.InvokeOnMainThreadAsync(() => {
+                        ErrorMessage = "Unable to load departments. Please check your connection and try again.";
+                        HasError = true;
+                        Departments.Clear();
+                    });
+                    return;
                 }
 
                 Debug.WriteLine($"[SignupViewModel] Successfully loaded {departments.Count} departments");
@@ -221,21 +167,6 @@ namespace TDFMAUI.Features.Auth
                         // Clear any previous errors first
                         HasError = false;
                         ErrorMessage = string.Empty;
-
-                        // Clear and add each department individually to ensure the ObservableCollection is updated
-                        Departments.Clear();
-                        foreach (var dept in departments)
-                        {
-                            Departments.Add(dept);
-                            Debug.WriteLine($"[SignupViewModel] Added department: Name='{dept.Name}', Id='{dept.Id}', Description='{dept.Description}'");
-                        }
-
-                        // Verify the ObservableCollection after adding
-                        Debug.WriteLine($"[SignupViewModel] ObservableCollection verification - Count: {Departments.Count}");
-                        for (int i = 0; i < Departments.Count; i++)
-                        {
-                            Debug.WriteLine($"[SignupViewModel] Departments[{i}]: Name='{Departments[i].Name}', Id='{Departments[i].Id}'");
-                        }
 
                         Debug.WriteLine($"[SignupViewModel] UI updated - Departments.Count: {Departments.Count}");
                         _logger?.LogInformation("DIAGNOSTIC: UI updated - Departments.Count: {Count}", Departments.Count);
@@ -274,8 +205,6 @@ namespace TDFMAUI.Features.Auth
             }
             finally
             {
-                // Always reset loading state
-                IsLoading = false;
                 Debug.WriteLine("[SignupViewModel] LoadLookupsAsync - End");
                 _logger?.LogInformation("DIAGNOSTIC: LoadLookupsAsync - End");
             }
@@ -439,9 +368,8 @@ namespace TDFMAUI.Features.Auth
                 {
                     // Try to get a more specific message from ApiException
                     string apiErrorMessage = apiEx.Message;
-                    if (!string.IsNullOrWhiteSpace(apiEx.ResponseContent) && apiEx.ResponseContent.Length < 500) // Avoid showing huge HTML error pages
+                    if (!string.IsNullOrWhiteSpace(apiEx.ResponseContent) && apiEx.ResponseContent.Length < 500)
                     {
-                        // Check if ResponseContent is a JSON ApiResponse
                         try
                         {
                             var errorResponse = TDFShared.Helpers.JsonSerializationHelper.Deserialize<TDFShared.DTOs.Common.ApiResponse<object>>(apiEx.ResponseContent);
@@ -449,26 +377,44 @@ namespace TDFMAUI.Features.Auth
                             {
                                 if (errorResponse.Errors != null && errorResponse.Errors.Any())
                                 {
-                                    // Prioritize detailed validation errors
-                                    apiErrorMessage = string.Join("; ", errorResponse.Errors.SelectMany(kv => $"{kv.Key}: {string.Join(", ", kv.Value)}"));
+                                    // Show all validation errors, one per line, and prepend a user-friendly label
+                                    apiErrorMessage = string.Join("\n", errorResponse.Errors.SelectMany(kv => $"{ToFriendlyFieldName(kv.Key)}: {string.Join(", ", kv.Value)}"));
                                 }
                                 else if (!string.IsNullOrWhiteSpace(errorResponse.Message))
                                 {
                                     apiErrorMessage = errorResponse.Message;
                                 }
-                                // If neither Errors nor Message is present in errorResponse, apiErrorMessage remains apiEx.Message ("Bad Request")
                             }
                         }
                         catch { /* Ignore if not a standard ApiResponse format */ }
                     }
-                    ErrorMessage = $"Signup Error: {apiErrorMessage}";
+                    ErrorMessage = apiErrorMessage;
                 }
                 else
                 {
-                    ErrorMessage = "An unexpected error occurred. Please check your network and try again.";
+                    ErrorMessage = $"An unexpected error occurred. Please check your network and try again.";
                 }
                 HasError = true;
             }
+        }
+
+        // Helper to convert backend field names to user-friendly labels
+        private string ToFriendlyFieldName(string field)
+        {
+            return field switch
+            {
+                "Username" => "Username",
+                "username" => "Username",
+                "Password" => "Password",
+                "password" => "Password",
+                "FullName" => "Full Name",
+                "fullName" => "Full Name",
+                "Department" => "Department",
+                "department" => "Department",
+                "Title" => "Title",
+                "title" => "Title",
+                _ => field
+            };
         }
 
         [RelayCommand]

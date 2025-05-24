@@ -66,25 +66,23 @@ namespace TDFMAUI.Services
             try
             {
                 _logger.LogInformation("DIAGNOSTIC: Fetching titles for department {DepartmentId} on demand.", departmentId);
-                var titlesResponse = await _apiService.GetAsync<ApiResponse<List<string>>>(string.Format(ApiRoutes.Lookups.GetTitlesByDepartment, departmentId));
+                var titles = await _apiService.GetAsync<List<string>>(string.Format(ApiRoutes.Lookups.GetTitlesByDepartment, departmentId));
 
-                if (titlesResponse != null && titlesResponse.Success && titlesResponse.Data != null)
+                if (titles != null && titles.Count > 0)
                 {
-                    _logger.LogInformation("DIAGNOSTIC: Loaded {Count} titles for department {DepartmentId}",
-                                        titlesResponse.Data.Count, departmentId);
-                    return titlesResponse.Data;
+                    _logger.LogInformation("DIAGNOSTIC: Loaded {Count} titles for department {DepartmentId}", titles.Count, departmentId);
+                    return titles;
                 }
                 else
                 {
-                    _logger.LogWarning("DIAGNOSTIC: No titles found or API error for department {DepartmentId}. Message: {ApiMessage}",
-                                        departmentId, titlesResponse?.ErrorMessage ?? "N/A");
+                    _logger.LogWarning("DIAGNOSTIC: No titles found or API error for department {DepartmentId}.", departmentId);
                     return new List<string>();
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "DIAGNOSTIC: Exception fetching titles for department {DepartmentId}", departmentId);
-            return new List<string>();
+                return new List<string>();
             }
         }
 

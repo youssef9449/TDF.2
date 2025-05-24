@@ -31,8 +31,8 @@ namespace TDFShared.Helpers
             PropertyNameCaseInsensitive = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-            ReferenceHandler = ReferenceHandler.IgnoreCycles,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }, // Handle enums as strings
+            ReferenceHandler = ReferenceHandler.IgnoreCycles, // Handle circular references
             WriteIndented = false // Explicitly set for network efficiency
         };
 

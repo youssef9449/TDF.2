@@ -56,14 +56,6 @@ namespace TDFShared.Validation
         string? ValidateStringLength(string? value, string fieldName, int? minLength = null, int? maxLength = null);
 
         /// <summary>
-        /// Validates email format
-        /// </summary>
-        /// <param name="email">Email to validate</param>
-        /// <param name="fieldName">Name of the field</param>
-        /// <returns>Validation error or null if valid</returns>
-        string? ValidateEmail(string? email, string fieldName = "Email");
-
-        /// <summary>
         /// Validates numeric range
         /// </summary>
         /// <param name="value">Value to validate</param>

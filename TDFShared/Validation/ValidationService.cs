@@ -113,19 +113,6 @@ namespace TDFShared.Validation
             return null;
         }
 
-        public string? ValidateEmail(string? email, string fieldName = "Email")
-        {
-            if (string.IsNullOrWhiteSpace(email))
-                return null; // Use ValidateRequired for null/empty checks
-
-            if (!EmailRegex.IsMatch(email))
-            {
-                return $"{fieldName} must be a valid email address.";
-            }
-
-            return null;
-        }
-
         public string? ValidateRange(int value, string fieldName, int? min = null, int? max = null)
         {
             if (min.HasValue && value < min.Value)

@@ -33,12 +33,11 @@
             <VerticalStackLayout Padding="24,20" Spacing="24">
                 <!-- Logo and title -->
                 <VerticalStackLayout Spacing="16" Margin="0,40,0,30">
-                    <Image Source="tdf_logo.png" HeightRequest="120" HorizontalOptions="Center">
+                    <Image Source="tdf_logo.png" HeightRequest="200" HorizontalOptions="Center">
                         <Image.GestureRecognizers>
                             <TapGestureRecognizer Tapped="OnDiagnosticsClicked" NumberOfTapsRequired="3" />
                         </Image.GestureRecognizers>
                     </Image>
-                    <Label Text="TDF System" FontSize="28" FontAttributes="Bold" TextColor="#333333" HorizontalOptions="Center"/>
                     <Label Text="Welcome back, please sign in" FontSize="16" TextColor="#666666" HorizontalOptions="Center"/>
                 </VerticalStackLayout>
 

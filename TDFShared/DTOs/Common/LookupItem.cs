@@ -52,4 +52,4 @@ namespace TDFShared.DTOs.Common
             Name = name;
         }
     }
-} 
+}

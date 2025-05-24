@@ -33,33 +33,13 @@
 
             <Label Text="Department" />
 
-            <!-- Debug label to show department count -->
-            <Label Text="{Binding Departments.Count, StringFormat='Debug: {0} departments loaded'}"
-                   FontSize="Small"
-                   TextColor="Blue"
-                   HorizontalOptions="Center" />
-
-            <!-- Loading indicator for departments -->
-            <ActivityIndicator IsVisible="{Binding IsLoading}"
-                             IsRunning="{Binding IsLoading}"
-                             Color="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}"
-                             HorizontalOptions="Center" />
-
             <!-- Department picker -->
             <Picker Title="Select Department"
                     ItemsSource="{Binding Departments}"
                     ItemDisplayBinding="{Binding Name}"
                     SelectedItem="{Binding SelectedDepartment}"
                     Style="{StaticResource PickerStyle}"
-                    IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}"
-                    IsVisible="{Binding IsLoading, Converter={StaticResource BooleanInverter}}" />
-
-            <!-- Loading message -->
-            <Label Text="Loading departments..."
-                   IsVisible="{Binding IsLoading}"
-                   HorizontalOptions="Center"
-                   FontSize="Small"
-                   TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" />
+                    IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}"/>
 
             <Label Text="Title" />
             <Picker Title="Select Title"

@@ -4,6 +4,8 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TDFMAUI", "TDFMAUI.csproj", "{3E34FC86-21EC-66B0-BE1C-2F3369D1CCFF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TDFShared", "..\TDFShared\TDFShared.csproj", "{C765A7FE-905C-DB1F-1376-A049918DF542}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +16,10 @@ Global
 		{3E34FC86-21EC-66B0-BE1C-2F3369D1CCFF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3E34FC86-21EC-66B0-BE1C-2F3369D1CCFF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3E34FC86-21EC-66B0-BE1C-2F3369D1CCFF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C765A7FE-905C-DB1F-1376-A049918DF542}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C765A7FE-905C-DB1F-1376-A049918DF542}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C765A7FE-905C-DB1F-1376-A049918DF542}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C765A7FE-905C-DB1F-1376-A049918DF542}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

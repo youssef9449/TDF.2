@@ -104,14 +104,14 @@ namespace TDFAPI.Services
                     {
                         if (!string.IsNullOrEmpty(departmentName) && !departments.Any(d => d.Name == departmentName))
                         {
-                            // Create department with name only
+                            // Set both Id and Name
                             var dept = new LookupItem
                             {
+                                Id = departmentName, // Use Name as Id
                                 Name = departmentName
                             };
                             departments.Add(dept);
-                            _logger.LogInformation("DIAGNOSTIC: Added department from Departments table: Name={Name}",
-                                dept.Name);
+                            _logger.LogInformation("DIAGNOSTIC: Added department from Departments table: Name={Name}, Id={Id}", dept.Name, dept.Id);
                         }
                     }
                 }

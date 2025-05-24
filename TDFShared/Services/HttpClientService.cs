@@ -340,23 +340,34 @@ namespace TDFShared.Services
                 return (T)(object)content;
             }
 
+            string rawContent = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrEmpty(rawContent))
+            {
+                _logger.LogWarning("Empty response body for {Endpoint}", endpoint);
+                return default(T);
+            }
+
             try
             {
-                var contentStream = await response.Content.ReadAsStreamAsync();
-                if (contentStream.Length == 0)
-                {
-                    _logger.LogWarning("Empty response body for {Endpoint}", endpoint);
-                    return default(T);
-                }
-
-                // Try to deserialize as ApiResponse<T> first
-                contentStream.Position = 0;
-                var apiResponse = await JsonSerializer.DeserializeAsync<ApiResponse<T>>(contentStream, _jsonOptions);
+                // Attempt standard deserialization first
+                var apiResponse = JsonSerializer.Deserialize<ApiResponse<T>>(rawContent, _jsonOptions);
 
                 if (apiResponse != null)
                 {
                     if (apiResponse.Success)
                     {
+                        // Special handling for List<LookupItem> to ensure Id is not empty
+                        if (typeof(T) == typeof(List<LookupItem>) && apiResponse.Data is List<LookupItem> lookupItems)
+                        {
+                            foreach (var item in lookupItems)
+                            {
+                                if (string.IsNullOrEmpty(item.Id))
+                                {
+                                    item.Id = item.Name;
+                                    _logger.LogDebug("Corrected empty Id for LookupItem: Name='{Name}', New Id='{Id}'", item.Name, item.Id);
+                                }
+                            }
+                        }
                         return apiResponse.Data;
                     }
                     else
@@ -365,17 +376,75 @@ namespace TDFShared.Services
                             apiResponse.Message, apiResponse.ErrorMessage);
                     }
                 }
-
-                // Fallback to direct deserialization
-                contentStream.Position = 0;
-                return await JsonSerializer.DeserializeAsync<T>(contentStream, _jsonOptions);
+                // Fallback to direct deserialization if ApiResponse wrapper is not used or is null
+                return JsonSerializer.Deserialize<T>(rawContent, _jsonOptions);
             }
-            catch (JsonException jsonEx)
+            catch (Exception ex) // Changed from JsonException to general Exception
             {
-                _logger.LogError(jsonEx, "JSON deserialization error for {Endpoint}", endpoint);
-                var content = await response.Content.ReadAsStringAsync();
-                _logger.LogError("Raw response content: {Content}", content);
-                throw new ApiException($"Failed to deserialize response from {endpoint}", jsonEx);
+                _logger.LogError(ex, "Deserialization error for {Endpoint}. Attempting fallback parsing.", endpoint);
+                _logger.LogError("Raw response content: {Content}", rawContent);
+
+                // Fallback to manual parsing for specific known problematic types (e.g., List<LookupItem>)
+                if (typeof(T) == typeof(List<LookupItem>))
+                {
+                    try
+                    {
+                        _logger.LogDebug("Attempting JsonDocument.Parse for manual fallback.");
+                        using (JsonDocument doc = JsonDocument.Parse(rawContent))
+                        {
+                            _logger.LogDebug("JsonDocument parsed. Checking for 'data' property.");
+                            if (doc.RootElement.TryGetProperty("data", out JsonElement dataElement) && dataElement.ValueKind == JsonValueKind.Array)
+                            {
+                                _logger.LogDebug("Found 'data' array. Starting manual LookupItem parsing.");
+                                var lookupItems = new List<LookupItem>();
+                                foreach (JsonElement element in dataElement.EnumerateArray())
+                                {
+                                    string id = element.TryGetProperty("id", out JsonElement idElement) ? idElement.GetString() ?? string.Empty : string.Empty;
+                                    string name = element.TryGetProperty("name", out JsonElement nameElement) ? nameElement.GetString() ?? string.Empty : string.Empty;
+                                    string? description = element.TryGetProperty("description", out JsonElement descElement) ? descElement.GetString() : null;
+                                    string? value = element.TryGetProperty("category", out JsonElement categoryElement) ? categoryElement.GetString() : null;
+                                    int? sortOrder = null;
+                                    if (element.TryGetProperty("sortOrder", out JsonElement sortOrderElement) && sortOrderElement.ValueKind == JsonValueKind.Number)
+                                    {
+                                        sortOrder = sortOrderElement.GetInt32();
+                                    }
+                                    else if (sortOrderElement.ValueKind == JsonValueKind.String && int.TryParse(sortOrderElement.GetString(), out int parsedSortOrder))
+                                    {
+                                        sortOrder = parsedSortOrder;
+                                    }
+
+                                    // Apply the user's request: if id is empty, default it to name
+                                    if (string.IsNullOrEmpty(id))
+                                    {
+                                        id = name;
+                                        _logger.LogDebug("Manually corrected empty Id for LookupItem during fallback: Name='{Name}', New Id='{Id}'", name, id);
+                                    }
+
+                                    lookupItems.Add(new LookupItem
+                                    {
+                                        Id = id,
+                                        Name = name,
+                                        Description = description,
+                                        Value = value,
+                                        SortOrder = sortOrder
+                                    });
+                                }
+                                _logger.LogInformation("Successfully manually parsed {Count} LookupItems from raw response.", lookupItems.Count);
+                                return (T)(object)lookupItems;
+                            }
+                            else
+                            {
+                                _logger.LogWarning("Manual parsing fallback: 'data' property not found or not an array.");
+                            }
+                        }
+                    }
+                    catch (Exception manualParseEx)
+                    {
+                        _logger.LogError(manualParseEx, "Manual JSON parsing fallback failed for {Endpoint}.", endpoint);
+                    }
+                }
+                // If manual parsing didn't work or wasn't applicable, re-throw original exception
+                throw new ApiException($"Failed to deserialize response from {endpoint}", ex);
             }
         }
 

@@ -46,7 +46,7 @@
                         <Picker x:Name="departmentPicker" 
                                 Title="Select department"
                                 ItemsSource="{Binding Departments}"
-                                ItemDisplayBinding="{Binding Value}"
+                                ItemDisplayBinding="{Binding Name}"
                                 SelectedIndexChanged="OnDepartmentSelectedIndexChanged"/>
 
                         <Label Text="Title" FontAttributes="Bold"/>

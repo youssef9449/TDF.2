@@ -97,81 +97,45 @@
 
                                         <!-- Action Buttons -->
                                         <HorizontalStackLayout Spacing="5" Margin="0,5,0,0">
-                                            <!-- Edit Button - Only visible for pending requests owned by current user -->
-                                             <Button Text="Edit"
-                                                     FontSize="Micro"
-                                                     Padding="8,4"
-                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=EditRequestCommand}"
-                                                     CommandParameter="{Binding .}">
-                                                <Button.IsVisible>
-                                                    <MultiBinding Converter="{StaticResource CanEditDeleteConverter}">
-                                                        <Binding Path="Status" />
-                                                        <Binding Path="Source.CurrentUserId" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
-                                                        <Binding Path="UserID" />
-                                                    </MultiBinding>
-                                                </Button.IsVisible>
-                                            </Button>
-
-                                            <!-- Delete Button - Visible for pending requests (owner or admin) -->
-                                            <Button Text="Delete"
-                                                    FontSize="Micro"
-                                                    Padding="8,4"
-                                                    BackgroundColor="Red"
-                                                    TextColor="White"
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=DeleteRequestCommand}"
-                                                    CommandParameter="{Binding .}">
-                                                <Button.IsVisible>
-                                                    <MultiBinding Converter="{StaticResource RequestButtonVisibilityConverter}" ConverterParameter="delete">
-                                                        <Binding Path="Status" />
-                                                        <Binding Path="Source.CurrentUserId" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
-                                                        <Binding Path="UserID" />
-                                                        <Binding Path="Source.IsCurrentUserAdmin" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
-                                                    </MultiBinding>
-                                                </Button.IsVisible>
-                                            </Button>
-
-                                            <!-- Approve Button - Only visible for admins on pending requests they don't own -->
-                                            <Button Text="Approve"
-                                                    FontSize="Micro"
-                                                    Padding="8,4"
-                                                    BackgroundColor="Green"
-                                                    TextColor="White"
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=ApproveRequestCommand}"
-                                                    CommandParameter="{Binding .}">
-                                                <Button.IsVisible>
-                                                    <MultiBinding Converter="{StaticResource CanApproveRejectConverter}">
-                                                        <Binding Path="Status" />
-                                                        <Binding Path="Source.CurrentUserId" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
-                                                        <Binding Path="UserID" />
-                                                        <Binding Path="Source.IsCurrentUserAdmin" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
-                                                    </MultiBinding>
-                                                </Button.IsVisible>
-                                            </Button>
-
-                                            <!-- Reject Button - Only visible for admins on pending requests they don't own -->
-                                            <Button Text="Reject"
-                                                    FontSize="Micro"
-                                                    Padding="8,4"
-                                                    BackgroundColor="OrangeRed"
-                                                    TextColor="White"
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=RejectRequestCommand}"
-                                                    CommandParameter="{Binding .}">
-                                                <Button.IsVisible>
-                                                    <MultiBinding Converter="{StaticResource CanApproveRejectConverter}">
-                                                        <Binding Path="Status" />
-                                                        <Binding Path="Source.CurrentUserId" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
-                                                        <Binding Path="UserID" />
-                                                        <Binding Path="Source.IsCurrentUserAdmin" Source="{RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}" />
-                                                    </MultiBinding>
-                                                </Button.IsVisible>
-                                            </Button>
-
                                             <!-- View Details Button (If needed separate from actions) -->
                                             <Button Text="Details"
                                                     FontSize="Micro"
                                                     Padding="8,4"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=GoToRequestDetailsCommand}"
                                                     CommandParameter="{Binding .}"
+                                                    />
+
+                                            <!-- Action Buttons -->
+                                            <Button Text="Approve"
+                                                    FontSize="Micro"
+                                                    Padding="8,4"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=ApproveRequestCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanApproveRejectRequest, Converter={StaticResource CanApproveRejectConverter}}"
+                                                    />
+
+                                            <Button Text="Reject"
+                                                    FontSize="Micro"
+                                                    Padding="8,4"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=RejectRequestCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanApproveRejectRequest, Converter={StaticResource CanApproveRejectConverter}}"
+                                                    />
+
+                                            <Button Text="Edit"
+                                                    FontSize="Micro"
+                                                    Padding="8,4"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=EditRequestCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanEditDeleteRequest, Converter={StaticResource CanEditDeleteConverter}}"
+                                                    />
+
+                                            <Button Text="Delete"
+                                                    FontSize="Micro"
+                                                    Padding="8,4"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=DeleteRequestCommand}"
+                                                    CommandParameter="{Binding .}"
+                                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanEditDeleteRequest, Converter={StaticResource CanEditDeleteConverter}}"
                                                     />
                                         </HorizontalStackLayout>
                                     </VerticalStackLayout>

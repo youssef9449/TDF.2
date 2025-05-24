@@ -6,6 +6,10 @@ using TDFMAUI.Services;
 using System.Threading.Tasks;
 using System.Linq;
 using CommunityToolkit.Mvvm.Input;
+using TDFMAUI.Helpers;
+using TDFShared.Utilities;
+using TDFShared.DTOs.Requests;
+using TDFShared.DTOs.Common;
 
 namespace TDFMAUI.ViewModels
 {
@@ -25,37 +29,48 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private ObservableCollection<UserDto> _teamMembers;
 
+        [ObservableProperty]
+        private string _errorMessage;
+
+        [ObservableProperty]
+        private bool _hasError;
+
         private readonly ApiService _apiService;
         private readonly TDFShared.Services.IAuthService _authService;
+        private readonly INavigationService _navigationService;
 
         // Constructor injection
-        public MyTeamViewModel(ApiService apiService, TDFShared.Services.IAuthService authService)
+        public MyTeamViewModel(
+            ApiService apiService, 
+            TDFShared.Services.IAuthService authService,
+            INavigationService navigationService)
         {
-             _apiService = apiService;
-             _authService = authService;
-             TeamMembers = new ObservableCollection<UserDto>();
-             // Load data when the view model is created
-             // Consider moving to an OnAppearing/NavigatedTo method if more appropriate
-             _ = LoadTeamAsync();
+            _apiService = apiService;
+            _authService = authService;
+            _navigationService = navigationService;
+            TeamMembers = new ObservableCollection<UserDto>();
+            // Load data when the view model is created
+            // Consider moving to an OnAppearing/NavigatedTo method if more appropriate
+            _ = LoadTeamAsync();
         }
 
         // Example command placeholder
         [RelayCommand]
         private async Task LoadTeamAsync()
         {
-             IsLoading = true;
-             try
-             {
-                // Get current user from auth service
+            IsLoading = true;
+            HasError = false;
+            ErrorMessage = string.Empty;
+
+            try
+            {
                 var currentUser = await _authService.GetCurrentUserAsync();
                 if (currentUser == null)
                 {
-                    // Handle case where user is not logged in
-                    // Maybe display a message or navigate away
+                    await _navigationService.NavigateToAsync("//Login");
                     return;
                 }
 
-                // Convert to UserDto for RequestStateManager
                 var userDto = new UserDto
                 {
                     UserID = currentUser.UserID,
@@ -65,52 +80,141 @@ namespace TDFMAUI.ViewModels
                     Department = currentUser.Department
                 };
 
-                // Check if user can manage requests (managers, HR, admin can see team members)
-                if (!RequestStateManager.CanManageRequests(userDto))
+                // Use AuthorizationUtilities to check access
+                if (!AuthorizationUtilities.IsManagement(userDto))
                 {
-                    // Regular users shouldn't see team page - this should be handled by navigation logic
+                    await _navigationService.NavigateToAsync("//Home");
                     return;
                 }
 
-                // For managers, only show users from departments they can manage
-                // For HR/Admin, show all users from the specified department
-                var members = await _apiService.GetUsersByDepartmentAsync(currentUser.Department);
+                // Get accessible departments using AuthorizationUtilities
+                var allDepartments = await _apiService.GetDepartmentsAsync();
+                var departmentNames = allDepartments.Select(d => d.Name);
+                var accessibleDepartments = AuthorizationUtilities.GetAccessibleDepartments(userDto, departmentNames);
 
                 TeamMembers.Clear();
-                if (members != null)
+                foreach (var department in accessibleDepartments)
                 {
-                    foreach(var member in members)
+                    var members = await _apiService.GetUsersByDepartmentAsync(department);
+                    if (members != null)
                     {
-                         // Filter out the current user if needed
-                         if (member.UserID != currentUser.UserID)
-                         {
-                            // For managers, validate they can manage this user's department
-                            if (userDto.IsManager && !userDto.IsAdmin && !userDto.IsHR)
+                        foreach (var member in members)
+                        {
+                            // Filter out the current user
+                            if (member.UserID != currentUser.UserID)
                             {
-                                if (RequestStateManager.CanManageDepartment(userDto, member.Department))
+                                // For managers, validate they can manage this user's department
+                                if (userDto.IsManager && !userDto.IsAdmin && !userDto.IsHR)
                                 {
+                                    if (AuthorizationUtilities.CanAccessDepartment(userDto, member.Department))
+                                    {
+                                        TeamMembers.Add(member);
+                                    }
+                                }
+                                else
+                                {
+                                    // HR and Admin can see all users
                                     TeamMembers.Add(member);
                                 }
                             }
-                            else
-                            {
-                                // HR and Admin can see all users
-                                TeamMembers.Add(member);
-                            }
-                         }
+                        }
                     }
                 }
-             }
-             catch (Exception ex)
-             {
-                 // Handle exceptions appropriately (logging, user message)
-                 System.Diagnostics.Debug.WriteLine($"Error loading team members: {ex.Message}"); // Basic logging
-                 // Optionally, display an error message to the user
-             }
-             finally
-             {
-                 IsLoading = false;
-             }
+            }
+            catch (Exception ex)
+            {
+                HasError = true;
+                ErrorMessage = "Failed to load team members. Please try again.";
+                System.Diagnostics.Debug.WriteLine($"Error loading team members: {ex.Message}");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        [RelayCommand]
+        private async Task ViewProfileAsync(int userId)
+        {
+            try
+            {
+                await _navigationService.NavigateToAsync($"UserProfile?userId={userId}");
+            }
+            catch (Exception ex)
+            {
+                HasError = true;
+                ErrorMessage = "Failed to navigate to user profile.";
+                System.Diagnostics.Debug.WriteLine($"Error navigating to profile: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private async Task MessageAsync(int userId)
+        {
+            try
+            {
+                await _navigationService.NavigateToAsync($"NewMessage?recipientId={userId}");
+            }
+            catch (Exception ex)
+            {
+                HasError = true;
+                ErrorMessage = "Failed to start new message.";
+                System.Diagnostics.Debug.WriteLine($"Error starting message: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private async Task ViewRequestsAsync(int userId)
+        {
+            try
+            {
+                var currentUser = await _authService.GetCurrentUserAsync();
+                if (currentUser == null)
+                {
+                    await _navigationService.NavigateToAsync("//Login");
+                    return;
+                }
+
+                var userDto = new UserDto
+                {
+                    UserID = currentUser.UserID,
+                    IsAdmin = currentUser.IsAdmin,
+                    IsHR = currentUser.IsHR,
+                    IsManager = currentUser.IsManager,
+                    Department = currentUser.Department
+                };
+
+                // Get the target user
+                var targetUser = TeamMembers.FirstOrDefault(u => u.UserID == userId);
+                if (targetUser == null)
+                {
+                    HasError = true;
+                    ErrorMessage = "User not found.";
+                    return;
+                }
+
+                // Check if current user can view target user's requests
+                if (!AuthorizationUtilities.CanAccessDepartment(userDto, targetUser.Department))
+                {
+                    HasError = true;
+                    ErrorMessage = "You don't have permission to view this user's requests.";
+                    return;
+                }
+
+                await _navigationService.NavigateToAsync($"RequestApproval?userId={userId}");
+            }
+            catch (Exception ex)
+            {
+                HasError = true;
+                ErrorMessage = "Failed to view user requests.";
+                System.Diagnostics.Debug.WriteLine($"Error viewing requests: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private async Task RefreshAsync()
+        {
+            await LoadTeamAsync();
         }
     }
 }

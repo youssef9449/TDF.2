@@ -1,0 +1,37 @@
+{
+  "patterns": [
+    "TODO",
+    "FIXME",
+    "XXX",
+    "HACK",
+    "@todo",
+    "@fixme",
+    "@hack"
+  ],
+  "extensions": [
+    ".cs",
+    ".csproj",
+    ".xaml",
+    ".xaml.cs",
+    ".md"
+  ],
+  "excludePaths": [
+    "obj/",
+    "bin/",
+    ".git/",
+    "packages/",
+    "node_modules/"
+  ],
+  "failOnTodo": false,
+  "maxTodos": 0,
+  "reportFormat": "text",
+  "severityLevels": {
+    "TODO": "warning",
+    "FIXME": "error",
+    "XXX": "error",
+    "HACK": "error",
+    "@todo": "warning",
+    "@fixme": "error",
+    "@hack": "error"
+  }
+} 

@@ -12,6 +12,8 @@ using TDFShared.DTOs.Common; // Added for pagination
 using TDFShared.Enums;
 using TDFMAUI.Features.Requests;
 using TDFShared.Services;
+using TDFShared.Utilities;
+using TDFShared.DTOs.Users;
 
 namespace TDFMAUI.ViewModels
 {
@@ -20,6 +22,7 @@ namespace TDFMAUI.ViewModels
         private readonly IRequestService _requestService;
         private readonly INavigation _navigation; // Assuming navigation is passed from the page
         private readonly IErrorHandlingService _errorHandlingService;
+        private readonly IAuthService _authService;
 
         [ObservableProperty]
         private bool _isLoading;
@@ -45,11 +48,63 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private RequestResponseDto _selectedRequest;
 
-        public ReportsViewModel(IRequestService requestService, INavigation navigation, IErrorHandlingService errorHandlingService)
+        // Authorization properties
+        [ObservableProperty]
+        private bool _canViewReports;
+
+        [ObservableProperty]
+        private bool _canExportReports;
+
+        public ReportsViewModel(
+            IRequestService requestService, 
+            INavigation navigation, 
+            IErrorHandlingService errorHandlingService,
+            IAuthService authService)
         {
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
             _errorHandlingService = errorHandlingService ?? throw new ArgumentNullException(nameof(errorHandlingService));
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        }
+
+        public async Task InitializeAsync()
+        {
+            // Set default dates
+            FromDate = DateTime.Today;
+            ToDate = FromDate;
+
+            // Check authorization before loading data
+            var currentUser = await _authService.GetCurrentUserAsync();
+            if (currentUser == null)
+            {
+                await Shell.Current.DisplayAlert("Access Denied", "You must be logged in to view reports.", "OK");
+                await Shell.Current.GoToAsync("//Login");
+                return;
+            }
+
+            var userDto = new UserDto
+            {
+                UserID = currentUser.UserID,
+                IsAdmin = currentUser.IsAdmin,
+                IsHR = currentUser.IsHR,
+                IsManager = currentUser.IsManager,
+                Department = currentUser.Department
+            };
+
+            // Use RequestStateManager for state-based checks
+            CanViewReports = RequestStateManager.CanManageRequests(userDto);
+            
+            // Use AuthorizationUtilities for action-specific checks
+            CanExportReports = AuthorizationUtilities.CanPerformRequestAction(userDto, null, RequestAction.View);
+
+            if (!CanViewReports)
+            {
+                await Shell.Current.DisplayAlert("Access Denied", "You don't have permission to view reports.", "OK");
+                await Shell.Current.GoToAsync("//Home");
+                return;
+            }
+
+            await LoadRequestsAsync();
         }
 
         // Command to load/refresh data based on filters
@@ -63,29 +118,38 @@ namespace TDFMAUI.ViewModels
 
             try
             {
-                // Determine userId based on role (pass null if admin/not needed by API for 'my' requests)
-                int? userIdToFetch = App.CurrentUser?.IsAdmin == false ? App.CurrentUser.UserID : null;
+                var currentUser = await _authService.GetCurrentUserAsync();
+                if (currentUser == null) return;
 
-                // Adapt filter values before sending to API if needed (e.g., "All" might mean null)
-                string statusFilter = SelectedStatus == "All" ? null : SelectedStatus;
+                var userDto = new UserDto
+                {
+                    UserID = currentUser.UserID,
+                    IsAdmin = currentUser.IsAdmin,
+                    IsHR = currentUser.IsHR,
+                    IsManager = currentUser.IsManager,
+                    Department = currentUser.Department
+                };
 
-                // Create a RequestPaginationDto for filtering
+                // Create pagination DTO
                 var pagination = new RequestPaginationDto
                 {
-                    FilterStatus = statusFilter == null ? (RequestStatus?)null : Enum.TryParse<RequestStatus>(statusFilter, true, out var parsedStatus) ? parsedStatus : (RequestStatus?)null,
+                    FilterStatus = SelectedStatus == "All" ? null : 
+                        Enum.TryParse<RequestStatus>(SelectedStatus, true, out var parsedStatus) ? parsedStatus : null,
                     FromDate = FromDate,
                     ToDate = ToDate,
                     Page = 1,
                     PageSize = 50
                 };
 
-                // Call GetRequestsAsync with the proper parameters
-                // Ensure pagination.UserId is set correctly before this call
-                var fetchedRequests = await _requestService.GetAllRequestsAsync(pagination);
+                var result = await _requestService.GetAllRequestsAsync(pagination);
 
-                if (fetchedRequests?.Items != null)
+                if (result?.Data?.Items != null)
                 {
-                    foreach (var req in fetchedRequests.Items)
+                    // Filter requests based on user permissions using RequestStateManager
+                    var filteredRequests = result.Data.Items.Where(request =>
+                        RequestStateManager.CanViewRequest(request, userDto)).ToList();
+
+                    foreach (var req in filteredRequests)
                     {
                         Requests.Add(req);
                     }
@@ -94,7 +158,6 @@ namespace TDFMAUI.ViewModels
             }
             catch (Exception ex)
             {
-                // Use shared error handling service for consistent error messages
                 await _errorHandlingService.ShowErrorAsync(ex, "loading requests");
                 RequestCountText = "Error loading requests";
             }
@@ -116,7 +179,25 @@ namespace TDFMAUI.ViewModels
         [RelayCommand]
         private async Task NavigateToAddRequestAsync()
         {
-            // Use Shell navigation instead
+            var currentUser = await _authService.GetCurrentUserAsync();
+            if (currentUser == null) return;
+
+            var userDto = new UserDto
+            {
+                UserID = currentUser.UserID,
+                IsAdmin = currentUser.IsAdmin,
+                IsHR = currentUser.IsHR,
+                IsManager = currentUser.IsManager,
+                Department = currentUser.Department
+            };
+
+            // Check if user can create requests using AuthorizationUtilities
+            if (!AuthorizationUtilities.CanPerformRequestAction(userDto, null, RequestAction.View))
+            {
+                await Shell.Current.DisplayAlert("Access Denied", "You don't have permission to create requests.", "OK");
+                return;
+            }
+
             await Shell.Current.GoToAsync(nameof(AddRequestPage));
         }
 
@@ -126,20 +207,29 @@ namespace TDFMAUI.ViewModels
         {
             if (request == null) return;
 
-            // Use Shell navigation instead
+            var currentUser = await _authService.GetCurrentUserAsync();
+            if (currentUser == null) return;
+
+            var userDto = new UserDto
+            {
+                UserID = currentUser.UserID,
+                IsAdmin = currentUser.IsAdmin,
+                IsHR = currentUser.IsHR,
+                IsManager = currentUser.IsManager,
+                Department = currentUser.Department
+            };
+
+            // Check if user can view this request using RequestStateManager
+            if (!RequestStateManager.CanViewRequest(request, userDto))
+            {
+                await Shell.Current.DisplayAlert("Access Denied", "You don't have permission to view this request.", "OK");
+                return;
+            }
+
             await Shell.Current.GoToAsync($"{nameof(RequestDetailsPage)}", new Dictionary<string, object>
             {
                 {"RequestId", request.RequestID}
             });
-        }
-
-        // This method might be called when the page appears
-        public Task InitializeAsync()
-        {
-            // Set default dates if needed
-            FromDate = DateTime.Today;
-            ToDate = FromDate;
-            return LoadRequestsAsync();
         }
     }
 }

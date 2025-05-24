@@ -1223,8 +1223,6 @@ namespace TDFMAUI.Services
         }
 
         // IDisposable Implementation
-        // Note: _disposed field is already declared at the class level
-
         public void Dispose()
         {
             Dispose(true);

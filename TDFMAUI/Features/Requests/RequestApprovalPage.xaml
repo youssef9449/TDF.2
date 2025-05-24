@@ -18,6 +18,7 @@
             <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
             <converters:DateTimeToStringConverter x:Key="DateTimeToStringConverter" />
             <converters:IsPendingConverter x:Key="IsPendingConverter" />
+            <converters:PageNumberToColorConverter x:Key="PageNumberToColorConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -156,8 +157,78 @@
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-         <!-- Placeholder for Pagination Controls -->
-        <Label Grid.Row="3" Grid.ColumnSpan="2" Text="Pagination placeholder" HorizontalOptions="Center" Margin="10"/>
+        <!-- Pagination Controls -->
+        <Grid Grid.Row="3" Grid.ColumnSpan="2" 
+              ColumnDefinitions="Auto,*,Auto"
+              Padding="10"
+              IsVisible="{Binding HasRequests}">
+            <!-- Page Info -->
+            <Label Grid.Column="0" 
+                   Text="{Binding PageInfo}"
+                   VerticalOptions="Center"
+                   Margin="0,0,10,0"/>
+
+            <!-- Page Navigation -->
+            <HorizontalStackLayout Grid.Column="1" 
+                                  HorizontalOptions="Center" 
+                                  Spacing="5">
+                <Button Text="&lt;&lt;"
+                        Command="{Binding FirstPageCommand}"
+                        IsEnabled="{Binding CanGoToFirstPage}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        WidthRequest="{OnIdiom Phone=40, Default=50}"
+                        HeightRequest="{OnIdiom Phone=40, Default=50}"/>
+                <Button Text="&lt;"
+                        Command="{Binding PreviousPageCommand}"
+                        IsEnabled="{Binding CanGoToPreviousPage}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        WidthRequest="{OnIdiom Phone=40, Default=50}"
+                        HeightRequest="{OnIdiom Phone=40, Default=50}"/>
+                
+                <!-- Page Numbers -->
+                <CollectionView ItemsSource="{Binding PageNumbers}"
+                              ItemsLayout="HorizontalList"
+                              HorizontalOptions="Center"
+                              SelectionMode="None">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Button Text="{Binding}"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=GoToPageCommand}"
+                                    CommandParameter="{Binding}"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    WidthRequest="{OnIdiom Phone=40, Default=50}"
+                                    HeightRequest="{OnIdiom Phone=40, Default=50}"
+                                    BackgroundColor="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=CurrentPage, Converter={StaticResource PageNumberToColorConverter}, ConverterParameter={Binding}}"/>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <Button Text="&gt;"
+                        Command="{Binding NextPageCommand}"
+                        IsEnabled="{Binding CanGoToNextPage}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        WidthRequest="{OnIdiom Phone=40, Default=50}"
+                        HeightRequest="{OnIdiom Phone=40, Default=50}"/>
+                <Button Text="&gt;&gt;"
+                        Command="{Binding LastPageCommand}"
+                        IsEnabled="{Binding CanGoToLastPage}"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        WidthRequest="{OnIdiom Phone=40, Default=50}"
+                        HeightRequest="{OnIdiom Phone=40, Default=50}"/>
+            </HorizontalStackLayout>
+
+            <!-- Items Per Page -->
+            <HorizontalStackLayout Grid.Column="2" 
+                                  HorizontalOptions="End" 
+                                  Spacing="5"
+                                  VerticalOptions="Center">
+                <Label Text="Items per page:"
+                       VerticalOptions="Center"/>
+                <Picker ItemsSource="{Binding PageSizeOptions}"
+                        SelectedItem="{Binding PageSize}"
+                        WidthRequest="{OnIdiom Phone=80, Default=100}"/>
+            </HorizontalStackLayout>
+        </Grid>
 
     </Grid>
 </ContentPage>

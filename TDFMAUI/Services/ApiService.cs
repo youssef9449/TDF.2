@@ -82,7 +82,6 @@ namespace TDFMAUI.Services
             _jsonOptions = TDFShared.Helpers.JsonSerializationHelper.DefaultOptions;
 
             _logger?.LogInformation("ApiService: Initialized");
-            InitializeAuthenticationAsync().ConfigureAwait(false);
             _networkMonitor = networkMonitor;
             if (_networkMonitor != null)
             {
@@ -273,6 +272,16 @@ namespace TDFMAUI.Services
             _initialized = true;
         }
 
+        // Add a new method to handle async initialization
+        public async Task InitializeAsync()
+        {
+            if (!_initialized)
+            {
+                await InitializeAuthenticationAsync();
+                _initialized = true;
+            }
+        }
+
         #region HTTP Methods
         // Helper method to determine if an exception is retryable
         private bool IsRetryableException(Exception ex)
@@ -447,112 +456,75 @@ namespace TDFMAUI.Services
         #endregion
 
         #region Authentication
-        public async Task<UserDto> LoginAsync(string username, string password)
+        public async Task<ApiResponse<LoginResponseDto>> LoginAsync(LoginRequestDto loginRequest)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            var request = new AuthLoginRequest { Username = username, Password = password };
             string endpoint = ApiRoutes.Auth.Login;
-
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
                 throw new NetworkUnavailableException();
-
             try
             {
-                var tokenResponse = await PostAsync<AuthLoginRequest, ApiResponse<TokenResponse>>(endpoint, request);
-
-                if (tokenResponse == null || !tokenResponse.Success || tokenResponse.Data == null)
+                var response = await PostAsync<LoginRequestDto, ApiResponse<LoginResponseDto>>(endpoint, loginRequest);
+                if (response?.Success == true && response.Data != null)
                 {
-                    throw new ApiException(HttpStatusCode.Unauthorized, tokenResponse?.ErrorMessage ?? "Login failed: Invalid response from server.");
+                    DateTime expiration = DateTime.UtcNow.AddHours(24); // fallback
+                    await _secureStorage.SaveTokenAsync(response.Data.Token, expiration);
+                    await _httpClientService.SetAuthenticationTokenAsync(response.Data.Token);
                 }
-
-                DateTime tokenExpiration = DateTime.UtcNow.AddHours(24);
-
-                await _secureStorage.SaveTokenAsync(tokenResponse.Data.Token, tokenExpiration);
-                await _httpClientService.SetAuthenticationTokenAsync(tokenResponse.Data.Token);
-
-                var userDto = new UserDto {
-                    UserID = tokenResponse.Data.UserId,
-                    Username = tokenResponse.Data.Username,
-                    FullName = tokenResponse.Data.FullName,
-                    IsAdmin = tokenResponse.Data.IsAdmin
-                };
-                App.CurrentUser = userDto;
-                return userDto;
-            }
-            catch (ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized || ex.StatusCode == HttpStatusCode.BadRequest)
-            {
-                _logger.LogWarning("Login failed for user {Username}: {StatusCode} - {Message}", username, ex.StatusCode, ex.Message);
-                await _secureStorage.ClearTokenAsync();
-                await _httpClientService.ClearAuthenticationTokenAsync();
-                throw;
+                return response ?? new ApiResponse<LoginResponseDto> { Success = false, Message = "Login failed" };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error during login for user {Username}", username);
-                await _secureStorage.ClearTokenAsync();
-                await _httpClientService.ClearAuthenticationTokenAsync();
-                throw new ApiException("An unexpected error occurred during login.", ex);
+                _logger?.LogError(ex, "ApiService: Login failed: {Message}", ex.Message);
+                return new ApiResponse<LoginResponseDto> { Success = false, Message = ex.Message };
             }
         }
 
-        public async Task<bool> LogoutAsync()
+        public async Task<ApiResponse<bool>> LogoutAsync()
         {
-             if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = ApiRoutes.Auth.Logout;
-             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
-                 throw new NetworkUnavailableException();
-
+            if (!_initialized) await InitializeAuthenticationAsync();
             try
             {
-                 await PostAsync<object, object>(endpoint, null);
-                await _secureStorage.ClearTokenAsync();
                 await _httpClientService.ClearAuthenticationTokenAsync();
-                _logger?.LogInformation("ApiService: Logout successful, token cleared.");
-                return true;
+                await _secureStorage.ClearTokenAsync();
+                return new ApiResponse<bool> { Success = true, Data = true };
             }
             catch (Exception ex)
             {
-                 _logger.LogError(ex, "Error during logout API call");
-                 await _secureStorage.ClearTokenAsync();
-                 await _httpClientService.ClearAuthenticationTokenAsync();
-                 return false;
+                _logger?.LogError(ex, "ApiService: Logout failed: {Message}", ex.Message);
+                return new ApiResponse<bool> { Success = false, Message = ex.Message };
             }
         }
 
-        public async Task<bool> RegisterUserAsync(CreateUserRequest registration)
+        public async Task<ApiResponse<RegisterResponseDto>> RegisterAsync(RegisterRequestDto registerRequest)
         {
-             if (!_initialized) await InitializeAuthenticationAsync();
-             string endpoint = ApiRoutes.Auth.Register;
-              if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: false))
-                 throw new NetworkUnavailableException();
-
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = ApiRoutes.Auth.Register;
             try
             {
-                _logger?.LogInformation("ApiService: Registering new user {Username}", registration.Username);
-                var response = await PostAsync<CreateUserRequest, ApiResponse<UserDto>>(endpoint, registration);
-
-                if (response == null || !response.Success)
-                {
-                    HttpStatusCode statusCode = HttpStatusCode.BadRequest;
-                    if (response != null)
-                    {
-                        statusCode = (HttpStatusCode)response.StatusCode;
-                    }
-                    throw new ApiException(statusCode, response?.ErrorMessage ?? "Registration failed: Invalid response.");
-                }
-
-                _logger?.LogInformation("ApiService: User {Username} registered successfully", registration.Username);
-                return true;
-            }
-            catch (ApiException ex)
-            {
-                 _logger?.LogError(ex, "ApiService: API error registering user {Username}", registration.Username);
-                 throw;
+                var response = await PostAsync<RegisterRequestDto, ApiResponse<RegisterResponseDto>>(endpoint, registerRequest);
+                return response ?? new ApiResponse<RegisterResponseDto> { Success = false, Message = "Registration failed" };
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "ApiService: Failed to register user {Username}", registration.Username);
-                throw new ApiException($"Registration failed: {GetFriendlyErrorMessage(ex)}", ex);
+                _logger?.LogError(ex, "Error during registration: {Message}", ex.Message);
+                return new ApiResponse<RegisterResponseDto> { Success = false, Message = ex.Message };
+            }
+        }
+
+        public async Task<ApiResponse<bool>> SignupAsync(SignupModel signupModel)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = ApiRoutes.Auth.Register;
+            try
+            {
+                var response = await PostAsync<SignupModel, ApiResponse<bool>>(endpoint, signupModel);
+                return response ?? new ApiResponse<bool> { Success = false, Message = "Signup failed" };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Signup failed: {Message}", ex.Message);
+                return new ApiResponse<bool> { Success = false, Message = ex.Message };
             }
         }
         #endregion
@@ -584,26 +556,20 @@ namespace TDFMAUI.Services
             return await GetUserByIdAsync(userId);
         }
 
-        public async Task<UserProfileDto> GetUserProfileAsync(int userId)
+        public async Task<ApiResponse<UserProfileDto>> GetUserProfileAsync(int userId)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
-            // Use ApiRoutes.Users.GetProfile for the profile endpoint
-            string endpoint = ApiRoutes.Users.GetProfile;
-
-            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
-                return await QueueRequestAsync<UserProfileDto>(endpoint, null, "GET");
-
-            var response = await GetAsync<ApiResponse<UserProfileDto>>(endpoint);
-            if (response == null || !response.Success)
+            string endpoint = string.Format(ApiRoutes.Users.GetById, userId);
+            try
             {
-                HttpStatusCode statusCode = HttpStatusCode.NotFound;
-                if (response != null)
-                {
-                    statusCode = (HttpStatusCode)response.StatusCode;
-                }
-                throw new ApiException(statusCode, response?.ErrorMessage ?? "User profile not found");
+                var response = await GetAsync<ApiResponse<UserProfileDto>>(endpoint);
+                return response ?? new ApiResponse<UserProfileDto> { Success = false, Message = "Failed to get user profile" };
             }
-            return response.Data;
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to get user profile: {Message}", ex.Message);
+                return new ApiResponse<UserProfileDto> { Success = false, Message = ex.Message };
+            }
         }
 
         public async Task<PaginatedResult<UserDto>> GetAllUsersAsync(int page = 1, int pageSize = 10)
@@ -628,11 +594,11 @@ namespace TDFMAUI.Services
 
         public async Task<List<UserDto>> GetUsersByDepartmentAsync(string department)
         {
-             if (!_initialized) await InitializeAuthenticationAsync();
-             if (string.IsNullOrWhiteSpace(department)) return new List<UserDto>();
-             string endpoint = string.Format(ApiRoutes.Users.GetByDepartment, Uri.EscapeDataString(department));
-             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
-                 return await QueueRequestAsync<List<UserDto>>(endpoint, null, "GET");
+            if (!_initialized) await InitializeAuthenticationAsync();
+            if (string.IsNullOrWhiteSpace(department)) return new List<UserDto>();
+            string endpoint = string.Format(ApiRoutes.Users.GetByDepartment, Uri.EscapeDataString(department));
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                return await QueueRequestAsync<List<UserDto>>(endpoint, null, "GET");
 
             try
             {
@@ -650,36 +616,7 @@ namespace TDFMAUI.Services
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "ApiService: Failed to get users for department '{Department}': {ErrorMessage}", department, GetFriendlyErrorMessage(ex));
-                throw;
-            }
-        }
-
-        public async Task<List<UserDto>> GetTeamMembersAsync()
-        {
-            if (!_initialized) await InitializeAuthenticationAsync();
-            string endpoint = ApiRoutes.Users.GetTeamMembers;
-
-            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
-                return await QueueRequestAsync<List<UserDto>>(endpoint, null, "GET");
-
-            try
-            {
-                var response = await GetAsync<ApiResponse<List<UserDto>>>(endpoint);
-                if (response == null || !response.Success)
-                {
-                    HttpStatusCode statusCode = HttpStatusCode.NotFound;
-                    if (response != null)
-                    {
-                        statusCode = (HttpStatusCode)response.StatusCode;
-                    }
-                    throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to get team members");
-                }
-                return response.Data ?? new List<UserDto>();
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "ApiService: Failed to get team members: {ErrorMessage}", GetFriendlyErrorMessage(ex));
+                _logger?.LogError(ex, "ApiService: Failed to get users by department '{Department}': {ErrorMessage}", department, GetFriendlyErrorMessage(ex));
                 throw;
             }
         }
@@ -1118,415 +1055,211 @@ namespace TDFMAUI.Services
 
         #endregion
 
-        // Authentication methods
-        public async Task<LoginResponseDto> LoginAsync(LoginRequestDto loginRequest)
+        // AUTH
+        public async Task<ApiResponse<UserDto>> GetCurrentUserAsync()
         {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = ApiRoutes.Users.GetCurrent;
             try
             {
-                var response = await PostAsync<LoginRequestDto, LoginResponseDto>(ApiRoutes.Auth.Login, loginRequest);
-
-                if (response != null && !string.IsNullOrEmpty(response.Token))
-                {
-                    DateTime expiration = DateTime.UtcNow.AddHours(24);
-                    await _secureStorage.SaveTokenAsync(response.Token, expiration);
-                    await _httpClientService.SetAuthenticationTokenAsync(response.Token);
-                }
-
-                return response;
+                var response = await GetAsync<ApiResponse<UserDto>>(endpoint);
+                return response ?? new ApiResponse<UserDto> { Success = false, Message = "Failed to get current user" };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during login: {Message}", ex.Message);
-                throw;
+                _logger?.LogError(ex, "ApiService: Failed to get current user: {Message}", ex.Message);
+                return new ApiResponse<UserDto> { Success = false, Message = ex.Message };
             }
         }
 
-        public async Task<RegisterResponseDto> RegisterAsync(RegisterRequestDto registerRequest)
+        public async Task<ApiResponse<int>> GetCurrentUserIdAsync()
         {
-            try
-            {
-                // This method now seems redundant if SignupAsync uses CreateUserRequest
-                // and calls PostAsync directly.
-                _logger.LogWarning("RegisterAsync(RegisterRequestDto) called, consider removing if SignupAsync is the primary path.");
-                // If kept, it should likely call the backend with RegisterRequestDto
-                // or be adapted.
-                return await PostAsync<RegisterRequestDto, RegisterResponseDto>(ApiRoutes.Auth.Register, registerRequest);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during registration: {Message}", ex.Message);
-                throw;
-            }
+            var userResponse = await GetCurrentUserAsync();
+            if (userResponse.Success && userResponse.Data != null)
+                return new ApiResponse<int> { Success = true, Data = userResponse.Data.UserID };
+            return new ApiResponse<int> { Success = false, Message = userResponse.Message };
         }
 
-        // User methods
-        public async Task<UserDto> GetCurrentUserAsync()
+        public async Task<ApiResponse<bool>> IsAuthenticatedAsync()
         {
             try
             {
-                return await GetAsync<UserDto>(ApiRoutes.Users.GetCurrent);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting current user: {Message}", ex.Message);
-                throw;
-            }
-        }
-
-        public async Task<int> GetCurrentUserIdAsync()
-        {
-            try
-            {
-                var user = await GetCurrentUserAsync();
-                return user?.UserID ?? 0;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting current user ID: {Message}", ex.Message);
-                throw;
-            }
-        }
-
-        public async Task<bool> IsAuthenticatedAsync()
-        {
-            try
-            {
-                // Check if we should persist token based on platform
-                if (DeviceHelper.IsDesktop)
-                {
-                    _logger.LogInformation("IsAuthenticatedAsync: Desktop platform detected, checking token persistence");
-                    // For desktop platforms, check if we should clear tokens
-                    bool shouldPersist = _secureStorage.ShouldPersistToken();
-                    if (!shouldPersist)
-                    {
-                        _logger.LogInformation("IsAuthenticatedAsync: Token persistence disabled for desktop platform");
-                        // This will ensure we don't use any stored tokens on desktop platforms
-                        await _secureStorage.HandleTokenPersistenceAsync();
-                        return false;
-                    }
-                }
-
                 var tokenInfo = await _secureStorage.GetTokenAsync();
-                return !string.IsNullOrEmpty(tokenInfo.Token) && tokenInfo.Expiration > DateTime.UtcNow;
+                bool isValid = !string.IsNullOrEmpty(tokenInfo.Token) && tokenInfo.Expiration > DateTime.UtcNow;
+                return new ApiResponse<bool> { Success = true, Data = isValid };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error checking authentication status: {Message}", ex.Message);
-                return false;
+                return new ApiResponse<bool> { Success = false, Message = ex.Message };
             }
         }
 
-        // Request methods
-        public async Task<PaginatedResult<RequestResponseDto>> GetRequestsAsync(RequestPaginationDto pagination, int? userId = null, string department = null, bool queueIfUnavailable = true)
+        // REQUESTS
+        public async Task<ApiResponse<RequestResponseDto>> GetRequestByIdAsync(int requestId, bool queueIfUnavailable = true)
         {
             try
             {
-                var queryParams = new List<string>();
-
-                if (pagination != null)
-                {
-                    queryParams.Add($"page={pagination.Page}");
-                    queryParams.Add($"pageSize={pagination.PageSize}");
-
-                    if (pagination.FromDate.HasValue)
-                    {
-                        queryParams.Add($"fromDate={pagination.FromDate.Value:yyyy-MM-dd}");
-                    }
-
-                    if (pagination.ToDate.HasValue)
-                    {
-                        queryParams.Add($"toDate={pagination.ToDate.Value:yyyy-MM-dd}");
-                    }
-
-                    if (pagination.FilterStatus.HasValue)
-                    {
-                        queryParams.Add($"status={pagination.FilterStatus.Value.ToString()}");
-                    }
-
-                    if (pagination.FilterType.HasValue)
-                    {
-                        queryParams.Add($"type={pagination.FilterType.Value.ToString()}");
-                    }
-                }
-
-                if (userId.HasValue)
-                {
-                    queryParams.Add($"userId={userId.Value}");
-                }
-
-                if (!string.IsNullOrEmpty(department) && department != "All")
-                {
-                    queryParams.Add($"department={Uri.EscapeDataString(department)}");
-                }
-
-                string baseUrl = ApiRoutes.RemoveBasePrefix(ApiRoutes.Requests.GetAll);
-                string url = $"{baseUrl}{(queryParams.Any() ? $"?{string.Join("&", queryParams)}" : "")}";
-
-                return await GetAsync<PaginatedResult<RequestResponseDto>>(url, queueIfUnavailable);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting requests: {Message}", ex.Message);
-                throw;
-            }
-        }
-
-        public async Task<RequestResponseDto> CreateRequestAsync(RequestCreateDto requestDto)
-        {
-            try
-            {
-                _logger?.LogInformation("ApiService: Creating request");
-                var response = await PostAsync<RequestCreateDto, RequestResponseDto>(ApiRoutes.Requests.Base, requestDto);
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error creating request: {Message}", ex.Message);
-                throw;
-            }
-        }
-
-        public async Task<RequestResponseDto> UpdateRequestAsync(int requestId, RequestUpdateDto requestDto)
-        {
-            try
-            {
-                _logger?.LogInformation("ApiService: Updating request {RequestId}", requestId);
-                string endpoint = string.Format(ApiRoutes.Requests.Update, requestId);
-                var response = await PutAsync<RequestUpdateDto, RequestResponseDto>(endpoint, requestDto);
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Error updating request {RequestId}: {Message}", requestId, ex.Message);
-                throw;
-            }
-        }
-
-        public async Task<RequestResponseDto> GetRequestByIdAsync(int requestId, bool queueIfUnavailable = true)
-        {
-            try
-            {
-                _logger?.LogInformation("ApiService: Getting request {RequestId}", requestId);
                 string endpoint = string.Format(ApiRoutes.Requests.GetById, requestId);
-                var response = await GetAsync<RequestResponseDto>(endpoint, queueIfUnavailable);
-                return response;
+                var response = await GetAsync<ApiResponse<RequestResponseDto>>(endpoint, queueIfUnavailable);
+                return response ?? new ApiResponse<RequestResponseDto> { Success = false, Message = "Failed to get request" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error getting request {RequestId}: {Message}", requestId, ex.Message);
-                throw;
+                return new ApiResponse<RequestResponseDto> { Success = false, Message = ex.Message };
             }
         }
 
-
-        public async Task<bool> DeleteRequestAsync(int requestId)
+        public async Task<ApiResponse<RequestResponseDto>> CreateRequestAsync(RequestCreateDto requestDto)
         {
             try
             {
-                _logger?.LogInformation("ApiService: Deleting request {RequestId}", requestId);
+                var response = await PostAsync<RequestCreateDto, ApiResponse<RequestResponseDto>>(ApiRoutes.Requests.Base, requestDto);
+                return response ?? new ApiResponse<RequestResponseDto> { Success = false, Message = "Failed to create request" };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error creating request: {Message}", ex.Message);
+                return new ApiResponse<RequestResponseDto> { Success = false, Message = ex.Message };
+            }
+        }
+
+        public async Task<ApiResponse<RequestResponseDto>> UpdateRequestAsync(int requestId, RequestUpdateDto requestDto)
+        {
+            try
+            {
+                string endpoint = string.Format(ApiRoutes.Requests.Update, requestId);
+                var response = await PutAsync<RequestUpdateDto, ApiResponse<RequestResponseDto>>(endpoint, requestDto);
+                return response ?? new ApiResponse<RequestResponseDto> { Success = false, Message = "Failed to update request" };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error updating request {RequestId}: {Message}", requestId, ex.Message);
+                return new ApiResponse<RequestResponseDto> { Success = false, Message = ex.Message };
+            }
+        }
+
+        public async Task<ApiResponse<bool>> DeleteRequestAsync(int requestId)
+        {
+            try
+            {
                 string endpoint = string.Format(ApiRoutes.Requests.Delete, requestId);
                 var response = await DeleteAsync(endpoint);
-                return response.IsSuccessStatusCode;
+                return new ApiResponse<bool> { Success = response.IsSuccessStatusCode, Data = response.IsSuccessStatusCode };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error deleting request {RequestId}: {Message}", requestId, ex.Message);
-                throw;
+                return new ApiResponse<bool> { Success = false, Message = ex.Message };
             }
         }
 
-        public async Task<bool> ApproveRequestAsync(int requestId, RequestApprovalDto approvalDto)
+        public async Task<ApiResponse<bool>> ApproveRequestAsync(int requestId, RequestApprovalDto approvalDto)
         {
             try
             {
-                _logger?.LogInformation("ApiService: Approving request {RequestId}", requestId);
                 string endpoint = string.Format(ApiRoutes.Requests.Approve, requestId);
                 var response = await PostAsync<RequestApprovalDto, ApiResponse<bool>>(endpoint, approvalDto);
-                return response?.Success ?? false;
+                return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to approve request" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error approving request {RequestId}: {Message}", requestId, ex.Message);
-                throw;
+                return new ApiResponse<bool> { Success = false, Message = ex.Message };
             }
         }
 
-        public async Task<bool> RejectRequestAsync(int requestId, RequestRejectDto rejectDto)
+        public async Task<ApiResponse<bool>> RejectRequestAsync(int requestId, RequestRejectDto rejectDto)
         {
             try
             {
-                _logger?.LogInformation("ApiService: Rejecting request {RequestId}", requestId);
                 string endpoint = string.Format(ApiRoutes.Requests.Reject, requestId);
                 var response = await PostAsync<RequestRejectDto, ApiResponse<bool>>(endpoint, rejectDto);
-                return response?.Success ?? false;
+                return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to reject request" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error rejecting request {RequestId}: {Message}", requestId, ex.Message);
-                throw;
+                return new ApiResponse<bool> { Success = false, Message = ex.Message };
             }
         }
 
-        // Common methods
-        public async Task<List<LookupItem>> GetDepartmentsAsync(bool queueIfUnavailable = true)
+        public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetRequestsAsync(RequestPaginationDto pagination, int? userId = null, string department = null, bool queueIfUnavailable = true)
         {
             try
             {
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync called in TDFMAUI ApiService");
-
-                // Check network connectivity
-                var networkAccess = Connectivity.NetworkAccess;
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Network status: {NetworkStatus}", networkAccess);
-
-                if (networkAccess != NetworkAccess.Internet)
+                string endpoint = ApiRoutes.Requests.Base;
+                var queryParams = new List<string>();
+                if (userId.HasValue)
+                    queryParams.Add($"userId={userId.Value}");
+                if (!string.IsNullOrEmpty(department))
+                    queryParams.Add($"department={Uri.EscapeDataString(department)}");
+                if (pagination != null)
                 {
-                    _logger.LogError("DIAGNOSTIC: GetDepartmentsAsync - No internet connectivity.");
-                    throw new InvalidOperationException("No internet connectivity available.");
+                    queryParams.Add($"page={pagination.Page}");
+                    queryParams.Add($"pageSize={pagination.PageSize}");
+                    if (!string.IsNullOrEmpty(pagination.SortBy))
+                        queryParams.Add($"sortBy={Uri.EscapeDataString(pagination.SortBy)}");
+                    queryParams.Add($"ascending={!pagination.Ascending}");
                 }
-
-                // Log API endpoint details
-                string endpoint = ApiRoutes.Lookups.GetDepartments;
-                string fullUrl = $"{_httpClientService.BaseUrl?.TrimEnd('/')}/{endpoint.TrimStart('/')}";
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Starting API request to endpoint: {Endpoint}, full URL: {FullUrl}", endpoint, fullUrl);
-
-                // Make the API call with detailed logging
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Making HTTP request");
-
-                // Try direct HTTP request first to diagnose any issues
-                try
-                {
-                    string rawResponse = await _httpClientService.GetRawAsync(endpoint);
-                    _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - Raw response received: {Length} characters",
-                        rawResponse?.Length ?? 0);
-
-                    if (!string.IsNullOrEmpty(rawResponse))
-                    {
-                        _logger.LogDebug("DIAGNOSTIC: GetDepartmentsAsync - Raw response preview: {Preview}",
-                            rawResponse.Length > 100 ? rawResponse.Substring(0, 100) + "..." : rawResponse);
-                    }
-                }
-                catch (Exception rawEx)
-                {
-                    _logger.LogError(rawEx, "DIAGNOSTIC: GetDepartmentsAsync - Error getting raw response: {Message}", rawEx.Message);
-                }
-
-                // Now make the actual API call
-                var result = await GetAsync<ApiResponse<List<LookupItem>>>(endpoint, queueIfUnavailable);
-
-                // Log the result
-                if (result == null)
-                {
-                    _logger.LogError("DIAGNOSTIC: GetDepartmentsAsync - API request returned null result");
-                    throw new InvalidOperationException("API request returned null result");
-                }
-
-                if (!result.Success)
-                {
-                    _logger.LogError("DIAGNOSTIC: GetDepartmentsAsync - API request failed with status code {StatusCode}: {ErrorMessage}",
-                        result.StatusCode, result.ErrorMessage);
-                    throw new InvalidOperationException($"API request failed: {result.ErrorMessage}");
-                }
-
-                if (result.Data == null)
-                {
-                    _logger.LogError("DIAGNOSTIC: GetDepartmentsAsync - API request succeeded but returned null data");
-                    throw new InvalidOperationException("API request succeeded but returned null data");
-                }
-
-                // Log successful result
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync - API request completed successfully, returned {Count} items", result.Data.Count);
-
-                // Log the first few departments for debugging
-                for (int i = 0; i < Math.Min(result.Data.Count, 5); i++)
-                {
-                    var dept = result.Data[i];
-                    _logger.LogInformation("DIAGNOSTIC: Department[{Index}] - Id: {Id}, Name: {Name}, Value: {Value}",
-                        i, dept.Id, dept.Name, dept.Value);
-                }
-
-                return result.Data;
+                if (queryParams.Count > 0)
+                    endpoint += "?" + string.Join("&", queryParams);
+                var response = await GetAsync<ApiResponse<PaginatedResult<RequestResponseDto>>>(endpoint, queueIfUnavailable);
+                return response ?? new ApiResponse<PaginatedResult<RequestResponseDto>> { Success = false, Message = "Failed to get requests" };
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "DIAGNOSTIC ERROR: Error getting departments: {Message}", ex.Message);
-                throw;
+                _logger?.LogError(ex, "Error getting requests: {Message}", ex.Message);
+                return new ApiResponse<PaginatedResult<RequestResponseDto>> { Success = false, Message = ex.Message };
             }
         }
 
+        // LEAVE BALANCES
+        public async Task<ApiResponse<Dictionary<string, int>>> GetLeaveBalancesAsync(int userId, bool queueIfUnavailable = true)
+        {
+            try
+            {
+                string endpoint = string.Format(ApiRoutes.Requests.GetUserBalances, userId);
+                var response = await GetAsync<ApiResponse<Dictionary<string, int>>>(endpoint, queueIfUnavailable);
+                return response ?? new ApiResponse<Dictionary<string, int>> { Success = false, Message = "Failed to get leave balances" };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error getting leave balances: {Message}", ex.Message);
+                return new ApiResponse<Dictionary<string, int>> { Success = false, Message = ex.Message };
+            }
+        }
+
+        // DEPARTMENTS
+        public async Task<ApiResponse<List<LookupItem>>> GetDepartmentsAsync(bool queueIfUnavailable = true)
+        {
+            try
+            {
+                string endpoint = ApiRoutes.Lookups.GetDepartments;
+                var response = await GetAsync<ApiResponse<List<LookupItem>>>(endpoint, queueIfUnavailable);
+                return response ?? new ApiResponse<List<LookupItem>> { Success = false, Message = "Failed to get departments" };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error getting departments: {Message}", ex.Message);
+                return new ApiResponse<List<LookupItem>> { Success = false, Message = ex.Message };
+            }
+        }
+
+        // LEAVE TYPES (exception: returns Task<List<LookupItem>>)
         public async Task<List<LookupItem>> GetLeaveTypesAsync(bool queueIfUnavailable = true)
         {
             try
             {
-                return await GetAsync<List<LookupItem>>(ApiRoutes.Lookups.GetLeaveTypes, queueIfUnavailable);
+                string endpoint = ApiRoutes.Lookups.GetLeaveTypes;
+                var response = await GetAsync<ApiResponse<List<LookupItem>>>(endpoint, queueIfUnavailable);
+                return response?.Data ?? new List<LookupItem>();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting leave types: {Message}", ex.Message);
-                throw;
-            }
-        }
-
-        public async Task<Dictionary<string, int>> GetLeaveBalancesAsync(int userId, bool queueIfUnavailable = true)
-        {
-            try
-            {
-                // Use ApiRoutes.Requests.GetUserBalances for the leave balances endpoint
-                string endpoint = string.Format(ApiRoutes.Requests.GetUserBalances, userId);
-                return await GetAsync<Dictionary<string, int>>(endpoint, queueIfUnavailable);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting leave balances: {Message}", ex.Message);
-                throw;
-            }
-        }
-
-        public async Task<List<LookupItem>> GetLookupAsync(string lookupType, bool queueIfUnavailable = true)
-        {
-            try
-            {
-                string url = $"{ApiRoutes.Base}/lookups/{Uri.EscapeDataString(lookupType)}";
-                return await GetAsync<List<LookupItem>>(url, queueIfUnavailable);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting lookup data for '{LookupType}': {Message}", lookupType, ex.Message);
-                throw;
-            }
-        }
-
-        // Add SignupAsync method implementation
-        public async Task<bool> SignupAsync(SignupModel signupModel)
-        {
-            try
-            {
-                // Create the DTO expected by the backend controller
-                var createUserRequest = new CreateUserRequest
-                {
-                    Username = signupModel.Username,
-                    Password = signupModel.Password,
-                    FullName = signupModel.FullName,
-                    Department = signupModel.Department,
-                    Title = signupModel.Title,
-                    // IsAdmin and IsManager are set to false on the backend (AuthController)
-                    // Do not include them here to avoid sending unnecessary/potentially insecure data
-                    IsAdmin = false, // Explicitly false, matching backend expectation/override
-                    IsManager = false // Explicitly false, matching backend expectation/override
-                };
-
-                // Call the backend registration endpoint using the correct DTO type
-                // Assuming PostAsync can handle CreateUserRequest and expects ApiResponse<UserDto>
-                // based on AuthController.Register signature
-                var response = await PostAsync<CreateUserRequest, ApiResponse<UserDto>>(ApiRoutes.Auth.Register, createUserRequest);
-
-                // Check the ApiResponse for success
-                return response != null && response.Success;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during user signup: {Message}", ex.Message);
-                // Consider returning a more specific result or error message to the caller
-                throw; // Re-throw for ViewModel to handle
+                _logger?.LogError(ex, "Error getting leave types: {Message}", ex.Message);
+                return new List<LookupItem>();
             }
         }
     }

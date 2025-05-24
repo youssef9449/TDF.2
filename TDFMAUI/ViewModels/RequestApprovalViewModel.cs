@@ -93,6 +93,42 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private bool _hasError = false;
 
+        // Pagination Properties
+        [ObservableProperty]
+        private int _currentPage = 1;
+
+        [ObservableProperty]
+        private int _pageSize = 10;
+
+        [ObservableProperty]
+        private int _totalItems;
+
+        [ObservableProperty]
+        private int _totalPages;
+
+        [ObservableProperty]
+        private bool _canGoToFirstPage;
+
+        [ObservableProperty]
+        private bool _canGoToPreviousPage;
+
+        [ObservableProperty]
+        private bool _canGoToNextPage;
+
+        [ObservableProperty]
+        private bool _canGoToLastPage;
+
+        [ObservableProperty]
+        private ObservableCollection<int> _pageNumbers;
+
+        [ObservableProperty]
+        private ObservableCollection<int> _pageSizeOptions;
+
+        [ObservableProperty]
+        private bool _hasRequests;
+
+        public string PageInfo => $"Page {CurrentPage} of {TotalPages}";
+
         public List<string> StatusOptions => RequestOptions.StatusOptions;
         public List<string> TypeOptions => RequestOptions.TypeOptions;
         public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
@@ -160,6 +196,8 @@ namespace TDFMAUI.ViewModels
 
             Requests = new ObservableCollection<RequestResponseDto>();
             PendingRequests = new ObservableCollection<RequestResponseDto>();
+            PageNumbers = new ObservableCollection<int>();
+            PageSizeOptions = new ObservableCollection<int> { 5, 10, 20, 50 };
 
             _logger.LogInformation("RequestApprovalViewModel initialized");
 
@@ -271,14 +309,18 @@ namespace TDFMAUI.ViewModels
             HasError = false;
         }
 
-        // Authorization checks using TDFShared RequestStateManager
+        // Authorization checks using AuthorizationUtilities
         private bool CanApprove(RequestResponseDto request)
         {
             var currentUser = GetCachedCurrentUser();
-            return currentUser != null && RequestStateManager.CanApproveOrRejectRequest(request, currentUser);
+            return currentUser != null && AuthorizationUtilities.CanPerformRequestAction(currentUser, request, TDFShared.Utilities.RequestAction.Approve);
         }
 
-        private bool CanReject(RequestResponseDto request) => CanApprove(request); // Same logic as approve
+        private bool CanReject(RequestResponseDto request)
+        {
+            var currentUser = GetCachedCurrentUser();
+            return currentUser != null && AuthorizationUtilities.CanPerformRequestAction(currentUser, request, TDFShared.Utilities.RequestAction.Reject);
+        }
 
         public bool CanExecuteApprove(int id) =>
             Requests?.FirstOrDefault(r => r.RequestID == id) is RequestResponseDto req && CanApprove(req);
@@ -309,23 +351,18 @@ namespace TDFMAUI.ViewModels
 
                 _logger.LogInformation($"Approving request {requestId} for user {request.UserName}");
 
-                var approvalDto = new RequestApprovalDto
+                var result = await _requestService.ApproveRequestAsync(requestId, "Approved via approval page");
+                if (result?.Success == true)
                 {
-                    Status = RequestStatus.Approved,
-                    Comment = "Approved via approval page"
-                };
-
-                bool success = await _requestService.ApproveRequestAsync(requestId, approvalDto);
-                if (success)
-                {
-                    _logger.LogInformation($"Request {requestId} approved successfully");
+                    var approvedId = result.Data != null ? result.Data.RequestID : requestId;
+                    _logger.LogInformation($"Request {approvedId} approved successfully");
                     await _notificationService.ShowSuccessAsync("Request approved successfully");
                     await LoadRequestsInternalAsync(cancellationToken);
                 }
                 else
                 {
                     _logger.LogWarning($"Failed to approve request {requestId}");
-                    await HandleErrorAsync("Failed to approve request", new InvalidOperationException("Approval operation failed"));
+                    await HandleErrorAsync(result?.Message ?? "Failed to approve request", new InvalidOperationException("Approval operation failed"));
                 }
             }
             catch (Exception ex)
@@ -373,19 +410,18 @@ namespace TDFMAUI.ViewModels
 
                 _logger.LogInformation($"Rejecting request {requestId} for user {request.UserName} with reason: {reason}");
 
-                var rejectDto = new RequestRejectDto { RejectReason = reason };
-
-                bool success = await _requestService.RejectRequestAsync(requestId, rejectDto);
-                if (success)
+                var result = await _requestService.RejectRequestAsync(requestId, reason);
+                if (result?.Success == true)
                 {
-                    _logger.LogInformation($"Request {requestId} rejected successfully");
+                    var rejectedId = result.Data != null ? result.Data.RequestID : requestId;
+                    _logger.LogInformation($"Request {rejectedId} rejected successfully");
                     await _notificationService.ShowSuccessAsync("Request rejected successfully");
                     await LoadRequestsInternalAsync(cancellationToken);
                 }
                 else
                 {
                     _logger.LogWarning($"Failed to reject request {requestId}");
-                    await HandleErrorAsync("Failed to reject request", new InvalidOperationException("Rejection operation failed"));
+                    await HandleErrorAsync(result?.Message ?? "Failed to reject request", new InvalidOperationException("Rejection operation failed"));
                 }
             }
             catch (Exception ex)
@@ -449,15 +485,15 @@ namespace TDFMAUI.ViewModels
                     return;
                 }
 
-                var requests = await _requestService.GetAllRequestsAsync(requestPagination);
+                var result = await _requestService.GetAllRequestsAsync(requestPagination);
 
-                if (requests?.Items != null)
+                if (result?.Data?.Items != null)
                 {
-                    var requestCount = requests.Items.Count();
+                    var requestCount = result.Data.Items.Count();
                     _logger.LogInformation($"Loaded {requestCount} requests");
 
                     // Filter requests based on user permissions using RequestStateManager
-                    var filteredRequests = requests.Items.Where(request =>
+                    var filteredRequests = result.Data.Items.Where(request =>
                         RequestStateManager.CanViewRequest(request, currentUser)).ToList();
 
                     _logger.LogDebug($"Filtered to {filteredRequests.Count} viewable requests out of {requestCount} total");
@@ -513,7 +549,7 @@ namespace TDFMAUI.ViewModels
                 _logger.LogInformation($"Viewing request details for request {requestId}");
 
                 var requestDetails = await _requestService.GetRequestByIdAsync(requestId);
-                if (requestDetails == null)
+                if (requestDetails?.Data == null)
                 {
                     _logger.LogWarning($"Could not find request details for ID {requestId}");
                     await _notificationService.ShowErrorAsync("Could not find request details");
@@ -522,7 +558,7 @@ namespace TDFMAUI.ViewModels
 
                 await Shell.Current.GoToAsync($"RequestDetailsPage", new Dictionary<string, object>
                 {
-                    {"RequestId", requestDetails.RequestID}
+                    {"RequestId", requestDetails.Data.RequestID}
                 });
             }
             catch (Exception ex)

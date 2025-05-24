@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using TDFMAUI.Services;
 using TDFShared.Enums;
 using Microsoft.Extensions.Logging;
+using TDFShared.Utilities;
 
 namespace TDFMAUI.ViewModels
 {
@@ -251,20 +252,33 @@ namespace TDFMAUI.ViewModels
 
                 if (IsEditMode)
                 {
-                    var updateDto = RequestUpdateDto;
-                    _logger.LogInformation("Attempting to update request {RequestId}", RequestId);
-                    response = await _requestService.UpdateRequestAsync(RequestId, updateDto);
-                    _logger.LogInformation("Update request {RequestId} completed.", RequestId);
+                    var updateResponse = await _requestService.UpdateRequestAsync(RequestId, RequestUpdateDto);
+                    if (updateResponse?.Success == true && updateResponse.Data != null)
+                    {
+                        response = updateResponse.Data;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Failed to update request {RequestId}", RequestId);
+                        await Shell.Current.DisplayAlert("Error", "Failed to update request.", "OK");
+                        return;
+                    }
                 }
                 else
                 {
                     var createDto = RequestCreateDto;
                     createDto.UserId = currentUserId; // Set the user ID
-                    _logger.LogInformation("Attempting to create request for user {UserId}", createDto.UserId);
-                    response = await _requestService.CreateRequestAsync(createDto);
-                     _logger.LogInformation("Create request completed.");
-                     // Assuming the response contains the new ID, update the ViewModel if needed
-                     if (response != null) RequestId = response.RequestID;
+                    var createResponse = await _requestService.CreateRequestAsync(createDto);
+                    if (createResponse?.Success == true && createResponse.Data != null)
+                    {
+                        response = createResponse.Data;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Failed to create request");
+                        await Shell.Current.DisplayAlert("Error", "Failed to create request.", "OK");
+                        return;
+                    }
                 }
 
                 if (response != null) // Check if API call was successful (HandleApiResponse should handle errors)
@@ -312,11 +326,12 @@ namespace TDFMAUI.ViewModels
                 var currentUser = await _authService.GetCurrentUserAsync();
                 if (currentUser == null)
                 {
-                    _logger.LogWarning("Cannot validate edit access: User not authenticated");
+                    _logger.LogWarning("User not authenticated when validating edit access");
+                    await Shell.Current.DisplayAlert("Access Denied", "You must be logged in to edit requests.", "OK");
+                    await Shell.Current.GoToAsync("..");
                     return;
                 }
 
-                // Convert to UserDto for RequestStateManager
                 var userDto = new UserDto
                 {
                     UserID = currentUser.UserID,
@@ -328,20 +343,31 @@ namespace TDFMAUI.ViewModels
 
                 bool isOwner = request.RequestUserID == currentUser.UserID;
 
-                // Use RequestStateManager for consistent authorization logic
+                // Use RequestStateManager for state-based checks
                 if (!RequestStateManager.CanEdit(request, userDto.IsAdmin, isOwner))
                 {
-                    _logger.LogWarning("User {UserId} attempted to edit request {RequestId} but lacks permission",
+                    _logger.LogWarning("User {UserId} attempted to edit request {RequestId} without proper state permissions", 
                         currentUser.UserID, request.RequestID);
-
-                    await Shell.Current.DisplayAlert("Access Denied",
-                        "You do not have permission to edit this request.", "OK");
+                    await Shell.Current.DisplayAlert("Access Denied", "You do not have permission to edit this request.", "OK");
                     await Shell.Current.GoToAsync("..");
+                    return;
+                }
+
+                // Use AuthorizationUtilities for action-specific checks
+                if (!AuthorizationUtilities.CanPerformRequestAction(userDto, request, TDFShared.Utilities.RequestAction.Edit))
+                {
+                    _logger.LogWarning("User {UserId} attempted to edit request {RequestId} without proper action permissions", 
+                        currentUser.UserID, request.RequestID);
+                    await Shell.Current.DisplayAlert("Access Denied", "You do not have permission to edit this request.", "OK");
+                    await Shell.Current.GoToAsync("..");
+                    return;
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error validating edit access for request {RequestId}", request.RequestID);
+                await Shell.Current.DisplayAlert("Error", "An error occurred while validating access.", "OK");
+                await Shell.Current.GoToAsync("..");
             }
         }
 

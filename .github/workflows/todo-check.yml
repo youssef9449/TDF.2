@@ -1,0 +1,95 @@
+name: TODO Detection
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check-todos:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Set up .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '7.0.x'
+
+    - name: Install dependencies
+      run: |
+        dotnet tool install -g dotnet-todo-checker
+        echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+    - name: Check for TODOs
+      run: |
+        # Create a temporary script to check for TODOs
+        cat > check-todos.sh << 'EOF'
+        #!/bin/bash
+        
+        # Patterns to search for
+        PATTERNS=(
+          "TODO"
+          "FIXME"
+          "XXX"
+          "HACK"
+          "@todo"
+          "@fixme"
+          "@hack"
+        )
+        
+        # File extensions to check
+        EXTENSIONS=(
+          ".cs"
+          ".csproj"
+          ".xaml"
+          ".xaml.cs"
+          ".md"
+        )
+        
+        # Initialize counters
+        total_todos=0
+        found_todos=()
+        
+        # Search for each pattern in each file type
+        for ext in "${EXTENSIONS[@]}"; do
+          for pattern in "${PATTERNS[@]}"; do
+            while IFS=: read -r file line content; do
+              if [[ ! "$file" =~ "obj/" && ! "$file" =~ "bin/" && ! "$file" =~ ".git/" ]]; then
+                found_todos+=("$file:$line: $content")
+                ((total_todos++))
+              fi
+            done < <(grep -n "$pattern" $(find . -name "*$ext"))
+          done
+        done
+        
+        # Output results
+        echo "Found $total_todos TODO items:"
+        printf '%s\n' "${found_todos[@]}"
+        
+        # Exit with error if TODOs found (configurable)
+        if [ "$total_todos" -gt 0 ]; then
+          echo "::warning::Found $total_todos TODO items in the codebase"
+          # Uncomment the following line to fail the build if TODOs are found
+          # exit 1
+        fi
+        EOF
+        
+        chmod +x check-todos.sh
+        ./check-todos.sh
+
+    - name: Create TODO Report
+      if: always()
+      run: |
+        mkdir -p reports
+        ./check-todos.sh > reports/todo-report.txt
+        
+    - name: Upload TODO Report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: todo-report
+        path: reports/todo-report.txt 

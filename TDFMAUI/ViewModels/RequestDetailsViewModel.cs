@@ -11,6 +11,7 @@ using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Users;
 using TDFShared.Enums;
 using TDFShared.Services;
+using TDFShared.Utilities;
 
 namespace TDFMAUI.ViewModels
 {
@@ -66,9 +67,10 @@ namespace TDFMAUI.ViewModels
             IsLoading = true;
             try
             {
-                Request = await _apiService.GetRequestByIdAsync(RequestId);
-                if (Request != null)
+                var response = await _apiService.GetRequestByIdAsync(RequestId);
+                if (response?.Data != null)
                 {
+                    Request = response.Data;
                     // Validate if user can view this request using RequestStateManager
                     var currentUser = await _authService.GetCurrentUserAsync();
                     if (currentUser != null)
@@ -125,7 +127,7 @@ namespace TDFMAUI.ViewModels
                 return;
             }
 
-            // Convert to UserDto for RequestStateManager
+            // Convert to UserDto for authorization checks
             var userDto = new UserDto
             {
                 UserID = currentUser.UserID,
@@ -137,11 +139,13 @@ namespace TDFMAUI.ViewModels
 
             bool isOwner = Request.RequestUserID == currentUser.UserID;
 
-            // Use RequestStateManager for consistent authorization logic
+            // Use RequestStateManager for state-based checks
             CanEdit = RequestStateManager.CanEdit(Request, userDto.IsAdmin, isOwner);
             CanDelete = RequestStateManager.CanDelete(Request, userDto.IsAdmin, isOwner);
-            CanApprove = RequestStateManager.CanApproveOrRejectRequest(Request, userDto);
-            CanReject = RequestStateManager.CanApproveOrRejectRequest(Request, userDto);
+            
+            // Use AuthorizationUtilities for action-specific checks
+            CanApprove = AuthorizationUtilities.CanPerformRequestAction(userDto, Request, TDFShared.Utilities.RequestAction.Approve);
+            CanReject = AuthorizationUtilities.CanPerformRequestAction(userDto, Request, TDFShared.Utilities.RequestAction.Reject);
         }
 
         [RelayCommand]
@@ -194,9 +198,9 @@ namespace TDFMAUI.ViewModels
             try
             {
                 var approvalDto = new RequestApprovalDto { Comment = comment };
-                bool success = await _apiService.ApproveRequestAsync(Request.RequestID, approvalDto);
+                var response = await _apiService.ApproveRequestAsync(Request.RequestID, approvalDto);
 
-                if (success)
+                if (response?.Success == true)
                 {
                     await Shell.Current.DisplayAlert("Success", "Request approved.", "OK");
                     await LoadRequestDetailsAsync();
@@ -234,9 +238,9 @@ namespace TDFMAUI.ViewModels
             try
             {
                 var rejectDto = new RequestRejectDto { RejectReason = reason };
-                bool success = await _apiService.RejectRequestAsync(Request.RequestID, rejectDto);
+                var response = await _apiService.RejectRequestAsync(Request.RequestID, rejectDto);
 
-                if (success)
+                if (response?.Success == true)
                 {
                     await Shell.Current.DisplayAlert("Success", "Request rejected.", "OK");
                     await LoadRequestDetailsAsync();

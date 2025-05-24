@@ -52,10 +52,29 @@ namespace TDFMAUI.ViewModels
         private bool? _isHR;
 
         // Computed Properties - Use TDFShared RequestStateManager for consistency
-        public bool CanManageRequests => GetCurrentUserDto() is UserDto user && RequestStateManager.CanManageRequests(user);
-        public bool CanApproveReject => GetCurrentUserDto() is UserDto user && RequestStateManager.CanManageRequests(user);
-        public bool CanEditDeleteAny => IsAdmin == true;
-        public bool CanFilterByDepartment => IsManager == true;
+        public async Task<bool> CanManageRequestsAsync()
+        {
+            var user = await GetCurrentUserDtoAsync();
+            return user != null && RequestStateManager.CanManageRequests(user);
+        }
+
+        public async Task<bool> CanApproveRejectAsync()
+        {
+            var user = await GetCurrentUserDtoAsync();
+            return user != null && RequestStateManager.CanManageRequests(user);
+        }
+
+        public async Task<bool> CanEditDeleteAnyAsync()
+        {
+            var user = await GetCurrentUserDtoAsync();
+            return user?.IsAdmin == true;
+        }
+
+        public async Task<bool> CanFilterByDepartmentAsync()
+        {
+            var user = await GetCurrentUserDtoAsync();
+            return user?.IsManager == true;
+        }
 
         public List<string> StatusOptions => RequestOptions.StatusOptions;
         public List<string> TypeOptions => RequestOptions.TypeOptions;
@@ -129,15 +148,49 @@ namespace TDFMAUI.ViewModels
             }
         }
 
+        // Permission caches
+        private readonly Dictionary<int, bool> _canEditDeleteCache = new();
+        private readonly Dictionary<int, bool> _canApproveRejectCache = new();
+
+        // Synchronous CanExecute methods for commands (read from cache)
+        private bool CanEditDeleteRequest(RequestResponseDto? request)
+        {
+            if (request == null) return false;
+            return _canEditDeleteCache.TryGetValue(request.RequestID, out var canEdit) && canEdit;
+        }
+
+        private bool CanApproveRejectRequest(RequestResponseDto? request)
+        {
+            if (request == null) return false;
+            return _canApproveRejectCache.TryGetValue(request.RequestID, out var canApprove) && canApprove;
+        }
+
+        private async Task RefreshRequestPermissionsAsync()
+        {
+            var user = await GetCurrentUserDtoAsync();
+            _canEditDeleteCache.Clear();
+            _canApproveRejectCache.Clear();
+            foreach (var req in Requests)
+            {
+                bool isOwner = req.RequestUserID == user?.UserID;
+                // Use RequestStateManager for state-based checks
+                _canEditDeleteCache[req.RequestID] = user != null && 
+                    RequestStateManager.CanEdit(req, user.IsAdmin, isOwner);
+
+                // Use AuthorizationUtilities for action-specific checks
+                _canApproveRejectCache[req.RequestID] = user != null && 
+                    AuthorizationUtilities.CanPerformRequestAction(user, req, TDFShared.Utilities.RequestAction.Approve);
+            }
+            NotifyCommandsCanExecuteChanged();
+        }
+
+        // After loading requests, refresh permissions
         [RelayCommand(CanExecute = nameof(IsNotBusy))]
         private async Task LoadRequestsAsync()
         {
             IsBusy = true;
             Requests.Clear();
-
-            // Start performance monitoring
             TDFMAUI.Services.DebugService.StartTimer("LoadRequests");
-
             try
             {
                 if (_currentUserId == 0 && !(IsAdmin == true || IsHR == true || IsManager == true))
@@ -147,32 +200,25 @@ namespace TDFMAUI.ViewModels
                     IsBusy = false;
                     return;
                 }
-
                 var pagination = new RequestPaginationDto
                 {
                     Page = 1,
                     PageSize = 50,
                     FilterStatus = ShowPendingOnly ? RequestStatus.Pending : RequestStatus.All
                 };
-
-                PaginatedResult<RequestResponseDto>? result = null;
-
-                // Use the unified endpoint that handles access control server-side
-                _logger.LogInformation("Loading requests with unified access control for user {UserId} with filter: {Filter}", _currentUserId, pagination.FilterStatus);
-                result = await _requestService.GetAllRequestsAsync(pagination);
-
-                if (result?.Items != null)
+                var response = await _requestService.GetAllRequestsAsync(pagination);
+                if (response?.Success == true && response.Data?.Items != null)
                 {
-                    foreach (var request in result.Items)
-                    {
+                    foreach (var request in response.Data.Items)
                         Requests.Add(request);
-                    }
                     _logger.LogInformation("Loaded {Count} requests.", Requests.Count);
                 }
                 else
                 {
                     _logger.LogWarning("Received null or empty item list when loading requests.");
                 }
+                // Refresh permissions after loading requests
+                await RefreshRequestPermissionsAsync();
             }
             catch (ApiException apiEx)
             {
@@ -188,7 +234,6 @@ namespace TDFMAUI.ViewModels
             }
             finally
             {
-                // Stop performance monitoring
                 TDFMAUI.Services.DebugService.StopTimer("LoadRequests");
                 IsBusy = false;
             }
@@ -209,22 +254,16 @@ namespace TDFMAUI.ViewModels
             { {"RequestId", request.RequestID} });
         }
 
-        // This command can be used for pull-to-refresh
+        // Also refresh permissions after refresh
         [RelayCommand(CanExecute = nameof(IsNotBusy))]
         private async Task RefreshRequestsAsync()
         {
-            // Optional: Reload roles if they might change dynamically during app session
-            // await LoadUserRolesAsync();
-
-            // Refresh the current user ID
             _currentUserId = await _authService.GetCurrentUserIdAsync();
             _logger.LogInformation("Current user ID refreshed: {UserId}", _currentUserId);
             OnPropertyChanged(nameof(CurrentUserId));
-
-            // Notify commands that their CanExecute status might have changed
             NotifyCommandsCanExecuteChanged();
-
             await LoadRequestsAsync();
+            await RefreshRequestPermissionsAsync();
         }
 
         // --- Action Commands Implementation ---
@@ -237,45 +276,6 @@ namespace TDFMAUI.ViewModels
         public bool IsCurrentUserAdmin => IsAdmin == true;
 
         // Helper to check if current user can edit/delete a specific request
-        private bool CanEditDeleteRequest(RequestResponseDto? request)
-        {
-            if (request == null) return false;
-
-            // Use async helper for proper authorization checking
-            return Task.Run(async () => await CanEditRequestHelperAsync(request)).Result;
-        }
-
-        // Helper to check if current user can approve/reject a specific request
-        private bool CanApproveRejectRequest(RequestResponseDto? request)
-        {
-            if (request == null) return false;
-
-            // Use async helper for proper authorization checking
-            return Task.Run(async () => await CanApproveRejectRequestHelperAsync(request)).Result;
-        }
-
-        #region Authorization Helper Methods
-
-        /// <summary>
-        /// Gets the current user as a UserDto for authorization checks
-        /// </summary>
-        private async Task<TDFShared.DTOs.Users.UserDto?> GetCurrentUserDtoAsync()
-        {
-            var currentUser = await _authService.GetCurrentUserAsync();
-            return currentUser;
-        }
-
-        /// <summary>
-        /// Gets the current user as UserDto synchronously for property bindings
-        /// </summary>
-        private UserDto? GetCurrentUserDto()
-        {
-            return Task.Run(async () => await GetCurrentUserDtoAsync()).Result;
-        }
-
-        /// <summary>
-        /// Determines if a user can edit a specific request using RequestStateManager
-        /// </summary>
         private async Task<bool> CanEditRequestHelperAsync(RequestResponseDto request)
         {
             if (request == null) return false;
@@ -288,97 +288,62 @@ namespace TDFMAUI.ViewModels
         }
 
         /// <summary>
-        /// Determines if a user can approve/reject a specific request using RequestStateManager
+        /// Gets the current user as UserDto asynchronously
         /// </summary>
-        private async Task<bool> CanApproveRejectRequestHelperAsync(RequestResponseDto request)
+        private async Task<UserDto?> GetCurrentUserDtoAsync()
         {
-            if (request == null) return false;
-
-            var currentUser = await GetCurrentUserDtoAsync();
-            if (currentUser == null) return false;
-
-            return RequestStateManager.CanApproveOrRejectRequest(request, currentUser);
+            var currentUser = await _authService.GetCurrentUserAsync();
+            return currentUser;
         }
-
-        #endregion
 
         [RelayCommand(CanExecute = nameof(CanApproveRejectRequest))]
         private async Task ApproveRequestAsync(RequestResponseDto? request)
         {
             if (request == null) return;
-
-            bool confirmed = await Shell.Current.DisplayAlert("Confirm Approval", $"Approve request from {request.UserName} for {request.LeaveType} starting {request.RequestStartDate:d}?", "Approve", "Cancel");
-            if (!confirmed) return;
-
-            IsBusy = true;
             try
             {
-                _logger.LogInformation("Attempting to approve request {RequestId}", request.RequestID);
-                var approvalDto = new RequestApprovalDto { Status = RequestStatus.Approved, Comment = "Approved via Mobile App" };
-                bool success = await _requestService.ApproveRequestAsync(request.RequestID, approvalDto);
-                if (success)
+                var response = await _requestService.ApproveRequestAsync(request.RequestID, "Approved via mobile app");
+                if (response?.Success == true)
                 {
-                    _logger.LogInformation("Successfully approved request {RequestId}", request.RequestID);
-                    request.Status = RequestStatus.Approved;
-                    OnPropertyChanged(nameof(Requests));
-                    await Shell.Current.DisplayAlert("Success", "Request approved.", "OK");
+                    await Shell.Current.DisplayAlert("Success", "Request approved successfully.", "OK");
+                    await LoadRequestsAsync();
+                    await RefreshRequestPermissionsAsync();
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to approve request {RequestId} via API.", request.RequestID);
-                    await Shell.Current.DisplayAlert("Error", "Failed to approve request.", "OK");
+                    await Shell.Current.DisplayAlert("Error", response?.Message ?? "Failed to approve request.", "OK");
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error approving request {RequestId}", request.RequestID);
-                await Shell.Current.DisplayAlert("Error", "An error occurred while approving.", "OK");
+                await Shell.Current.DisplayAlert("Error", "Failed to approve request.", "OK");
             }
-            finally { IsBusy = false; }
         }
 
         [RelayCommand(CanExecute = nameof(CanApproveRejectRequest))]
         private async Task RejectRequestAsync(RequestResponseDto? request)
         {
             if (request == null) return;
-
-            string reason = await Shell.Current.DisplayPromptAsync("Reject Request", $"Reason for rejecting {request.UserName}'s request:", "OK", "Cancel", "Reason", maxLength: 100, keyboard: Keyboard.Text);
-
-            if (string.IsNullOrWhiteSpace(reason)) // User cancelled or entered empty reason
-            {
-                if (reason == null) _logger.LogInformation("Reject cancelled by user.");
-                else _logger.LogWarning("Rejection reason cannot be empty.");
-                // Optionally show error if reason was empty but not cancelled
-                if (reason != null) await Shell.Current.DisplayAlert("Invalid Reason", "Rejection reason cannot be empty.", "OK");
-                return;
-            }
-
-            IsBusy = true;
             try
             {
-                _logger.LogInformation("Attempting to reject request {RequestId}", request.RequestID);
-                var rejectDto = new RequestRejectDto { RejectReason = reason };
-                bool success = await _requestService.RejectRequestAsync(request.RequestID, rejectDto);
-                if (success)
+                var response = await _requestService.RejectRequestAsync(request.RequestID, "Rejected via mobile app");
+                if (response?.Success == true)
                 {
-                    _logger.LogInformation("Successfully rejected request {RequestId}", request.RequestID);
-                    request.Status = RequestStatus.Rejected;
-                    request.Remarks = reason; // Update remarks locally?
-                    OnPropertyChanged(nameof(Requests));
-                    await Shell.Current.DisplayAlert("Success", "Request rejected.", "OK");
+                    await Shell.Current.DisplayAlert("Success", "Request rejected successfully.", "OK");
+                    await LoadRequestsAsync();
+                    await RefreshRequestPermissionsAsync();
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to reject request {RequestId} via API.", request.RequestID);
-                    await Shell.Current.DisplayAlert("Error", "Failed to reject request.", "OK");
+                    await Shell.Current.DisplayAlert("Error", response?.Message ?? "Failed to reject request.", "OK");
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error rejecting request {RequestId}", request.RequestID);
-                await Shell.Current.DisplayAlert("Error", "An error occurred while rejecting.", "OK");
+                await Shell.Current.DisplayAlert("Error", "Failed to reject request.", "OK");
             }
-            finally { IsBusy = false; }
         }
 
         [RelayCommand(CanExecute = nameof(CanEditDeleteRequest))]
@@ -394,25 +359,24 @@ namespace TDFMAUI.ViewModels
         private async Task DeleteRequestAsync(RequestResponseDto? request)
         {
             if (request == null) return;
-
             bool confirmed = await Shell.Current.DisplayAlert("Confirm Delete", $"Are you sure you want to delete the request for {request.LeaveType} starting {request.RequestStartDate:d}?", "Delete", "Cancel");
             if (!confirmed) return;
-
             IsBusy = true;
             try
             {
                 _logger.LogInformation("Attempting to delete request {RequestId}", request.RequestID);
-                bool success = await _requestService.DeleteRequestAsync(request.RequestID);
-                if (success)
+                var response = await _requestService.DeleteRequestAsync(request.RequestID);
+                if (response?.Success == true)
                 {
                     _logger.LogInformation("Successfully deleted request {RequestId}", request.RequestID);
                     Requests.Remove(request); // Remove from list locally
                     await Shell.Current.DisplayAlert("Success", "Request deleted.", "OK");
+                    await RefreshRequestPermissionsAsync();
                 }
                 else
                 {
                     _logger.LogWarning("Failed to delete request {RequestId} via API.", request.RequestID);
-                    await Shell.Current.DisplayAlert("Error", "Failed to delete request.", "OK");
+                    await Shell.Current.DisplayAlert("Error", response?.Message ?? "Failed to delete request.", "OK");
                 }
             }
             catch (Exception ex)

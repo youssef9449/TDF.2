@@ -539,7 +539,9 @@ namespace TDFAPI.Repositories
             const string sql = @"
                 SELECT m.* FROM Messages m
                 INNER JOIN Users u ON m.SenderID = u.UserID
-                WHERE u.Role = @Role
+                WHERE (u.IsAdmin = 1 AND @Role = 'Admin')
+                   OR (u.IsManager = 1 AND @Role = 'Manager')
+                   OR (u.IsHR = 1 AND @Role = 'HR')
                 ORDER BY m.Timestamp DESC
                 OFFSET @Skip ROWS
                 FETCH NEXT @Take ROWS ONLY";
@@ -619,7 +621,9 @@ namespace TDFAPI.Repositories
                 INSERT INTO Messages (SenderID, ReceiverID, MessageText, Timestamp, IsRead, IsDelivered)
                 SELECT @SenderID, u.UserID, @MessageText, @Timestamp, 0, 0
                 FROM Users u
-                WHERE u.Role = @Role";
+                WHERE (u.IsAdmin = 1 AND @Role = 'Admin')
+                   OR (u.IsManager = 1 AND @Role = 'Manager')
+                   OR (u.IsHR = 1 AND @Role = 'HR')";
 
             using var connection = await _connectionFactory.CreateConnectionAsync(_logger);
             using var command = new SqlCommand(sql, connection);

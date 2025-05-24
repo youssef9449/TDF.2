@@ -3,26 +3,29 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using TDFShared.Models.Request;
+using TDFShared.Enums;
 
 namespace TDFShared.Models.User
 {
-    // Represents the User entity corresponding to the dbo.Users table
-    public class User
+    /// <summary>
+    /// Represents the User entity corresponding to the dbo.Users table
+    /// </summary>
+    public class UserEntity
     {
         [Key]
         public int UserID { get; set; }
 
         [Required]
         [StringLength(50)]
-        public string UserName { get; set; } // Mapped from UserName in SQL
+        public string Username { get; set; } = string.Empty;
 
         [Required]
         [StringLength(256)]
-        public string PasswordHash { get; set; }
+        public string PasswordHash { get; set; } = string.Empty;
 
         [Required]
         [StringLength(128)]
-        public string Salt { get; set; }
+        public string Salt { get; set; } = string.Empty;
 
         [StringLength(100)]
         public string? FullName { get; set; }
@@ -32,11 +35,11 @@ namespace TDFShared.Models.User
 
         [Required]
         [StringLength(255)]
-        public string Department { get; set; }
+        public string Department { get; set; } = string.Empty;
  
         public byte[]? Picture { get; set; }
 
-        public bool isConnected { get; set; } // Note: C# convention usually uses PascalCase (IsConnected)
+        public bool IsConnected { get; set; }
 
         [StringLength(100)]
         public string? MachineName { get; set; }
@@ -48,18 +51,18 @@ namespace TDFShared.Models.User
         [JsonPropertyName("createdAt")]
         public DateTime? CreatedAt { get; set; }
 
-        public int? PresenceStatus { get; set; }
+        public UserPresenceStatus PresenceStatus { get; set; } = UserPresenceStatus.Offline;
 
         [StringLength(100)]
         public string? CurrentDevice { get; set; }
 
-        public bool? IsAvailableForChat { get; set; }
+        public bool IsAvailableForChat { get; set; } = true;
 
-        public bool? IsAdmin { get; set; }
+        public bool IsAdmin { get; set; }
 
-        public bool? IsManager { get; set; }
+        public bool IsManager { get; set; }
 
-        public bool? IsHR { get; set; }
+        public bool IsHR { get; set; }
 
         [StringLength(128)]
         public string? RefreshToken { get; set; }
@@ -71,9 +74,9 @@ namespace TDFShared.Models.User
         [StringLength(50)]
         public string? LastLoginIp { get; set; }
 
-        public int? FailedLoginAttempts { get; set; }
+        public int FailedLoginAttempts { get; set; }
 
-        public bool? IsLocked { get; set; }
+        public bool IsLocked { get; set; }
 
         public DateTime? LockoutEndTime { get; set; }
 
@@ -84,7 +87,7 @@ namespace TDFShared.Models.User
         // public int? AnnualBalance { get; set; }
         // public int? CasualBalance { get; set; }
 
-        public bool? IsActive { get; set; }
+        public bool IsActive { get; set; } = true;
         public DateTime? UpdatedAt { get; set; }
 
         // --- Navigation Properties ---

@@ -10,6 +10,7 @@ using TDFAPI.Data;
 using TDFShared.Models.User;
 using TDFShared.Models.Request;
 using TDFAPI.Services;
+using TDFShared.Services;
 
 namespace TDFAPI.Repositories
 {
@@ -17,11 +18,13 @@ namespace TDFAPI.Repositories
     {
         private readonly ILogger<UserRepository> _logger;
         private readonly ApplicationDbContext _context;
+        private readonly IRoleService _roleService;
         
-        public UserRepository(ILogger<UserRepository> logger, ApplicationDbContext context)
+        public UserRepository(ILogger<UserRepository> logger, ApplicationDbContext context, IRoleService roleService)
         {
             _logger = logger;
-            _context = context;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
         }
         
         public async Task<UserDto?> GetByIdAsync(int userId)
@@ -48,7 +51,7 @@ namespace TDFAPI.Repositories
                 var user = await _context.Users
                                        .Include(u => u.AnnualLeave)
                                        .AsNoTracking()
-                                       .FirstOrDefaultAsync(u => u.UserName == username);
+                                       .FirstOrDefaultAsync(u => u.Username == username);
                 return user != null ? MapUserDtoFromEntity(user) : null;
             }
             catch (Exception ex)
@@ -65,7 +68,7 @@ namespace TDFAPI.Repositories
                 var users = await _context.Users
                                         .Include(u => u.AnnualLeave)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.UserName)
+                                        .OrderBy(u => u.Username)
                                         .ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
@@ -84,7 +87,7 @@ namespace TDFAPI.Repositories
                 var users = await _context.Users
                                         .Include(u => u.AnnualLeave)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.UserName)
+                                        .OrderBy(u => u.Username)
                                         .Skip((page - 1) * pageSize)
                                         .Take(pageSize)
                                         .ToListAsync();
@@ -100,9 +103,9 @@ namespace TDFAPI.Repositories
 
         public async Task<int> CreateAsync(CreateUserRequest userDto, string passwordHash, string salt)
         {
-            var newUser = new User
+            var newUser = new UserEntity
             {
-                UserName = userDto.Username,
+                Username = userDto.Username,
                 FullName = userDto.FullName,
                 Department = userDto.Department,
                 Title = userDto.Title,
@@ -113,8 +116,8 @@ namespace TDFAPI.Repositories
                 IsHR = false,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true,
-                isConnected = false,
-                PresenceStatus = (int)UserPresenceStatus.Offline,
+                IsConnected = false,
+                PresenceStatus = UserPresenceStatus.Offline,
                 IsAvailableForChat = true,
                 FailedLoginAttempts = 0,
                 IsLocked = false
@@ -196,7 +199,7 @@ namespace TDFAPI.Repositories
                         UserId = u.UserID,
                         PasswordHash = u.PasswordHash,
                         PasswordSalt = u.Salt,
-                        IsLocked = u.IsLocked ?? false,
+                        IsLocked = u.IsLocked,
                         LockoutEnd = u.LockoutEndTime,
                         RefreshToken = u.RefreshToken ?? string.Empty,
                         RefreshTokenExpiryTime = u.RefreshTokenExpiryTime
@@ -398,8 +401,8 @@ namespace TDFAPI.Repositories
                 var user = await _context.Users.FindAsync(userId);
                 if (user == null) return false;
 
-                user.PresenceStatus = (int)status;
-                user.isConnected = (status != UserPresenceStatus.Offline);
+                user.PresenceStatus = status;
+                user.IsConnected = (status != UserPresenceStatus.Offline);
                 if (statusMessage != null)
                 {
                     user.StatusMessage = statusMessage.Length > 255 ? statusMessage.Substring(0, 255) : statusMessage;
@@ -480,7 +483,7 @@ namespace TDFAPI.Repositories
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.Department == department)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.UserName)
+                                        .OrderBy(u => u.Username)
                                         .ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
@@ -517,9 +520,9 @@ namespace TDFAPI.Repositories
             {
                 var users = await _context.Users
                                         .Include(u => u.AnnualLeave)
-                                        .Where(u => u.isConnected == true)
+                                        .Where(u => u.IsConnected == true)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.UserName)
+                                        .OrderBy(u => u.Username)
                                         .ToListAsync();
 
                 return users.Select(MapUserDtoFromEntity).ToList();
@@ -539,7 +542,7 @@ namespace TDFAPI.Repositories
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.Department == department && (u.IsAdmin == true || u.IsManager == true || u.IsHR == true))
                                         .AsNoTracking()
-                                        .OrderBy(u => u.UserName)
+                                        .OrderBy(u => u.Username)
                                         .ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
@@ -554,7 +557,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                IQueryable<User> query = _context.Users.Include(u => u.AnnualLeave).AsNoTracking();
+                IQueryable<UserEntity> query = _context.Users.Include(u => u.AnnualLeave).AsNoTracking();
 
                 if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
                     query = query.Where(u => u.IsAdmin == true);
@@ -565,7 +568,7 @@ namespace TDFAPI.Repositories
                 else
                     query = query.Where(u => u.IsAdmin != true && u.IsManager != true && u.IsHR != true);
 
-                var users = await query.OrderBy(u => u.UserName).ToListAsync();
+                var users = await query.OrderBy(u => u.Username).ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
             catch (Exception ex)
@@ -594,7 +597,7 @@ namespace TDFAPI.Repositories
                 
                 if (request.PresenceStatus.HasValue)
                 {
-                    user.PresenceStatus = (int)request.PresenceStatus.Value;
+                    user.PresenceStatus = request.PresenceStatus.Value;
                 }
                 
                 if (request.StatusMessage != null)
@@ -644,60 +647,74 @@ namespace TDFAPI.Repositories
             }
         }
 
-        private UserDto MapUserDtoFromEntity(User user)
+        public async Task UpdateUserDeviceInfoAsync(int userId, string deviceId, string userAgent)
         {
-            if (user == null) return null;
-            
+            try
+            {
+                var user = await _context.Users.FindAsync(userId);
+                if (user == null)
+                {
+                    _logger.LogWarning("Attempted to update device info for non-existent user {UserId}", userId);
+                    return;
+                }
+
+                // Update device info
+                user.CurrentDevice = deviceId;
+                user.MachineName = userAgent;
+                user.LastLoginDate = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Updated device info for user {UserId}", userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating device info for user {UserId}", ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<bool> IsFullNameTakenAsync(string fullName, int? excludeUserId = null)
+        {
+            try
+            {
+                var query = _context.Users.Where(u => u.FullName == fullName);
+                
+                if (excludeUserId.HasValue)
+                {
+                    query = query.Where(u => u.UserID != excludeUserId.Value);
+                }
+                
+                return await query.AnyAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking if full name {FullName} is taken", fullName);
+                throw;
+            }
+        }
+
+        private UserDto MapUserDtoFromEntity(UserEntity entity)
+        {
             var dto = new UserDto
             {
-                UserID = user.UserID,
-                Username = user.UserName,
-                FullName = user.FullName ?? string.Empty,
-                Department = user.Department,
-                Title = user.Title ?? string.Empty,
-                IsAdmin = user.IsAdmin ?? false,
-                IsManager = user.IsManager ?? false,
-                IsHR = user.IsHR ?? false,
-                IsActive = user.IsActive ?? true,
-                PresenceStatus = (UserPresenceStatus)(user.PresenceStatus ?? (int)UserPresenceStatus.Offline),
-                StatusMessage = user.StatusMessage,
-                IsAvailableForChat = user.IsAvailableForChat ?? true,
-                LastActivityTime = user.LastActivityTime,
-                ProfilePictureData = user.Picture,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt,
-                isConnected = user.isConnected,
-                FailedLoginAttempts = user.FailedLoginAttempts ?? 0,
-                IsLocked = user.IsLocked ?? false,
-                LockoutEndTime = user.LockoutEndTime,
-                Roles = new List<string>(),
-                CurrentDevice = user.CurrentDevice
+                UserID = entity.UserID,
+                Username = entity.Username,
+                FullName = entity.FullName,
+                Department = entity.Department,
+                Title = entity.Title,
+                IsActive = entity.IsActive,
+                IsAdmin = entity.IsAdmin,
+                IsManager = entity.IsManager,
+                IsHR = entity.IsHR,
+                LastLoginDate = entity.LastLoginDate,
+                LastLoginIp = entity.LastLoginIp,
+                IsLocked = entity.IsLocked,
+                FailedLoginAttempts = entity.FailedLoginAttempts,
+                Roles = new List<string>()
             };
-            
-            // Map leave balances if AnnualLeave is available
-            if (user.AnnualLeave != null)
-            {
-                // Calculate balances by calling methods on the entity
-                int annualBalance = user.AnnualLeave.GetAnnualBalance();
-                int casualBalance = user.AnnualLeave.GetCasualBalance();
-                int permissionsBalance = user.AnnualLeave.GetPermissionsBalance();
 
-                dto.AnnualBalance = annualBalance; // Legacy property
-                dto.CasualBalance = casualBalance; // Legacy property
-                dto.AnnualLeaveBalance = annualBalance;
-                dto.CasualLeaveBalance = casualBalance;
-                dto.PermissionsBalance = permissionsBalance;
-                dto.UnpaidLeaveUsed = user.AnnualLeave.UnpaidUsed; // Directly mapped
-            }
-            
-            // Add role strings based on role flags
-            if (dto.IsAdmin) dto.Roles.Add("Admin");
-            if (dto.IsManager) dto.Roles.Add("Manager");
-            if (dto.IsHR) dto.Roles.Add("HR");
-            if (!dto.Roles.Any()) dto.Roles.Add("User");
-            
-            // Set the Role property for backward compatibility
-            dto.Role = dto.Roles.FirstOrDefault() ?? "User";
+            // Assign roles using RoleService
+            _roleService.AssignRoles(dto);
             
             return dto;
         }

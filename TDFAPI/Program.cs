@@ -602,6 +602,10 @@ builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IUserPresenceService, UserPresenceService>();
 builder.Services.AddScoped<TDFShared.Services.INotificationService, NotificationService>();
 
+// Register services
+builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddScoped<IRequestRepository, RequestRepository>();
+
 // Add background services
 builder.Services.AddHostedService<UserInactivityBackgroundService>();
 

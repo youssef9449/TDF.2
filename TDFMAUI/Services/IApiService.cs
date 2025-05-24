@@ -19,7 +19,6 @@ namespace TDFMAUI.Services
         Task<ApiResponse<LoginResponseDto>> LoginAsync(LoginRequestDto loginRequest);
         Task<ApiResponse<bool>> LogoutAsync();
         Task<ApiResponse<RegisterResponseDto>> RegisterAsync(RegisterRequestDto registerRequest);
-        Task<ApiResponse<bool>> SignupAsync(SignupModel signupModel);
         
         // Users
         Task<ApiResponse<UserDto>> GetCurrentUserAsync();

@@ -17,10 +17,17 @@ namespace TDFShared.Services
     /// </summary>
     public class SecurityService : ISecurityService
     {
+        private readonly IRoleService _roleService;
+
         // Security constants - using modern recommended values
         private const int PBKDF2_ITERATIONS = 310000; // OWASP recommended minimum for 2024
         private const int SALT_SIZE_BYTES = 32;       // 256 bits
         private const int HASH_SIZE_BYTES = 32;       // 256 bits
+
+        public SecurityService(IRoleService roleService)
+        {
+            _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
+        }
 
         /// <summary>
         /// Hashes a password using PBKDF2 with SHA-512 and generates a new salt
@@ -295,7 +302,7 @@ namespace TDFShared.Services
         /// <summary>
         /// Builds comprehensive claims for the user
         /// </summary>
-        private static List<Claim> BuildUserClaims(UserDto user)
+        private List<Claim> BuildUserClaims(UserDto user)
         {
             var claims = new List<Claim>
             {
@@ -313,7 +320,7 @@ namespace TDFShared.Services
                 new Claim("userId", user.UserID.ToString()),
                 new Claim("username", user.Username),
                 new Claim("fullName", user.FullName ?? string.Empty),
-                new Claim("department", user.Department ?? string.Empty),
+                new Claim("department", user.Department),
                 new Claim("title", user.Title ?? string.Empty),
                 new Claim("isActive", user.IsActive.ToString().ToLowerInvariant()),
 
@@ -323,19 +330,10 @@ namespace TDFShared.Services
                 new Claim("isHR", user.IsHR.ToString().ToLowerInvariant())
             };
 
-            // Add role claims
-            if (user.Roles?.Any() == true)
+            // Add role claims using RoleService (roles are a list)
+            foreach (var role in _roleService.GetRoles(user))
             {
-                foreach (var role in user.Roles.Where(r => !string.IsNullOrWhiteSpace(r)))
-                {
-                    claims.Add(new Claim(ClaimTypes.Role, role.Trim()));
-                }
-            }
-
-            // Add single role claim if available (for backward compatibility)
-            if (!string.IsNullOrWhiteSpace(user.Role))
-            {
-                claims.Add(new Claim(ClaimTypes.Role, user.Role.Trim()));
+                claims.Add(new Claim(ClaimTypes.Role, role));
             }
 
             // Add security-related claims
@@ -349,16 +347,9 @@ namespace TDFShared.Services
                 claims.Add(new Claim("lastLoginIp", user.LastLoginIp));
             }
 
-            // Add account status claims
-            if (user.IsLocked.HasValue && user.IsLocked.Value)
-            {
-                claims.Add(new Claim("isLocked", "true"));
-            }
-
-            if (user.FailedLoginAttempts.HasValue && user.FailedLoginAttempts.Value > 0)
-            {
-                claims.Add(new Claim("failedLoginAttempts", user.FailedLoginAttempts.Value.ToString()));
-            }
+            // Add account status claims (no .HasValue/.Value, use directly)
+            claims.Add(new Claim("isLocked", user.IsLocked.ToString().ToLowerInvariant()));
+            claims.Add(new Claim("failedLoginAttempts", user.FailedLoginAttempts.ToString()));
 
             return claims;
         }
@@ -374,7 +365,7 @@ namespace TDFShared.Services
             try
             {
                 var tokenHandler = new JwtSecurityTokenHandler();
-                var key = Encoding.ASCII.GetBytes(secretKey);
+                var key = Encoding.UTF8.GetBytes(secretKey);
 
                 var validationParameters = new TokenValidationParameters
                 {

@@ -13,6 +13,7 @@ using System.IdentityModel.Tokens.Jwt;
 using TDFAPI.Extensions;
 using TDFShared.Constants;
 using TDFShared.Services;
+using System.ComponentModel.DataAnnotations;
 
 namespace TDFAPI.Controllers
 {
@@ -40,14 +41,17 @@ namespace TDFAPI.Controllers
         [EnableRateLimiting("auth")]
         [HttpPost("login")]
         [Route(ApiRoutes.Auth.Login)]
-        public async Task<ActionResult<ApiResponse<TokenResponse>>> Login([FromBody] AuthLoginRequest request)
+        public async Task<ActionResult<ApiResponse<TokenResponse>>> Login([FromBody] LoginRequestDto request)
         {
             try
             {
-                // Basic validation
-                if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+                // Model validation
+                if (!ModelState.IsValid)
                 {
-                    return BadRequest(ApiResponse<TokenResponse>.ErrorResponse("Username and password are required"));
+                    var errors = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage);
+                    return BadRequest(ApiResponse<TokenResponse>.ErrorResponse(string.Join(", ", errors)));
                 }
 
                 // Get client information for security logging
@@ -56,20 +60,20 @@ namespace TDFAPI.Controllers
 
                 _logger.LogInformation("Login attempt for user {Username} from IP {IpAddress}", request.Username, ipAddress);
 
+                // Check if account is locked before attempting login
+                var user = await _userService.GetByUsernameAsync(request.Username);
+                var userAuth = user != null ? await _userRepository.GetUserAuthDataAsync(user.UserID) : null;
+
+                if (userAuth?.IsLocked == true && userAuth.LockoutEnd.HasValue && userAuth.LockoutEnd.Value > DateTime.UtcNow)
+                {
+                    var remainingLockoutTime = Math.Ceiling((userAuth.LockoutEnd.Value - DateTime.UtcNow).TotalMinutes);
+                    _logger.LogWarning("Failed login attempt for locked account: {Username} from IP {IpAddress}", request.Username, ipAddress);
+                    return Unauthorized(ApiResponse<TokenResponse>.ErrorResponse($"Account is temporarily locked. Please try again in {remainingLockoutTime} minute(s)"));
+                }
+
                 var tokenResponse = await _authService.LoginAsync(request.Username, request.Password);
                 if (tokenResponse == null)
                 {
-                    // Check if account is locked - we could enhance AuthService to return specific failure reasons
-                    var user = await _userService.GetByUsernameAsync(request.Username);
-                    var userAuth = user != null ? await _userRepository.GetUserAuthDataAsync(user.UserID) : null;
-
-                    if (userAuth != null && userAuth.IsLocked && userAuth.LockoutEnd.HasValue && userAuth.LockoutEnd.Value > DateTime.UtcNow)
-                    {
-                        var remainingLockoutTime = Math.Ceiling((userAuth.LockoutEnd.Value - DateTime.UtcNow).TotalMinutes);
-                        _logger.LogWarning("Failed login attempt for locked account: {Username} from IP {IpAddress}", request.Username, ipAddress);
-                        return Unauthorized(ApiResponse<TokenResponse>.ErrorResponse($"Account is temporarily locked. Please try again in {remainingLockoutTime} minute(s)"));
-                    }
-
                     _logger.LogWarning("Failed login attempt for user {Username} from IP {IpAddress}", request.Username, ipAddress);
                     return Unauthorized(ApiResponse<TokenResponse>.ErrorResponse("Invalid username or password"));
                 }
@@ -78,8 +82,12 @@ namespace TDFAPI.Controllers
                 _logger.LogInformation("User {UserId} ({Username}) successfully logged in from {IpAddress}",
                     tokenResponse.UserId, request.Username, ipAddress);
 
-                // Update user's online status
+                // Update user's online status and device info
                 await _userService.UpdateUserPresenceAsync(tokenResponse.UserId, true, userAgent);
+                if (!string.IsNullOrEmpty(request.DeviceId))
+                {
+                    await _userService.UpdateUserDeviceInfoAsync(tokenResponse.UserId, request.DeviceId, userAgent);
+                }
 
                 return Ok(ApiResponse<TokenResponse>.SuccessResponse(tokenResponse,
                     $"Login successful. Token expires in {(tokenResponse.Expiration - DateTime.UtcNow).TotalMinutes:0} minutes"));
@@ -87,7 +95,7 @@ namespace TDFAPI.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during login for user {Username}", request.Username);
-                return StatusCode(500, ApiResponse<TokenResponse>.ErrorResponse("An error occurred during login"));
+                return StatusCode(500, ApiResponse<TokenResponse>.ErrorResponse("An error occurred during login. Please try again later."));
             }
         }
 
@@ -129,56 +137,81 @@ namespace TDFAPI.Controllers
         [EnableRateLimiting("auth")]
         [HttpPost("register")]
         [Route(ApiRoutes.Auth.Register)]
-        public async Task<ActionResult<ApiResponse<UserDto>>> Register([FromBody] CreateUserRequest request)
+        public async Task<ActionResult<ApiResponse<RegisterResponseDto>>> Register([FromBody] RegisterRequestDto request)
         {
             try
             {
-                // Validate request
-                if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+                // Model validation is handled by ASP.NET Core using the data annotations
+                if (!ModelState.IsValid)
                 {
-                    return BadRequest(ApiResponse<UserDto>.ErrorResponse("Username and password are required"));
-                }
-
-                // Validate username format (letters, numbers, underscore, no spaces)
-                if (!System.Text.RegularExpressions.Regex.IsMatch(request.Username, @"^[a-zA-Z0-9_]+$"))
-                {
-                    return BadRequest(ApiResponse<UserDto>.ErrorResponse("Username can only contain letters, numbers, and underscores"));
+                    var errors = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage);
+                    return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse(string.Join(", ", errors)));
                 }
 
                 // Check if username already exists
                 var existingUser = await _userService.GetByUsernameAsync(request.Username);
                 if (existingUser != null)
                 {
-                    return BadRequest(ApiResponse<UserDto>.ErrorResponse("Username already exists"));
+                    return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse("Username already exists"));
                 }
 
-                // Sanitize inputs
-                request.FullName = string.IsNullOrWhiteSpace(request.FullName) ? string.Empty : request.FullName.Trim();
-                request.Department = string.IsNullOrWhiteSpace(request.Department) ? string.Empty : request.Department.Trim();
-                request.Title = string.IsNullOrWhiteSpace(request.Title) ? string.Empty : request.Title.Trim();
-
                 // Prevent self-assignment of admin privileges for regular registrations
-                request.IsAdmin = false; // Force to false for public registrations
-                request.IsManager = false; // Also force IsManager to false
+                request.IsAdmin = false;
+                request.IsManager = false;
                 request.IsHR = false;
 
-                // Set account status flag for future verification system
-                // For now, we'll just create the user without verification
+                // Create user using the service
+                var userId = await _userService.CreateAsync(new CreateUserRequest
+                {
+                    Username = request.Username,
+                    Password = request.Password,
+                    FullName = request.FullName,
+                    Department = request.Department,
+                    Title = request.Title,
+                    IsAdmin = request.IsAdmin,
+                    IsManager = request.IsManager,
+                    IsHR = request.IsHR
+                });
 
-                var userId = await _userService.CreateAsync(request);
                 var newUser = await _userService.GetUserDtoByIdAsync(userId);
 
                 _logger.LogInformation("New user registered: {Username}", request.Username);
+
                 if (newUser == null)
                 {
-                    return StatusCode(500, ApiResponse<UserDto>.ErrorResponse("Failed to retrieve user after registration"));
+                    return StatusCode(500, ApiResponse<RegisterResponseDto>.ErrorResponse("Failed to retrieve user after registration"));
                 }
-                return Ok(ApiResponse<UserDto>.SuccessResponse(newUser, "User registered successfully"));
+
+                var response = new RegisterResponseDto
+                {
+                    Success = true,
+                    Message = "User registered successfully",
+                    UserDetails = new UserDetailsDto
+                    {
+                        UserId = newUser.UserID,
+                        UserName = newUser.Username,
+                        FullName = newUser.FullName,
+                        Department = newUser.Department,
+                        IsAdmin = newUser.IsAdmin,
+                        IsManager = newUser.IsManager,
+                        IsHR = newUser.IsHR,
+                        Roles = new List<string>()
+                    }
+                };
+
+                return Ok(ApiResponse<RegisterResponseDto>.SuccessResponse(response, "User registered successfully"));
+            }
+            catch (ValidationException ex)
+            {
+                _logger.LogWarning(ex, "Validation error during user registration for {Username}", request.Username);
+                return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during user registration for {Username}", request.Username);
-                return StatusCode(500, ApiResponse<UserDto>.ErrorResponse($"An error occurred: {ex.Message}"));
+                return StatusCode(500, ApiResponse<RegisterResponseDto>.ErrorResponse($"An error occurred: {ex.Message}"));
             }
         }
 

@@ -527,16 +527,20 @@ namespace TDFAPI.Services
 
         private async Task NotifyDepartmentManagers(string department, string message, int excludedUserId = 0)
         {
-            // Get users by department, then filter by role
+            // Get users by department and role
             var usersInDepartment = await _userRepository.GetUsersByDepartmentAsync(department);
-            var managers = usersInDepartment.Where(u => u.Role == "Manager");
+            var managers = await _userRepository.GetUsersByRoleAsync("Manager");
+            
+            // Find managers in the specific department
+            var departmentManagers = managers.Where(m => 
+                usersInDepartment.Any(u => u.UserID == m.UserID) && 
+                m.UserID != excludedUserId);
 
-            foreach (var manager in managers.Where(m => m.UserID != excludedUserId))
+            foreach (var manager in departmentManagers)
             {
-                // Use CreateNotificationAsync instead of SendNotification
                 await _notificationService.CreateNotificationAsync(
                     receiverId: manager.UserID,
-                    message: message); // Sender context might vary, using null for now
+                    message: message);
             }
         }
 
@@ -545,10 +549,9 @@ namespace TDFAPI.Services
             var hrUsers = await _userRepository.GetUsersByRoleAsync("HR");
             foreach (var hr in hrUsers.Where(h => h.UserID != excludedUserId))
             {
-                 // Use CreateNotificationAsync instead of SendNotification
-                 await _notificationService.CreateNotificationAsync(
-                     receiverId: hr.UserID,
-                     message: message); // Sender context might vary, using null for now
+                await _notificationService.CreateNotificationAsync(
+                    receiverId: hr.UserID,
+                    message: message);
             }
         }
 

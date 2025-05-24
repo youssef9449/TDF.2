@@ -30,13 +30,19 @@ public class AuthService : TDFShared.Services.IAuthService
     private readonly TDFShared.Services.ISecurityService _securityService;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly string _baseApiUrl;
+    private readonly IRoleService _roleService;
+    private readonly IApiService _apiService;
+    private readonly ISecureStorage _secureStorage;
 
     public AuthService(
         SecureStorageService secureStorageService,
         IUserProfileService userProfileService,
         TDFShared.Services.IHttpClientService httpClientService,
         TDFShared.Services.ISecurityService securityService,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IRoleService roleService,
+        IApiService apiService,
+        ISecureStorage secureStorage)
     {
         try
         {
@@ -59,6 +65,18 @@ public class AuthService : TDFShared.Services.IAuthService
             logger?.LogInformation("Checking SecurityService...");
             _securityService = securityService ?? throw new ArgumentNullException(nameof(securityService));
             logger?.LogInformation("SecurityService resolved successfully.");
+
+            logger?.LogInformation("Checking RoleService...");
+            _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
+            logger?.LogInformation("RoleService resolved successfully.");
+
+            logger?.LogInformation("Checking ApiService...");
+            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            logger?.LogInformation("ApiService resolved successfully.");
+
+            logger?.LogInformation("Checking SecureStorage...");
+            _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
+            logger?.LogInformation("SecureStorage resolved successfully.");
 
             logger?.LogInformation("Saving logger reference...");
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -83,14 +101,18 @@ public class AuthService : TDFShared.Services.IAuthService
 
     public async Task<TokenResponse?> LoginAsync(string username, string password)
     {
-        var loginRequest = new { UserName = username, Password = password };
+        var loginRequest = new LoginRequestDto
+        {
+            Username = username,
+            Password = password
+        };
         var endpoint = "auth/login";
         _logger.LogInformation("Attempting login for user {Username} via {Endpoint}", username, endpoint);
 
         try
         {
             // Use shared service to post the login request and get raw response
-            var apiResponseContent = await _httpClientService.PostAsync<object, string>(endpoint, loginRequest);
+            var apiResponseContent = await _httpClientService.PostAsync<LoginRequestDto, string>(endpoint, loginRequest);
             _logger.LogDebug("Login API response: {Content}", apiResponseContent);
 
             // Use centralized JSON options for consistency
@@ -122,10 +144,10 @@ public class AuthService : TDFShared.Services.IAuthService
                         if (apiResponse.Data.IsManager) userDetails.Roles.Add("Manager");
                         if (apiResponse.Data.IsHR) userDetails.Roles.Add("HR");
 
-                        // Add Employee role by default if no other roles are present
+                        // Add User role by default if no other roles are present
                         if (userDetails.Roles.Count == 0)
                         {
-                            userDetails.Roles.Add("Employee");
+                            userDetails.Roles.Add("User");
                         }
 
                         // Store the token and user details
@@ -157,10 +179,10 @@ public class AuthService : TDFShared.Services.IAuthService
                             loginResponse.UserDetails.UserName ??= string.Empty;
                             loginResponse.UserDetails.Roles ??= new();
 
-                            // Add Employee role by default if no roles are present
+                            // Add User role by default if no roles are present
                             if (loginResponse.UserDetails.Roles.Count == 0)
                             {
-                                loginResponse.UserDetails.Roles.Add("Employee");
+                                loginResponse.UserDetails.Roles.Add("User");
                             }
 
 DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
@@ -602,5 +624,22 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
             _logger.LogError(ex, "Error checking if token with JTI {Jti} is revoked", jti);
             return true; // Default to considering token as revoked if there's an error
         }
+    }
+
+    private async Task<LoginResponse> HandleLoginResponse(LoginResponse loginResponse)
+    {
+        if (loginResponse?.UserDetails == null)
+        {
+            throw new AuthenticationException("Invalid login response");
+        }
+
+        // Assign roles using RoleService
+        _roleService.AssignRoles(loginResponse.UserDetails);
+
+        // Store user details
+        await _secureStorageService.SaveTokenAsync(loginResponse.Token, loginResponse.Expiration);
+        _userProfileService.SetUserDetails(loginResponse.UserDetails);
+
+        return loginResponse;
     }
 }

@@ -512,13 +512,13 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<ApiResponse<bool>> SignupAsync(SignupModel signupModel)
+        public async Task<ApiResponse<bool>> SignupAsync(RegisterRequestDto signupModel)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             string endpoint = ApiRoutes.Auth.Register;
             try
             {
-                var response = await PostAsync<SignupModel, ApiResponse<bool>>(endpoint, signupModel);
+                var response = await PostAsync<RegisterRequestDto, ApiResponse<bool>>(endpoint, signupModel);
                 return response ?? new ApiResponse<bool> { Success = false, Message = "Signup failed" };
             }
             catch (Exception ex)

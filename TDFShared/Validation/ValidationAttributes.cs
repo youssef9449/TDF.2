@@ -205,6 +205,13 @@ namespace TDFShared.Validation
             @"^[a-zA-Z0-9._-]{3,20}$", 
             RegexOptions.Compiled);
 
+        private static readonly HashSet<string> ReservedUsernames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "admin", "administrator", "system", "root", "guest", "anonymous",
+            "support", "help", "info", "noreply", "no-reply", "webmaster",
+            "mail", "email", "contact", "security", "test", "demo"
+        };
+
         public UsernameAttribute()
         {
             ErrorMessage = "Username must be 3-20 characters and contain only letters, numbers, dots, underscores, or hyphens.";
@@ -215,7 +222,74 @@ namespace TDFShared.Validation
             if (value is not string username)
                 return true; // Let Required attribute handle null values
 
-            return UsernameRegex.IsMatch(username);
+            // Check basic format
+            if (!UsernameRegex.IsMatch(username))
+                return false;
+
+            // Check for reserved usernames
+            if (ReservedUsernames.Contains(username))
+            {
+                ErrorMessage = "This username is reserved and cannot be used.";
+                return false;
+            }
+
+            // Check for consecutive special characters
+            if (ContainsConsecutiveSpecialChars(username))
+            {
+                ErrorMessage = "Username cannot contain consecutive special characters.";
+                return false;
+            }
+
+            // Check for common patterns that might indicate automated attempts
+            if (IsCommonPattern(username))
+            {
+                ErrorMessage = "This username pattern is not allowed.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool ContainsConsecutiveSpecialChars(string username)
+        {
+            for (int i = 0; i < username.Length - 1; i++)
+            {
+                if (IsSpecialChar(username[i]) && IsSpecialChar(username[i + 1]))
+                    return true;
+            }
+            return false;
+        }
+
+        private bool IsSpecialChar(char c)
+        {
+            return c == '.' || c == '_' || c == '-';
+        }
+
+        private bool IsCommonPattern(string username)
+        {
+            // Check for sequential numbers
+            if (Regex.IsMatch(username, @"\d{3,}"))
+            {
+                var numbers = username.Where(char.IsDigit).ToArray();
+                if (numbers.Length >= 3)
+                {
+                    for (int i = 0; i < numbers.Length - 2; i++)
+                    {
+                        if (numbers[i] + 1 == numbers[i + 1] && numbers[i + 1] + 1 == numbers[i + 2])
+                            return true;
+                    }
+                }
+            }
+
+            // Check for repeated characters
+            if (Regex.IsMatch(username, @"(.)\1{2,}"))
+                return true;
+
+            // Check for common prefixes/suffixes
+            var commonPatterns = new[] { "test", "demo", "user", "admin", "temp", "tmp" };
+            return commonPatterns.Any(pattern => 
+                username.StartsWith(pattern, StringComparison.OrdinalIgnoreCase) || 
+                username.EndsWith(pattern, StringComparison.OrdinalIgnoreCase));
         }
     }
 

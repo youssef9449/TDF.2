@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using TDFShared.DTOs.Users;
 using TDFShared.DTOs.Requests;
 using TDFShared.Enums;
+using TDFShared.Models.User;
 
 namespace TDFShared.Models.Request
 {
@@ -147,7 +148,7 @@ namespace TDFShared.Models.Request
         /// <summary>
         /// Reference to the associated user entity (not DTO)
         /// </summary>
-        public virtual User.User? User { get; set; }
+        public virtual UserEntity? User { get; set; }
 
         /// <summary>
         /// User DTO for API responses (not mapped to database)

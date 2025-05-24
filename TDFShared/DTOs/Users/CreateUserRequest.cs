@@ -62,9 +62,9 @@ namespace TDFShared.DTOs.Users
         public bool IsManager { get; set; }
 
         /// <summary>
-        /// Whether the user is a manager
+        /// Whether the user is in HR
         /// </summary>
-        [JsonPropertyName("IsHR")]
+        [JsonPropertyName("isHR")]
         public bool IsHR { get; set; }
     }
 }

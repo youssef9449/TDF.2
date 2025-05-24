@@ -7,6 +7,8 @@ using TDFShared.DTOs.Requests;
 using TDFShared.Models.User; // Required for dynamic sortin
 using TDFShared.DTOs.Users;
 using TDFShared.Enums;
+using TDFAPI.Services;
+using TDFShared.Services;
 
 namespace TDFAPI.Repositories
 {
@@ -14,11 +16,13 @@ namespace TDFAPI.Repositories
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<RequestRepository> _logger;
+        private readonly IRoleService _roleService;
 
-        public RequestRepository(ApplicationDbContext context, ILogger<RequestRepository> logger)
+        public RequestRepository(ApplicationDbContext context, ILogger<RequestRepository> logger, IRoleService roleService)
         {
-            _context = context;
-            _logger = logger;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
         }
 
         public async Task<RequestEntity> GetByIdAsync(int requestId)
@@ -573,57 +577,28 @@ namespace TDFAPI.Repositories
         /// <summary>
         /// Maps a User entity to UserDto
         /// </summary>
-        private UserDto MapUserToDto(User user)
+        private UserDto MapUserToDto(UserEntity user)
         {
-            if (user == null) return null;
-
             var dto = new UserDto
             {
                 UserID = user.UserID,
-                Username = user.UserName,
-                FullName = user.FullName ?? string.Empty,
+                Username = user.Username,
+                FullName = user.FullName,
                 Department = user.Department,
-                Title = user.Title ?? string.Empty,
-                IsAdmin = user.IsAdmin ?? false,
-                IsManager = user.IsManager ?? false,
-                IsHR = user.IsHR ?? false,
-                IsActive = user.IsActive ?? true,
-                PresenceStatus = (UserPresenceStatus)(user.PresenceStatus ?? (int)UserPresenceStatus.Offline),
-                StatusMessage = user.StatusMessage,
-                IsAvailableForChat = user.IsAvailableForChat ?? true,
-                LastActivityTime = user.LastActivityTime,
-                ProfilePictureData = user.Picture,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt,
-                isConnected = user.isConnected,
-                FailedLoginAttempts = user.FailedLoginAttempts ?? 0,
-                IsLocked = user.IsLocked ?? false,
-                LockoutEndTime = user.LockoutEndTime,
-                Roles = new List<string>(),
-                CurrentDevice = user.CurrentDevice
+                Title = user.Title,
+                IsActive = user.IsActive,
+                IsAdmin = user.IsAdmin,
+                IsManager = user.IsManager,
+                IsHR = user.IsHR,
+                LastLoginDate = user.LastLoginDate,
+                LastLoginIp = user.LastLoginIp,
+                IsLocked = user.IsLocked,
+                FailedLoginAttempts = user.FailedLoginAttempts,
+                Roles = new List<string>()
             };
 
-            // Map leave balances if AnnualLeave is available
-            if (user.AnnualLeave != null)
-            {
-                // Calculate balances by calling methods on the entity
-                int annualBalance = user.AnnualLeave.GetAnnualBalance();
-                int casualBalance = user.AnnualLeave.GetCasualBalance();
-                int permissionsBalance = user.AnnualLeave.GetPermissionsBalance();
-
-                dto.AnnualBalance = annualBalance; // Legacy property
-                dto.CasualBalance = casualBalance; // Legacy property
-                dto.AnnualLeaveBalance = annualBalance;
-                dto.CasualLeaveBalance = casualBalance;
-                dto.PermissionsBalance = permissionsBalance;
-                dto.UnpaidLeaveUsed = user.AnnualLeave.UnpaidUsed; // Directly mapped
-            }
-
-            // Determine roles based on flags
-            if (user.IsAdmin == true) dto.Roles.Add("Admin");
-            if (user.IsManager == true) dto.Roles.Add("Manager");
-            if (user.IsHR == true) dto.Roles.Add("HR");
-            if (!dto.Roles.Any()) dto.Roles.Add("Employee");
+            // Assign roles using RoleService
+            _roleService.AssignRoles(dto);
 
             return dto;
         }

@@ -1,6 +1,7 @@
 using TDFShared.Enums;
 using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Users;
+using TDFShared.Models.User;
 using System;
 using TDFAPI.Services;
 
@@ -42,6 +43,23 @@ namespace TDFAPI.Repositories
         // New methods for handling status and availability with UpdateUserStatusRequest
         Task<bool> UpdateStatusAsync(int userId, UpdateUserStatusRequest request);
         Task<bool> UpdateAvailabilityAsync(int userId, UpdateUserStatusRequest request);
+
+        /// <summary>
+        /// Updates the device information for a user
+        /// </summary>
+        /// <param name="userId">The ID of the user</param>
+        /// <param name="deviceId">The unique identifier of the device</param>
+        /// <param name="userAgent">The user agent string of the device</param>
+        /// <returns>A task representing the asynchronous operation</returns>
+        Task UpdateUserDeviceInfoAsync(int userId, string deviceId, string userAgent);
+
+        /// <summary>
+        /// Checks if a full name is already taken by another user
+        /// </summary>
+        /// <param name="fullName">The full name to check</param>
+        /// <param name="excludeUserId">Optional user ID to exclude from the check (for updates)</param>
+        /// <returns>True if the full name is already taken, false otherwise</returns>
+        Task<bool> IsFullNameTakenAsync(string fullName, int? excludeUserId = null);
     }
 
     // UserAuthData used for password operations

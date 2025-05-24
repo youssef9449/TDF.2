@@ -41,6 +41,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
     private readonly IConfiguration _configuration;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ISecurityService _securityService;
+    private readonly IRoleService _roleService;
     private readonly string _jwtSecretKey;
     private readonly int _jwtTokenExpirationMinutes;
     private readonly int _refreshTokenExpirationDays;
@@ -56,7 +57,8 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
         IConfiguration configuration,
         IHttpContextAccessor httpContextAccessor,
         ISecurityService securityService,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IRoleService roleService)
     {
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _revokedTokenRepository = revokedTokenRepository ?? throw new ArgumentNullException(nameof(revokedTokenRepository));
@@ -64,6 +66,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
         _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
         _securityService = securityService ?? throw new ArgumentNullException(nameof(securityService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
 
         // Get JWT settings from configuration
         _jwtSecretKey = _configuration["Jwt:SecretKey"] ??
@@ -591,10 +594,9 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
     /// <summary>
     /// Validates password strength using the shared SecurityService
     /// </summary>
-    public static bool IsPasswordStrong(string password)
+    public bool IsPasswordStrong(string password)
     {
-        var securityService = new SecurityService();
-        return securityService.IsPasswordStrong(password, out _);
+        return _securityService.IsPasswordStrong(password, out _);
     }
 
     public async Task RevokeTokenAsync(string jti, DateTime expiryDateUtc, int? userId = null)

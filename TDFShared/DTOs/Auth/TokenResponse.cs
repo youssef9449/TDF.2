@@ -5,31 +5,6 @@ using TDFShared.DTOs.Users;
 namespace TDFShared.DTOs.Auth
 {
     /// <summary>
-    /// Login request for authentication
-    /// </summary>
-    public class AuthLoginRequest
-    {
-        /// <summary>
-        /// Username for login
-        /// </summary>
-        [JsonPropertyName("username")]
-        public string Username { get; set; } = string.Empty;
-        
-        /// <summary>
-        /// Password for login
-        /// </summary>
-        [JsonPropertyName("password")]
-        public string Password { get; set; } = string.Empty;
-    }
-
-    /// <summary>
-    /// For backward compatibility with code that uses LoginRequest
-    /// </summary>
-    public class LoginRequest : AuthLoginRequest
-    {
-    }
-
-    /// <summary>
     /// Response returned after successful authentication
     /// </summary>
     public class TokenResponse

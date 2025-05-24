@@ -4,7 +4,6 @@ using TDFShared.Models.Message;
 using TDFShared.Models.Notification;
 using TDFShared.Models.Request;
 using TDFShared.Models.Department;
-using TDFAPI.Domain;
 using TDFAPI.Domain.Auth;
 using TDFShared.Enums;
 
@@ -17,7 +16,7 @@ namespace TDFAPI.Data
 
         }
 
-        public DbSet<User> Users { get; set; }
+        public DbSet<UserEntity> Users { get; set; }
         public DbSet<RequestEntity> Requests { get; set; }
         public DbSet<NotificationEntity> Notifications { get; set; }
         public DbSet<MessageEntity> Messages { get; set; }
@@ -30,23 +29,23 @@ namespace TDFAPI.Data
             // Explicitly configure that UserDto is not an entity type
             builder.Ignore<TDFShared.DTOs.Users.UserDto>();
 
-            builder.Entity<User>(entity =>
+            builder.Entity<UserEntity>(entity =>
             {
                 entity.ToTable("Users");
                 entity.HasKey(e => e.UserID);
                 entity.Property(e => e.UserID).ValueGeneratedOnAdd();
-                entity.Property(e => e.UserName).HasColumnName("UserName").IsRequired().HasMaxLength(50);
-                entity.HasIndex(e => e.UserName).HasDatabaseName("UQ__Users__536C85E474AE94DB").IsUnique();
+                entity.Property(e => e.Username).HasColumnName("UserName").IsRequired().HasMaxLength(50);
+                entity.HasIndex(e => e.Username).HasDatabaseName("UQ__Users__536C85E474AE94DB").IsUnique();
                 entity.Property(e => e.PasswordHash).IsRequired().HasMaxLength(256);
                 entity.Property(e => e.Salt).IsRequired().HasMaxLength(128);
                 entity.Property(e => e.FullName).HasMaxLength(100);
                 entity.Property(e => e.Title).HasMaxLength(100).IsUnicode(false);
                 entity.Property(e => e.Department).IsRequired().HasMaxLength(255).IsUnicode(false);
                 entity.Property(e => e.Picture).HasColumnType("varbinary(max)");
-                entity.Property(e => e.isConnected).IsRequired().HasDefaultValue(false);
+                entity.Property(e => e.IsConnected).IsRequired().HasDefaultValue(false);
                 entity.Property(e => e.MachineName).HasMaxLength(100);
                 entity.Property(e => e.LastActivityTime).HasColumnType("datetime");
-                entity.Property(e => e.PresenceStatus).HasDefaultValue(0);
+                entity.Property(e => e.PresenceStatus).HasDefaultValue(UserPresenceStatus.Offline);
                 entity.Property(e => e.CurrentDevice).HasMaxLength(100);
                 entity.Property(e => e.IsAvailableForChat).HasDefaultValue(true);
                 entity.Property(e => e.IsAdmin).HasDefaultValue(false);
@@ -113,7 +112,7 @@ namespace TDFAPI.Data
                 entity.Property(e => e.Remarks);
                 entity.Property(e => e.RowVersion);
 
-                // Configure the relationship with User
+                // Configure the relationship with UserEntity
                 entity.HasOne(r => r.User)
                     .WithMany(u => u.Requests)
                     .HasForeignKey(r => r.RequestUserID)
@@ -133,12 +132,12 @@ namespace TDFAPI.Data
                  entity.Property(e => e.MessageText).HasMaxLength(255).IsUnicode(false);
 
                  // Define relationships
-                 entity.HasOne<User>()
+                 entity.HasOne<UserEntity>()
                      .WithMany()
                      .HasForeignKey(n => n.ReceiverID)
                      .OnDelete(DeleteBehavior.Restrict);
 
-                 entity.HasOne<User>()
+                 entity.HasOne<UserEntity>()
                      .WithMany()
                      .HasForeignKey(n => n.SenderID)
                      .OnDelete(DeleteBehavior.SetNull)
@@ -164,12 +163,12 @@ namespace TDFAPI.Data
                 entity.Property(e => e.IsDelivered);
 
                 // Define relationships
-                entity.HasOne<User>()
+                entity.HasOne<UserEntity>()
                     .WithMany()
                     .HasForeignKey(m => m.SenderID)
                     .OnDelete(DeleteBehavior.Restrict);
 
-                entity.HasOne<User>()
+                entity.HasOne<UserEntity>()
                     .WithMany()
                     .HasForeignKey(m => m.ReceiverID)
                     .OnDelete(DeleteBehavior.Restrict);
@@ -189,7 +188,7 @@ namespace TDFAPI.Data
                 entity.Property(e => e.PermissionsUsed);
                 entity.Property(e => e.UnpaidUsed).HasDefaultValue(0);
 
-                entity.HasOne<User>()
+                entity.HasOne<UserEntity>()
                     .WithOne(p => p.AnnualLeave)
                     .HasForeignKey<AnnualLeaveEntity>(d => d.UserID)
                     .OnDelete(DeleteBehavior.Cascade)

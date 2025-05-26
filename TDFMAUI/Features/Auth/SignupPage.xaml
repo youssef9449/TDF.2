@@ -11,49 +11,74 @@
             <Setter Property="TextColor">
                 <AppThemeBinding Light="Black" Dark="Black" />
             </Setter>
-            <!-- Add other common Entry properties here if needed -->
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="HeightRequest" Value="40" />
         </Style>
         <Style x:Key="PickerStyle" TargetType="Picker">
             <Setter Property="TextColor">
                 <AppThemeBinding Light="Black" Dark="Black" />
             </Setter>
-            <!-- Add other common Picker properties here if needed -->
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="HeightRequest" Value="40" />
         </Style>
     </ContentPage.Resources>
 
-    <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="10" VerticalOptions="Center">
+    <!-- No ScrollView to ensure everything fits in 1280x720 -->
+    <Grid MaximumHeightRequest="720" MaximumWidthRequest="1280">
+        <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,Auto,*" Margin="0,10,0,0">
+            <!-- Left column spacer -->
+            <BoxView Grid.Column="0" Grid.RowSpan="3" />
+            
+            <!-- Main content - compact layout -->
+            <VerticalStackLayout Grid.Column="1" Grid.Row="1" Padding="10" Spacing="5" 
+                                 VerticalOptions="Center" HorizontalOptions="Center" 
+                                 MaximumWidthRequest="450">
 
-            <Label Text="Create Account" FontSize="Large" HorizontalOptions="Center" />
+                <Label x:Name="TitleLabel" Text="Create Account" FontSize="24" HorizontalOptions="Center" Margin="0,0,0,5" />
 
-            <Entry Placeholder="Username" Text="{Binding Username}" Style="{StaticResource EntryStyle}" />
-            <Entry Placeholder="Password" IsPassword="True" Text="{Binding Password}" Style="{StaticResource EntryStyle}" />
-            <Entry Placeholder="Confirm Password" IsPassword="True" Text="{Binding ConfirmPassword}" Style="{StaticResource EntryStyle}" />
-            <Entry Placeholder="Full Name" Text="{Binding FullName}" Style="{StaticResource EntryStyle}" />
+                <!-- Form fields with reduced height -->
+                <Entry Placeholder="Username" Text="{Binding Username}" Style="{StaticResource EntryStyle}" 
+                       Margin="0,2,0,2" />
+                       
+                <Entry Placeholder="Password" IsPassword="True" Text="{Binding Password}" Style="{StaticResource EntryStyle}" 
+                       Margin="0,2,0,2" />
+                       
+                <Entry Placeholder="Confirm Password" IsPassword="True" Text="{Binding ConfirmPassword}" Style="{StaticResource EntryStyle}" 
+                       Margin="0,2,0,2" />
+                       
+                <Entry Placeholder="Full Name" Text="{Binding FullName}" Style="{StaticResource EntryStyle}" 
+                       Margin="0,2,0,2" />
 
-            <Label Text="Department" />
+                <Label Text="Department" Margin="0,2,0,0" />
 
-            <!-- Department picker -->
-            <Picker Title="Select Department"
-                    ItemsSource="{Binding Departments}"
-                    ItemDisplayBinding="{Binding Name}"
-                    SelectedItem="{Binding SelectedDepartment}"
-                    Style="{StaticResource PickerStyle}"
-                    IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}"/>
+                <!-- Department picker -->
+                <Picker Title="Select Department"
+                        ItemsSource="{Binding Departments}"
+                        ItemDisplayBinding="{Binding Name}"
+                        SelectedItem="{Binding SelectedDepartment}"
+                        Style="{StaticResource PickerStyle}"
+                        IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}" />
 
-            <Label Text="Title" />
-            <Picker Title="Select Title"
-                    ItemsSource="{Binding Titles}"
-                    SelectedItem="{Binding SelectedTitle}"
-                    Style="{StaticResource PickerStyle}"
-                    IsEnabled="{Binding Titles.Count, Converter={StaticResource IntToBoolConverter}}" />
+                <Label Text="Title" Margin="0,2,0,0" />
+                <Picker Title="Select Title"
+                        ItemsSource="{Binding Titles}"
+                        SelectedItem="{Binding SelectedTitle}"
+                        Style="{StaticResource PickerStyle}"
+                        IsEnabled="{Binding Titles.Count, Converter={StaticResource IntToBoolConverter}}" />
 
-            <Button Text="Sign Up" Command="{Binding SignupCommand}" Margin="0,10,0,0" />
+                <Button Text="Sign Up" Command="{Binding SignupCommand}" Margin="0,8,0,5" HeightRequest="45" />
 
-            <Label Text="{Binding ErrorMessage}" TextColor="Red" IsVisible="{Binding HasError}" HorizontalOptions="Center" />
+                <Label Text="{Binding ErrorMessage}" TextColor="Red" IsVisible="{Binding HasError}" 
+                       HorizontalOptions="Center" HeightRequest="20" />
 
-            <Button Text="Already have an account? Login" Command="{Binding GoToLoginCommand}" BackgroundColor="Transparent" TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" HorizontalOptions="Center"/>
-
-        </VerticalStackLayout>
-    </ScrollView>
+                <Button Text="Already have an account? Login" Command="{Binding GoToLoginCommand}" 
+                        BackgroundColor="Transparent" 
+                        TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" 
+                        HorizontalOptions="Center" HeightRequest="40"/>
+            </VerticalStackLayout>
+            
+            <!-- Right column spacer -->
+            <BoxView Grid.Column="2" Grid.RowSpan="3" />
+        </Grid>
+    </Grid>
 </ContentPage>

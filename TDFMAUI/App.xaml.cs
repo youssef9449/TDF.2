@@ -243,6 +243,14 @@ namespace TDFMAUI
                 // Log important app state information
                 DebugService.LogInfo("App", $"Current MainPage type: {MainPage?.GetType().Name ?? "null"}");
                 DebugService.LogInfo("App", $"App.Services available: {Services != null}");
+                
+                // Configure window size and properties for desktop platforms
+                if (DeviceHelper.IsDesktop && Application.Current?.Windows.Count > 0)
+                {
+                    var mainWindow = Application.Current.Windows[0];
+                    WindowManager.ConfigureMainWindow(mainWindow);
+                    DebugService.LogInfo("App", $"Window configured with fixed size {WindowManager.DefaultWidth}x{WindowManager.DefaultHeight}");
+                }
 
                 // MainPage is now set here instead of the constructor
                 await SetupInitialPageAsync(); // Call the setup logic asynchronously

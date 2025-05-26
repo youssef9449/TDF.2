@@ -25,6 +25,24 @@ namespace TDFMAUI.Features.Auth
 
             // Apply platform-specific styling using DeviceHelper
             ApplyPlatformSpecificStyles();
+            
+            // Subscribe to window maximization changes
+            DeviceHelper.WindowMaximizationChanged += OnWindowMaximizationChanged;
+        }
+        
+        private void OnWindowMaximizationChanged(object sender, bool isMaximized)
+        {
+            // Adjust UI when window is maximized
+            if (isMaximized)
+            {
+                // Scale up for maximized window
+                LogoImage.HeightRequest = 400;
+            }
+            else
+            {
+                // Default size for 1280x720
+                LogoImage.HeightRequest = 150;
+            }
         }
 
         private void ApplyPlatformSpecificStyles()
@@ -107,12 +125,8 @@ namespace TDFMAUI.Features.Auth
         {
             try
             {
-                var mainStack = FindMainContentStack();
-                if (mainStack?.Children.Count > 0 && mainStack.Children[0] is VerticalStackLayout logoStack && logoStack.Children.Count > 0)
-                {
-                    return logoStack.Children[0] as Image;
-                }
-                return null;
+                // In the new layout, we have a direct reference to the LogoImage
+                return LogoImage;
             }
             catch
             {
@@ -145,6 +159,17 @@ namespace TDFMAUI.Features.Auth
             _viewModel?.ClearLoginData();
 
             System.Diagnostics.Debug.WriteLine("[LoginPage] OnAppearing");
+            
+            // Apply current window state
+            OnWindowMaximizationChanged(null, DeviceHelper.IsWindowMaximized);
+        }
+        
+        protected override void OnDisappearing()
+        {
+            base.OnDisappearing();
+            
+            // Unsubscribe from events to prevent memory leaks
+            DeviceHelper.WindowMaximizationChanged -= OnWindowMaximizationChanged;
         }
 
         private async void OnSignupClicked(object sender, EventArgs e)

@@ -1,4 +1,5 @@
 using Microsoft.Maui.Devices;
+using Microsoft.Maui.Controls;
 
 namespace TDFMAUI.Helpers
 {
@@ -7,6 +8,34 @@ namespace TDFMAUI.Helpers
     /// </summary>
     public static class DeviceHelper
     {
+        // Window state tracking
+        public static bool IsWindowMaximized { get; set; } = false;
+        
+        // Event for window maximization state changes
+        public static event EventHandler<bool>? WindowMaximizationChanged;
+        
+        // Update window maximization state and trigger event
+        public static void SetWindowMaximized(bool isMaximized)
+        {
+            if (IsWindowMaximized != isMaximized)
+            {
+                IsWindowMaximized = isMaximized;
+                
+                // Invoke the event on the main thread to avoid cross-thread issues
+                if (WindowMaximizationChanged is not null)
+                {
+                    if (Application.Current?.Dispatcher?.IsDispatchRequired ?? false)
+                    {
+                        Application.Current.Dispatcher.Dispatch(() => 
+                            WindowMaximizationChanged?.Invoke(null, isMaximized));
+                    }
+                    else
+                    {
+                        WindowMaximizationChanged?.Invoke(null, isMaximized);
+                    }
+                }
+            }
+        }
         /// <summary>
         /// Returns true if the current device is running Windows
         /// </summary>

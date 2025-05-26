@@ -21,6 +21,26 @@ public partial class SignupPage : ContentPage
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         BindingContext = _viewModel;
         Debug.WriteLine("[SignupPage] DI constructor - ViewModel assigned successfully");
+        
+        // Subscribe to window maximization changes
+        Helpers.DeviceHelper.WindowMaximizationChanged += OnWindowMaximizationChanged;
+    }
+    
+    private void OnWindowMaximizationChanged(object sender, bool isMaximized)
+    {
+        // Adjust UI when window is maximized
+        if (isMaximized)
+        {
+            // Scale up for maximized window
+            TitleLabel.FontSize = 32;
+            TitleLabel.Margin = new Thickness(0, 10, 0, 15);
+        }
+        else
+        {
+            // Default size for 1280x720
+            TitleLabel.FontSize = 24;
+            TitleLabel.Margin = new Thickness(0, 0, 0, 5);
+        }
     }
 
     protected override async void OnAppearing()
@@ -42,6 +62,17 @@ public partial class SignupPage : ContentPage
 
         // The ViewModel handles department loading in its constructor.
         // No need to explicitly load departments here unless there's a specific refresh requirement.
+        
+        // Apply current window state
+        OnWindowMaximizationChanged(null, Helpers.DeviceHelper.IsWindowMaximized);
+    }
+    
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        
+        // Unsubscribe from events to prevent memory leaks
+        Helpers.DeviceHelper.WindowMaximizationChanged -= OnWindowMaximizationChanged;
     }
 
     // All logic, properties, and event handling methods previously here

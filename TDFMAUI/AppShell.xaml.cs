@@ -168,39 +168,35 @@ namespace TDFMAUI
         {
             _logger?.LogInformation("Attempting to set up right swipe gestures.");
 
-            // Gesture to open the flyout (swipe from right edge on page content)
-            if (CurrentPage is ContentPage page && page.Content != null)
+            try
             {
-                bool openGestureExists = page.Content.GestureRecognizers.Any(g => g is SwipeGestureRecognizer sgr && sgr.Direction == SwipeDirection.Right && sgr.CommandParameter as string == "open_users_flyout");
-                if (!openGestureExists)
+                // Gesture to open the flyout (swipe from right edge on page content)
+                if (CurrentPage is ContentPage page && page.Content != null)
                 {
-                    var openSwipeGesture = new SwipeGestureRecognizer { Direction = SwipeDirection.Right, CommandParameter = "open_users_flyout" };
-                    openSwipeGesture.Swiped += OnOpenRightFlyout_Swiped;
-                    page.Content.GestureRecognizers.Add(openSwipeGesture);
-                    _logger?.LogInformation("Added OPEN swipe gesture (right edge) to current page content.");
+                    bool openGestureExists = page.Content.GestureRecognizers.Any(g => g is SwipeGestureRecognizer sgr && sgr.Direction == SwipeDirection.Right && sgr.CommandParameter as string == "open_users_flyout");
+                    if (!openGestureExists)
+                    {
+                        var openSwipeGesture = new SwipeGestureRecognizer { Direction = SwipeDirection.Right, CommandParameter = "open_users_flyout" };
+                        openSwipeGesture.Swiped += OnOpenRightFlyout_Swiped;
+                        page.Content.GestureRecognizers.Add(openSwipeGesture);
+                        _logger?.LogInformation("Added OPEN swipe gesture (right edge) to current page content.");
+                    }
                 }
-            }
-            else
-            {
-                 _logger?.LogWarning("CurrentPage is not a ContentPage with Content, cannot attach open swipe gesture.");
-            }
+                else
+                {
+                     _logger?.LogWarning("CurrentPage is not a ContentPage with Content, cannot attach open swipe gesture.");
+                }
 
-            // Gesture to close the flyout (swipe left on the flyout panel itself)
-            if (this.RightSideUsersFlyout?.Content != null && this.RightSideUsersFlyout.Content is VisualElement)
-            {
-                View flyoutActualContent = (View)this.RightSideUsersFlyout.Content;
-                bool closeGestureExists = flyoutActualContent.GestureRecognizers.Any(g => g is SwipeGestureRecognizer sgr && sgr.Direction == SwipeDirection.Left && sgr.CommandParameter as string == "close_users_flyout");
-                if (!closeGestureExists)
-                {
-                    var closeSwipeGesture = new SwipeGestureRecognizer { Direction = SwipeDirection.Left, CommandParameter = "close_users_flyout" };
-                    closeSwipeGesture.Swiped += OnCloseRightFlyout_Swiped;
-                    flyoutActualContent.GestureRecognizers.Add(closeSwipeGesture);
-                    _logger?.LogInformation("Added CLOSE swipe gesture to RightSideUsersFlyout's actual content (UsersRightPanel).");
-                }
+                // For the close gesture, we'll handle it differently
+                // Instead of trying to access the content directly, we'll add the gesture in the UsersRightPanel class
+                // This avoids the timing issue where the content might not be fully loaded yet
+                
+                // We'll just log that we're skipping this part for now
+                _logger?.LogInformation("Close swipe gesture will be handled by UsersRightPanel itself.");
             }
-            else
+            catch (Exception ex)
             {
-                _logger?.LogWarning("Could not find RightSideUsersFlyout's content as VisualElement to attach close swipe gesture.");
+                _logger?.LogError(ex, "Error setting up swipe gestures");
             }
         }
 

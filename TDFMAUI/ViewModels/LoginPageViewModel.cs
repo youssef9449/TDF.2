@@ -112,7 +112,22 @@ namespace TDFMAUI.ViewModels
                                 {
                                     _logger.LogInformation("Shell.Current is now available, navigating to Home tab");
                                     // Navigate to the first tab (Home) which now contains DashboardPage
-                                    await Shell.Current.GoToAsync("//");
+                                    // Use a try-catch block to handle potential navigation errors
+                                    try {
+                                        // Use a more specific route to avoid index out of range errors
+                                        await Shell.Current.GoToAsync("//Home");
+                                    }
+                                    catch (Exception navEx) {
+                                        _logger.LogWarning(navEx, "Error navigating to //Home, trying fallback navigation");
+                                        try {
+                                            // Try the root route as a fallback
+                                            await Shell.Current.GoToAsync("/");
+                                        }
+                                        catch (Exception fallbackEx) {
+                                            _logger.LogError(fallbackEx, "Fallback navigation also failed");
+                                            // Don't throw - we're already in the AppShell, so the user can navigate manually
+                                        }
+                                    }
                                 }
                             }
                             else
@@ -151,7 +166,22 @@ namespace TDFMAUI.ViewModels
                                 {
                                     _logger.LogInformation("Shell.Current is now available, navigating to Home tab (secondary navigation)");
                                     // Navigate to the first tab (Home) which now contains DashboardPage
-                                    await Shell.Current.GoToAsync("//");
+                                    // Use a try-catch block to handle potential navigation errors
+                                    try {
+                                        // Use a more specific route to avoid index out of range errors
+                                        await Shell.Current.GoToAsync("//Home");
+                                    }
+                                    catch (Exception navEx) {
+                                        _logger.LogWarning(navEx, "Error navigating to //Home in secondary navigation, trying fallback");
+                                        try {
+                                            // Try the root route as a fallback
+                                            await Shell.Current.GoToAsync("/");
+                                        }
+                                        catch (Exception fallbackEx) {
+                                            _logger.LogError(fallbackEx, "Fallback navigation also failed in secondary navigation");
+                                            // Don't throw - we're already in the AppShell, so the user can navigate manually
+                                        }
+                                    }
                                 }
                             }
                             else

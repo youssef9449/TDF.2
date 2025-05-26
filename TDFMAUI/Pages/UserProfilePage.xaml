@@ -155,10 +155,10 @@
                                         <Label Text="{Binding CurrentUser.Department}" Style="{StaticResource FieldValueStyle}" />
                                         <Label Text="Title" Style="{StaticResource FieldLabelStyle}" />
                                         <Label Text="{Binding CurrentUser.Title}" Style="{StaticResource FieldValueStyle}" />
-                                        <Label Text="Employee ID" Style="{StaticResource FieldLabelStyle}" />
-                                        <Label Text="{Binding CurrentUser.EmployeeId}" Style="{StaticResource FieldValueStyle}" />
-                                        <Label Text="Employee Type" Style="{StaticResource FieldLabelStyle}" />
-                                        <Label Text="{Binding CurrentUser.EmployeeType}" Style="{StaticResource FieldValueStyle}" />
+                                        <Label Text="User ID" Style="{StaticResource FieldLabelStyle}" />
+                                        <Label Text="{Binding CurrentUser.UserID}" Style="{StaticResource FieldValueStyle}" />
+                                        <Label Text="Username" Style="{StaticResource FieldLabelStyle}" />
+                                        <Label Text="{Binding CurrentUser.UserName}" Style="{StaticResource FieldValueStyle}" />
                                     </VerticalStackLayout>
                                     
                                     <!-- Edit mode -->

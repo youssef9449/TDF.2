@@ -148,6 +148,7 @@ namespace TDFShared.Models.Request
         /// <summary>
         /// Reference to the associated user entity (not DTO)
         /// </summary>
+        [JsonIgnore]
         public virtual UserEntity? User { get; set; }
 
         /// <summary>

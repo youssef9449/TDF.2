@@ -337,7 +337,31 @@ namespace TDFMAUI.Features.Auth
         [RelayCommand]
         private async Task GoToLoginAsync()
         {
-                    await Shell.Current.GoToAsync("//LoginPage");
+            try
+            {
+                // Get the current page's navigation
+                if (Application.Current?.MainPage?.Navigation != null)
+                {
+                    // Check if we can pop to the root (if LoginPage is the root)
+                    await Application.Current.MainPage.Navigation.PopToRootAsync();
+                }
+                else
+                {
+                    // Fallback to Shell navigation if available
+                    if (Shell.Current != null)
+                    {
+                        await Shell.Current.GoToAsync("//LoginPage");
+                    }
+                    else
+                    {
+                        _logger?.LogError("Navigation failed: Both Navigation and Shell.Current are null");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error navigating to login page");
+            }
         }
     }
 }

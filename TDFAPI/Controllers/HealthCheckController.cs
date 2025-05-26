@@ -77,7 +77,7 @@ namespace TDFAPI.Controllers
             _logger.LogInformation("Detailed health check requested");
 
             var assembly = Assembly.GetExecutingAssembly();
-            var version = assembly.GetName().Version.ToString();
+            var version = (assembly.GetName()?.Version is Version v) ? v.ToString() : "N/A";
 
             var healthInfo = new
             {

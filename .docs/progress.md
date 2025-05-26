@@ -152,4 +152,36 @@
 5. Fixed property references for filtering by department:
    - Updated property name from `Department` to `RequestDepartment` in both the page and ViewModel filtering code
 
+### Linter Error Resolution (Date: current date)
+
+**What features were implemented?**
+
+Resolved multiple linter errors across the TDFMAUI project to improve code quality and maintainability.
+
+**What errors were encountered?**
+
+Encountered a variety of C# linter errors, including:
+
+-   `CS0117`: Type or namespace name does not exist (e.g., `Colors.Primary`).
+-   `CS1061`: 'ApiResponse<T>' does not contain a definition for 'Property' (accessing properties directly on `ApiResponse` instead of its `Data` property).
+-   `CS7036`: There is no argument given that corresponds to the required parameter (missing constructor arguments).
+-   `CS1503`: Argument type mismatch in method calls (specifically in logging).
+-   `CS0021`: Cannot apply indexing with [] to an expression of type (indexing directly on `ApiResponse`).
+-   `CS0019`: Operator '<' cannot be applied to operands of type (incorrect type comparison).
+-   `CS0029`: Cannot implicitly convert type 'SourceType' to 'TargetType' (assigning `ApiResponse` to a list type).
+
+**How were the errors fixed?**
+
+The errors were fixed by:
+
+1.  Adding missing `using` directives (`Microsoft.Maui.Graphics`) to resolve type errors.
+2.  Modifying code to access the `Data` property of `ApiResponse` objects before accessing the paginated results (`Items`, `TotalCount`) or lists (`LookupItem`).
+3.  Removing redundant code that was causing errors due to incorrect assumptions about ViewModel commands.
+4.  Refactoring dependency injection by injecting required services (`ISecurityService`, `IRoleService`) into constructors where needed, instead of creating new instances directly.
+5.  Moving password validation logic to the appropriate ViewModel (`SignupViewModel`) and ensuring it uses the injected `ISecurityService`.
+6.  Correcting logging calls to match the expected argument types and counts.
+7.  Removing references to non-existent properties (`ProfilePictureData`) after confirming their absence in the relevant DTOs.
+
+This systematic approach involved reading relevant files, identifying the root cause of each error, and applying targeted code edits to resolve them while improving the overall code structure and adherence to best practices like dependency injection and correct API response handling.
+
 ---

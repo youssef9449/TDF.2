@@ -34,8 +34,8 @@ namespace TDFAPI.Data
                 entity.ToTable("Users");
                 entity.HasKey(e => e.UserID);
                 entity.Property(e => e.UserID).ValueGeneratedOnAdd();
-                entity.Property(e => e.Username).HasColumnName("UserName").IsRequired().HasMaxLength(50);
-                entity.HasIndex(e => e.Username).HasDatabaseName("UQ__Users__536C85E474AE94DB").IsUnique();
+                entity.Property(e => e.UserName).HasColumnName("UserName").IsRequired().HasMaxLength(50);
+                entity.HasIndex(e => e.UserName).HasDatabaseName("UQ__Users__536C85E474AE94DB").IsUnique();
                 entity.Property(e => e.PasswordHash).IsRequired().HasMaxLength(256);
                 entity.Property(e => e.Salt).IsRequired().HasMaxLength(128);
                 entity.Property(e => e.FullName).HasMaxLength(100);

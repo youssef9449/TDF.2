@@ -15,12 +15,5 @@ namespace TDFMAUI.ViewModels
 
         [ObservableProperty]
         private bool _isBusy;
-
-        // Password strength validation helper using shared SecurityService
-        protected bool IsPasswordStrong(string password, out string validationMessage)
-        {
-            var securityService = new TDFShared.Services.SecurityService();
-            return securityService.IsPasswordStrong(password, out validationMessage);
-        }
     }
 }

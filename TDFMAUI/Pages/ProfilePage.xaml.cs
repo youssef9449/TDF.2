@@ -68,7 +68,7 @@ public partial class ProfilePage : ContentPage, INotifyPropertyChanged
             var UserDto = new UpdateUserRequest
             {
                 UserID = App.CurrentUser.UserID,
-                Username = App.CurrentUser.Username,
+                Username = App.CurrentUser.UserName,
                 FullName = App.CurrentUser.FullName,
 
                 Department = App.CurrentUser.Department,

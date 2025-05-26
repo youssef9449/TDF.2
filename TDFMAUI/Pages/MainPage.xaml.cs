@@ -10,11 +10,13 @@ namespace TDFMAUI.Pages;
 public partial class MainPage : ContentPage
 {
     private readonly ApiService _apiService;
+    private readonly IServiceProvider _serviceProvider; // Add IServiceProvider
 
-    public MainPage()
+    public MainPage(IServiceProvider serviceProvider) // Inject IServiceProvider
     {
         InitializeComponent();
         _apiService = App.Services.GetService<ApiService>();
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider)); // Assign IServiceProvider
         LoadUserInfo();
     }
 
@@ -50,7 +52,7 @@ public partial class MainPage : ContentPage
 
     private async void OnLeaveRequestsClicked(object sender, EventArgs e)
     {
-        var requestsViewModel = App.Services.GetService<ViewModels.RequestsViewModel>();
+        var requestsViewModel = App.Services.GetService<RequestsViewModel>();
         await Navigation.PushAsync(new RequestsPage(requestsViewModel));
     }
 
@@ -80,7 +82,7 @@ public partial class MainPage : ContentPage
             var requestService = App.Services.GetRequiredService<IRequestService>();
             var apiService = App.Services.GetRequiredService<ApiService>();
             var errorHandlingService = App.Services.GetRequiredService<TDFShared.Services.IErrorHandlingService>();
-            await Navigation.PushAsync(new AdminPage(requestService, apiService, errorHandlingService));
+            await Navigation.PushAsync(_serviceProvider.GetRequiredService<AdminPage>());
         }
     }
 

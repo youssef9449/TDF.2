@@ -96,14 +96,14 @@ namespace TDFMAUI.Services
                         var userInfo = new UserPresenceInfo
                         {
                             UserId = userDto.UserID,
-                            Username = userDto.Username,
+                            Username = userDto.UserName,
                             FullName = userDto.FullName,
                             Department = userDto.Department,
                             Status = userDto.PresenceStatus,
                             StatusMessage = userDto.StatusMessage,
                             IsAvailableForChat = userDto.IsAvailableForChat,
                             LastActivityTime = userDto.LastActivityTime ?? DateTime.UtcNow,
-                            ProfilePictureData = userDto.ProfilePictureData
+                            ProfilePictureData = userDto.Picture
                         };
 
                         allUsersDictionary[userInfo.UserId] = userInfo;
@@ -171,7 +171,7 @@ namespace TDFMAUI.Services
                     {
                         UserId = userId,
                         FullName = App.CurrentUser.FullName,
-                        Username = App.CurrentUser.Username,
+                        Username = App.CurrentUser.UserName,
                         Status = status,
                         StatusMessage = statusMessage,
                         LastActivityTime = DateTime.UtcNow

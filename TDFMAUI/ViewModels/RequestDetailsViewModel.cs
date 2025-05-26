@@ -18,8 +18,8 @@ namespace TDFMAUI.ViewModels
     [QueryProperty(nameof(RequestId), "RequestId")]
     public partial class RequestDetailsViewModel : ObservableObject
     {
-        private readonly TDFMAUI.Services.IApiService _apiService;
-        private readonly TDFShared.Services.IAuthService _authService;
+        private readonly IApiService _apiService;
+        private readonly IAuthService _authService;
         private readonly ILogger<RequestDetailsViewModel> _logger;
 
         [ObservableProperty]
@@ -39,7 +39,7 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty] private bool _canEdit;
         [ObservableProperty] private bool _canDelete;
 
-        public RequestDetailsViewModel(TDFMAUI.Services.IApiService apiService, TDFShared.Services.IAuthService authService, ILogger<RequestDetailsViewModel> logger)
+        public RequestDetailsViewModel(IApiService apiService, IAuthService authService, ILogger<RequestDetailsViewModel> logger)
         {
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));

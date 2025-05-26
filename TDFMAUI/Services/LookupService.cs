@@ -5,6 +5,7 @@ using Microsoft.Maui.ApplicationModel;
 using TDFShared.Constants;
 using TDFShared.DTOs.Common;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 
 namespace TDFMAUI.Services
 {
@@ -13,170 +14,134 @@ namespace TDFMAUI.Services
         private readonly ApiService _apiService;
         private readonly ILogger<LookupService> _logger;
         private List<LookupItem> _departments;
-        private bool _disposed = false;
+        private bool _disposed;
 
         public LookupService(ApiService apiService, ILogger<LookupService> logger)
         {
-            _logger?.LogInformation("LookupService constructor started.");
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _departments = new List<LookupItem>();
-            _logger?.LogInformation("LookupService constructor finished.");
+            _logger.LogInformation("LookupService initialized");
         }
 
         public async Task<List<LookupItem>> GetDepartmentsAsync()
         {
+            if (_disposed) throw new ObjectDisposedException(nameof(LookupService));
+
             try
             {
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync called in TDFMAUI LookupService");
+                _logger.LogInformation("GetDepartmentsAsync called");
+
+                // Ensure we have a non-null departments list
+                _departments ??= new List<LookupItem>();
 
                 // Always reload departments to ensure fresh data
                 await LoadDataAsync();
 
-                string debugInfo = $"Returning {_departments?.Count ?? 0} departments";
-                if (_departments != null && _departments.Count > 0)
+                _logger.LogInformation("GetDepartmentsAsync returning {Count} departments", _departments.Count);
+
+                if (_departments.Any())
                 {
-                    debugInfo += $"\nFirst department: {_departments[0].Name}";
-                    _logger.LogInformation("DIAGNOSTIC: First department in result: Name={Name}",
-                        _departments[0].Name);
+                    _logger.LogDebug("First department - Id: {Id}, Name: {Name}", 
+                        _departments[0].Id, _departments[0].Name);
                 }
 
-                System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE] Departments Result: {debugInfo}");
-                _logger.LogInformation("DIAGNOSTIC: GetDepartmentsAsync returning {Count} departments", _departments?.Count ?? 0);
-
                 // Make a defensive copy to avoid potential issues with the shared list
-                return _departments != null ? new List<LookupItem>(_departments) : new List<LookupItem>();
+                return new List<LookupItem>(_departments);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE Error] Error in GetDepartmentsAsync: {ex.Message}");
-                _logger.LogError(ex, "DIAGNOSTIC: Error in GetDepartmentsAsync: {Message}", ex.Message);
-                throw; // Re-throw to let calling code handle the error
+                _logger.LogError(ex, "Error in GetDepartmentsAsync: {Message}", ex.Message);
+                throw;
             }
         }
 
         public async Task<List<string>> GetTitlesForDepartmentAsync(string departmentId)
         {
+            if (_disposed) throw new ObjectDisposedException(nameof(LookupService));
             if (string.IsNullOrEmpty(departmentId))
             {
-                _logger.LogWarning("GetTitlesForDepartmentAsync called with null or empty department ID.");
+                _logger.LogWarning("GetTitlesForDepartmentAsync called with null or empty department ID");
                 return new List<string>();
             }
 
             try
             {
-                _logger.LogInformation("DIAGNOSTIC: Fetching titles for department {DepartmentId} on demand.", departmentId);
-                var titles = await _apiService.GetAsync<List<string>>(string.Format(ApiRoutes.Lookups.GetTitlesByDepartment, departmentId));
+                _logger.LogInformation("Fetching titles for department {DepartmentId}", departmentId);
+                var response = await _apiService.GetAsync<ApiResponse<List<string>>>(
+                    string.Format(ApiRoutes.Lookups.GetTitlesByDepartment, departmentId));
 
-                if (titles != null && titles.Count > 0)
+                if (response?.Success == true && response.Data != null)
                 {
-                    _logger.LogInformation("DIAGNOSTIC: Loaded {Count} titles for department {DepartmentId}", titles.Count, departmentId);
-                    return titles;
+                    _logger.LogInformation("Loaded {Count} titles for department {DepartmentId}", 
+                        response.Data.Count, departmentId);
+                    return response.Data;
                 }
                 else
                 {
-                    _logger.LogWarning("DIAGNOSTIC: No titles found or API error for department {DepartmentId}.", departmentId);
+                    _logger.LogWarning("No titles found or API error for department {DepartmentId}", departmentId);
                     return new List<string>();
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "DIAGNOSTIC: Exception fetching titles for department {DepartmentId}", departmentId);
+                _logger.LogError(ex, "Exception fetching titles for department {DepartmentId}", departmentId);
                 return new List<string>();
             }
         }
 
         public async Task LoadDataAsync()
         {
-            if (_disposed) return;
+            if (_disposed) throw new ObjectDisposedException(nameof(LookupService));
 
             try
             {
-                System.Diagnostics.Debug.WriteLine("[LookupService CONSOLE] LoadDataAsync: Simplified - Loading only departments.");
-                _logger.LogInformation("DIAGNOSTIC: LoadDataAsync - Simplified - Loading only departments.");
+                _logger.LogInformation("LoadDataAsync - Loading departments");
 
-                // Check network connectivity before making API call
                 var networkAccess = Connectivity.NetworkAccess;
-                _logger.LogInformation("DIAGNOSTIC: Network connectivity status: {NetworkStatus}", networkAccess);
+                _logger.LogInformation("Network connectivity status: {NetworkStatus}", networkAccess);
 
                 if (networkAccess != NetworkAccess.Internet)
                 {
-                    _logger.LogWarning("DIAGNOSTIC: No internet connectivity. Network status: {NetworkStatus}", networkAccess);
                     throw new Exception($"No internet connection. Current network status: {networkAccess}");
                 }
 
-                // Log the API endpoint URL
-                string departmentsEndpoint = ApiRoutes.Lookups.GetDepartments;
-                _logger.LogInformation("DIAGNOSTIC: Calling departments endpoint: {Endpoint}", departmentsEndpoint);
+                var departmentsResponse = await _apiService.GetDepartmentsAsync();
+                _logger.LogInformation("GetDepartmentsAsync completed");
 
-                // Make the API call with detailed logging
-                _logger.LogInformation("DIAGNOSTIC: Directly calling departments endpoint");
-
-                try
+                if (!departmentsResponse.Success)
                 {
-                    _logger.LogInformation("DIAGNOSTIC: About to call _apiService.GetDepartmentsAsync()");
-                    var departments = await _apiService.GetDepartmentsAsync();
-                    _logger.LogInformation("DIAGNOSTIC: _apiService.GetDepartmentsAsync() completed successfully");
-
-                    // Enhanced logging for department data received by LookupService
-                    if (departments == null)
-                    {
-                        _logger.LogWarning("DIAGNOSTIC: _apiService.GetDepartmentsAsync() returned a NULL list to LookupService.");
-                    }
-                    else
-                    {
-                        _logger.LogInformation("DIAGNOSTIC: _apiService.GetDepartmentsAsync() returned a list with {Count} items to LookupService.", departments.Count);
-                        if (departments.Any())
-                        {
-                            // Log details of the first department to inspect deserialized values
-                            var firstDept = departments[0];
-                            _logger.LogInformation("DIAGNOSTIC: First department received by LookupService - Name: {Name}",
-                                                   firstDept.Name);
-
-                            // Log all departments for debugging
-                            for (int i = 0; i < departments.Count; i++)
-                            {
-                                var dept = departments[i];
-                                _logger.LogDebug("DIAGNOSTIC: Department[{Index}] - Name: {Name}",
-                                    i, dept.Name);
-                            }
-                        }
-                    }
-
-                    _logger.LogInformation("DIAGNOSTIC: About to assign departments to _departments field");
-                    if (departments != null) { // Allow empty list as a valid response
-                        _logger.LogInformation("DIAGNOSTIC: Successfully processed departments list (Count: {Count})", departments.Count);
-                        _departments = departments;
-
-                        System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE] Final State: Departments loaded: {_departments?.Count ?? 0}");
-                        _logger.LogInformation("DIAGNOSTIC: Final loaded state - Departments: {DeptCount}", _departments?.Count ?? 0);
-                    }
-                    else {
-                        _logger.LogError("DIAGNOSTIC: Department data was null after API call. No fallback departments will be provided.");
-                        _departments = new List<LookupItem>(); // Empty list, no fallback
-                    }
-                    _logger.LogInformation("DIAGNOSTIC: LoadDataAsync completed successfully");
+                    throw new Exception($"Failed to get departments: {departmentsResponse.Message}");
                 }
-                catch (Exception apiEx)
+
+                var departments = departmentsResponse.Data ?? new List<LookupItem>();
+                _logger.LogInformation("Received {Count} departments", departments.Count);
+
+                // Ensure all departments have an Id
+                foreach (var dept in departments.Where(d => string.IsNullOrEmpty(d.Id)))
                 {
-                    _logger.LogError(apiEx, "DIAGNOSTIC: Error calling GetDepartmentsAsync API: {Message}. Full exception: {Exception}", apiEx.Message, apiEx.ToString());
-                    _departments = new List<LookupItem>(); // Empty list, no fallback
-                    throw; // Re-throw to let calling code handle the error
+                    dept.Id = dept.Name;
+                    _logger.LogDebug("Set empty Id to Name for department: {Name}", dept.Name);
                 }
+
+                _departments = departments;
+                _logger.LogInformation("Departments loaded successfully: {Count} items", _departments.Count);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[LookupService CONSOLE Error] Failed to load data: {ex.Message}\n\nStack: {ex.StackTrace}");
-                _logger.LogError(ex, "DIAGNOSTIC: Failed to load lookup data");
-                _departments = new List<LookupItem>(); // Empty list, no fallback
-                throw; // Re-throw to let calling code handle the error
+                _logger.LogError(ex, "Failed to load departments");
+                _departments = new List<LookupItem>();
+                throw;
             }
         }
 
         public async Task<IEnumerable<TitleDTO>> GetTitlesAsync()
         {
-            _logger.LogWarning("GetTitlesAsync called, but titles are loaded on demand. This method may not function as expected.");
-                return new List<TitleDTO>();
+            if (_disposed) throw new ObjectDisposedException(nameof(LookupService));
+            
+            _logger.LogWarning("GetTitlesAsync called but not implemented - titles are loaded on demand");
+            await Task.CompletedTask; // Satisfy async contract
+            return new List<TitleDTO>();
         }
 
         public void Dispose()
@@ -191,7 +156,7 @@ namespace TDFMAUI.Services
             {
                 if (disposing)
                 {
-                    _departments?.Clear();
+                    _departments.Clear();
                 }
                 _disposed = true;
             }

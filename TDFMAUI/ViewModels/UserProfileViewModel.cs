@@ -67,10 +67,10 @@ namespace TDFMAUI.ViewModels
 
         private void UpdateProfileImageSource()
         {
-            if (CurrentUser?.ProfilePictureData != null && CurrentUser.ProfilePictureData.Length > 0)
+            if (CurrentUser?.Picture != null && CurrentUser.Picture.Length > 0)
             {
                 // Create ImageSource from byte array
-                ProfileImage = ImageSource.FromStream(() => new MemoryStream(CurrentUser.ProfilePictureData));
+                ProfileImage = ImageSource.FromStream(() => new MemoryStream(CurrentUser.Picture));
             }
             else
             {

@@ -436,7 +436,7 @@ namespace TDFMAUI
                 // If we have a notification service, mark as seen if appropriate
                 if (Services != null && e.NotificationId > 0)
                 {
-                    var notificationService = Services.GetService<TDFMAUI.Services.INotificationService>();
+                    var notificationService = Services.GetService<Services.INotificationService>();
                     if (notificationService != null && CurrentUser != null)
                     {
                         // Fire and forget - don't block the UI

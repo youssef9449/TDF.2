@@ -102,6 +102,18 @@
             ],
             "problemMatcher": "$msCompile",
             "detail": "Build TDFAPI project"
+        },
+        {
+            "label": "build: all",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/TDF.sln"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build",
+            "detail": "Build all projects in the solution"
         }
     ]
 }

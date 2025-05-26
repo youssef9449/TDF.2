@@ -124,17 +124,17 @@ namespace TDFMAUI.WinUI
                     FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(uiXamlDllPath);
                     Debug.WriteLine($"Microsoft.UI.Xaml.dll version: {versionInfo.FileVersion}");
 
-                    // Try to load the assembly to ensure it's valid
-                    try
-                    {
-                        var assembly = Assembly.LoadFrom(uiXamlDllPath);
-                        Debug.WriteLine($"Successfully loaded Microsoft.UI.Xaml.dll: {assembly.FullName}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"Failed to load Microsoft.UI.Xaml.dll: {ex.Message}");
-                        // Don't throw here, we'll continue and try to initialize anyway
-                    }
+                    //    // Try to load the assembly to ensure it's valid
+                    //    try
+                    //    {
+                    //        //var assembly = Assembly.LoadFrom(uiXamlDllPath);
+                    //     //   Debug.WriteLine($"Successfully loaded Microsoft.UI.Xaml.dll: {assembly.FullName}");
+                    //    }
+                    //    catch (Exception ex)
+                    //    {
+                    //        Debug.WriteLine($"Failed to load Microsoft.UI.Xaml.dll: {ex.Message}");
+                    //        // Don't throw here, we'll continue and try to initialize anyway
+                    //    }
                 }
                 else
                 {
@@ -641,7 +641,7 @@ namespace TDFMAUI.WinUI
             try
             {
                 using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
-                var principal = new System.Security.Principal.WindowsPrincipal(identity);
+                var principal = new WindowsPrincipal(identity);
                 return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
             }
             catch (Exception ex)

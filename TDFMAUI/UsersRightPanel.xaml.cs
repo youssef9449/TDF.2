@@ -21,7 +21,7 @@ namespace TDFMAUI
         private IUserPresenceService _userPresenceService;
         private ApiService _apiService;
         private ILogger<UsersRightPanel> _logger;
-        private TDFShared.Services.IConnectivityService _connectivityService;
+        private IConnectivityService _connectivityService;
 
         private ObservableCollection<UserViewModel> _users = new ObservableCollection<UserViewModel>();
         public ObservableCollection<UserViewModel> Users => _users;
@@ -69,7 +69,7 @@ namespace TDFMAUI
                 _userPresenceService = App.Services.GetService<IUserPresenceService>();
                 _apiService = App.Services.GetService<ApiService>();
                 _logger = App.Services.GetService<ILogger<UsersRightPanel>>();
-                _connectivityService = App.Services.GetService<TDFShared.Services.IConnectivityService>();
+                _connectivityService = App.Services.GetService<IConnectivityService>();
 
                 if (_userPresenceService == null) _logger?.LogCritical("UsersRightPanel: IUserPresenceService could not be resolved.");
                 if (_apiService == null) _logger?.LogCritical("UsersRightPanel: ApiService could not be resolved.");
@@ -93,7 +93,7 @@ namespace TDFMAUI
             IUserPresenceService userPresenceService,
             ApiService apiService,
             ILogger<UsersRightPanel> logger,
-            TDFShared.Services.IConnectivityService connectivityService)
+            IConnectivityService connectivityService)
         {
             InitializeComponent();
             _userPresenceService = userPresenceService;

@@ -1,7 +1,9 @@
+using Microsoft.Maui.Controls;
 using TDFMAUI.Services;
 using TDFMAUI.ViewModels;
 using TDFShared.Services;
 using System;
+using System.Threading.Tasks;
 
 namespace TDFMAUI.Pages
 {
@@ -10,12 +12,12 @@ namespace TDFMAUI.Pages
         private readonly ReportsViewModel _viewModel;
 
         // Inject ViewModel and IRequestService via constructor
-        public ReportsPage(IRequestService requestService, IErrorHandlingService errorHandlingService)
+        public ReportsPage(IRequestService requestService, IErrorHandlingService errorHandlingService, IAuthService authService)
         {
             InitializeComponent();
 
             // Create the ViewModel, passing dependencies
-            _viewModel = new ReportsViewModel(requestService, Navigation, errorHandlingService);
+            _viewModel = new ReportsViewModel(requestService, Navigation, errorHandlingService, authService);
 
             // Set the binding context for the page
             BindingContext = _viewModel;

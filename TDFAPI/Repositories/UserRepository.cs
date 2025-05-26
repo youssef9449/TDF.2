@@ -51,7 +51,7 @@ namespace TDFAPI.Repositories
                 var user = await _context.Users
                                        .Include(u => u.AnnualLeave)
                                        .AsNoTracking()
-                                       .FirstOrDefaultAsync(u => u.Username == username);
+                                       .FirstOrDefaultAsync(u => u.UserName == username);
                 return user != null ? MapUserDtoFromEntity(user) : null;
             }
             catch (Exception ex)
@@ -68,7 +68,7 @@ namespace TDFAPI.Repositories
                 var users = await _context.Users
                                         .Include(u => u.AnnualLeave)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.Username)
+                                        .OrderBy(u => u.UserName)
                                         .ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
@@ -87,7 +87,7 @@ namespace TDFAPI.Repositories
                 var users = await _context.Users
                                         .Include(u => u.AnnualLeave)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.Username)
+                                        .OrderBy(u => u.UserName)
                                         .Skip((page - 1) * pageSize)
                                         .Take(pageSize)
                                         .ToListAsync();
@@ -105,7 +105,7 @@ namespace TDFAPI.Repositories
         {
             var newUser = new UserEntity
             {
-                Username = userDto.Username,
+                UserName = userDto.Username,
                 FullName = userDto.FullName,
                 Department = userDto.Department,
                 Title = userDto.Title,
@@ -483,7 +483,7 @@ namespace TDFAPI.Repositories
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.Department == department)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.Username)
+                                        .OrderBy(u => u.UserName)
                                         .ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
@@ -522,7 +522,7 @@ namespace TDFAPI.Repositories
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.IsConnected == true)
                                         .AsNoTracking()
-                                        .OrderBy(u => u.Username)
+                                        .OrderBy(u => u.UserName)
                                         .ToListAsync();
 
                 return users.Select(MapUserDtoFromEntity).ToList();
@@ -542,7 +542,7 @@ namespace TDFAPI.Repositories
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.Department == department && (u.IsAdmin == true || u.IsManager == true || u.IsHR == true))
                                         .AsNoTracking()
-                                        .OrderBy(u => u.Username)
+                                        .OrderBy(u => u.UserName)
                                         .ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
@@ -568,7 +568,7 @@ namespace TDFAPI.Repositories
                 else
                     query = query.Where(u => u.IsAdmin != true && u.IsManager != true && u.IsHR != true);
 
-                var users = await query.OrderBy(u => u.Username).ToListAsync();
+                var users = await query.OrderBy(u => u.UserName).ToListAsync();
                 return users.Select(MapUserDtoFromEntity).ToList();
             }
             catch (Exception ex)
@@ -698,7 +698,7 @@ namespace TDFAPI.Repositories
             var dto = new UserDto
             {
                 UserID = entity.UserID,
-                Username = entity.Username,
+                UserName = entity.UserName,
                 FullName = entity.FullName,
                 Department = entity.Department,
                 Title = entity.Title,

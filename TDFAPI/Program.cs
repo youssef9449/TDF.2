@@ -8,8 +8,6 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Security.Claims;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using TDFAPI.Configuration;
 using TDFAPI.Middleware;
@@ -25,7 +23,6 @@ using System.IO.Compression;
 using MediatR;
 using TDFShared.Models.Message;
 using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.AspNetCore.HttpOverrides;
 using TDFShared.Constants;
 using TDFShared.Services;
 
@@ -270,7 +267,8 @@ builder.Services.AddControllers()
     {
         // Use centralized JSON serialization options for consistency across the application
         var centralizedOptions = TDFShared.Helpers.JsonSerializationHelper.DefaultOptions;
-        options.JsonSerializerOptions.PropertyNamingPolicy = centralizedOptions.PropertyNamingPolicy;
+        // Force property names to match [JsonPropertyName] exactly
+        options.JsonSerializerOptions.PropertyNamingPolicy = null;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = centralizedOptions.PropertyNameCaseInsensitive;
         options.JsonSerializerOptions.DefaultIgnoreCondition = centralizedOptions.DefaultIgnoreCondition;
         options.JsonSerializerOptions.ReferenceHandler = centralizedOptions.ReferenceHandler;

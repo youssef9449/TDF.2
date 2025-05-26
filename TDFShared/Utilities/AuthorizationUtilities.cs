@@ -232,11 +232,11 @@ namespace TDFShared.Utilities
         /// <param name="getRequestAsync">Function to get request by ID</param>
         /// <param name="getUserAsync">Function to get user by ID</param>
         /// <returns>Configured BusinessRuleContext</returns>
-        public static TDFShared.Validation.BusinessRuleContext CreateAuthorizationContext(
-            Func<int, Task<TDFShared.DTOs.Requests.RequestResponseDto?>> getRequestAsync,
-            Func<int, Task<TDFShared.DTOs.Users.UserDto?>> getUserAsync)
+        public static Validation.BusinessRuleContext CreateAuthorizationContext(
+            Func<int, Task<RequestResponseDto?>> getRequestAsync,
+            Func<int, Task<UserDto?>> getUserAsync)
         {
-            return new TDFShared.Validation.BusinessRuleContext
+            return new Validation.BusinessRuleContext
             {
                 GetRequestAsync = getRequestAsync,
                 GetUserAsync = getUserAsync

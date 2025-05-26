@@ -200,7 +200,7 @@ namespace TDFMAUI.Services
         /// Handle system connectivity changes from MAUI platform
         /// Real-time connectivity detection with platform-specific details
         /// </summary>
-        private void OnNativeConnectivityChanged(object sender, Microsoft.Maui.Networking.ConnectivityChangedEventArgs e)
+        private void OnNativeConnectivityChanged(object sender, ConnectivityChangedEventArgs e)
         {
             try
             {

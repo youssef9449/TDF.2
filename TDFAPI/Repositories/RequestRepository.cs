@@ -582,7 +582,7 @@ namespace TDFAPI.Repositories
             var dto = new UserDto
             {
                 UserID = user.UserID,
-                Username = user.Username,
+                UserName = user.UserName,
                 FullName = user.FullName,
                 Department = user.Department,
                 Title = user.Title,

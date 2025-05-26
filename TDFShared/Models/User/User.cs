@@ -4,6 +4,8 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using TDFShared.Models.Request;
 using TDFShared.Enums;
+using TDFShared.Models.Message;
+
 
 namespace TDFShared.Models.User
 {
@@ -17,7 +19,7 @@ namespace TDFShared.Models.User
 
         [Required]
         [StringLength(50)]
-        public string Username { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
 
         [Required]
         [StringLength(256)]
@@ -83,9 +85,6 @@ namespace TDFShared.Models.User
         [StringLength(255)]
         public string? StatusMessage { get; set; }
 
-        // Ignored in DbContext configuration - managed in AnnualLeave table
-        // public int? AnnualBalance { get; set; }
-        // public int? CasualBalance { get; set; }
 
         public bool IsActive { get; set; } = true;
         public DateTime? UpdatedAt { get; set; }
@@ -98,8 +97,8 @@ namespace TDFShared.Models.User
         public virtual AnnualLeaveEntity? AnnualLeave { get; set; }
 
         // Add other navigation properties if needed for Messages, Notifications etc.
-        // public virtual ICollection<MessageEntity> SentMessages { get; set; } = new List<MessageEntity>();
-        // public virtual ICollection<MessageEntity> ReceivedMessages { get; set; } = new List<MessageEntity>();
-        // public virtual ICollection<NotificationEntity> Notifications { get; set; } = new List<NotificationEntity>();
+        public virtual ICollection<MessageEntity> SentMessages { get; set; } = new List<MessageEntity>();
+        public virtual ICollection<MessageEntity> ReceivedMessages { get; set; } = new List<MessageEntity>();
+       // public virtual ICollection<NotificationEntity> Notifications { get; set; } = new List<NotificationEntity>();
     }
 } 

@@ -9,6 +9,7 @@ using TDFMAUI.Services;
 using TDFMAUI.ViewModels;
 using TDFShared.DTOs.Users;
 using TDFMAUI.Helpers;
+using TDFShared.Services;
 
 namespace TDFMAUI.Pages;
 
@@ -16,34 +17,21 @@ public partial class AddUserPage : ContentPage
 {
     private readonly ApiService _apiService;
     private readonly LookupService _lookupService;
+    private readonly ISecurityService _securityService;
+    private readonly IRoleService _roleService;
 
     public ObservableCollection<LookupItem> Departments { get; set; }
     public ObservableCollection<string> Titles { get; set; }
     public string SelectedDepartment { get; set; }
 
-    public AddUserPage()
+    public AddUserPage(ApiService apiService, LookupService lookupService, ISecurityService securityService, IRoleService roleService)
     {
         InitializeComponent();
 
-        // Get services from DI
-        _apiService = App.Services.GetService<ApiService>();
-        _lookupService = App.Services.GetService<LookupService>();
-
-        // Initialize collections
-        Departments = new ObservableCollection<LookupItem>();
-        Titles = new ObservableCollection<string>();
-
-        BindingContext = this;
-
-        // Load departments from lookup service
-        LoadDepartmentsAsync();
-    }
-
-    public AddUserPage(ApiService apiService)
-    {
-        InitializeComponent();
-        _apiService = apiService;
-        _lookupService = App.Services.GetService<LookupService>();
+        _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+        _lookupService = lookupService ?? throw new ArgumentNullException(nameof(lookupService));
+        _securityService = securityService ?? throw new ArgumentNullException(nameof(securityService));
+        _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
 
         // Initialize collections
         Departments = new ObservableCollection<LookupItem>();
@@ -97,8 +85,7 @@ public partial class AddUserPage : ContentPage
 
     private bool IsPasswordStrong(string password, out string validationMessage)
     {
-        var securityService = new TDFShared.Services.SecurityService();
-        return securityService.IsPasswordStrong(password, out validationMessage);
+        return _securityService.IsPasswordStrong(password, out validationMessage);
     }
 
     private async void OnAddUserClicked(object sender, EventArgs e)

@@ -12,7 +12,7 @@
             "stopAtEntry": false,
             "serverReadyAction": {
                 "action": "openExternally",
-                "pattern": "\\\\bNow listening on:\\\\s+(https?://\\\\S+)"
+                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
             },
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development"
@@ -46,7 +46,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "maui: Build for Windows",
-            "program": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-windows10.0.19041.0/win10-x64/TDFMAUI.exe",
+            "program": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-windows10.0.19041.0/win10-x64/TDF.exe",
             "cwd": "${workspaceFolder}/TDFMAUI",
             "console": "internalConsole"
         },
@@ -55,9 +55,18 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "maui: Basic Windows Build",
-            "program": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-windows10.0.19041.0/TDFMAUI.dll",
+            "program": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-windows10.0.19041.0/TDF.dll",
             "cwd": "${workspaceFolder}/TDFMAUI",
             "console": "internalConsole"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Run API and TDFMAUI (Windows)",
+            "configurations": [
+                "TDFAPI: Launch (web)",
+                "TDFMAUI: Windows (Default)"
+            ]
         }
     ]
 }

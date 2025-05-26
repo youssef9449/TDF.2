@@ -20,8 +20,8 @@ namespace TDFMAUI.ViewModels
 {
     public class AddRequestViewModel : INotifyPropertyChanged
     {
-        private readonly TDFMAUI.Services.IRequestService _requestService;
-        private readonly TDFShared.Services.IAuthService _authService;
+        private readonly IRequestService _requestService;
+        private readonly IAuthService _authService;
         private readonly ILogger<AddRequestViewModel> _logger;
         private readonly TDFShared.Validation.IValidationService _validationService;
 
@@ -141,7 +141,7 @@ namespace TDFMAUI.ViewModels
         public bool IsNotBusy => !IsBusy;
 
         public RequestCreateDto RequestCreateDto =>
-            Enum.TryParse<LeaveType>(SelectedLeaveType, true, out LeaveType leaveType)
+            Enum.TryParse(SelectedLeaveType, true, out LeaveType leaveType)
                 ? RequestDtoFactory.CreateRequestDto(
                     leaveType,
                     StartDate,
@@ -153,7 +153,7 @@ namespace TDFMAUI.ViewModels
                 : new RequestCreateDto();
 
         public RequestUpdateDto RequestUpdateDto =>
-            Enum.TryParse<LeaveType>(SelectedLeaveType, true, out LeaveType leaveType)
+            Enum.TryParse(SelectedLeaveType, true, out LeaveType leaveType)
                 ? RequestDtoFactory.CreateUpdateDto(
                     leaveType,
                     StartDate,
@@ -166,7 +166,7 @@ namespace TDFMAUI.ViewModels
         public ICommand SubmitRequestCommand { get; }
         public ICommand CancelCommand { get; }
 
-        public AddRequestViewModel(IRequestService requestService, TDFShared.Services.IAuthService authService, ILogger<AddRequestViewModel> logger, TDFShared.Validation.IValidationService validationService, RequestResponseDto? existingRequest = null)
+        public AddRequestViewModel(IRequestService requestService, IAuthService authService, ILogger<AddRequestViewModel> logger, TDFShared.Validation.IValidationService validationService, RequestResponseDto? existingRequest = null)
         {
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
@@ -383,7 +383,7 @@ namespace TDFMAUI.ViewModels
                 return false;
             }
 
-            if (!Enum.TryParse<LeaveType>(SelectedLeaveType, true, out LeaveType leaveType))
+            if (!Enum.TryParse(SelectedLeaveType, true, out LeaveType leaveType))
             {
                 errors.Add("Invalid leave type selected.");
                 ValidationErrors = errors;

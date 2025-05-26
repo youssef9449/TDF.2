@@ -199,7 +199,7 @@ namespace TDFMAUI.Features.Dashboard
                     pendingPagination.UserId = App.CurrentUser.UserID;
                 }
                 var pendingResult = await _requestService.GetAllRequestsAsync(pendingPagination);
-                PendingRequestsCount = pendingResult?.TotalCount ?? 0;
+                PendingRequestsCount = pendingResult?.Data?.TotalCount ?? 0;
 
                 // Get unread notifications count
                 var notifications = await _notificationService.GetUnreadNotificationsAsync();
@@ -245,9 +245,9 @@ namespace TDFMAUI.Features.Dashboard
                 var recentResult = await _requestService.GetAllRequestsAsync(pagination);
 
                 RecentRequests.Clear();
-                if (recentResult?.Items != null)
+                if (recentResult?.Data?.Items != null)
                 {
-                    foreach (var req in recentResult.Items)
+                    foreach (var req in recentResult.Data.Items)
                     {
                         RecentRequests.Add(req);
                     }

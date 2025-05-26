@@ -36,13 +36,13 @@ namespace TDFMAUI.ViewModels
         private bool _hasError;
 
         private readonly ApiService _apiService;
-        private readonly TDFShared.Services.IAuthService _authService;
+        private readonly IAuthService _authService;
         private readonly INavigationService _navigationService;
 
         // Constructor injection
         public MyTeamViewModel(
-            ApiService apiService, 
-            TDFShared.Services.IAuthService authService,
+            ApiService apiService,
+            IAuthService authService,
             INavigationService navigationService)
         {
             _apiService = apiService;
@@ -89,7 +89,7 @@ namespace TDFMAUI.ViewModels
 
                 // Get accessible departments using AuthorizationUtilities
                 var allDepartments = await _apiService.GetDepartmentsAsync();
-                var departmentNames = allDepartments.Select(d => d.Name);
+                var departmentNames = allDepartments?.Data?.Select(d => d.Name);
                 var accessibleDepartments = AuthorizationUtilities.GetAccessibleDepartments(userDto, departmentNames);
 
                 TeamMembers.Clear();

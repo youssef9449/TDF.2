@@ -2,6 +2,7 @@ using Microsoft.Maui.Networking;
 using TDFMAUI.Config;
 using TDFMAUI.Services;
 using TDFShared.Services;
+using TDFMAUI.Features.Auth;
 
 namespace TDFMAUI.Pages
 {
@@ -201,13 +202,13 @@ namespace TDFMAUI.Pages
                     // Clear any other cached data
                     // ...
 
-                    await DisplayAlert("Success", "App cache cleared successfully. The app will now restart.", "OK");
+                    await DisplayAlert("Success", "App cache cleared successfully. You will be redirected to the login page.", "OK");
 
                     // Log the cache clear
                     DebugService.LogInfo("DiagnosticsPage", "App cache cleared by user");
 
-                    // Restart the app (this is a simple way to simulate a restart)
-                    Application.Current.MainPage = new NavigationPage(new DiagnosticsPage(_connectivity, _apiService, _httpClientService));
+                    // Navigate to login page
+                    await NavigateToLoginPage();
                 }
                 catch (Exception ex)
                 {
@@ -215,6 +216,43 @@ namespace TDFMAUI.Pages
                     DebugService.LogError("DiagnosticsPage", $"Cache clear error: {ex.Message}");
                 }
             }
+        }
+
+        private async Task NavigateToLoginPage()
+        {
+            try
+            {
+                if (App.Services == null)
+                {
+                    DebugService.LogError("DiagnosticsPage", "App.Services is null. Cannot resolve LoginPage.");
+                    await DisplayAlert("Navigation Error", "App services are not available. Please restart the app.", "OK");
+                    return;
+                }
+                // Get the login page from DI container
+                var loginPage = App.Services.GetService<LoginPage>();
+                if (loginPage == null)
+                {
+                    DebugService.LogError("DiagnosticsPage", "LoginPage could not be resolved from DI container.");
+                    await DisplayAlert("Navigation Error", "Failed to resolve LoginPage. Please restart the app.", "OK");
+                    return;
+                }
+                // Create a new navigation page with the login page
+                var navPage = new NavigationPage(loginPage);
+                // Set as main page
+                Application.Current.MainPage = navPage;
+                DebugService.LogInfo("DiagnosticsPage", "Successfully navigated to login page");
+            }
+            catch (Exception ex)
+            {
+                DebugService.LogError("DiagnosticsPage", $"Error navigating to login page: {ex.Message}");
+                await DisplayAlert("Navigation Error", "Failed to navigate to login page. Please restart the app.", "OK");
+            }
+        }
+
+        private async void GoToLoginButton_Clicked(object sender, EventArgs e)
+        {
+            DebugService.LogInfo("DiagnosticsPage", "GoToLoginButton_Clicked invoked");
+            await NavigateToLoginPage();
         }
     }
 }

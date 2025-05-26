@@ -26,9 +26,9 @@ namespace TDFMAUI.ViewModels
 
     public partial class RequestApprovalViewModel : ObservableObject, IDisposable
     {
-        private readonly TDFMAUI.Services.IRequestService _requestService;
-        private readonly TDFMAUI.Services.INotificationService _notificationService;
-        private readonly TDFShared.Services.IAuthService _authService;
+        private readonly IRequestService _requestService;
+        private readonly Services.INotificationService _notificationService;
+        private readonly IAuthService _authService;
         private readonly ILogger<RequestApprovalViewModel> _logger;
         private readonly CancellationTokenSource _cancellationTokenSource = new();
         private bool _disposed = false;
@@ -183,9 +183,9 @@ namespace TDFMAUI.ViewModels
         }
 
         public RequestApprovalViewModel(
-            TDFMAUI.Services.IRequestService requestService,
-            TDFMAUI.Services.INotificationService notificationService,
-            TDFShared.Services.IAuthService authService,
+            IRequestService requestService,
+            Services.INotificationService notificationService,
+            IAuthService authService,
             ILogger<RequestApprovalViewModel> logger)
         {
             _title = "Request Approval";

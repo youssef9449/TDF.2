@@ -14,18 +14,11 @@ using TDFShared.DTOs.Auth;
 using TDFShared.DTOs.Users;
 using TDFAPI.Extensions; // Only one set of usings
 using System.Net.Http.Json;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using TDFAPI.Domain.Auth;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
-using TDFAPI.Repositories;
-using TDFShared.DTOs.Auth;
-using TDFShared.DTOs.Users;
 using TDFShared.DTOs.Common;
 using TDFShared.Enums;
 using TDFShared.Services;
@@ -178,7 +171,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 RefreshToken = refreshToken,
                 Expiration = DateTime.UtcNow.AddMinutes(_jwtTokenExpirationMinutes),
                 UserId = user.UserID,
-                Username = user.Username,
+                Username = user.UserName,
                 FullName = user.FullName,
                 IsAdmin = user.IsAdmin,
                 IsManager = user.IsManager,
@@ -389,7 +382,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             return new UserDto
             {
                 UserID = user.UserID,
-                Username = user.Username,
+                UserName = user.UserName,
                 Department = department ?? user.Department,
                 IsAdmin = user.IsAdmin,
                 IsManager = user.IsManager,
@@ -478,7 +471,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             var updatedUser = new UserDto
             {
                 UserID = user.UserID,
-                Username = user.Username ?? string.Empty,
+                UserName = user.UserName ?? string.Empty,
                 FullName = user.FullName ?? string.Empty,
                 IsAdmin = user.IsAdmin,
                 IsManager = user.IsManager,
@@ -495,7 +488,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             {
                 // Skip properties we've already set explicitly
                 if (prop.Name == nameof(UserDto.UserID) ||
-                    prop.Name == nameof(UserDto.Username) ||
+                    prop.Name == nameof(UserDto.UserName) ||
                     prop.Name == nameof(UserDto.FullName) ||
                     prop.Name == nameof(UserDto.IsAdmin) ||
                     prop.Name == nameof(UserDto.IsManager) ||
@@ -534,7 +527,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 RefreshToken = newRefreshToken,
                 Expiration = DateTime.UtcNow.AddMinutes(_jwtTokenExpirationMinutes),
                 UserId = user.UserID,
-                Username = user.Username,
+                Username = user.UserName,
                 FullName = user.FullName,
                 IsAdmin = user.IsAdmin,
                 IsManager = user.IsManager,
@@ -589,14 +582,6 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
     public bool VerifyPassword(string password, string storedHash, string salt)
     {
         return _securityService.VerifyPassword(password, storedHash, salt);
-    }
-
-    /// <summary>
-    /// Validates password strength using the shared SecurityService
-    /// </summary>
-    public bool IsPasswordStrong(string password)
-    {
-        return _securityService.IsPasswordStrong(password, out _);
     }
 
     public async Task RevokeTokenAsync(string jti, DateTime expiryDateUtc, int? userId = null)

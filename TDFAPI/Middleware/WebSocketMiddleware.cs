@@ -222,7 +222,7 @@ namespace TDFAPI.Middleware
                 {
                     var userRepository = scope.ServiceProvider.GetRequiredService<Repositories.IUserRepository>();
                     var user = await userRepository.GetByIdAsync(userId);
-                    return user?.Username ?? "Unknown";
+                    return user?.UserName ?? "Unknown";
                 }
             }
             catch (Exception ex)

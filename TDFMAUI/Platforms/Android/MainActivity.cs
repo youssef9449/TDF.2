@@ -29,7 +29,7 @@ namespace TDFMAUI
 
                 LogToFile("MainActivity", "OnCreate completed successfully");
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 // Log the exception
                 LogCrash("MainActivity.OnCreate", ex);
@@ -70,7 +70,7 @@ namespace TDFMAUI
             }
         }
 
-        public static void LogCrash(string source, System.Exception ex)
+        public static void LogCrash(string source, Exception ex)
         {
             try
             {
@@ -117,8 +117,8 @@ namespace TDFMAUI
             try
             {
                 // Convert Java exception to .NET exception for logging
-                var netException = new System.Exception($"Uncaught Android exception: {ex.Message}",
-                    new System.Exception(ex.ToString()));
+                var netException = new Exception($"Uncaught Android exception: {ex.Message}",
+                    new Exception(ex.ToString()));
 
                 // Log the crash
                 MainActivity.LogCrash("UncaughtException", netException);

@@ -94,5 +94,13 @@ namespace TDFAPI.Services
         /// <param name="userAgent">The user agent string of the device</param>
         /// <returns>A task representing the asynchronous operation</returns>
         Task UpdateUserDeviceInfoAsync(int userId, string deviceId, string userAgent);
+        
+        /// <summary>
+        /// Checks if a full name is already taken by another user
+        /// </summary>
+        /// <param name="fullName">The full name to check</param>
+        /// <param name="excludeUserId">Optional user ID to exclude from the check (for updates)</param>
+        /// <returns>True if the full name is already taken, false otherwise</returns>
+        Task<bool> IsFullNameTakenAsync(string fullName, int? excludeUserId = null);
     }
 }

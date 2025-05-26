@@ -25,7 +25,7 @@ public partial class UserDetailsPage : ContentPage
             var user = await _apiService.GetUserAsync(_userId);
             if (user != null)
             {
-                userNameLabel.Text = user.Username;
+                userNameLabel.Text = user.UserName;
                 fullNameLabel.Text = user.FullName;
                 departmentLabel.Text = user.Department;
                 titleLabel.Text = user.Title;

@@ -60,7 +60,7 @@ namespace TDFAPI.Services
                 _userPresence[userId] = new UserPresenceInfo
                 {
                     UserId = userId,
-                    Username = user.Username,
+                    Username = user.UserName,
                     FullName = user.FullName,
                     Status = user.PresenceStatus,
                     StatusMessage = user.StatusMessage,
@@ -116,7 +116,7 @@ namespace TDFAPI.Services
                     id => new UserPresenceInfo
                     {
                         UserId = id,
-                        Username = user.Username,
+                        Username = user.UserName,
                         FullName = user.FullName,
                         Status = status,
                         StatusMessage = statusMessage ?? user.StatusMessage,
@@ -137,7 +137,7 @@ namespace TDFAPI.Services
                 // Publish status changed event via the event mediator
                 _eventMediator.Publish(new Messaging.UserStatusChangedEvent(
                     userId, 
-                    user.Username, 
+                    user.UserName, 
                     user.FullName, 
                     status, 
                     statusMessage ?? user.StatusMessage
@@ -254,7 +254,7 @@ namespace TDFAPI.Services
                     id => new UserPresenceInfo
                     {
                         UserId = id,
-                        Username = user.Username,
+                        Username = user.UserName,
                         FullName = user.FullName,
                         Status = user.PresenceStatus,
                         StatusMessage = user.StatusMessage,
@@ -271,7 +271,7 @@ namespace TDFAPI.Services
                 // Publish availability changed event using the event mediator
                 _eventMediator.Publish(new Messaging.UserAvailabilityChangedEvent(
                     userId,
-                    user.Username,
+                    user.UserName,
                     user.FullName,
                     isAvailable
                 ));

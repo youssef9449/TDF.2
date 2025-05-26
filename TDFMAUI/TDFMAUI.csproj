@@ -2,18 +2,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
+		<MauiVersion>8.0.0</MauiVersion>
 		<TargetFrameworks>net8.0-ios;net8.0-maccatalyst;net8.0-android34.0;net8.0-windows10.0.19041.0</TargetFrameworks>
-		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
-		<!-- <TargetFrameworks>$(TargetFrameworks);net8.0-tizen</TargetFrameworks> -->
-
-		<!-- Note for MacCatalyst:
-    The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
-    When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
-    The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
-    either BOTH runtimes must be indicated or ONLY macatalyst-x64.
-    -->
-		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
-
 		<OutputType>Exe</OutputType>
 		<RootNamespace>TDFMAUI</RootNamespace>
 		<UseMaui>true</UseMaui>
@@ -21,100 +11,113 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<WarningsNotAsErrors>NU1605</WarningsNotAsErrors>
-
-		<!-- Display name -->
-		<ApplicationTitle>TDFMAUI</ApplicationTitle>
-
-		<!-- App Identifier -->
+		<ApplicationTitle>TDF</ApplicationTitle>
 		<ApplicationId>com.companyname.tdfmaui</ApplicationId>
-
-		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
-
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">11.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
-		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
+		<AssemblyName>TDF</AssemblyName>
 	</PropertyGroup>
 
+	<!-- Windows-specific configuration -->
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+		<PlatformTarget>x64</PlatformTarget>
+		<Platforms>x64</Platforms>
+		<UseWinUI>true</UseWinUI>
+		<SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+		<UseAppHost>true</UseAppHost>
+	</PropertyGroup>
+
+	<!-- Platform-specific supported versions -->
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+		<SupportedOSPlatformVersion>11.0</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+		<SupportedOSPlatformVersion>13.1</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+		<SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">
+		<SupportedOSPlatformVersion>6.5</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<!-- Assets and resources -->
 	<ItemGroup>
-		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+		<!-- Updated to generate round and adaptive Android icons -->
+		<MauiIcon
+		  Include="Resources\AppIcon\appicon.svg"
+		  ForegroundFile="Resources\AppIcon\appiconfg.svg"
+		  Color="#512BD4"
+		  AndroidIcon="Resources\AppIcon\appicon.svg"
+		  AndroidRoundIcon="Resources\AppIcon\appicon.svg"
+		  AndroidAdaptiveIconForeground="Resources\AppIcon\appiconfg.svg"
+		  AndroidAdaptiveIconBackground="Resources\AppIcon\appicon.svg" />
 
-		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
-
-		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" />
 		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
-
-		<!-- Custom Fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
-
-		<!-- Raw Assets (also remove the original json theme file) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
+	<!-- NuGet package references -->
 	<ItemGroup>
-		<!-- PackageReference Include="CommunityToolkit.Maui" Version="9.0.1" /-->
-		<PackageReference Include="CommunityToolkit.Maui" Version="8.0.0" />
+		<PackageReference Include="CommunityToolkit.Maui" Version="8.0.14" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.1" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Maui.Controls" Version="8.0.14" />
+		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.14" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
-		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250513003" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-		<!-- Added to resolve package downgrade errors -->
 		<PackageReference Include="System.Collections" Version="4.3.0" />
 		<PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0" />
-		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" /> <!-- Added JWT package -->
+		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" />
 	</ItemGroup>
 
+	<!-- Windows-specific packages -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop" Version="8.0.14" />
+		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.240211001" />
+		<PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
+	</ItemGroup>
+
+	<!-- Configuration files -->
 	<ItemGroup>
 		<None Update="appsettings.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-	</ItemGroup>
-
-	<ItemGroup>
 		<EmbeddedResource Include="appsettings.json">
 			<LogicalName>TDFMAUI.appsettings.json</LogicalName>
 		</EmbeddedResource>
 	</ItemGroup>
 
+	<!-- Project references -->
 	<ItemGroup>
 		<ProjectReference Include="..\TDFShared\TDFShared.csproj" />
 	</ItemGroup>
 
+	<!-- Feature folder organization -->
 	<ItemGroup>
-		<!-- Clean up old commented-out references if any -->
-		<!-- Add new Feature references -->
 		<Compile Update="Features\**\*.xaml.cs">
 			<DependentUpon>%(Filename)</DependentUpon>
 		</Compile>
 		<MauiXaml Update="Features\**\*.xaml">
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
-		<!-- Add Compile entry for ViewModels within Features -->
 		<Compile Update="Features\**\*ViewModel.cs">
 			<SubType>Code</SubType>
 		</Compile>
-		<!-- Include other necessary cs files like Models or specific logic files if they were moved to Features -->
-		<!-- Switched to Include+Exclude to avoid using Exclude on Update -->
 		<Compile Include="Features\**\*.cs" Exclude="Features\**\*ViewModel.cs;Features\**\*.xaml.cs">
 			<SubType>Code</SubType>
 		</Compile>
 	</ItemGroup>
 
-	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
-	  <PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop">
-	    <Version>8.0.100</Version>
-	  </PackageReference>
-	</ItemGroup>
 </Project>

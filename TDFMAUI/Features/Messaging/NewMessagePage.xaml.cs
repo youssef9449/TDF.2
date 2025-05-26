@@ -107,7 +107,7 @@ public partial class NewMessagePage : ContentPage
             var message = new MessageCreateDto
             {
                 SenderID = App.CurrentUser.UserID,
-                FromUserName = App.CurrentUser.Username,
+                FromUserName = App.CurrentUser.UserName,
                 ReceiverID = recipient.UserID,
                 MessageText = contentEditor.Text,
                 SentAt = DateTime.UtcNow

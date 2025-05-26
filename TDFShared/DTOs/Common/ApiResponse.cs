@@ -7,10 +7,48 @@ using System.Net; // Added for HttpStatusCode
 namespace TDFShared.DTOs.Common
 {
     /// <summary>
+    /// Base class for API responses containing common properties
+    /// </summary>
+    public class ApiResponseBase
+    {
+        /// <summary>
+        /// Whether the request was successful
+        /// </summary>
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        /// <summary>
+        /// Message describing the result (especially useful for errors)
+        /// </summary>
+        [JsonPropertyName("message")]
+        public string Message { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Optional detailed error message
+        /// </summary>
+        [JsonPropertyName("errorMessage")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ErrorMessage { get; set; }
+
+        /// <summary>
+        /// HTTP status code associated with the response
+        /// </summary>
+        [JsonPropertyName("statusCode")]
+        public int StatusCode { get; set; } = (int)HttpStatusCode.OK;
+
+        /// <summary>
+        /// Optional validation errors if applicable
+        /// </summary>
+        [JsonPropertyName("errors")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<string, List<string>>? Errors { get; set; }
+    }
+
+    /// <summary>
     /// Standard API response wrapper for consistent response format
     /// </summary>
     /// <typeparam name="T">Type of data being returned</typeparam>
-    public class ApiResponse<T>
+    public class ApiResponse<T> : ApiResponseBase
     {
         /// <summary>
         /// Whether the request was successful

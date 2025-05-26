@@ -330,6 +330,14 @@ namespace TDFShared.Services
             }
         }
 
+        /// <summary>
+        /// Process the HTTP response and deserialize the content to the requested type.
+        /// </summary>
+        /// <typeparam name="T">The type to deserialize to</typeparam>
+        /// <param name="response">The HTTP response message</param>
+        /// <param name="endpoint">The API endpoint that was called</param>
+        /// <returns>The deserialized response object</returns>
+        /// <exception cref="ApiException">Thrown when deserialization fails</exception>
         private async Task<T> ProcessResponseAsync<T>(HttpResponseMessage response, string endpoint)
         {
             await EnsureSuccessStatusCodeAsync(response, endpoint);
@@ -344,107 +352,147 @@ namespace TDFShared.Services
             if (string.IsNullOrEmpty(rawContent))
             {
                 _logger.LogWarning("Empty response body for {Endpoint}", endpoint);
-                return default(T);
+                if (typeof(T).IsValueType)
+                {
+                    return default!;
+                }
+                throw new ApiException($"Empty response from {endpoint}");
             }
 
             try
             {
-                // Attempt standard deserialization first
-                var apiResponse = JsonSerializer.Deserialize<ApiResponse<T>>(rawContent, _jsonOptions);
-
-                if (apiResponse != null)
+                // Special handling for ApiResponse<List<LookupItem>>
+                if (typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(ApiResponse<>) &&
+                    typeof(T).GetGenericArguments()[0] == typeof(List<LookupItem>))
                 {
-                    if (apiResponse.Success)
-                    {
-                        // Special handling for List<LookupItem> to ensure Id is not empty
-                        if (typeof(T) == typeof(List<LookupItem>) && apiResponse.Data is List<LookupItem> lookupItems)
-                        {
-                            foreach (var item in lookupItems)
-                            {
-                                if (string.IsNullOrEmpty(item.Id))
-                                {
-                                    item.Id = item.Name;
-                                    _logger.LogDebug("Corrected empty Id for LookupItem: Name='{Name}', New Id='{Id}'", item.Name, item.Id);
-                                }
-                            }
-                        }
-                        return apiResponse.Data;
-                    }
-                    else
-                    {
-                        throw new ApiException((HttpStatusCode)apiResponse.StatusCode,
-                            apiResponse.Message, apiResponse.ErrorMessage);
-                    }
-                }
-                // Fallback to direct deserialization if ApiResponse wrapper is not used or is null
-                return JsonSerializer.Deserialize<T>(rawContent, _jsonOptions);
-            }
-            catch (Exception ex) // Changed from JsonException to general Exception
-            {
-                _logger.LogError(ex, "Deserialization error for {Endpoint}. Attempting fallback parsing.", endpoint);
-                _logger.LogError("Raw response content: {Content}", rawContent);
-
-                // Fallback to manual parsing for specific known problematic types (e.g., List<LookupItem>)
-                if (typeof(T) == typeof(List<LookupItem>))
-                {
+                    _logger.LogDebug("Processing ApiResponse<List<LookupItem>> response from {Endpoint}", endpoint);
                     try
                     {
-                        _logger.LogDebug("Attempting JsonDocument.Parse for manual fallback.");
-                        using (JsonDocument doc = JsonDocument.Parse(rawContent))
+                        using var doc = JsonDocument.Parse(rawContent);
+                        var lookupItems = new List<LookupItem>();
+
+                        // Parse the data array if it exists
+                        if (doc.RootElement.TryGetProperty("data", out JsonElement dataElement) &&
+                            dataElement.ValueKind == JsonValueKind.Array)
                         {
-                            _logger.LogDebug("JsonDocument parsed. Checking for 'data' property.");
-                            if (doc.RootElement.TryGetProperty("data", out JsonElement dataElement) && dataElement.ValueKind == JsonValueKind.Array)
+                            foreach (JsonElement element in dataElement.EnumerateArray())
                             {
-                                _logger.LogDebug("Found 'data' array. Starting manual LookupItem parsing.");
-                                var lookupItems = new List<LookupItem>();
-                                foreach (JsonElement element in dataElement.EnumerateArray())
+                                var lookupItem = new LookupItem();
+
+                                // Name is required, use empty string if not found
+                                lookupItem.Name = element.TryGetProperty("name", out JsonElement nameElement)
+                                    ? nameElement.GetString() ?? string.Empty
+                                    : string.Empty;
+
+                                // ID defaults to name if not present
+                                lookupItem.Id = element.TryGetProperty("id", out JsonElement idElement)
+                                    ? idElement.GetString() ?? lookupItem.Name
+                                    : lookupItem.Name;
+
+                                // Description is optional
+                                if (element.TryGetProperty("description", out JsonElement descElement))
                                 {
-                                    string id = element.TryGetProperty("id", out JsonElement idElement) ? idElement.GetString() ?? string.Empty : string.Empty;
-                                    string name = element.TryGetProperty("name", out JsonElement nameElement) ? nameElement.GetString() ?? string.Empty : string.Empty;
-                                    string? description = element.TryGetProperty("description", out JsonElement descElement) ? descElement.GetString() : null;
-                                    string? value = element.TryGetProperty("category", out JsonElement categoryElement) ? categoryElement.GetString() : null;
-                                    int? sortOrder = null;
-                                    if (element.TryGetProperty("sortOrder", out JsonElement sortOrderElement) && sortOrderElement.ValueKind == JsonValueKind.Number)
-                                    {
-                                        sortOrder = sortOrderElement.GetInt32();
-                                    }
-                                    else if (sortOrderElement.ValueKind == JsonValueKind.String && int.TryParse(sortOrderElement.GetString(), out int parsedSortOrder))
-                                    {
-                                        sortOrder = parsedSortOrder;
-                                    }
-
-                                    // Apply the user's request: if id is empty, default it to name
-                                    if (string.IsNullOrEmpty(id))
-                                    {
-                                        id = name;
-                                        _logger.LogDebug("Manually corrected empty Id for LookupItem during fallback: Name='{Name}', New Id='{Id}'", name, id);
-                                    }
-
-                                    lookupItems.Add(new LookupItem
-                                    {
-                                        Id = id,
-                                        Name = name,
-                                        Description = description,
-                                        Value = value,
-                                        SortOrder = sortOrder
-                                    });
+                                    lookupItem.Description = descElement.GetString();
                                 }
-                                _logger.LogInformation("Successfully manually parsed {Count} LookupItems from raw response.", lookupItems.Count);
-                                return (T)(object)lookupItems;
-                            }
-                            else
-                            {
-                                _logger.LogWarning("Manual parsing fallback: 'data' property not found or not an array.");
+
+                                // Value is optional, defaults to Name
+                                lookupItem.Value = element.TryGetProperty("value", out JsonElement valueElement)
+                                    ? valueElement.GetString() ?? lookupItem.Name
+                                    : lookupItem.Name;
+
+                                // SortOrder is optional
+                                if (element.TryGetProperty("sortOrder", out JsonElement sortOrderElement))
+                                {
+                                    if (sortOrderElement.ValueKind == JsonValueKind.Number)
+                                    {
+                                        lookupItem.SortOrder = sortOrderElement.GetInt32();
+                                    }
+                                    else if (sortOrderElement.ValueKind == JsonValueKind.String &&
+                                            int.TryParse(sortOrderElement.GetString(), out var parsedOrder))
+                                    {
+                                        lookupItem.SortOrder = parsedOrder;
+                                    }
+                                }
+
+                                lookupItems.Add(lookupItem);
                             }
                         }
+                        else
+                        {
+                            _logger.LogWarning("Response from {Endpoint} has no data array or data is not an array", endpoint);
+                        }
+
+                        // Get success status (default false)
+                        var success = doc.RootElement.TryGetProperty("success", out JsonElement successElement) &&
+                                    successElement.ValueKind == JsonValueKind.True;
+
+                        // Get message (default to empty)
+                        var message = doc.RootElement.TryGetProperty("message", out JsonElement messageElement)
+                            ? messageElement.GetString() ?? string.Empty
+                            : string.Empty;
+
+                        // Get status code (default to 200 OK)
+                        var statusCode = doc.RootElement.TryGetProperty("statusCode", out JsonElement statusElement) &&
+                                       statusElement.ValueKind == JsonValueKind.Number
+                            ? statusElement.GetInt32()
+                            : (int)HttpStatusCode.OK;
+
+                        // Get error message if present
+                        var errorMessage = doc.RootElement.TryGetProperty("errorMessage", out JsonElement errorElement)
+                            ? errorElement.GetString()
+                            : null;
+
+                        var apiResponse = new ApiResponse<List<LookupItem>>
+                        {
+                            Success = success,
+                            Message = message,
+                            StatusCode = statusCode,
+                            ErrorMessage = errorMessage,
+                            Data = lookupItems
+                        };
+
+                        if (!success)
+                        {
+                            _logger.LogWarning("Unsuccessful response from {Endpoint}. Message: {Message}, Error: {Error}", 
+                                endpoint, message, errorMessage ?? "none");
+                        }
+                        else
+                        {
+                            _logger.LogDebug("Successfully processed {Count} lookup items from {Endpoint}", 
+                                lookupItems.Count, endpoint);
+                        }
+
+                        return (T)(object)apiResponse;
                     }
-                    catch (Exception manualParseEx)
+                    catch (JsonException jsonEx)
                     {
-                        _logger.LogError(manualParseEx, "Manual JSON parsing fallback failed for {Endpoint}.", endpoint);
+                        _logger.LogError(jsonEx, "JSON parsing error processing response from {Endpoint}. Content: {Content}", 
+                            endpoint, rawContent);
+                        throw new ApiException($"Failed to parse JSON response from {endpoint}: {jsonEx.Message}", jsonEx);
                     }
                 }
-                // If manual parsing didn't work or wasn't applicable, re-throw original exception
-                throw new ApiException($"Failed to deserialize response from {endpoint}", ex);
+
+                // Standard deserialization for other types
+                try
+                {
+                    var result = JsonSerializer.Deserialize<T>(rawContent, _jsonOptions);
+                    if (result == null && !typeof(T).IsValueType)
+                    {
+                        throw new ApiException($"Deserialization returned null for non-nullable type {typeof(T).Name}");
+                    }
+                    return result!;
+                }
+                catch (JsonException jsonEx)
+                {
+                    _logger.LogError(jsonEx, "JSON deserialization error for type {Type} from {Endpoint}. Content: {Content}", 
+                        typeof(T).Name, endpoint, rawContent);
+                    throw new ApiException($"Failed to deserialize {typeof(T).Name} from {endpoint}: {jsonEx.Message}", jsonEx);
+                }
+            }
+            catch (Exception ex) when (ex is not ApiException)
+            {
+                _logger.LogError(ex, "Error processing response from {Endpoint}. Content: {Content}", endpoint, rawContent);
+                throw new ApiException($"Failed to process response from {endpoint}: {ex.Message}", ex);
             }
         }
 
@@ -499,12 +547,37 @@ namespace TDFShared.Services
 
         private string GetFriendlyErrorMessage(HttpStatusCode statusCode, string errorContent)
         {
+            // Try to extract error message from API response content
+            if (!string.IsNullOrEmpty(errorContent))
+            {
+                try
+                {
+                    // Try to deserialize as ApiResponse
+                    var apiResponse = JsonSerializer.Deserialize<ApiResponseBase>(
+                        errorContent, 
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+                    
+                    if (apiResponse != null && !string.IsNullOrEmpty(apiResponse.Message))
+                    {
+                        return apiResponse.Message;
+                    }
+                }
+                catch (JsonException)
+                {
+                    // If we can't deserialize as ApiResponse, just continue to default messages
+                    _logger.LogDebug("Could not deserialize error content as ApiResponse: {Content}", errorContent);
+                }
+            }
+
+            // Default friendly messages based on status code
             return statusCode switch
             {
                 HttpStatusCode.Unauthorized => "Authentication required. Please log in again.",
                 HttpStatusCode.Forbidden => "You don't have permission to access this resource.",
                 HttpStatusCode.NotFound => "The requested resource was not found.",
                 HttpStatusCode.RequestTimeout => "The request timed out. Please try again.",
+                HttpStatusCode.BadRequest => "The request was invalid. Please check your input and try again.",
                 (HttpStatusCode)429 => "Too many requests. Please wait before trying again.", // TooManyRequests
                 HttpStatusCode.InternalServerError => "A server error occurred. Please try again later.",
                 HttpStatusCode.BadGateway => "Service temporarily unavailable. Please try again later.",

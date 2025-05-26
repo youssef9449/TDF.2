@@ -262,8 +262,8 @@ namespace TDFMAUI.Services
                     var user = await apiService.GetUserAsync(userId);
                     if (user != null && !string.IsNullOrWhiteSpace(user.FullName))
                         return user.FullName;
-                    if (user != null && !string.IsNullOrWhiteSpace(user.Username))
-                        return user.Username;
+                    if (user != null && !string.IsNullOrWhiteSpace(user.UserName))
+                        return user.UserName;
                 }
             }
             catch (Exception ex)

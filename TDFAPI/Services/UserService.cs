@@ -397,5 +397,24 @@ namespace TDFAPI.Services
                 throw;
             }
         }
+        
+        /// <inheritdoc />
+        public async Task<bool> IsFullNameTakenAsync(string fullName, int? excludeUserId = null)
+        {
+            if (string.IsNullOrWhiteSpace(fullName))
+            {
+                throw new ArgumentException("Full name cannot be null or empty", nameof(fullName));
+            }
+
+            try
+            {
+                return await _userRepository.IsFullNameTakenAsync(fullName, excludeUserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking if full name {FullName} is taken", fullName);
+                throw;
+            }
+        }
     }
 }

@@ -1,4 +1,6 @@
 using System;
+using Microsoft.Maui.Controls; // Added for ContentPage, ActivityIndicator, Navigation, DisplayAlert, Shell
+using Microsoft.Extensions.DependencyInjection; // Added for GetRequiredService
 using TDFMAUI.Services;
 using TDFShared.DTOs.Requests;
 using TDFMAUI.Pages;
@@ -12,15 +14,17 @@ namespace TDFMAUI.Features.Admin
         private readonly IRequestService _requestService;
         private readonly ApiService _apiService;
         private readonly IErrorHandlingService _errorHandlingService;
+        private readonly IServiceProvider _serviceProvider; // Add IServiceProvider
         private List<UserDto> _users;
         private List<RequestResponseDto> _requests;
 
-        public AdminPage(IRequestService requestService, ApiService apiService, IErrorHandlingService errorHandlingService)
+        public AdminPage(IRequestService requestService, ApiService apiService, IErrorHandlingService errorHandlingService, IServiceProvider serviceProvider) // Inject IServiceProvider
         {
             InitializeComponent();
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
             _errorHandlingService = errorHandlingService ?? throw new ArgumentNullException(nameof(errorHandlingService));
+            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider)); // Assign IServiceProvider
             LoadData();
         }
 
@@ -44,7 +48,7 @@ namespace TDFMAUI.Features.Admin
                 // Load requests data
                 var pagination = new RequestPaginationDto { Page = 1, PageSize = 100 };
                 var requestsResult = await _requestService.GetAllRequestsAsync(pagination);
-                _requests = requestsResult?.Items?.ToList() ?? new List<RequestResponseDto>();
+                _requests = requestsResult?.Data?.Items?.ToList() ?? new List<RequestResponseDto>();
 
                 // Data loaded successfully - UI updates would be handled by ViewModel in MVVM pattern
             }
@@ -92,7 +96,7 @@ namespace TDFMAUI.Features.Admin
         {
              // Navigate to AddUserPage within Users feature
              // Assuming AddUserPage is moved and namespace updated
-            await Navigation.PushAsync(new AddUserPage());
+            await Navigation.PushAsync(_serviceProvider.GetRequiredService<AddUserPage>());
         }
 
         private async void OnManageRequestsClicked(object sender, EventArgs e)

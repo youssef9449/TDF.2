@@ -502,32 +502,52 @@ namespace TDFMAUI.Services
             string endpoint = ApiRoutes.Auth.Register;
             try
             {
+                _logger?.LogInformation("ApiService: Attempting registration for user {Username}", registerRequest.Username);
                 var response = await PostAsync<RegisterRequestDto, ApiResponse<RegisterResponseDto>>(endpoint, registerRequest);
                 return response ?? new ApiResponse<RegisterResponseDto> { Success = false, Message = "Registration failed" };
             }
+            catch (ApiException ex)
+            {
+                _logger?.LogError(ex, "ApiService: API error during registration for {Username}: {Message}", registerRequest.Username, ex.Message);
+                
+                // Try to extract more specific error message from response content
+                string errorMessage = ex.Message;
+                
+                // If we have response content, try to extract a more specific message
+                if (!string.IsNullOrEmpty(ex.ResponseContent))
+                {
+                    try
+                    {
+                        var errorResponse = System.Text.Json.JsonSerializer.Deserialize<ApiResponseBase>(
+                            ex.ResponseContent,
+                            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                        );
+                        
+                        if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Message))
+                        {
+                            errorMessage = errorResponse.Message;
+                        }
+                    }
+                    catch
+                    {
+                        // If we can't deserialize, just use the original message
+                        _logger?.LogDebug("Could not deserialize error response content: {Content}", ex.ResponseContent);
+                    }
+                }
+                
+                return new ApiResponse<RegisterResponseDto> 
+                { 
+                    Success = false, 
+                    Message = errorMessage,
+                    StatusCode = (int)ex.StatusCode
+                };
+            }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error during registration: {Message}", ex.Message);
-                return new ApiResponse<RegisterResponseDto> { Success = false, Message = ex.Message };
+                _logger?.LogError(ex, "ApiService: Error during registration for {Username}: {Message}", registerRequest.Username, ex.Message);
+                return new ApiResponse<RegisterResponseDto> { Success = false, Message = GetFriendlyErrorMessage(ex) };
             }
         }
-
-        public async Task<ApiResponse<bool>> SignupAsync(RegisterRequestDto signupModel)
-        {
-            if (!_initialized) await InitializeAuthenticationAsync();
-            string endpoint = ApiRoutes.Auth.Register;
-            try
-            {
-                var response = await PostAsync<RegisterRequestDto, ApiResponse<bool>>(endpoint, signupModel);
-                return response ?? new ApiResponse<bool> { Success = false, Message = "Signup failed" };
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "ApiService: Signup failed: {Message}", ex.Message);
-                return new ApiResponse<bool> { Success = false, Message = ex.Message };
-            }
-        }
-        #endregion
 
         #region User Operations (Now returns DTOs)
          public async Task<UserDto> GetUserByIdAsync(int userId)
@@ -1229,16 +1249,40 @@ namespace TDFMAUI.Services
                 _logger?.LogError(ex, "Error getting leave balances: {Message}", ex.Message);
                 return new ApiResponse<Dictionary<string, int>> { Success = false, Message = ex.Message };
             }
-        }
-
-        // DEPARTMENTS
+        }        // DEPARTMENTS
         public async Task<ApiResponse<List<LookupItem>>> GetDepartmentsAsync(bool queueIfUnavailable = true)
         {
             try
             {
                 string endpoint = ApiRoutes.Lookups.GetDepartments;
+                _logger?.LogDebug("Getting departments from endpoint: {Endpoint}", endpoint);
+                
+                // Since the endpoint returns ApiResponse<List<LookupItem>>, we need to avoid double wrapping
                 var response = await GetAsync<ApiResponse<List<LookupItem>>>(endpoint, queueIfUnavailable);
-                return response ?? new ApiResponse<List<LookupItem>> { Success = false, Message = "Failed to get departments" };
+                
+                if (response == null)
+                {
+                    _logger?.LogWarning("GetDepartmentsAsync: Received null response from endpoint");
+                    return new ApiResponse<List<LookupItem>> { Success = false, Message = "Failed to get departments: null response" };
+                }
+
+                _logger?.LogDebug("GetDepartmentsAsync: Received response - Success: {Success}, Items: {Count}",
+                    response.Success, response.Data?.Count ?? 0);
+
+                // Enhanced logging of the response
+                if (response.Data != null)
+                {
+                    _logger?.LogDebug("GetDepartmentsAsync: First department: {FirstDepartment}",
+                        response.Data.FirstOrDefault()?.Name ?? "none");
+                }
+
+                // Check if we got a valid data list
+                if (response.Success && response.Data == null)
+                {
+                    response.Data = new List<LookupItem>();
+                }
+
+                return response;
             }
             catch (Exception ex)
             {
@@ -1263,4 +1307,5 @@ namespace TDFMAUI.Services
             }
         }
     }
+    #endregion
 }

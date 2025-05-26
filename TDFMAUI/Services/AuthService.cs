@@ -18,16 +18,17 @@ using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Users;
 using TDFShared.Enums;
 using TDFShared.Services;
+using TDFShared.Helpers;
 
 namespace TDFMAUI.Services;
 
-public class AuthService : TDFShared.Services.IAuthService
+public class AuthService : IAuthService
 {
     private readonly SecureStorageService _secureStorageService;
     private readonly IUserProfileService _userProfileService;
-    private readonly TDFShared.Services.IHttpClientService _httpClientService;
+    private readonly IHttpClientService _httpClientService;
     private readonly ILogger<AuthService> _logger;
-    private readonly TDFShared.Services.ISecurityService _securityService;
+    private readonly ISecurityService _securityService;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly string _baseApiUrl;
     private readonly IRoleService _roleService;
@@ -37,8 +38,8 @@ public class AuthService : TDFShared.Services.IAuthService
     public AuthService(
         SecureStorageService secureStorageService,
         IUserProfileService userProfileService,
-        TDFShared.Services.IHttpClientService httpClientService,
-        TDFShared.Services.ISecurityService securityService,
+        IHttpClientService httpClientService,
+        ISecurityService securityService,
         ILogger<AuthService> logger,
         IRoleService roleService,
         IApiService apiService,
@@ -122,107 +123,119 @@ public class AuthService : TDFShared.Services.IAuthService
             {
                 var apiResponse = JsonSerializer.Deserialize<ApiResponse<TokenResponse>>(apiResponseContent, options);
 
-                    if (apiResponse?.Data != null && !string.IsNullOrEmpty(apiResponse.Data.Token))
-                    {
-                        _logger.LogInformation("Login successful for user {Username} using ApiResponse<TokenResponse> format", username);
-
-                        // Create UserDetailsDto from TokenResponse data
-                        var userDetails = new UserDetailsDto
-                        {
-                            UserId = apiResponse.Data.UserId,
-                            FullName = apiResponse.Data.FullName ?? string.Empty,
-                            UserName = apiResponse.Data.Username ?? string.Empty,
-                            Department = apiResponse.Data.User?.Department,
-                            IsAdmin = apiResponse.Data.IsAdmin,
-                            IsManager = apiResponse.Data.IsManager,
-                            IsHR = apiResponse.Data.IsHR,
-                            Roles = new()
-                        };
-
-                        // Add roles based on bit fields
-                        if (apiResponse.Data.IsAdmin) userDetails.Roles.Add("Admin");
-                        if (apiResponse.Data.IsManager) userDetails.Roles.Add("Manager");
-                        if (apiResponse.Data.IsHR) userDetails.Roles.Add("HR");
-
-                        // Add User role by default if no other roles are present
-                        if (userDetails.Roles.Count == 0)
-                        {
-                            userDetails.Roles.Add("User");
-                        }
-
-                        // Store the token and user details
-                        await _secureStorageService.SaveTokenAsync(apiResponse.Data.Token, apiResponse.Data.Expiration);
-                        _userProfileService.SetUserDetails(userDetails);
-
-                        _logger.LogInformation("User {Username} logged in with roles: {Roles}",
-                            username, string.Join(", ", userDetails.Roles));
-
-                        return apiResponse.Data;
-                    }
-
-                    _logger.LogWarning("ApiResponse<TokenResponse> format succeeded but data or token was null/empty");
-                }
-                catch (JsonException jsonEx)
+                if (apiResponse?.Data != null && !string.IsNullOrEmpty(apiResponse.Data.Token))
                 {
-                    _logger.LogWarning(jsonEx, "Failed to deserialize as ApiResponse<TokenResponse>, trying direct LoginResponseDto format");
+                    _logger.LogInformation("Login successful for user {Username} using ApiResponse<TokenResponse> format", username);
 
-                    try
+                    // Create UserDetailsDto from TokenResponse data
+                    var userDetails = new UserDetailsDto
                     {
-                        var loginResponse = JsonSerializer.Deserialize<LoginResponseDto>(apiResponseContent, options);
+                        UserId = apiResponse.Data.UserId,
+                        FullName = apiResponse.Data.FullName ?? string.Empty,
+                        UserName = apiResponse.Data.Username ?? string.Empty,
+                        Department = apiResponse.Data.User?.Department,
+                        IsAdmin = apiResponse.Data.IsAdmin,
+                        IsManager = apiResponse.Data.IsManager,
+                        IsHR = apiResponse.Data.IsHR,
+                        Roles = new()
+                    };
 
-                        if (loginResponse?.UserDetails != null && !string.IsNullOrEmpty(loginResponse.Token))
-                        {
-                            _logger.LogInformation("Login successful for user {Username} using direct LoginResponseDto format", username);
+                    // Add roles based on bit fields
+                    if (apiResponse.Data.IsAdmin) userDetails.Roles.Add("Admin");
+                    if (apiResponse.Data.IsManager) userDetails.Roles.Add("Manager");
+                    if (apiResponse.Data.IsHR) userDetails.Roles.Add("HR");
 
-                            // Ensure all properties are properly initialized
-                            loginResponse.UserDetails.FullName ??= string.Empty;
-                            loginResponse.UserDetails.UserName ??= string.Empty;
-                            loginResponse.UserDetails.Roles ??= new();
-
-                            // Add User role by default if no roles are present
-                            if (loginResponse.UserDetails.Roles.Count == 0)
-                            {
-                                loginResponse.UserDetails.Roles.Add("User");
-                            }
-
-DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
-                            await _secureStorageService.SaveTokenAsync(loginResponse.Token, expiration);
-                            _userProfileService.SetUserDetails(loginResponse.UserDetails);
-
-                            // Create and return TokenResponse
-                            return new TokenResponse
-                            {
-                                Token = loginResponse.Token,
-                                Expiration = expiration,
-                                UserId = loginResponse.UserDetails.UserId,
-                                Username = loginResponse.UserDetails.UserName,
-                                FullName = loginResponse.UserDetails.FullName,
-                                IsAdmin = loginResponse.UserDetails.IsAdmin,
-                                IsManager = loginResponse.UserDetails.IsManager,
-                                IsHR = loginResponse.UserDetails.IsHR,
-                                User = new UserDto
-                                {
-                                    UserID = loginResponse.UserDetails.UserId,
-                                    Username = loginResponse.UserDetails.UserName,
-                                    FullName = loginResponse.UserDetails.FullName,
-                                    Department = loginResponse.UserDetails.Department
-                                }
-                            };
-                        }
-                    }
-                    catch (JsonException innerEx)
+                    // Add User role by default if no other roles are present
+                    if (userDetails.Roles.Count == 0)
                     {
-                        _logger.LogError(innerEx, "Failed to deserialize login response in fallback format");
+                        userDetails.Roles.Add("User");
                     }
+
+                    // Store the token and user details
+                    await _secureStorageService.SaveTokenAsync(apiResponse.Data.Token, apiResponse.Data.Expiration);
+                    _userProfileService.SetUserDetails(userDetails);
+
+                    _logger.LogInformation("User {Username} logged in with roles: {Roles}",
+                        username, string.Join(", ", userDetails.Roles));
+
+                    return apiResponse.Data;
                 }
 
-            _logger.LogError("Login API call successful but response format could not be parsed. Response: {Response}", apiResponseContent);
-            return null;
+                // Check for specific error messages in the API response
+                if (!apiResponse?.Success ?? true)
+                {
+                    var errorMessage = !string.IsNullOrEmpty(apiResponse?.ErrorMessage) 
+                        ? apiResponse.ErrorMessage 
+                        : apiResponse?.Message ?? "Invalid username or password";
+                    
+                    _logger.LogWarning("Login failed with API error: {Error}", errorMessage);
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                _logger.LogWarning("ApiResponse<TokenResponse> format succeeded but data or token was null/empty");
+            }
+            catch (JsonException jsonEx)
+            {
+                _logger.LogWarning(jsonEx, "Failed to deserialize as ApiResponse<TokenResponse>, trying direct LoginResponseDto format");
+
+                try
+                {
+                    var loginResponse = JsonSerializer.Deserialize<LoginResponseDto>(apiResponseContent, options);
+
+                    if (loginResponse?.UserDetails != null && !string.IsNullOrEmpty(loginResponse.Token))
+                    {
+                        _logger.LogInformation("Login successful for user {Username} using direct LoginResponseDto format", username);
+
+                        // Ensure all properties are properly initialized
+                        loginResponse.UserDetails.FullName ??= string.Empty;
+                        loginResponse.UserDetails.UserName ??= string.Empty;
+                        loginResponse.UserDetails.Roles ??= new();
+
+                        // Add User role by default if no roles are present
+                        if (loginResponse.UserDetails.Roles.Count == 0)
+                        {
+                            loginResponse.UserDetails.Roles.Add("User");
+                        }
+
+                        DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
+                        await _secureStorageService.SaveTokenAsync(loginResponse.Token, expiration);
+                        _userProfileService.SetUserDetails(loginResponse.UserDetails);
+
+                        // Create and return TokenResponse
+                        return new TokenResponse
+                        {
+                            Token = loginResponse.Token,
+                            Expiration = expiration,
+                            UserId = loginResponse.UserDetails.UserId,
+                            Username = loginResponse.UserDetails.UserName,
+                            FullName = loginResponse.UserDetails.FullName,
+                            IsAdmin = loginResponse.UserDetails.IsAdmin,
+                            IsManager = loginResponse.UserDetails.IsManager,
+                            IsHR = loginResponse.UserDetails.IsHR,
+                            User = new UserDto
+                            {
+                                UserID = loginResponse.UserDetails.UserId,
+                                UserName = loginResponse.UserDetails.UserName,
+                                FullName = loginResponse.UserDetails.FullName,
+                                Department = loginResponse.UserDetails.Department
+                            }
+                        };
+                    }
+                }
+                catch (JsonException innerEx)
+                {
+                    _logger.LogError(innerEx, "Failed to deserialize login response in fallback format");
+                }
+            }
+
+            // If we get here, login failed
+            _logger.LogWarning("Login failed for user {Username}: Invalid credentials", username);
+            throw new InvalidOperationException("Invalid username or password");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during login for {Username}", username);
-            return null;
+            throw; // Rethrow to allow the ViewModel to handle the error appropriately
         }
     }
 
@@ -547,7 +560,7 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
-            new Claim(ClaimTypes.Name, user.Username ?? string.Empty)
+            new Claim(ClaimTypes.Name, user.UserName ?? string.Empty)
         };
 
         // Add roles if available
@@ -559,13 +572,11 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
             }
         }
 
-        var tokenDescriptor = new Microsoft.IdentityModel.Tokens.SecurityTokenDescriptor
+        var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
             Expires = DateTime.UtcNow.AddHours(24),
-            SigningCredentials = new Microsoft.IdentityModel.Tokens.SigningCredentials(
-                new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(key),
-                Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256Signature)
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key),SecurityAlgorithms.HmacSha256Signature)
         };
 
         var token = tokenHandler.CreateToken(tokenDescriptor);
@@ -624,22 +635,5 @@ DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
             _logger.LogError(ex, "Error checking if token with JTI {Jti} is revoked", jti);
             return true; // Default to considering token as revoked if there's an error
         }
-    }
-
-    private async Task<LoginResponse> HandleLoginResponse(LoginResponse loginResponse)
-    {
-        if (loginResponse?.UserDetails == null)
-        {
-            throw new AuthenticationException("Invalid login response");
-        }
-
-        // Assign roles using RoleService
-        _roleService.AssignRoles(loginResponse.UserDetails);
-
-        // Store user details
-        await _secureStorageService.SaveTokenAsync(loginResponse.Token, loginResponse.Expiration);
-        _userProfileService.SetUserDetails(loginResponse.UserDetails);
-
-        return loginResponse;
     }
 }

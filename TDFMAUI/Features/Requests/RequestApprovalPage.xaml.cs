@@ -65,14 +65,14 @@ namespace TDFMAUI.Pages
 
     public partial class RequestApprovalPage : ContentPage
     {
-        private readonly TDFMAUI.Services.INotificationService _notificationService;
-        private readonly TDFMAUI.Services.IRequestService _requestService;
+        private readonly INotificationService _notificationService;
+        private readonly IRequestService _requestService;
         private readonly TDFShared.Services.IAuthService _authService;
         private RequestApprovalViewModel _viewModel;
 
         public RequestApprovalPage(
-            TDFMAUI.Services.INotificationService notificationService,
-            TDFMAUI.Services.IRequestService requestService,
+            INotificationService notificationService,
+            IRequestService requestService,
             TDFShared.Services.IAuthService authService,
             ILogger<RequestApprovalViewModel> logger)
         {

@@ -232,7 +232,7 @@ public partial class GlobalChatPage : ContentPage
             {
                 type = "global_chat_message", // Example type, adjust based on server implementation
                 senderId = App.CurrentUser.UserID,
-                senderName = App.CurrentUser.Username,
+                senderName = App.CurrentUser.UserName,
                 content = messageContent,
                 timestamp = DateTime.UtcNow // Use UtcNow for consistency
             };

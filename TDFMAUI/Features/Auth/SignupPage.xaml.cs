@@ -40,51 +40,8 @@ public partial class SignupPage : ContentPage
 
         Debug.WriteLine($"[SignupPage] OnAppearing - ViewModel is available, Departments count: {_viewModel.Departments?.Count ?? 0}");
 
-        // Check if departments are already loaded
-        if (_viewModel.Departments?.Any() == true)
-        {
-            Debug.WriteLine("[SignupPage] OnAppearing - Departments already loaded");
-            return;
-        }
-
-        // Load departments
-        Debug.WriteLine("[SignupPage] OnAppearing - Loading departments");
-
-        try 
-        {        
-            // Clear any previous errors
-            _viewModel.HasError = false;
-            _viewModel.ErrorMessage = string.Empty;
-            
-            // Execute the load command
-            if (_viewModel.LoadDepartmentsCommand.CanExecute(null))
-            {
-                Debug.WriteLine("[SignupPage] OnAppearing - Executing LoadDepartmentsCommand");
-                await _viewModel.LoadDepartmentsCommand.ExecuteAsync(null);
-                Debug.WriteLine($"[SignupPage] OnAppearing - LoadDepartmentsCommand completed. Departments loaded: {_viewModel.Departments?.Count ?? 0}");
-                
-                // If still no departments, show an error
-                if (!_viewModel.Departments?.Any() == true) {
-                    _viewModel.ErrorMessage = "Failed to load departments. Please check your connection and try again.";
-                    _viewModel.HasError = true;
-                    Debug.WriteLine("[SignupPage] OnAppearing - No departments were loaded");
-                }
-            }
-            else
-            {
-                Debug.WriteLine("[SignupPage] OnAppearing - LoadDepartmentsCommand cannot execute at this time");
-                _viewModel.ErrorMessage = "Cannot load departments at this time. Please try again later.";
-                _viewModel.HasError = true;
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[SignupPage] OnAppearing - Error loading departments: {ex.Message}");
-            Debug.WriteLine($"[SignupPage] OnAppearing - Exception details: {ex}");
-            
-            _viewModel.ErrorMessage = "An error occurred while loading departments. Please check your connection and try again.";
-            _viewModel.HasError = true;
-        }
+        // The ViewModel handles department loading in its constructor.
+        // No need to explicitly load departments here unless there's a specific refresh requirement.
     }
 
     // All logic, properties, and event handling methods previously here

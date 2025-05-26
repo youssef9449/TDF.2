@@ -95,7 +95,7 @@ namespace TDFMAUI.Pages
                             if (user != null && !_userCache.ContainsKey(senderId.Value))
                             {
                                 // Cache the username or full name depending on what's available/preferred
-                                _userCache.Add(senderId.Value, user.Username);
+                                _userCache.Add(senderId.Value, user.UserName);
                             }
                         }
                         catch (Exception ex)
@@ -223,7 +223,7 @@ namespace TDFMAUI.Pages
                             var user = await _apiService.GetUserByIdAsync(e.SenderId.Value);
                             if (user != null)
                             {
-                                senderName = user.Username; // Or user.FullName
+                                senderName = user.UserName; // Or user.FullName
                                 if (!_userCache.ContainsKey(e.SenderId.Value))
                                 {
                                     _userCache.Add(e.SenderId.Value, senderName);

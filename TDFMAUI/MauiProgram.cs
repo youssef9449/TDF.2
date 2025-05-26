@@ -14,6 +14,8 @@ using TDFMAUI.Features.Admin;
 using CommunityToolkit.Maui;
 using System.Diagnostics;
 using TDFShared.Constants;
+using TDFShared.Validation;
+using TDFShared.Services;
 
 
 namespace TDFMAUI
@@ -189,6 +191,7 @@ namespace TDFMAUI
             builder.Services.AddSingleton<ApiService>();
             builder.Services.AddSingleton<IApiService>(sp => sp.GetRequiredService<ApiService>());
             builder.Services.AddSingleton<SecureStorageService>();
+            builder.Services.AddSingleton(SecureStorage.Default);
             builder.Services.AddSingleton<NetworkMonitorService>();
             builder.Services.AddSingleton<LocalStorageService>();
             builder.Services.AddSingleton<ILocalStorageService, LocalStorageService>();
@@ -209,14 +212,17 @@ namespace TDFMAUI
             // Register RequestService
             builder.Services.AddTransient<IRequestService, RequestService>();
 
+            // Register RoleService
+            builder.Services.AddSingleton<IRoleService, RoleService>();
+
             // Register SecurityService
-            builder.Services.AddSingleton<TDFShared.Services.ISecurityService, TDFShared.Services.SecurityService>();
+            builder.Services.AddSingleton<ISecurityService, SecurityService>();
 
             // Register shared error handling service
-            builder.Services.AddSingleton<TDFShared.Services.IErrorHandlingService, TDFShared.Services.ErrorHandlingService>();
+            builder.Services.AddSingleton<IErrorHandlingService, ErrorHandlingService>();
 
             // Register shared HTTP client services with DevelopmentHttpClientHandler
-            builder.Services.AddHttpClient<TDFShared.Services.IHttpClientService, TDFShared.Services.HttpClientService>((serviceProvider, client) =>
+            builder.Services.AddHttpClient<IHttpClientService, HttpClientService>((serviceProvider, client) =>
             {
                 var apiSettings = serviceProvider.GetRequiredService<IOptions<ApiSettings>>().Value;
                 client.BaseAddress = new Uri(apiSettings.BaseUrl);
@@ -226,22 +232,22 @@ namespace TDFMAUI
             .ConfigurePrimaryHttpMessageHandler(serviceProvider =>
             {
                 var handler = serviceProvider.GetRequiredService<DevelopmentHttpClientHandler>();
-                var logger = serviceProvider.GetRequiredService<ILogger<TDFShared.Services.HttpClientService>>();
+                var logger = serviceProvider.GetRequiredService<ILogger<HttpClientService>>();
                 logger.LogInformation("Configuring HttpClient with DevelopmentHttpClientHandler for SSL bypass");
                 return handler;
             });
 
             // Register platform-specific connectivity service with shared interface
-            builder.Services.AddSingleton<ConnectivityService>();
-            builder.Services.AddSingleton<TDFShared.Services.IConnectivityService>(sp => sp.GetRequiredService<ConnectivityService>());
+            builder.Services.AddSingleton<TDFMAUI.Services.ConnectivityService>();
+            builder.Services.AddSingleton<TDFShared.Services.IConnectivityService>(sp => sp.GetRequiredService<TDFMAUI.Services.ConnectivityService>());
 
             // Register shared validation services
-            builder.Services.AddSingleton<TDFShared.Validation.IValidationService, TDFShared.Validation.ValidationService>();
-            builder.Services.AddSingleton<TDFShared.Validation.IBusinessRulesService, TDFShared.Validation.BusinessRulesService>();
+            builder.Services.AddSingleton<IValidationService, ValidationService>();
+            builder.Services.AddSingleton<IBusinessRulesService, BusinessRulesService>();
 
             // Register AuthService with shared HTTP client service
             builder.Services.AddSingleton<AuthService>();
-            builder.Services.AddSingleton<TDFShared.Services.IAuthService>(sp => sp.GetRequiredService<AuthService>());
+            builder.Services.AddSingleton<IAuthService>(sp => sp.GetRequiredService<AuthService>());
 
             // Register MessageService with shared HTTP client service
             builder.Services.AddSingleton<MessageService>();
@@ -251,7 +257,7 @@ namespace TDFMAUI
             builder.Services.AddSingleton<IPlatformNotificationService, PlatformNotificationService>();
             builder.Services.AddSingleton<NotificationService>();
             builder.Services.AddSingleton<IExtendedNotificationService>(sp => sp.GetRequiredService<NotificationService>());
-            builder.Services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<IExtendedNotificationService>());
+            builder.Services.AddSingleton<TDFMAUI.Services.INotificationService>(sp => sp.GetRequiredService<IExtendedNotificationService>());
 
             // Register ViewModels
             builder.Services.AddTransient<UserProfileViewModel>();

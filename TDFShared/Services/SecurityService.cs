@@ -295,7 +295,7 @@ namespace TDFShared.Services
             if (user.UserID <= 0)
                 throw new ArgumentException("User must have a valid UserID", nameof(user));
 
-            if (string.IsNullOrWhiteSpace(user.Username))
+            if (string.IsNullOrWhiteSpace(user.UserName))
                 throw new ArgumentException("User must have a valid Username", nameof(user));
         }
 
@@ -313,12 +313,12 @@ namespace TDFShared.Services
 
                 // Standard identity claims
                 new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
-                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Name, user.UserName),
                 new Claim(ClaimTypes.GivenName, user.FullName ?? string.Empty),
 
                 // Application-specific claims
                 new Claim("userId", user.UserID.ToString()),
-                new Claim("username", user.Username),
+                new Claim("username", user.UserName),
                 new Claim("fullName", user.FullName ?? string.Empty),
                 new Claim("department", user.Department),
                 new Claim("title", user.Title ?? string.Empty),

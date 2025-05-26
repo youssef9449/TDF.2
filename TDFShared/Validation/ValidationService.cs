@@ -29,8 +29,8 @@ namespace TDFShared.Validation
             if (obj == null)
                 return ValidationResult<T>.Failure("Object cannot be null");
 
-            var validationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
-            var validationContext = new System.ComponentModel.DataAnnotations.ValidationContext(obj);
+            var validationResults = new List<ValidationResult>();
+            var validationContext = new ValidationContext(obj);
 
             bool isValid = Validator.TryValidateObject(obj, validationContext, validationResults, true);
 
@@ -57,12 +57,12 @@ namespace TDFShared.Validation
         public List<string> ValidateProperty(object? value, string propertyName, Type objectType)
         {
             var errors = new List<string>();
-            var validationContext = new System.ComponentModel.DataAnnotations.ValidationContext(new object())
+            var validationContext = new ValidationContext(new object())
             {
                 MemberName = propertyName
             };
 
-            var validationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+            var validationResults = new List<ValidationResult>();
 
             // Get validation attributes for the property
             var property = objectType.GetProperty(propertyName);

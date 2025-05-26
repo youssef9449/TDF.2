@@ -35,7 +35,7 @@ public partial class RequestsPage : ContentPage
         AdjustCollectionViewLayout();
     }
 
-    private void OnPageSizeChanged(object sender, System.EventArgs e)
+    private void OnPageSizeChanged(object sender, EventArgs e)
     {
         AdjustCollectionViewLayout();
     }

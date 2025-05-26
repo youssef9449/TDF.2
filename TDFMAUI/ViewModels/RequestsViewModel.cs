@@ -21,10 +21,10 @@ namespace TDFMAUI.ViewModels
 {
     public partial class RequestsViewModel : ObservableObject
     {
-        private readonly TDFMAUI.Services.IRequestService _requestService;
-        private readonly TDFShared.Services.IAuthService _authService;
+        private readonly IRequestService _requestService;
+        private readonly IAuthService _authService;
         private readonly ILogger<RequestsViewModel> _logger;
-        private readonly TDFShared.Services.IErrorHandlingService _errorHandlingService;
+        private readonly IErrorHandlingService _errorHandlingService;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsNotBusy))]
@@ -81,10 +81,10 @@ namespace TDFMAUI.ViewModels
         public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
 
         public RequestsViewModel(
-            TDFMAUI.Services.IRequestService requestService,
-            TDFShared.Services.IAuthService authService,
+            IRequestService requestService,
+            IAuthService authService,
             ILogger<RequestsViewModel> logger,
-            TDFShared.Services.IErrorHandlingService errorHandlingService)
+            IErrorHandlingService errorHandlingService)
         {
             _requestService = requestService;
             _authService = authService;

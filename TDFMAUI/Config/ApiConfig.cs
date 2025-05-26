@@ -404,7 +404,7 @@ namespace TDFMAUI.Config
                         DebugService.LogInfo("ApiConfig", $"User-Agent: TDFMAUI-DiagnosticTest/{AppInfo.VersionString}");
 
                         // Make the request using shared service
-                        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                         var responseContent = await httpClientService.GetRawAsync(healthCheckUrl, cts.Token);
 
                         // If we get here, the request was successful
@@ -460,7 +460,7 @@ namespace TDFMAUI.Config
                         DebugService.LogInfo("ApiConfig", $"User-Agent: TDFMAUI-FallbackDiagnosticTest/{AppInfo.VersionString}");
 
                         // Make the request with a cancellation token
-                        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                         var response = await client.GetAsync(healthCheckUrl, cts.Token);
 
                         // Log detailed response information

@@ -74,7 +74,7 @@ namespace TDFMAUI.Features.Auth
                 var logoImage = FindLogoImage();
                 if (logoImage != null)
                 {
-                    logoImage.HeightRequest = 150;
+                    logoImage.HeightRequest = 400;
                 }
 
                 // Increase main title font size
@@ -176,7 +176,7 @@ namespace TDFMAUI.Features.Auth
             try
             {
                 System.Diagnostics.Debug.WriteLine("[LoginPage] Navigating to DiagnosticsPage");
-                var diagnosticsPage = App.Services?.GetService<TDFMAUI.Pages.DiagnosticsPage>();
+                var diagnosticsPage = App.Services?.GetService<Pages.DiagnosticsPage>();
 
                 if (diagnosticsPage != null)
                 {

@@ -10,7 +10,7 @@ namespace TDFMAUI.ViewModels
 {
     public partial class LoginPageViewModel : ObservableObject
     {
-        private readonly TDFShared.Services.IAuthService _authService;
+        private readonly IAuthService _authService;
         private readonly WebSocketService _webSocketService;
         private readonly ILogger<LoginPageViewModel> _logger;
         private readonly IServiceProvider _serviceProvider;
@@ -33,7 +33,7 @@ namespace TDFMAUI.ViewModels
         public bool IsNotBusy => !IsBusy;
 
         public LoginPageViewModel(
-            TDFShared.Services.IAuthService authService,
+            IAuthService authService,
             WebSocketService webSocketService,
             ILogger<LoginPageViewModel> logger,
             IServiceProvider serviceProvider)

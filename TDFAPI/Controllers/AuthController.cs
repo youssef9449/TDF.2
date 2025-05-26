@@ -156,6 +156,21 @@ namespace TDFAPI.Controllers
                 {
                     return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse("Username already exists"));
                 }
+                
+                // Check if full name is already taken
+                try
+                {
+                    var isFullNameTaken = await _userService.IsFullNameTakenAsync(request.FullName);
+                    if (isFullNameTaken)
+                    {
+                        return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse($"Full name '{request.FullName}' is already taken"));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error checking for duplicate full name: {FullName}", request.FullName);
+                    // Continue with registration attempt even if this check fails
+                }
 
                 // Prevent self-assignment of admin privileges for regular registrations
                 request.IsAdmin = false;
@@ -191,7 +206,7 @@ namespace TDFAPI.Controllers
                     UserDetails = new UserDetailsDto
                     {
                         UserId = newUser.UserID,
-                        UserName = newUser.Username,
+                        UserName = newUser.UserName,
                         FullName = newUser.FullName,
                         Department = newUser.Department,
                         IsAdmin = newUser.IsAdmin,
@@ -207,6 +222,16 @@ namespace TDFAPI.Controllers
             {
                 _logger.LogWarning(ex, "Validation error during user registration for {Username}", request.Username);
                 return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse(ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Operation error during user registration for {Username}", request.Username);
+                // Try to provide a user-friendly message for duplicate username
+                if (ex.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse(ex.Message));
+                }
+                return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse("Registration failed: " + ex.Message));
             }
             catch (Exception ex)
             {
@@ -257,7 +282,7 @@ namespace TDFAPI.Controllers
                     _logger.LogWarning("Logout attempted with invalid user identity from {IpAddress}", ipAddress);
                 }
 
-                return Ok(ApiResponse<object>.SuccessResponse(null, "Logout successful"));
+                return Ok(ApiResponse<object>.SuccessResponse(new { }, "Logout successful"));
             }
             catch (Exception ex)
             {

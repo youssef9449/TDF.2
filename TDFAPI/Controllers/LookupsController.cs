@@ -54,7 +54,22 @@ namespace TDFAPI.Controllers
                 Response.Headers.Append("Cache-Control", "public, max-age=3600");
                 var departments = await _lookupService.GetDepartmentsAsync();
                 _logger.LogInformation("DIAGNOSTIC: GetDepartments returning {Count} departments", departments?.Count ?? 0);
-                return Ok(ApiResponse<List<LookupItem>>.SuccessResponse(departments));
+
+                // Ensure we never pass null to SuccessResponse
+                departments ??= new List<LookupItem>();
+
+                var response = ApiResponse<List<LookupItem>>.SuccessResponse(departments);
+                
+                // Log the actual JSON that will be returned
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                };
+                var jsonResponse = System.Text.Json.JsonSerializer.Serialize(response, jsonOptions);
+                _logger.LogInformation("DIAGNOSTIC: JSON Response: {JsonResponse}", jsonResponse);
+
+                return Ok(response);
             }
             catch (Exception ex)
             {

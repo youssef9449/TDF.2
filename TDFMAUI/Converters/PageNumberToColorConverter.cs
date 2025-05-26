@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Maui.Graphics;
 
 namespace TDFMAUI.Converters
 {
@@ -8,7 +9,7 @@ namespace TDFMAUI.Converters
         {
             if (value is int currentPage && parameter is int pageNumber)
             {
-                return currentPage == pageNumber ? Colors.Primary : Colors.Transparent;
+                return currentPage == pageNumber ? Colors.Blue : Colors.Transparent;
             }
             return Colors.Transparent;
         }

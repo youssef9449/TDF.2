@@ -6,7 +6,6 @@ using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Users;
 using TDFShared.Exceptions;
 using TDFShared.Services;
-using TDFShared.Factories;
 using System.Windows.Input;
 using Microsoft.Maui.Controls;
 using System.Collections.ObjectModel;
@@ -142,25 +141,27 @@ namespace TDFMAUI.ViewModels
 
         public RequestCreateDto RequestCreateDto =>
             Enum.TryParse(SelectedLeaveType, true, out LeaveType leaveType)
-                ? RequestDtoFactory.CreateRequestDto(
-                    leaveType,
-                    StartDate,
-                    EndDate,
-                    StartTime,
-                    EndTime,
-                    RequestReason,
-                    0) // UserId will be set in OnSubmit
+                ? new RequestCreateDto {
+                    LeaveType = leaveType,
+                    RequestStartDate = StartDate,
+                    RequestEndDate = EndDate ?? StartDate,
+                    RequestBeginningTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartTime : null,
+                    RequestEndingTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? EndTime : null,
+                    RequestReason = RequestReason ?? string.Empty,
+                    UserId = 0 // UserId will be set in OnSubmit
+                }
                 : new RequestCreateDto();
 
         public RequestUpdateDto RequestUpdateDto =>
             Enum.TryParse(SelectedLeaveType, true, out LeaveType leaveType)
-                ? RequestDtoFactory.CreateUpdateDto(
-                    leaveType,
-                    StartDate,
-                    EndDate,
-                    StartTime,
-                    EndTime,
-                    RequestReason)
+                ? new RequestUpdateDto {
+                    LeaveType = leaveType,
+                    RequestStartDate = StartDate,
+                    RequestEndDate = EndDate ?? StartDate,
+                    RequestBeginningTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartTime : null,
+                    RequestEndingTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? EndTime : null,
+                    RequestReason = RequestReason ?? string.Empty
+                }
                 : new RequestUpdateDto();
 
         public ICommand SubmitRequestCommand { get; }

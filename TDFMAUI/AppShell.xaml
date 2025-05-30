@@ -8,13 +8,25 @@
     xmlns:admin="clr-namespace:TDFMAUI.Features.Admin"
     xmlns:requests="clr-namespace:TDFMAUI.Features.Requests"
     xmlns:dashboard="clr-namespace:TDFMAUI.Features.Dashboard"
+    xmlns:settings="clr-namespace:TDFMAUI.Features.Settings"
     Shell.FlyoutBehavior="Flyout"
-    FlyoutBackgroundColor="#512BD4">
+    FlyoutBackgroundColor="#512BD4"
+    Shell.BackgroundColor="White"
+    Shell.TitleColor="Black"
+    Shell.ForegroundColor="Black"
+    Shell.UnselectedColor="#696969">
 
     <Shell.TitleView>
-        <Grid ColumnDefinitions="*,Auto">
+        <Grid ColumnDefinitions="*,Auto,Auto">
             <!-- Existing Title or leave empty for page titles to show -->
             <ImageButton Grid.Column="1"
+                         Source="theme_toggle.png"
+                         Clicked="ToggleTheme_Clicked"
+                         HeightRequest="30"
+                         WidthRequest="30"
+                         Margin="0,0,10,0"
+                         VerticalOptions="Center" />
+            <ImageButton Grid.Column="2"
                          Source="users_panel_icon.png"
                          Clicked="OpenUsersFlyout_Tapped"
                          IsVisible="{Binding Source={RelativeSource AncestorType={x:Type local:AppShell}}, Path=IsDesktopUser}"
@@ -109,6 +121,13 @@
             Title="Admin"
             ContentTemplate="{DataTemplate admin:AdminPage}"
             Route="AdminPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Theme Settings" Icon="settings.png">
+        <ShellContent
+            Title="Theme Settings"
+            ContentTemplate="{DataTemplate settings:ThemeSettingsPage}"
+            Route="ThemeSettingsPage" />
     </FlyoutItem>
 
     <FlyoutItem Title="Diagnostics" Icon="bug.png">

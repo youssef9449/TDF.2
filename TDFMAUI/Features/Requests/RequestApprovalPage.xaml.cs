@@ -68,25 +68,28 @@ namespace TDFMAUI.Pages
         private readonly INotificationService _notificationService;
         private readonly IRequestService _requestService;
         private readonly TDFShared.Services.IAuthService _authService;
+        private readonly ILookupService _lookupService;
         private RequestApprovalViewModel _viewModel;
 
         public RequestApprovalPage(
             INotificationService notificationService,
             IRequestService requestService,
             TDFShared.Services.IAuthService authService,
-            ILogger<RequestApprovalViewModel> logger)
+            ILogger<RequestApprovalViewModel> logger,
+            ILookupService lookupService)
         {
             InitializeComponent();
             _notificationService = notificationService;
             _requestService = requestService;
             _authService = authService;
+            _lookupService = lookupService;
 
             // Add converters as resources
             this.Resources.Add("StatusColorConverter", new StatusColorConverter(this));
             this.Resources.Add("StatusTextColorConverter", new StatusTextColorConverter(this));
 
             // Set the binding context
-            _viewModel = new RequestApprovalViewModel(_requestService, _notificationService, _authService, logger);
+            _viewModel = new RequestApprovalViewModel(_requestService, _notificationService, _authService, logger, _lookupService);
             BindingContext = _viewModel;
 
             // Device-specific config and events

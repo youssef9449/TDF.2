@@ -1,27 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<?xaml-comp compile="true" ?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
-    <Color x:Key="Primary">#512BD4</Color>
-    <Color x:Key="PrimaryDark">#3E22A3</Color>
-    <Color x:Key="PrimaryLight">#6A44E3</Color>
-    <Color x:Key="PrimaryLighter">#8F6EEC</Color>
-    <Color x:Key="Secondary">#DFD8F7</Color>
-    <Color x:Key="Tertiary">#2B0B98</Color>
-    <Color x:Key="Gray100">#F1F1F1</Color>
-    <Color x:Key="Gray200">#E3E3E3</Color>
-    <Color x:Key="Gray300">#CDCDCD</Color>
-    <Color x:Key="Gray400">#B4B4B4</Color>
-    <Color x:Key="Gray500">#9B9B9B</Color>
-    <Color x:Key="Gray600">#828282</Color>
-    <Color x:Key="Gray700">#696969</Color>
-    <Color x:Key="Gray800">#505050</Color>
-    <Color x:Key="Gray900">#373737</Color>
-    <Color x:Key="Black">#000000</Color>
-    <Color x:Key="White">#FFFFFF</Color>
-
-    <!-- Dashboard Colors -->
-    <Color x:Key="Yellow100">#FFF8E1</Color>
-    <Color x:Key="Blue100">#E3F2FD</Color>
-    <Color x:Key="Green100">#E8F5E9</Color>
+    <ResourceDictionary.MergedDictionaries>
+        <!-- The correct theme dictionary will be merged at runtime in App.xaml.cs -->
+    </ResourceDictionary.MergedDictionaries>
 </ResourceDictionary>

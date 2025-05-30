@@ -22,12 +22,11 @@ namespace TDFShared.DTOs.Users
         /// </summary>
         [JsonPropertyName("annualLeaveBalance")]
         public int AnnualLeaveBalance { get; set; }
-
         /// <summary>
-        /// Casual leave balance
+        /// Emergency leave balance
         /// </summary>
-        [JsonPropertyName("casualLeaveBalance")]
-        public int CasualLeaveBalance { get; set; }
+        [JsonPropertyName("emergencyLeaveBalance")]
+        public int EmergencyLeaveBalance { get; set; }
 
         /// <summary>
         /// Permissions balance
@@ -46,12 +45,6 @@ namespace TDFShared.DTOs.Users
         /// </summary>
         [JsonPropertyName("annualBalance")]
         public int AnnualBalance { get; set; }
-
-        /// <summary>
-        /// Legacy casual balance property (kept for compatibility)
-        /// </summary>
-        [JsonPropertyName("casualBalance")]
-        public int CasualBalance { get; set; }
 
         /// <summary>
         /// Creates a clone of the UserDto
@@ -85,11 +78,11 @@ namespace TDFShared.DTOs.Users
         /// <summary>
         /// The connection ID for the user's current WebSocket connection (if any)
         /// </summary>
-        public string ConnectionId { get; set; }
+        public string? ConnectionId { get; set; }
 
         /// <summary>
         /// The type of device the user is connected from (e.g., "Mobile", "Desktop")
         /// </summary>
-        public string DeviceType { get; set; }
+        public string? DeviceType { get; set; }
     }
-} 
+}

@@ -31,8 +31,10 @@ namespace TDFMAUI.Services
         Task<ApiResponse<RequestResponseDto>> CreateRequestAsync(RequestCreateDto requestDto);
         Task<ApiResponse<RequestResponseDto>> UpdateRequestAsync(int requestId, RequestUpdateDto requestDto);
         Task<ApiResponse<bool>> DeleteRequestAsync(int requestId);
-        Task<ApiResponse<bool>> ApproveRequestAsync(int requestId, RequestApprovalDto approvalDto);
-        Task<ApiResponse<bool>> RejectRequestAsync(int requestId, RequestRejectDto rejectDto);
+        Task<ApiResponse<bool>> ManagerApproveRequestAsync(int requestId, ManagerApprovalDto approvalDto);
+        Task<ApiResponse<bool>> HRApproveRequestAsync(int requestId, HRApprovalDto approvalDto);
+        Task<ApiResponse<bool>> ManagerRejectRequestAsync(int requestId, ManagerRejectDto rejectDto);
+        Task<ApiResponse<bool>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto);
         Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetRequestsAsync(RequestPaginationDto pagination, int? userId = null, string department = null, bool queueIfUnavailable = true);
         
         // Leaderboard and balances

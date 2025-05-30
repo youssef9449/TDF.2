@@ -146,6 +146,8 @@ namespace TDFMAUI
                     InitializeComponent();
                     System.Diagnostics.Debug.WriteLine("InitializeComponent completed successfully");
 
+                    // Dynamically merge the correct theme dictionary
+                    SetThemeColors();
                     // Set a temporary page to satisfy MainPage requirement
                     MainPage = new ContentPage(); // This will be replaced in OnStart
                 }
@@ -243,6 +245,10 @@ namespace TDFMAUI
                 // Log important app state information
                 DebugService.LogInfo("App", $"Current MainPage type: {MainPage?.GetType().Name ?? "null"}");
                 DebugService.LogInfo("App", $"App.Services available: {Services != null}");
+                
+                // Initialize theme helper
+                ThemeHelper.Initialize();
+                DebugService.LogInfo("App", $"Theme initialized: {ThemeHelper.CurrentTheme}");
                 
                 // Configure window size and properties for desktop platforms
                 if (DeviceHelper.IsDesktop && Application.Current?.Windows.Count > 0)
@@ -1029,6 +1035,29 @@ namespace TDFMAUI
                         });
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Dynamically applies the correct theme resource dictionary for colors by copying values from the active theme dictionary.
+        /// </summary>
+        private void SetThemeColors()
+        {
+            var appTheme = Application.Current?.RequestedTheme ?? AppTheme.Light;
+            var merged = Application.Current.Resources.MergedDictionaries;
+
+            // Find both theme dictionaries
+            var lightDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Colors.Light.xaml"));
+            var darkDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Colors.Dark.xaml"));
+            var activeDict = appTheme == AppTheme.Dark ? darkDict : lightDict;
+
+            if (activeDict == null)
+                return;
+
+            // Copy all color keys from the active theme dictionary into Application.Current.Resources
+            foreach (var key in activeDict.Keys)
+            {
+                Application.Current.Resources[key] = activeDict[key];
             }
         }
 

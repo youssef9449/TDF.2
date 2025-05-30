@@ -4,14 +4,18 @@
                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
     <!-- Common Styles -->
+    <Style TargetType="ContentPage">
+        <Setter Property="BackgroundColor" Value="{StaticResource BackgroundColor}" />
+    </Style>
+    
     <Style TargetType="Label">
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}" />
+        <Setter Property="TextColor" Value="{StaticResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
     </Style>
 
     <!-- Headline Styles -->
     <Style x:Key="Headline" TargetType="Label">
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray900}, Dark={StaticResource Gray100}}" />
+        <Setter Property="TextColor" Value="{StaticResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSansSemibold" />
         <Setter Property="FontSize" Value="28" />
         <Setter Property="LineBreakMode" Value="TailTruncation" />
@@ -19,7 +23,7 @@
     </Style>
 
     <Style x:Key="SubHeadline" TargetType="Label">
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray700}, Dark={StaticResource Gray300}}" />
+        <Setter Property="TextColor" Value="{StaticResource TextSecondaryColor}" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
         <Setter Property="FontSize" Value="18" />
         <Setter Property="LineBreakMode" Value="TailTruncation" />
@@ -57,36 +61,58 @@
         <Setter Property="Padding" Value="0" />
         <Setter Property="FontFamily" Value="MaterialDesignIcons" />
         <Setter Property="FontSize" Value="24" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceVariantColor}" />
     </Style>
 
     <Style TargetType="Entry">
-        <Setter Property="TextColor" Value="Black" />
+        <Setter Property="TextColor" Value="{StaticResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}" />
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}" />
+        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray600}}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceVariantColor}" />
         <Setter Property="VisualStateManager.VisualStateGroups">
             <VisualStateGroupList>
                 <VisualStateGroup x:Name="CommonStates">
                     <VisualState x:Name="Normal">
                         <VisualState.Setters>
-                            <Setter Property="TextColor" Value="Black" />
+                            <Setter Property="TextColor" Value="{StaticResource TextColor}" />
                         </VisualState.Setters>
                     </VisualState>
                     <VisualState x:Name="Disabled">
                         <VisualState.Setters>
-                            <Setter Property="TextColor" Value="{StaticResource Gray400}" />
+                            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray600}}" />
+                            <Setter Property="BackgroundColor" Value="{StaticResource SurfaceColor}" />
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
             </VisualStateGroupList>
         </Setter>
     </Style>
-
+    
     <Style TargetType="Frame">
-        <Setter Property="HasShadow" Value="True" />
-        <Setter Property="BorderColor" Value="{StaticResource Gray200}" />
+        <Setter Property="HasShadow" Value="{AppThemeBinding Light=True, Dark=False}" />
+        <Setter Property="BorderColor" Value="{StaticResource BorderColor}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceColor}" />
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="Padding" Value="15" />
+    </Style>
+    
+    <Style TargetType="Border">
+        <Setter Property="Stroke" Value="{StaticResource BorderColor}" />
+        <Setter Property="Background" Value="{StaticResource SurfaceColor}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+        <Setter Property="Shadow">
+            <Setter.Value>
+                <Shadow Brush="{AppThemeBinding Light=Black, Dark=Transparent}" 
+                        Offset="0,2" 
+                        Radius="4" 
+                        Opacity="{AppThemeBinding Light=0.1, Dark=0}" />
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="BoxView">
+        <Setter Property="Color" Value="{StaticResource BorderColor}" />
     </Style>
 
     <Style TargetType="CollectionView">
@@ -102,17 +128,17 @@
     </Style>
 
     <Style TargetType="SearchBar">
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource Gray100}}" />
+        <Setter Property="TextColor" Value="{StaticResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="PlaceholderColor" Value="{StaticResource Gray500}" />
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}" />
+        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray600}}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceVariantColor}" />
     </Style>
 
     <Style TargetType="Picker">
-        <Setter Property="TextColor" Value="Black" />
+        <Setter Property="TextColor" Value="{StaticResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="TitleColor" Value="{StaticResource Gray500}" />
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}" />
+        <Setter Property="TitleColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray600}}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceVariantColor}" />
     </Style>
 
     <Style TargetType="CheckBox">
@@ -120,15 +146,53 @@
     </Style>
 
     <Style TargetType="DatePicker">
-        <Setter Property="TextColor" Value="Black" />
+        <Setter Property="TextColor" Value="{StaticResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceVariantColor}" />
     </Style>
 
     <Style TargetType="TimePicker">
-        <Setter Property="TextColor" Value="Black" />
+        <Setter Property="TextColor" Value="{StaticResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSansRegular" />
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource Gray800}}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceVariantColor}" />
+    </Style>
+    
+    <Style TargetType="ScrollView">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+    </Style>
+    
+    <Style TargetType="Grid">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+    </Style>
+    
+    <Style TargetType="StackLayout">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+    </Style>
+    
+    <Style TargetType="VerticalStackLayout">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+    </Style>
+    
+    <Style TargetType="HorizontalStackLayout">
+        <Setter Property="BackgroundColor" Value="Transparent" />
+    </Style>
+
+    <!-- Card Styles -->
+    <Style x:Key="CardStyle" TargetType="Border">
+        <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+        <Setter Property="Stroke" Value="{StaticResource BorderColor}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Background" Value="{StaticResource SurfaceColor}" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="Margin" Value="0,0,0,16" />
+        <Setter Property="Shadow">
+            <Setter.Value>
+                <Shadow Brush="{AppThemeBinding Light=Black, Dark=Transparent}" 
+                        Offset="0,2" 
+                        Radius="4" 
+                        Opacity="{AppThemeBinding Light=0.1, Dark=0}" />
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>

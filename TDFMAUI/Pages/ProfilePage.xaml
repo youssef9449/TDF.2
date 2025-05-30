@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:viewmodels="clr-namespace:TDFMAUI.ViewModels"
              x:Class="TDFMAUI.Pages.ProfilePage"
              Title="Profile"
-             BackgroundColor="#1a237e">
+             x:DataType="viewmodels:UserProfileViewModel"
+             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <ScrollView>
         <Grid RowDefinitions="Auto,Auto,Auto" Padding="20" RowSpacing="20">
@@ -14,6 +17,10 @@
             <Grid.HorizontalOptions>
                  <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
             </Grid.HorizontalOptions>
+
+            <!-- Position these labels properly or remove for production -->
+            <!-- <Label Grid.Row="3" Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/> -->
+            <!-- <Label Grid.Row="3" Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"/> -->
 
             <!-- User Info -->
             <Frame Grid.Row="0"

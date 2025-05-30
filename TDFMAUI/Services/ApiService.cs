@@ -45,22 +45,22 @@ namespace TDFMAUI.Services
         private readonly TDFShared.Services.IHttpClientService _httpClientService;
         private readonly SecureStorageService _secureStorage;
         private readonly JsonSerializerOptions _jsonOptions;
-        private NetworkMonitorService _networkMonitor;
+        private NetworkMonitorService? _networkMonitor;
         private bool _isNetworkAvailable = true;
         private readonly Dictionary<string, Queue<PendingRequest>> _pendingRequests = new Dictionary<string, Queue<PendingRequest>>();
-        private readonly ILogger<ApiService> _logger;
+        private readonly ILogger<ApiService>? _logger;
         private bool _initialized;
 
         // Class to represent a pending API request
         private class PendingRequest
         {
             public string Endpoint { get; set; }
-            public object Data { get; set; }
+            public object? Data { get; set; }
             public string RequestType { get; set; } // GET, POST, PUT, DELETE
             public DateTime QueuedTime { get; set; }
             public TaskCompletionSource<object> CompletionSource { get; set; }
 
-            public PendingRequest(string endpoint, object data, string requestType)
+            public PendingRequest(string endpoint, object? data, string requestType)
             {
                 Endpoint = endpoint;
                 Data = data;
@@ -73,16 +73,17 @@ namespace TDFMAUI.Services
         public ApiService(
             TDFShared.Services.IHttpClientService httpClientService,
             SecureStorageService secureStorage,
-            ILogger<ApiService> logger,
-            NetworkMonitorService networkMonitor)
+            ILogger<ApiService>? logger,
+            NetworkMonitorService? networkMonitor)
         {
             _httpClientService = httpClientService;
-            _secureStorage = secureStorage ?? new SecureStorageService();
+            _secureStorage = secureStorage;
             _logger = logger;
+            _networkMonitor = networkMonitor;
+
             _jsonOptions = TDFShared.Helpers.JsonSerializationHelper.DefaultOptions;
 
             _logger?.LogInformation("ApiService: Initialized");
-            _networkMonitor = networkMonitor;
             if (_networkMonitor != null)
             {
                 _isNetworkAvailable = _networkMonitor.IsConnected;
@@ -92,7 +93,7 @@ namespace TDFMAUI.Services
             _initialized = false;
         }
 
-        private void OnNetworkStatusChanged(object sender, NetworkStatusChangedEventArgs e)
+        private void OnNetworkStatusChanged(object? sender, NetworkStatusChangedEventArgs e)
         {
             _isNetworkAvailable = e.IsConnected;
             _logger?.LogInformation("ApiService: Network status changed: {Status}", (_isNetworkAvailable ? "Connected" : "Disconnected"));
@@ -135,7 +136,7 @@ namespace TDFMAUI.Services
 
                         _logger?.LogInformation("ApiService: Executing queued {RequestType} request to {Endpoint}", request.RequestType, request.Endpoint);
 
-                        object result = null;
+                        object? result = null;
 
                         switch (request.RequestType)
                         {
@@ -143,10 +144,10 @@ namespace TDFMAUI.Services
                                 result = await GetAsync<object>(request.Endpoint);
                                 break;
                             case "POST":
-                                result = await PostAsync<object, object>(request.Endpoint, request.Data);
+                                result = await PostAsync<object, object>(request.Endpoint, request.Data ?? new object());
                                 break;
                             case "PUT":
-                                await PutAsync<object, object>(request.Endpoint, request.Data);
+                                await PutAsync<object, object>(request.Endpoint, request.Data ?? new object());
                                 break;
                             case "DELETE":
                                 var response = await DeleteAsync(request.Endpoint);
@@ -157,7 +158,7 @@ namespace TDFMAUI.Services
 
                         // Complete the task
                         requests.Dequeue();
-                        request.CompletionSource.SetResult(result);
+                        request.CompletionSource.SetResult(result!);
                     }
                     catch (Exception ex)
                     {
@@ -186,7 +187,7 @@ namespace TDFMAUI.Services
         }
 
         // Method to queue a request for later execution
-        private Task<T> QueueRequestAsync<T>(string endpoint, object data, string requestType)
+        private Task<T> QueueRequestAsync<T>(string endpoint, object? data, string requestType)
         {
             _logger?.LogInformation("ApiService: Queuing {RequestType} request to {Endpoint} for later execution", requestType, endpoint);
 
@@ -220,7 +221,7 @@ namespace TDFMAUI.Services
         }
 
         // Method to check network before making requests
-        private bool CheckNetworkBeforeRequest(string endpoint, bool queueIfUnavailable = false, object data = null, string requestType = null)
+        private bool CheckNetworkBeforeRequest(string endpoint, bool queueIfUnavailable = false, object? data = null, string? requestType = null)
         {
             if (!_isNetworkAvailable)
             {
@@ -242,9 +243,7 @@ namespace TDFMAUI.Services
         public void Dispose()
         {
             if (_networkMonitor != null)
-            {
                 _networkMonitor.NetworkStatusChanged -= OnNetworkStatusChanged;
-            }
         }
 
         private async Task InitializeAuthenticationAsync()
@@ -303,7 +302,7 @@ namespace TDFMAUI.Services
 
         public async Task<string> GetRawResponseAsync(string endpoint)
         {
-            _logger.LogDebug("Executing Raw GET request to {Endpoint}", endpoint);
+            _logger?.LogDebug("Executing Raw GET request to {Endpoint}", endpoint);
             try
             {
                 // Ensure relative path and pass directly to HttpClientService
@@ -324,7 +323,7 @@ namespace TDFMAUI.Services
             {
                 return queueIfUnavailable
                     ? await QueueRequestAsync<T>(endpoint, null, "GET")
-                    : default(T);
+                    : default!;
             }
 
             try
@@ -354,7 +353,7 @@ namespace TDFMAUI.Services
             {
                 return queueIfUnavailable
                     ? await QueueRequestAsync<TResponse>(endpoint, data, "POST")
-                    : default(TResponse);
+                    : default!;
             }
 
             try
@@ -567,7 +566,7 @@ namespace TDFMAUI.Services
                  }
                  throw new ApiException(statusCode, response?.ErrorMessage ?? "User not found");
              }
-             return response.Data;
+             return response.Data!;
         }
 
         public async Task<UserDto> GetUserAsync(int userId)
@@ -664,7 +663,7 @@ namespace TDFMAUI.Services
                     throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to create user");
                 }
 
-                return response.Data;
+                return response.Data!;
             }
             catch (Exception ex)
             {
@@ -692,7 +691,7 @@ namespace TDFMAUI.Services
                       }
                       throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to update user");
                   }
-                 return response.Data;
+                 return response.Data!;
             }
             catch (Exception ex)
             {
@@ -749,12 +748,12 @@ namespace TDFMAUI.Services
             }
             catch (ApiException ex)
             {
-                _logger.LogError(ex, "API error changing password: {Message}", ex.Message);
+                _logger?.LogError(ex, "API error changing password: {Message}", ex.Message);
                 throw;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error changing password.");
+                _logger?.LogError(ex, "Unexpected error changing password.");
                 throw new ApiException("An unexpected error occurred while changing the password.", ex);
             }
         }
@@ -869,7 +868,7 @@ namespace TDFMAUI.Services
              var response = await PostAsync<MessageCreateDto, ApiResponse<ChatMessageDto>>(endpoint, createDto);
              if(response == null || !response.Success)
                 throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to create message");
-             return response.Data;
+             return response.Data!;
         }
 
         public async Task<ChatMessageDto> CreatePrivateMessageAsync(MessageCreateDto createDto)
@@ -883,7 +882,7 @@ namespace TDFMAUI.Services
             var response = await PostAsync<MessageCreateDto, ApiResponse<ChatMessageDto>>(endpoint, createDto);
             if (response == null || !response.Success)
                 throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to create private message");
-            return response.Data;
+            return response.Data!;
         }
 
         public async Task<bool> MarkMessageAsReadAsync(int messageId)
@@ -893,7 +892,7 @@ namespace TDFMAUI.Services
               if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
                  throw new NetworkUnavailableException("Mark message read requires network.");
 
-             var response = await PostAsync<object, ApiResponse<bool>>(endpoint, null);
+             var response = await PostAsync<object, ApiResponse<bool>>(endpoint, new object());
             return response?.Success ?? false;
         }
 
@@ -955,7 +954,7 @@ namespace TDFMAUI.Services
             return response?.Success ?? false;
         }
 
-        public async Task<bool> BroadcastNotificationAsync(string message, string department = null)
+        public async Task<bool> BroadcastNotificationAsync(string message, string? department = null)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
              string endpoint = "notifications/broadcast";
@@ -1110,7 +1109,7 @@ namespace TDFMAUI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking authentication status: {Message}", ex.Message);
+                _logger?.LogError(ex, "Error checking authentication status: {Message}", ex.Message);
                 return new ApiResponse<bool> { Success = false, Message = ex.Message };
             }
         }
@@ -1175,32 +1174,62 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<ApiResponse<bool>> ApproveRequestAsync(int requestId, RequestApprovalDto approvalDto)
+        public async Task<ApiResponse<bool>> ManagerApproveRequestAsync(int requestId, ManagerApprovalDto approvalDto)
         {
             try
             {
-                string endpoint = string.Format(ApiRoutes.Requests.Approve, requestId);
-                var response = await PostAsync<RequestApprovalDto, ApiResponse<bool>>(endpoint, approvalDto);
+                string endpoint = $"{TDFShared.Constants.ApiRoutes.Base}/requests/{requestId}/manager/approve";
+                var response = await PostAsync<ManagerApprovalDto, ApiResponse<bool>>(endpoint, approvalDto);
                 return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to approve request" };
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error approving request {RequestId}: {Message}", requestId, ex.Message);
+                _logger?.LogError(ex, "Error approving request {RequestId} as manager: {Message}", requestId, ex.Message);
                 return new ApiResponse<bool> { Success = false, Message = ex.Message };
             }
         }
 
-        public async Task<ApiResponse<bool>> RejectRequestAsync(int requestId, RequestRejectDto rejectDto)
+        public async Task<ApiResponse<bool>> HRApproveRequestAsync(int requestId, HRApprovalDto approvalDto)
         {
             try
             {
-                string endpoint = string.Format(ApiRoutes.Requests.Reject, requestId);
-                var response = await PostAsync<RequestRejectDto, ApiResponse<bool>>(endpoint, rejectDto);
+                string endpoint = $"{TDFShared.Constants.ApiRoutes.Base}/requests/{requestId}/hr/approve";
+                var response = await PostAsync<HRApprovalDto, ApiResponse<bool>>(endpoint, approvalDto);
+                return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to approve request" };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error approving request {RequestId} as HR: {Message}", requestId, ex.Message);
+                return new ApiResponse<bool> { Success = false, Message = ex.Message };
+            }
+        }
+
+        public async Task<ApiResponse<bool>> ManagerRejectRequestAsync(int requestId, ManagerRejectDto rejectDto)
+        {
+            try
+            {
+                string endpoint = $"{TDFShared.Constants.ApiRoutes.Base}/requests/{requestId}/manager/reject";
+                var response = await PostAsync<ManagerRejectDto, ApiResponse<bool>>(endpoint, rejectDto);
                 return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to reject request" };
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error rejecting request {RequestId}: {Message}", requestId, ex.Message);
+                _logger?.LogError(ex, "Error rejecting request {RequestId} as manager: {Message}", requestId, ex.Message);
+                return new ApiResponse<bool> { Success = false, Message = ex.Message };
+            }
+        }
+
+        public async Task<ApiResponse<bool>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto)
+        {
+            try
+            {
+                string endpoint = $"{TDFShared.Constants.ApiRoutes.Base}/requests/{requestId}/hr/reject";
+                var response = await PostAsync<HRRejectDto, ApiResponse<bool>>(endpoint, rejectDto);
+                return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to reject request" };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error rejecting request {RequestId} as HR: {Message}", requestId, ex.Message);
                 return new ApiResponse<bool> { Success = false, Message = ex.Message };
             }
         }

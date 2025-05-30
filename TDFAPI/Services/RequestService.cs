@@ -7,7 +7,6 @@ using TDFShared.Models.Request;
 using TDFShared.Enums;
 using TDFShared.Exceptions;
 using TDFShared.Services;
-using Microsoft.EntityFrameworkCore;
 using TDFShared.DTOs.Users;
 using EntityNotFoundException = TDFAPI.Exceptions.EntityNotFoundException;
 using RequestStatusEnum = TDFShared.Enums.RequestStatus;
@@ -22,6 +21,7 @@ namespace TDFAPI.Services
         private readonly ILogger<RequestService> _logger;
         private readonly TDFShared.Validation.IValidationService _validationService;
         private readonly TDFShared.Validation.IBusinessRulesService _businessRulesService;
+        private readonly IRoleService _roleService;
 
         // Known leave request types (now using enum)
         private static readonly LeaveType[] _supportedLeaveTypes =
@@ -40,7 +40,8 @@ namespace TDFAPI.Services
             INotificationService notificationService,
             ILogger<RequestService> logger,
             TDFShared.Validation.IValidationService validationService,
-            TDFShared.Validation.IBusinessRulesService businessRulesService)
+            TDFShared.Validation.IBusinessRulesService businessRulesService,
+            IRoleService roleService)
         {
             _requestRepository = requestRepository;
             _userRepository = userRepository;
@@ -48,6 +49,7 @@ namespace TDFAPI.Services
             _logger = logger;
             _validationService = validationService ?? throw new ArgumentNullException(nameof(validationService));
             _businessRulesService = businessRulesService ?? throw new ArgumentNullException(nameof(businessRulesService));
+            _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
         }
 
         /// <summary>
@@ -103,6 +105,11 @@ namespace TDFAPI.Services
         /// <summary>
         /// Creates a new request for a user.
         /// </summary>
+        /// <remarks>
+        /// Both the API and the shared validation service validate DTOs. This is intentional for defense-in-depth:
+        /// - API validation provides fast feedback and security at the boundary.
+        /// - Shared service validation ensures business rules are enforced regardless of entry point.
+        /// </remarks>
         /// <exception cref="ValidationException">Thrown if validation fails.</exception>
         /// <exception cref="BusinessRuleException">Thrown if business rules are violated.</exception>
         public async Task<RequestResponseDto> CreateAsync(RequestCreateDto createDto, int userId)
@@ -122,7 +129,8 @@ namespace TDFAPI.Services
                     GetLeaveBalanceAsync = async (uid, leaveType) =>
                     {
                         var balances = await _requestRepository.GetLeaveBalancesAsync(uid);
-                        return balances.TryGetValue(leaveType.ToString().ToLower(), out var balance) ? balance : 0;
+                        var key = LeaveTypeHelper.GetBalanceKey(leaveType);
+                        return key != null && balances.TryGetValue(key, out var balance) ? balance : 0;
                     },
                     HasConflictingRequestsAsync = _requestRepository.HasConflictingRequestsAsync,
                     MinAdvanceNoticeDays = 1,
@@ -144,7 +152,7 @@ namespace TDFAPI.Services
                 var request = new RequestEntity
                 {
                     RequestUserID = userId,
-                    RequestUserFullName = user.FullName,
+                    RequestUserFullName = user.FullName ?? string.Empty,
                     RequestDepartment = user.Department,
                     RequestType = createDto.LeaveType,
                     RequestReason = createDto.RequestReason ?? string.Empty,
@@ -152,7 +160,7 @@ namespace TDFAPI.Services
                     RequestToDay = createDto.RequestEndDate,
                     RequestBeginningTime = createDto.RequestBeginningTime,
                     RequestEndingTime = createDto.RequestEndingTime,
-                    RequestStatus = RequestStatusEnum.Pending,
+                    RequestManagerStatus = RequestStatusEnum.Pending,
                     RequestHRStatus = RequestStatusEnum.Pending,
                     RequestNumberOfDays = numberOfDays,
                     CreatedAt = DateTime.UtcNow
@@ -202,7 +210,7 @@ namespace TDFAPI.Services
 
                 await EnsureUserCanModifyRequest(existingRequest, userId);
 
-                if (!CanEdit(existingRequest.RequestStatus, existingRequest.RequestHRStatus))
+                if (!CanEdit(existingRequest.RequestManagerStatus, existingRequest.RequestHRStatus))
                     throw new BusinessRuleException("Request cannot be edited in its current state.");
 
                 // Validate using shared validation service
@@ -286,7 +294,7 @@ namespace TDFAPI.Services
 
                 await EnsureUserCanModifyRequest(existingRequest, userId);
 
-                if (!CanDelete(existingRequest.RequestStatus, existingRequest.RequestHRStatus))
+                if (!CanDelete(existingRequest.RequestManagerStatus, existingRequest.RequestHRStatus))
                     throw new BusinessRuleException("Only requests that are pending both manager and HR approval can be deleted.");
 
                 bool deleted = await _requestRepository.DeleteAsync(id);
@@ -315,7 +323,7 @@ namespace TDFAPI.Services
         /// </summary>
         /// <exception cref="EntityNotFoundException">Thrown if the request does not exist.</exception>
         /// <exception cref="BusinessRuleException">Thrown if the request cannot be approved.</exception>
-        public async Task<bool> ApproveRequestAsync(int requestId, RequestApprovalDto approvalDto, int approverId, string approverName, bool isHR)
+        public async Task<bool> ApproveRequestAsync(int requestId, int approverId, bool isHR)
         {
             try
             {
@@ -323,53 +331,61 @@ namespace TDFAPI.Services
                 if (request == null)
                     throw new EntityNotFoundException("Request", requestId);
 
-                if (!CanApprove(request.RequestStatus, request.RequestHRStatus, isHR))
-                    throw new BusinessRuleException($"Request is not pending {(isHR ? "HR" : "Manager")} approval. Current status: {(isHR ? request.RequestHRStatus : request.RequestStatus)}");
+                // Only allow approval if the request is pending (for manager), HR can approve at any status
+                if (!isHR && request.RequestManagerStatus != RequestStatusEnum.Pending)
+                    throw new BusinessRuleException($"Request is not pending approval. Current status: {request.RequestManagerStatus}");
 
-                bool fullyApproved = WillBeFullyApproved(request.RequestStatus, request.RequestHRStatus, isHR);
-                string? balanceType = GetBalanceType(request.RequestType);
-
-                if (balanceType != null && fullyApproved)
+                if (!isHR)
                 {
-                    _logger.LogInformation("Request {RequestId} fully approved. Updating leave balance for {LeaveType}.", requestId, balanceType);
-                    bool balanceUpdated = await _requestRepository.UpdateLeaveBalanceAsync(
-                        request.RequestUserID,
-                        Enum.Parse<LeaveType>(balanceType, true),
-                        request.RequestNumberOfDays,
-                        false);
-
-                    if (!balanceUpdated)
-                    {
-                        _logger.LogWarning($"Insufficient balance for request {requestId}. Auto-rejecting.");
-                        await RejectRequestAsync(requestId, new RequestRejectDto { RejectReason = "Insufficient leave balance." }, approverId, "System", isHR);
-                        await _notificationService.CreateNotificationAsync(
-                                request.RequestUserID,
-                                $"Your {request.RequestType} request was automatically rejected due to insufficient balance.");
-                        return false;
-                    }
+                    request.RequestManagerStatus = RequestStatusEnum.ManagerApproved;
+                    request.ManagerApproverId = approverId;
+                }
+                else
+                {
+                    // HR can approve at any status
+                    request.RequestManagerStatus = RequestStatusEnum.HRApproved;
+                    request.HRApproverId = approverId;
                 }
 
-                bool statusUpdated = await UpdateRequestStatusAsync(request, RequestStatusEnum.Approved, approverName, isHR, approvalDto.Comment);
+                request.UpdatedAt = DateTime.UtcNow;
+                await _requestRepository.UpdateAsync(request);
 
-                if (statusUpdated)
+                // Optionally update leave balance if fully approved (HRApproved)
+                if (request.RequestManagerStatus == RequestStatusEnum.HRApproved)
                 {
+                    string? balanceType = GetBalanceType(request.RequestType);
+                    if (balanceType != null)
+                    {
+                        bool balanceUpdated = await _requestRepository.UpdateLeaveBalanceAsync(
+                            request.RequestUserID,
+                            Enum.Parse<LeaveType>(balanceType, true),
+                            request.RequestNumberOfDays,
+                            false);
+                        if (!balanceUpdated)
+                        {
+                            // Auto-reject if balance update fails
+                            request.RequestManagerStatus = RequestStatusEnum.Rejected;
+                            await _requestRepository.UpdateAsync(request);
+                            await _notificationService.CreateNotificationAsync(
+                                request.RequestUserID,
+                                $"Your {request.RequestType} request was automatically rejected due to insufficient balance.");
+                            return false;
+                        }
+                    }
                     await _notificationService.CreateNotificationAsync(
                         request.RequestUserID,
-                        $"Your {request.RequestType} request has been {(isHR ? "processed by HR" : "reviewed by your manager")}: Approved.");
-
+                        $"Your {request.RequestType} request has been fully approved.");
+                }
+                else
+                {
+                    // Notify next approver (HR)
                     if (!isHR)
                     {
                         await NotifyHR($"{request.RequestUserFullName}'s request has been approved by manager and requires HR review.", approverId);
                     }
-                    else if (isHR && request.RequestStatus == RequestStatusEnum.Approved)
-                    {
-                        await _notificationService.CreateNotificationAsync(
-                            request.RequestUserID,
-                            $"Your {request.RequestType} request has been fully approved.");
-                    }
                 }
 
-                return statusUpdated;
+                return true;
             }
             catch (BusinessRuleException ex)
             {
@@ -388,7 +404,7 @@ namespace TDFAPI.Services
         /// </summary>
         /// <exception cref="EntityNotFoundException">Thrown if the request does not exist.</exception>
         /// <exception cref="BusinessRuleException">Thrown if the request cannot be rejected.</exception>
-        public async Task<bool> RejectRequestAsync(int requestId, RequestRejectDto rejectDto, int rejecterId, string rejecterName, bool isHR)
+        public async Task<bool> RejectRequestAsync(int requestId, int rejecterId, bool isHR, string? remarks = null)
         {
             try
             {
@@ -396,33 +412,41 @@ namespace TDFAPI.Services
                 if (request == null)
                     throw new EntityNotFoundException("Request", requestId);
 
-                if (!CanReject(request.RequestStatus, request.RequestHRStatus, isHR))
-                    throw new BusinessRuleException($"Request is not pending {(isHR ? "HR" : "Manager")} approval. Current status: {(isHR ? request.RequestHRStatus : request.RequestStatus)}");
+                // Only allow rejection if the request is pending (for manager), HR can reject at any status
+                if (!isHR && request.RequestManagerStatus != RequestStatusEnum.Pending)
+                    throw new BusinessRuleException("Only pending requests can be rejected by manager.");
 
-                bool updated = await UpdateRequestStatusAsync(
-                    request,
-                    RequestStatusEnum.Rejected,
-                    rejecterName,
-                    isHR,
-                    rejectDto.RejectReason);
-
-                if (updated)
+                request.RequestManagerStatus = RequestStatusEnum.Rejected;
+                if (isHR)
                 {
-                    await _notificationService.CreateNotificationAsync(
-                        request.RequestUserID,
-                        $"Your {request.RequestType} request has been rejected by {(isHR ? "HR" : "your manager")}. Reason: {rejectDto.RejectReason}");
+                    request.HRApproverId = rejecterId;
+                    request.HRRemarks = remarks;
+                }
+                else
+                {
+                    request.ManagerApproverId = rejecterId;
+                    request.ManagerRemarks = remarks;
+                }
+                request.UpdatedAt = DateTime.UtcNow;
+                await _requestRepository.UpdateAsync(request);
 
-                    if (!isHR)
-                    {
-                        await NotifyHR($"Request from {request.RequestUserFullName} rejected by manager.", rejecterId);
-                    }
-                    else
-                    {
-                        await NotifyDepartmentManagers(request.RequestDepartment, $"Request from {request.RequestUserFullName} rejected by HR.", rejecterId);
-                    }
+                string rejectionBy = isHR ? "HR" : "your manager";
+                string rejectionReason = isHR ? (request.HRRemarks ?? "No remarks provided") : (request.ManagerRemarks ?? "No remarks provided");
+                string notificationMsg = $"Your {request.RequestType} request has been rejected by {rejectionBy}. Reason: {rejectionReason}";
+                await _notificationService.CreateNotificationAsync(
+                    request.RequestUserID,
+                    notificationMsg);
+
+                if (!isHR)
+                {
+                    await NotifyHR($"Request from {request.RequestUserFullName} rejected by manager.", rejecterId);
+                }
+                else
+                {
+                    await NotifyDepartmentManagers(request.RequestDepartment, $"Request from {request.RequestUserFullName} rejected by HR.", rejecterId);
                 }
 
-                return updated;
+                return true;
             }
             catch (BusinessRuleException ex)
             {
@@ -436,79 +460,6 @@ namespace TDFAPI.Services
             }
         }
 
-        public async Task<RequestResponseDto> ProcessRequestApprovalAsync(int requestId, RequestApprovalDto approvalDto, int approverId)
-        {
-            // Get the approver's details
-            var approver = await _userRepository.GetByIdAsync(approverId);
-            if (approver == null)
-                throw new UnauthorizedAccessException("Approver not found");
-
-            // Get the request
-            var request = await _requestRepository.GetByIdAsync(requestId);
-            if (request == null)
-                throw new EntityNotFoundException("Request", requestId);
-
-            // Validate approver's authorization
-            bool canApprove = CanManageDepartment(
-                approver.IsAdmin,
-                approver.IsManager,
-                approver.IsHR,
-                approver.Department,
-                request.RequestDepartment);
-
-            if (!canApprove)
-                throw new UnauthorizedAccessException("User is not authorized to approve this request");
-
-            // Validate request state
-            if (request.RequestStatus != RequestStatusEnum.Pending)
-                throw new BusinessRuleException("Request is not in a state that can be approved");
-
-            // Perform the approval
-            var now = DateTime.UtcNow;
-
-            // Update request status
-            if (approver.IsHR == true)
-            {
-                request.RequestStatus = RequestStatusEnum.HRApproved;
-                request.HRApproverId = approverId;
-                request.HRRemarks = approvalDto.Comment;
-            }
-            else
-            {
-                request.RequestStatus = RequestStatusEnum.ManagerApproved;
-                request.ManagerApproverId = approverId;
-                request.ManagerRemarks = approvalDto.ManagerRemarks;
-            }
-
-            // Update in database
-            await _requestRepository.UpdateAsync(request);
-
-            // Return updated request DTO
-            return await GetByIdAsync(requestId);
-        }
-
-        public async Task<Dictionary<string, int>> GetLeaveBalancesAsync(int userId)
-        {
-            // Assuming RequestRepository handles fetching integer balances
-            return await _requestRepository.GetLeaveBalancesAsync(userId);
-        }
-
-        public async Task<int> GetPermissionUsedAsync(int userId)
-        {
-            return await _requestRepository.GetPermissionUsedAsync(userId);
-        }
-
-        public async Task<int> GetPendingDaysCountAsync(int userId, string requestType)
-        {
-            LeaveType leaveType = ParseLeaveType(requestType);
-            return await _requestRepository.GetPendingDaysCountAsync(userId, leaveType);
-        }
-
-        public async Task<bool> HasConflictingRequestsAsync(int userId, DateTime startDate, DateTime endDate, int requestId = 0)
-        {
-             return await _requestRepository.HasConflictingRequestsAsync(userId, startDate, endDate, requestId);
-         }
-
         #region Helper Methods
 
         private async Task EnsureUserCanModifyRequest(RequestEntity request, int userId)
@@ -517,8 +468,9 @@ namespace TDFAPI.Services
             if (user == null)
                  throw new UnauthorizedAccessException("User not found.");
 
+            _roleService.AssignRoles(user);
             // Allow if user is the owner OR if user is an Admin
-            if (request.RequestUserID != userId && user.IsAdmin != true)
+            if (request.RequestUserID != userId && !_roleService.HasRole(user, "Admin"))
             {
                  _logger.LogWarning("User {UserId} (IsAdmin: {IsAdmin}) attempted to modify request {RequestId} owned by {OwnerId}", userId, user.IsAdmin, request.RequestID, request.RequestUserID);
                 throw new UnauthorizedAccessException("User is not authorized to modify this request.");
@@ -558,22 +510,10 @@ namespace TDFAPI.Services
         // --- Centralized Validation Helpers ---
         private LeaveType ParseLeaveType(string leaveType)
         {
-            if (string.IsNullOrWhiteSpace(leaveType))
-                throw new ValidationException("Leave type is required.");
-            if (Enum.TryParse<LeaveType>(leaveType.Replace(" ", ""), true, out var parsed))
-                return parsed;
-            // Map aliases
-            if (leaveType.Equals("Casual Leave", StringComparison.OrdinalIgnoreCase) || leaveType.Equals("Casual", StringComparison.OrdinalIgnoreCase))
-                return LeaveType.Emergency;
-            if (leaveType.Equals("External Assignment", StringComparison.OrdinalIgnoreCase))
-                return LeaveType.ExternalAssignment;
-            if (leaveType.Equals("Work From Home", StringComparison.OrdinalIgnoreCase) || leaveType.Equals("WFH", StringComparison.OrdinalIgnoreCase))
-                return LeaveType.WorkFromHome;
-            throw new ValidationException($"Unsupported leave type: {leaveType}");
+            return LeaveTypeHelper.Parse(leaveType);
         }
 
         // ----- Mappers -----
-
         private async Task<RequestResponseDto> MapToResponseDto(RequestEntity? request)
         {
             if (request == null)
@@ -601,9 +541,6 @@ namespace TDFAPI.Services
                 RequestEndDate = request.RequestToDay,
                 RequestBeginningTime = request.RequestBeginningTime,
                 RequestEndingTime = request.RequestEndingTime,
-                Status = request.RequestStatus,
-                Remarks = request.Remarks,
-                ApproverName = request.RequestCloser,
                 CreatedDate = request.CreatedAt,
                 LastModifiedDate = request.UpdatedAt,
                 RequestNumberOfDays = request.RequestNumberOfDays,
@@ -639,16 +576,12 @@ namespace TDFAPI.Services
 
         #region Private Methods
 
-        /// <summary>
-        /// Calculates business days between two dates
-        /// </summary>
+        // Only keep helpers that are actually used by the main logic
         private static int CalculateBusinessDays(DateTime startDate, DateTime endDate)
         {
             if (startDate > endDate) return 0;
-
             int businessDays = 0;
             DateTime current = startDate.Date;
-
             while (current <= endDate.Date)
             {
                 if (current.DayOfWeek != DayOfWeek.Saturday && current.DayOfWeek != DayOfWeek.Sunday)
@@ -657,122 +590,125 @@ namespace TDFAPI.Services
                 }
                 current = current.AddDays(1);
             }
-
             return businessDays;
         }
 
-        /// <summary>
-        /// Checks if a request can be edited based on its status
-        /// </summary>
         private static bool CanEdit(RequestStatus status, RequestStatus hrStatus)
         {
             return status == RequestStatus.Pending && hrStatus == RequestStatus.Pending;
         }
 
-        /// <summary>
-        /// Checks if a request can be deleted based on its status
-        /// </summary>
         private static bool CanDelete(RequestStatus status, RequestStatus hrStatus)
         {
             return status == RequestStatus.Pending && hrStatus == RequestStatus.Pending;
         }
 
-        /// <summary>
-        /// Checks if a request can be approved
-        /// </summary>
-        private static bool CanApprove(RequestStatus currentStatus, RequestStatus hrStatus, bool isHR)
+        private static string? GetBalanceType(string leaveType)
         {
-            return isHR ?
-                currentStatus == RequestStatus.Approved && hrStatus == RequestStatus.Pending :
-                currentStatus == RequestStatus.Pending;
+            var parsed = LeaveTypeHelper.Parse(leaveType);
+            return parsed is LeaveType.Annual or LeaveType.Emergency or LeaveType.Permission ? leaveType : null;
         }
 
-        /// <summary>
-        /// Checks if a request can be rejected
-        /// </summary>
-        private static bool CanReject(RequestStatus currentStatus, RequestStatus hrStatus, bool isHR)
+        private static string? GetBalanceType(LeaveType? leaveType)
         {
-            return isHR ?
-                currentStatus == RequestStatus.Approved && hrStatus == RequestStatus.Pending :
-                currentStatus == RequestStatus.Pending;
+            return leaveType is LeaveType.Annual or LeaveType.Emergency or LeaveType.Permission ? leaveType.ToString() : null;
         }
 
-        /// <summary>
-        /// Checks if a request will be fully approved after this action
-        /// </summary>
-        private static bool WillBeFullyApproved(RequestStatus currentStatus, RequestStatus hrStatus, bool isHR)
+        private static bool CanManageDepartment(IRoleService roleService, UserDto user, string? requestDepartment)
         {
-            return (isHR && currentStatus == RequestStatus.Approved) ||
-                   (!isHR && hrStatus == RequestStatus.Approved);
+            if (user == null || string.IsNullOrEmpty(requestDepartment)) return false;
+            roleService.AssignRoles(user);
+            if (roleService.HasAnyRole(user, "Admin", "HR")) return true;
+            if (!roleService.HasRole(user, "Manager") || string.IsNullOrEmpty(user.Department)) return false;
+            return RequestStateManager.CanManageDepartment(user, requestDepartment);
         }
-
-        /// <summary>
-        /// Gets the balance type for a leave type
-        /// </summary>
-        private static string? GetBalanceType(LeaveType leaveType)
-        {
-            return leaveType switch
-            {
-                LeaveType.Annual => "annual",
-                LeaveType.Emergency => "emergency",
-                LeaveType.Unpaid => null, // Unpaid leave doesn't affect balance
-                LeaveType.Permission => null, // Permission doesn't affect balance
-                LeaveType.ExternalAssignment => null, // External assignment doesn't affect balance
-                LeaveType.WorkFromHome => null, // WFH doesn't affect balance
-                _ => null
-            };
-        }
-
-        /// <summary>
-        /// Checks if a user can manage a department
-        /// </summary>
-        private static bool CanManageDepartment(bool? isAdmin, bool? isManager, bool? isHR, string? userDepartment, string? requestDepartment)
-        {
-            // Admins and HR can manage all departments
-            if (isAdmin == true || isHR == true) return true;
-
-            // Managers can manage their own department (including constituent departments for hyphenated departments)
-            if (isManager != true || string.IsNullOrEmpty(userDepartment) || string.IsNullOrEmpty(requestDepartment)) return false;
-
-            // Use RequestStateManager for consistent department access logic
-            return RequestStateManager.CanManageDepartment(
-                new UserDto { IsAdmin = isAdmin ?? false, IsHR = isHR ?? false, IsManager = isManager ?? false, Department = userDepartment },
-                requestDepartment);
-        }
-
-        private async Task<bool> UpdateRequestStatusAsync(
-            RequestEntity request,
-            RequestStatusEnum newStatus,
-            string updatedBy,
-            bool isHRUpdate,
-            string? comment = null)
-        {
-            try
-            {
-                if (isHRUpdate)
-                {
-                    request.RequestHRStatus = newStatus;
-                    request.RequestHRCloser = updatedBy;
-                    request.HRRemarks = comment;
-                }
-                else
-                {
-                    request.RequestStatus = newStatus;
-                    request.RequestCloser = updatedBy;
-                    request.ManagerRemarks = comment;
-                }
-                request.UpdatedAt = DateTime.UtcNow;
-                await _requestRepository.UpdateAsync(request);
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating request {RequestId} status to {Status}", request.RequestID, newStatus);
-                return false;
-            }
-        }
-
         #endregion
+
+        public async Task<bool> ManagerApproveRequestAsync(int id, ManagerApprovalDto approvalDto, int approverId, string approverName)
+        {
+            var request = await _requestRepository.GetByIdAsync(id);
+            if (request == null)
+                throw new EntityNotFoundException("Request", id);
+            if (request.RequestManagerStatus != RequestStatusEnum.Pending)
+                throw new BusinessRuleException("Request is not pending manager approval.");
+            request.RequestManagerStatus = RequestStatusEnum.ManagerApproved;
+            request.ManagerApproverId = approverId;
+            request.ManagerRemarks = approvalDto.ManagerRemarks;
+            request.UpdatedAt = DateTime.UtcNow;
+            await _requestRepository.UpdateAsync(request);
+            await NotifyHR($"Request from {request.RequestUserFullName} approved by manager.", approverId);
+            return true;
+        }
+
+        public async Task<bool> HRApproveRequestAsync(int id, HRApprovalDto approvalDto, int approverId, string approverName)
+        {
+            var request = await _requestRepository.GetByIdAsync(id);
+            if (request == null)
+                throw new EntityNotFoundException("Request", id);
+            if (request.RequestManagerStatus != RequestStatusEnum.ManagerApproved)
+                throw new BusinessRuleException("Request must be manager approved before HR approval.");
+            request.RequestManagerStatus = RequestStatusEnum.HRApproved;
+            request.HRApproverId = approverId;
+            request.HRRemarks = approvalDto.HRRemarks;
+            request.UpdatedAt = DateTime.UtcNow;
+            await _requestRepository.UpdateAsync(request);
+            await _notificationService.CreateNotificationAsync(request.RequestUserID, $"Your {request.RequestType} request has been fully approved.");
+            return true;
+        }
+
+        public async Task<bool> ManagerRejectRequestAsync(int id, ManagerRejectDto rejectDto, int rejecterId, string rejecterName)
+        {
+            var request = await _requestRepository.GetByIdAsync(id);
+            if (request == null)
+                throw new EntityNotFoundException("Request", id);
+            if (request.RequestManagerStatus != RequestStatusEnum.Pending)
+                throw new BusinessRuleException("Request is not pending manager approval.");
+            request.RequestManagerStatus = RequestStatusEnum.Rejected;
+            request.ManagerApproverId = rejecterId;
+            request.ManagerRemarks = rejectDto.ManagerRemarks;
+            request.UpdatedAt = DateTime.UtcNow;
+            await _requestRepository.UpdateAsync(request);
+            await NotifyHR($"Request from {request.RequestUserFullName} rejected by manager.", rejecterId);
+            await _notificationService.CreateNotificationAsync(request.RequestUserID, $"Your {request.RequestType} request was rejected by your manager. Reason: {rejectDto.ManagerRemarks}");
+            return true;
+        }
+
+        public async Task<bool> HRRejectRequestAsync(int id, HRRejectDto rejectDto, int rejecterId, string rejecterName)
+        {
+            var request = await _requestRepository.GetByIdAsync(id);
+            if (request == null)
+                throw new EntityNotFoundException("Request", id);
+            if (request.RequestManagerStatus != RequestStatusEnum.ManagerApproved)
+                throw new BusinessRuleException("Request must be manager approved before HR rejection.");
+            request.RequestManagerStatus = RequestStatusEnum.Rejected;
+            request.HRApproverId = rejecterId;
+            request.HRRemarks = rejectDto.HRRemarks;
+            request.UpdatedAt = DateTime.UtcNow;
+            await _requestRepository.UpdateAsync(request);
+            await _notificationService.CreateNotificationAsync(request.RequestUserID, $"Your {request.RequestType} request was rejected by HR. Reason: {rejectDto.HRRemarks}");
+            await NotifyDepartmentManagers(request.RequestDepartment, $"Request from {request.RequestUserFullName} rejected by HR.", rejecterId);
+            return true;
+        }
+
+        public async Task<Dictionary<string, int>> GetLeaveBalancesAsync(int userId)
+        {
+            return await _requestRepository.GetLeaveBalancesAsync(userId);
+        }
+
+        public async Task<int> GetPermissionUsedAsync(int userId)
+        {
+            return await _requestRepository.GetPermissionUsedAsync(userId);
+        }
+
+        public async Task<int> GetPendingDaysCountAsync(int userId, string requestType)
+        {
+            LeaveType leaveType = ParseLeaveType(requestType);
+            return await _requestRepository.GetPendingDaysCountAsync(userId, leaveType);
+        }
+
+        public async Task<bool> HasConflictingRequestsAsync(int userId, DateTime startDate, DateTime endDate, int requestId = 0)
+        {
+            return await _requestRepository.HasConflictingRequestsAsync(userId, startDate, endDate, requestId);
+        }
     }
 }

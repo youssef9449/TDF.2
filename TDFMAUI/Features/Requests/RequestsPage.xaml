@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:TDFMAUI.Pages"
              xmlns:viewModels="clr-namespace:TDFMAUI.ViewModels"
-             xmlns:models="clr-namespace:TDFShared.DTOs.Requests"
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              xmlns:vm="clr-namespace:TDFMAUI.ViewModels"
              xmlns:dtos="clr-namespace:TDFShared.DTOs.Requests;assembly=TDFShared"
@@ -17,6 +16,7 @@
             <converters:RequestButtonVisibilityConverter x:Key="RequestButtonVisibilityConverter" />
             <converters:CanEditDeleteConverter x:Key="CanEditDeleteConverter" />
             <converters:CanApproveRejectConverter x:Key="CanApproveRejectConverter" />
+            <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
 
@@ -93,7 +93,8 @@
                                          <Label Text="{Binding RequestEndDate, StringFormat='To: {0:d}'}" IsVisible="{Binding RequestEndDate.HasValue}" FontSize="Small" />
                                          <Label Text="{Binding RequestReason, StringFormat='Reason: {0}'}" FontSize="Small" LineBreakMode="WordWrap" IsVisible="{Binding RequestReason, Converter={StaticResource StringNotEmptyConverter}}"/>
                                          <Label Text="{Binding Status, StringFormat='Status: {0}'}" FontAttributes="Bold" FontSize="Small" />
-                                         <Label Text="{Binding Remarks, StringFormat='Remarks: {0}'}" FontSize="Small" IsVisible="{Binding Remarks, Converter={StaticResource StringNotEmptyConverter}}"/>
+                                         <!-- Remarks property doesn't exist in RequestResponseDto -->
+                                         <Label Text="{Binding RequestReason, StringFormat='Remarks: {0}'}" FontSize="Small" IsVisible="{Binding RequestReason, Converter={StaticResource StringNotEmptyConverter}}"/>
 
                                         <!-- Action Buttons -->
                                         <HorizontalStackLayout Spacing="5" Margin="0,5,0,0">

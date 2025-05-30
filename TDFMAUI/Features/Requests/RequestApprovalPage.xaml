@@ -9,7 +9,9 @@
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              xmlns:dtos="clr-namespace:TDFShared.DTOs.Requests;assembly=TDFShared"
              x:Class="TDFMAUI.Pages.RequestApprovalPage"
-             Title="Request Approval">
+             Title="Request Approval"
+             x:DataType="vm:RequestApprovalViewModel"
+             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -27,6 +29,8 @@
     </ContentPage.BindingContext>
 
     <Grid RowDefinitions="Auto, Auto, *, Auto" ColumnDefinitions="*, Auto" Padding="10" RowSpacing="10">
+        <Label Grid.Row="0" Grid.Column="0" Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/>
+        <Label Grid.Row="0" Grid.Column="0" Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"/>
 
         <!-- Loading Indicator -->
         <ActivityIndicator Grid.RowSpan="4" Grid.ColumnSpan="2"
@@ -89,9 +93,9 @@
                 <Label Grid.Row="0" Grid.Column="3" Text="Type:" VerticalOptions="Center"/>
                 <Picker Grid.Row="1" Grid.Column="3" ItemsSource="{Binding TypeOptions}" SelectedItem="{Binding SelectedType}"/>
 
-                <!-- Department filter only for HR -->
-                <Label Grid.Row="0" Grid.Column="4" Text="Department:" IsVisible="{Binding IsHR}" VerticalOptions="Center"/>
-                <Picker Grid.Row="1" Grid.Column="4" ItemsSource="{Binding DepartmentOptions}" SelectedItem="{Binding SelectedDepartment}" IsVisible="{Binding IsHR}"/>
+                <!-- Department filter for Admins, HR, and Managers -->
+                <Label Grid.Row="0" Grid.Column="4" Text="Department:" IsVisible="{Binding CanFilterByDepartment}" VerticalOptions="Center"/>
+                <Picker Grid.Row="1" Grid.Column="4" ItemsSource="{Binding Departments}" SelectedItem="{Binding SelectedDepartment}" ItemDisplayBinding="{Binding Name}" IsVisible="{Binding CanFilterByDepartment}"/>
             </Grid>
                             </VerticalStackLayout>
 
@@ -191,7 +195,7 @@
                               HorizontalOptions="Center"
                               SelectionMode="None">
                     <CollectionView.ItemTemplate>
-                        <DataTemplate>
+                        <DataTemplate x:DataType="x:Int32">
                             <Button Text="{Binding}"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=GoToPageCommand}"
                                     CommandParameter="{Binding}"

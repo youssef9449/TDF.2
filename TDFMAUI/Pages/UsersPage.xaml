@@ -4,7 +4,7 @@
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              x:Class="TDFMAUI.Pages.UsersPage"
              Title="Users"
-             BackgroundColor="{StaticResource Gray100}">
+             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <Grid RowDefinitions="Auto,*,Auto" Padding="{OnIdiom Phone='10', Tablet='15', Desktop='20'}">
         <!-- Header -->
@@ -76,127 +76,126 @@
                                     EmptyView="No users currently online">
                         <CollectionView.ItemTemplate>
                             <DataTemplate>
-                                <Frame Margin="0,5" 
-                                       Padding="{OnIdiom Phone='10', Default='15'}" 
-                                       BackgroundColor="White" 
-                                       CornerRadius="10"
-                                       BorderColor="{StaticResource Gray300}">
-                                    <!-- Desktop/Tablet Layout -->
-                                    <Grid ColumnDefinitions="Auto,*,Auto"
-                                          IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}">
-                                        <!-- Status indicator -->
-                                        <Frame Grid.Column="0" 
-                                               BackgroundColor="{Binding StatusColor}" 
-                                               WidthRequest="16" 
-                                               HeightRequest="16" 
-                                               CornerRadius="8"
-                                               Padding="0"
-                                               VerticalOptions="Center"
-                                               Margin="0,0,10,0" />
+                                <!-- Fix nested Grid Content errors by wrapping multiple Grids in a parent layout inside the Frame -->
+                                <Frame Margin="0,5" Padding="{OnIdiom Phone='10', Default='15'}" BackgroundColor="White" CornerRadius="10" BorderColor="{StaticResource Gray300}">
+                                    <VerticalStackLayout>
+                                        <!-- Desktop/Tablet Layout -->
+                                        <Grid ColumnDefinitions="Auto,*,Auto"
+                                              IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}">
+                                            <!-- Status indicator -->
+                                            <Frame Grid.Column="0" 
+                                                   BackgroundColor="{Binding StatusColor}" 
+                                                   WidthRequest="16" 
+                                                   HeightRequest="16" 
+                                                   CornerRadius="8"
+                                                   Padding="0"
+                                                   VerticalOptions="Center"
+                                                   Margin="0,0,10,0" />
+                                            
+                                            <!-- User info -->
+                                            <VerticalStackLayout Grid.Column="1" Spacing="5">
+                                                <Label Text="{Binding FullName}" 
+                                                       FontAttributes="Bold" 
+                                                       FontSize="16" />
+                                                       
+                                                <Label Text="{Binding Department}" 
+                                                       TextColor="{StaticResource Gray600}" 
+                                                       FontSize="14" />
+                                                       
+                                                <Label Text="{Binding StatusMessage}" 
+                                                       IsVisible="{Binding HasStatusMessage}"
+                                                       TextColor="{StaticResource Gray500}"
+                                                       FontSize="12"
+                                                       MaxLines="2"
+                                                       LineBreakMode="TailTruncation" />
+                                            </VerticalStackLayout>
+                                            
+                                            <!-- Action buttons -->
+                                            <HorizontalStackLayout Grid.Column="2" 
+                                                        Spacing="10"
+                                                        VerticalOptions="Center">
+                                                <Button Text="Message"
+                                                        Command="{Binding BindingContext.MessageCommand, Source={x:Reference usersPage}}"
+                                                        CommandParameter="{Binding UserId}"
+                                                        BackgroundColor="{StaticResource Primary}"
+                                                        TextColor="White"
+                                                        HeightRequest="35"
+                                                        WidthRequest="90"
+                                                        CornerRadius="18"
+                                                        FontSize="14" />
+                                                        
+                                                <Button Text="Profile"
+                                                        Command="{Binding BindingContext.ViewProfileCommand, Source={x:Reference usersPage}}"
+                                                        CommandParameter="{Binding UserId}"
+                                                        BackgroundColor="{StaticResource Secondary}"
+                                                        TextColor="White"
+                                                        HeightRequest="35"
+                                                        WidthRequest="90"
+                                                        CornerRadius="18"
+                                                        FontSize="14" />
+                                            </HorizontalStackLayout>
+                                        </Grid>
                                         
-                                        <!-- User info -->
-                                        <VerticalStackLayout Grid.Column="1" Spacing="5">
-                                            <Label Text="{Binding FullName}" 
-                                                   FontAttributes="Bold" 
-                                                   FontSize="16" />
+                                        <!-- Mobile Layout - Simplified -->
+                                        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto"
+                                              IsVisible="{x:Static helpers:DeviceHelper.UseCompactUI}"
+                                              RowSpacing="8">
+                                            <!-- Status indicator and Name -->
+                                            <Frame Grid.Row="0" Grid.Column="0" 
+                                                   BackgroundColor="{Binding StatusColor}" 
+                                                   WidthRequest="12" 
+                                                   HeightRequest="12" 
+                                                   CornerRadius="6"
+                                                   Padding="0"
+                                                   VerticalOptions="Center"
+                                                   Margin="0,0,8,0" />
                                                    
-                                            <Label Text="{Binding Department}" 
-                                                   TextColor="{StaticResource Gray600}" 
-                                                   FontSize="14" />
-                                                   
-                                            <Label Text="{Binding StatusMessage}" 
+                                            <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="2">
+                                                <Label Text="{Binding FullName}" 
+                                                       FontAttributes="Bold" 
+                                                       FontSize="14" />
+                                                <Label Text="{Binding Department}" 
+                                                       TextColor="{StaticResource Gray600}" 
+                                                       FontSize="12" />
+                                            </VerticalStackLayout>
+                                            
+                                            <!-- Status message -->
+                                            <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                                                   Text="{Binding StatusMessage}" 
                                                    IsVisible="{Binding HasStatusMessage}"
                                                    TextColor="{StaticResource Gray500}"
                                                    FontSize="12"
                                                    MaxLines="2"
                                                    LineBreakMode="TailTruncation" />
-                                        </VerticalStackLayout>
-                                        
-                                        <!-- Action buttons -->
-                                        <HorizontalStackLayout Grid.Column="2" 
-                                                    Spacing="10"
-                                                    VerticalOptions="Center">
-                                            <Button Text="Message"
-                                                    Command="{Binding BindingContext.MessageCommand, Source={x:Reference usersPage}}"
-                                                    CommandParameter="{Binding UserId}"
-                                                    BackgroundColor="{StaticResource Primary}"
-                                                    TextColor="White"
-                                                    HeightRequest="35"
-                                                    WidthRequest="90"
-                                                    CornerRadius="18"
-                                                    FontSize="14" />
+                                            
+                                            <!-- Buttons -->
+                                            <HorizontalStackLayout Grid.Row="0" Grid.Column="2" 
+                                                         Spacing="5"
+                                                         VerticalOptions="Center">
+                                                <Button Text="Message"
+                                                        Command="{Binding BindingContext.MessageCommand, Source={x:Reference usersPage}}"
+                                                        CommandParameter="{Binding UserId}"
+                                                        BackgroundColor="{StaticResource Primary}"
+                                                        TextColor="White"
+                                                        HeightRequest="30"
+                                                        WidthRequest="70"
+                                                        CornerRadius="15"
+                                                        FontSize="11"
+                                                        Padding="0" />
                                                     
-                                            <Button Text="Profile"
-                                                    Command="{Binding BindingContext.ViewProfileCommand, Source={x:Reference usersPage}}"
-                                                    CommandParameter="{Binding UserId}"
-                                                    BackgroundColor="{StaticResource Secondary}"
-                                                    TextColor="White"
-                                                    HeightRequest="35"
-                                                    WidthRequest="90"
-                                                    CornerRadius="18"
-                                                    FontSize="14" />
-                                        </HorizontalStackLayout>
-                                    </Grid>
-                                    
-                                    <!-- Mobile Layout - Simplified -->
-                                    <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto"
-                                          IsVisible="{x:Static helpers:DeviceHelper.UseCompactUI}"
-                                          RowSpacing="8">
-                                        <!-- Status indicator and Name -->
-                                        <Frame Grid.Row="0" Grid.Column="0" 
-                                               BackgroundColor="{Binding StatusColor}" 
-                                               WidthRequest="12" 
-                                               HeightRequest="12" 
-                                               CornerRadius="6"
-                                               Padding="0"
-                                               VerticalOptions="Center"
-                                               Margin="0,0,8,0" />
-                                               
-                                        <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="2">
-                                            <Label Text="{Binding FullName}" 
-                                                   FontAttributes="Bold" 
-                                                   FontSize="14" />
-                                            <Label Text="{Binding Department}" 
-                                                   TextColor="{StaticResource Gray600}" 
-                                                   FontSize="12" />
-                                        </VerticalStackLayout>
-                                        
-                                        <!-- Status message -->
-                                        <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
-                                               Text="{Binding StatusMessage}" 
-                                               IsVisible="{Binding HasStatusMessage}"
-                                               TextColor="{StaticResource Gray500}"
-                                               FontSize="12"
-                                               MaxLines="2"
-                                               LineBreakMode="TailTruncation" />
-                                        
-                                        <!-- Buttons -->
-                                        <HorizontalStackLayout Grid.Row="0" Grid.Column="2" 
-                                                     Spacing="5"
-                                                     VerticalOptions="Center">
-                                            <Button Text="Message"
-                                                    Command="{Binding BindingContext.MessageCommand, Source={x:Reference usersPage}}"
-                                                    CommandParameter="{Binding UserId}"
-                                                    BackgroundColor="{StaticResource Primary}"
-                                                    TextColor="White"
-                                                    HeightRequest="30"
-                                                    WidthRequest="70"
-                                                    CornerRadius="15"
-                                                    FontSize="11"
-                                                    Padding="0" />
-                                                    
-                                            <Button Text="Profile"
-                                                    Command="{Binding BindingContext.ViewProfileCommand, Source={x:Reference usersPage}}"
-                                                    CommandParameter="{Binding UserId}"
-                                                    BackgroundColor="{StaticResource Secondary}"
-                                                    TextColor="White"
-                                                    HeightRequest="30"
-                                                    WidthRequest="70"
-                                                    CornerRadius="15"
-                                                    FontSize="11"
-                                                    Padding="0" />
-                                        </HorizontalStackLayout>
-                                    </Grid>
+                                                <Button Text="Profile"
+                                                        Command="{Binding BindingContext.ViewProfileCommand, Source={x:Reference usersPage}}"
+                                                        CommandParameter="{Binding UserId}"
+                                                        BackgroundColor="{StaticResource Secondary}"
+                                                        TextColor="White"
+                                                        HeightRequest="30"
+                                                        WidthRequest="70"
+                                                        CornerRadius="15"
+                                                        FontSize="11"
+                                                        Padding="0" />
+                                            </HorizontalStackLayout>
+                                        </Grid>
+                                    </VerticalStackLayout>
                                 </Frame>
                             </DataTemplate>
                         </CollectionView.ItemTemplate>
@@ -288,4 +287,4 @@
             </VerticalStackLayout>
         </Frame>
     </Grid>
-</ContentPage> 
+</ContentPage>

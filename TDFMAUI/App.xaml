@@ -8,7 +8,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Colors.Light.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Colors.Dark.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
@@ -20,6 +21,7 @@
             <converters:BooleanInverter x:Key="BooleanInverter" />
             <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
             <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
+            <converters:ThemeToBackgroundColorConverter x:Key="ThemeToBackgroundColorConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

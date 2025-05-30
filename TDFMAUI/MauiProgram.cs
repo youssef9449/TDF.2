@@ -268,7 +268,14 @@ namespace TDFMAUI
             builder.Services.AddTransient<MyTeamViewModel>();
             builder.Services.AddTransient<PrivateMessagesViewModel>();
             builder.Services.AddTransient<RequestApprovalViewModel>();
-            builder.Services.AddTransient<RequestsViewModel>();
+            builder.Services.AddTransient<RequestsViewModel>(sp => 
+                new RequestsViewModel(
+                    sp.GetRequiredService<IRequestService>(),
+                    sp.GetRequiredService<IAuthService>(),
+                    sp.GetRequiredService<ILogger<RequestsViewModel>>(),
+                    sp.GetRequiredService<IErrorHandlingService>(),
+                    sp.GetRequiredService<ILookupService>()
+                ));
             builder.Services.AddTransient<ReportsViewModel>();
             builder.Services.AddTransient<SignupViewModel>();
             builder.Services.AddTransient<RequestDetailsViewModel>();

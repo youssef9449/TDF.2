@@ -1,12 +1,14 @@
 using System;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Controls;
 using TDFMAUI.Features.Requests;
 using TDFMAUI.Services;
+using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Users;
 using TDFShared.Enums;
@@ -197,8 +199,25 @@ namespace TDFMAUI.ViewModels
             IsLoading = true;
             try
             {
-                var approvalDto = new RequestApprovalDto { Comment = comment };
-                var response = await _apiService.ApproveRequestAsync(Request.RequestID, approvalDto);
+                // Determine which approval DTO to use based on user role
+                var currentUser = await _authService.GetCurrentUserAsync();
+                ApiResponse<bool>? response = null;
+                
+                if (currentUser?.IsManager == true)
+                {
+                    var approvalDto = new ManagerApprovalDto { ManagerRemarks = comment };
+                    response = await _apiService.ManagerApproveRequestAsync(Request.RequestID, approvalDto);
+                }
+                else if (currentUser?.IsHR == true)
+                {
+                    var approvalDto = new HRApprovalDto { HRRemarks = comment };
+                    response = await _apiService.HRApproveRequestAsync(Request.RequestID, approvalDto);
+                }
+                else
+                {
+                    await Shell.Current.DisplayAlert("Error", "You do not have permission to approve this request.", "OK");
+                    return;
+                }
 
                 if (response?.Success == true)
                 {
@@ -237,8 +256,25 @@ namespace TDFMAUI.ViewModels
             IsLoading = true;
             try
             {
-                var rejectDto = new RequestRejectDto { RejectReason = reason };
-                var response = await _apiService.RejectRequestAsync(Request.RequestID, rejectDto);
+                // Determine which reject DTO to use based on user role
+                var currentUser = await _authService.GetCurrentUserAsync();
+                ApiResponse<bool>? response = null;
+                
+                if (currentUser?.IsManager == true)
+                {
+                    var rejectDto = new ManagerRejectDto { ManagerRemarks = reason };
+                    response = await _apiService.ManagerRejectRequestAsync(Request.RequestID, rejectDto);
+                }
+                else if (currentUser?.IsHR == true)
+                {
+                    var rejectDto = new HRRejectDto { HRRemarks = reason };
+                    response = await _apiService.HRRejectRequestAsync(Request.RequestID, rejectDto);
+                }
+                else
+                {
+                    await Shell.Current.DisplayAlert("Error", "You do not have permission to reject this request.", "OK");
+                    return;
+                }
 
                 if (response?.Success == true)
                 {

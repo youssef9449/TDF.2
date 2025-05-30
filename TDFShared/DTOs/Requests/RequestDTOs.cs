@@ -42,10 +42,6 @@ namespace TDFShared.DTOs.Requests
         /// <summary>Reason for the request</summary>
         [StringLength(500, ErrorMessage = "Reason cannot exceed 500 characters")]
         public string? RequestReason { get; set; }
-
-        /// <summary>Remarks for the request</summary>
-        [StringLength(500, ErrorMessage = "Remarks cannot exceed 500 characters")]
-        public string? RequestRemarks { get; set; }
     }
 
     /// <summary>
@@ -79,41 +75,47 @@ namespace TDFShared.DTOs.Requests
         [StringLength(500, ErrorMessage = "Reason cannot exceed 500 characters")]
         public string? RequestReason { get; set; }
 
-        /// <summary>Remarks for the request</summary>
-        [StringLength(500, ErrorMessage = "Remarks cannot exceed 500 characters")]
-        public string? RequestRemarks { get; set; }
-
         /// <summary>Row version for concurrency</summary>
         [JsonPropertyName("rowVersion")]
         public byte[]? RowVersion { get; set; }
     }
 
     /// <summary>
-    /// DTO for approving a request
+    /// DTO for manager approval of a request
     /// </summary>
-    public class RequestApprovalDto
+    public class ManagerApprovalDto
     {
-        /// <summary>New status for the request (typically "Approved")</summary>
-        [Required]
-        [JsonPropertyName("status")]
-        public RequestStatus Status { get; set; } = RequestStatus.Approved;
-
-        /// <summary>Optional comment about the approval</summary>
-        [JsonPropertyName("comment")]
-        public string? Comment { get; set; }
-                /// <summary>Remarks from updater/approver</summary>
-        public string? ManagerRemarks { get; set; } // Optional remarks from updater/approver
+        /// <summary>Manager remarks (optional)</summary>
+        public string? ManagerRemarks { get; set; }
     }
 
     /// <summary>
-    /// DTO for rejecting a request
+    /// DTO for manager rejection of a request
     /// </summary>
-    public class RequestRejectDto
+    public class ManagerRejectDto
     {
-        /// <summary>Reason for rejecting the request</summary>
+        /// <summary>Reason/remarks for manager rejection</summary>
         [Required]
-        [JsonPropertyName("rejectReason")]
-        public string RejectReason { get; set; } = string.Empty;
+        public string ManagerRemarks { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// DTO for HR approval of a request
+    /// </summary>
+    public class HRApprovalDto
+    {
+        /// <summary>HR remarks (optional)</summary>
+        public string? HRRemarks { get; set; }
+    }
+
+    /// <summary>
+    /// DTO for HR rejection of a request
+    /// </summary>
+    public class HRRejectDto
+    {
+        /// <summary>Reason/remarks for HR rejection</summary>
+        [Required]
+        public string HRRemarks { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -213,12 +215,6 @@ namespace TDFShared.DTOs.Requests
         /// <summary>HR status of the request</summary>
         public RequestStatus HRStatus { get; set; } = Enums.RequestStatus.Pending;
 
-        /// <summary>Remarks from approver/admin</summary>
-        public string? Remarks { get; set; } // Approver/Admin remarks
-
-        /// <summary>Name of the approver</summary>
-        public string? ApproverName { get; set; } // Added for display
-
         /// <summary>Date the request was created</summary>
         public DateTime CreatedDate { get; set; }
 
@@ -234,17 +230,5 @@ namespace TDFShared.DTOs.Requests
         /// <summary>Row version for concurrency</summary>
         [JsonPropertyName("rowVersion")]
         public byte[]? RowVersion { get; set; }
-    }
-
-    /// <summary>
-    /// DTO for updating the status of a request
-    /// </summary>
-    public class RequestStatusUpdateDto
-    {
-        /// <summary>New status of the request</summary>
-        public RequestStatus Status { get; set; } // e.g., Approved, Rejected, Cancelled
-
-        /// <summary>Remarks for the status update</summary>
-        public string? Remarks { get; set; }
     }
 }

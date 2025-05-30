@@ -18,39 +18,34 @@ namespace TDFShared.Models.Request
         [Column("Annual")]
         public int Annual { get; set; }
         
-        [Column("CasualLeave")]
-        public int CasualLeave { get; set; }
+        [Column("EmergencyLeave")]
+        public int EmergencyLeave { get; set; }
         
         [Column("AnnualUsed")]
         public int AnnualUsed { get; set; } = 0;
         
-        [Column("CasualUsed")]
-        public int CasualUsed { get; set; } = 0;
+        [Column("EmergencyUsed")]
+        public int EmergencyUsed { get; set; } = 0;
         
         // Method to calculate Annual Balance
         public int GetAnnualBalance() => Annual - AnnualUsed;
         
-        // Method to calculate Casual Balance
-        public int GetCasualBalance() => CasualLeave - CasualUsed;
+        // Method to calculate Emergency Balance
+        public int GetEmergencyBalance() => EmergencyLeave - EmergencyUsed;
+       // Method to calculate Permissions Balance
+        public int GetPermissionsBalance() => Permissions - PermissionsUsed;
         
         [Column("Permissions")]
         public int Permissions { get; set; }
         
         [Column("PermissionsUsed")]
-        public int PermissionsUsed { get; set; }
-        
-        // Method to calculate Permissions Balance
-        public int GetPermissionsBalance() => Permissions - PermissionsUsed;
+        public int PermissionsUsed { get; set; }   
         
         [Column("UnpaidUsed")]
         public int UnpaidUsed { get; set; } = 0;
+
+        [Column("WorkFromHomeUsed")]
+        public int WorkFromHomeUsed { get; set; } = 0;
         
-        // Add alias property for UnpaidLeaveUsed
-        [NotMapped]
-        public int UnpaidLeaveUsed
-        {
-            get { return UnpaidUsed; }
-            set { UnpaidUsed = value; }
-        }
     }
 } 

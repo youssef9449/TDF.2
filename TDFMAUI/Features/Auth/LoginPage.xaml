@@ -7,27 +7,36 @@
              x:Class="TDFMAUI.Features.Auth.LoginPage"
              x:DataType="vm:LoginPageViewModel"
              Title="Login"
-             BackgroundColor="White">
+             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <ContentPage.Resources>
         <Style x:Key="EntryStyle" TargetType="Entry">
-            <Setter Property="TextColor">
-                <AppThemeBinding Light="Black" Dark="Black" />
-            </Setter>
-            <Setter Property="BackgroundColor" Value="#F5F5F7" />
-            <Setter Property="PlaceholderColor" Value="#999999" />
+            <Setter Property="TextColor" Value="{StaticResource TextColor}" />
+            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F5F5F7, Dark={StaticResource DarkSurfaceVariant}}" />
+            <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light=#999999, Dark={StaticResource DarkTextTertiary}}" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="HeightRequest" Value="40" />
             <Setter Property="ReturnCommand" Value="{Binding LoginCommand}" />
             <Setter Property="ClearButtonVisibility" Value="WhileEditing" />
             <Setter Property="IsEnabled" Value="{Binding IsNotBusy}" />
         </Style>
+        
+        <Style x:Key="LoginInputFrameStyle" TargetType="Frame">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F5F5F7, Dark={StaticResource DarkSurfaceVariant}}" />
+            <Setter Property="HasShadow" Value="False" />
+            <Setter Property="BorderColor" Value="Transparent" />
+            <Setter Property="HeightRequest" Value="45" />
+        </Style>
     </ContentPage.Resources>
 
     <!-- Main grid with fixed height to fit 720px -->
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0" MaximumHeightRequest="720" MaximumWidthRequest="1280">
+        <Label Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/>
+        <Label Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"/>
         <!-- Top safe area padding - minimal -->
-        <BoxView Grid.Row="0" BackgroundColor="White" HeightRequest="0" />
+        <BoxView Grid.Row="0" BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource DarkBackground}}" HeightRequest="0" />
 
         <!-- Main content - No ScrollView to ensure everything fits -->
         <Grid Grid.Row="1" VerticalOptions="FillAndExpand">
@@ -42,7 +51,7 @@
                             <TapGestureRecognizer Tapped="OnDiagnosticsClicked" NumberOfTapsRequired="3" />
                         </Image.GestureRecognizers>
                     </Image>
-                    <Label Text="Welcome back, please sign in" FontSize="16" TextColor="#666666" HorizontalOptions="Center"/>
+                    <Label Text="Welcome back, please sign in" FontSize="16" TextColor="{StaticResource TextSecondaryColor}" HorizontalOptions="Center"/>
                 </StackLayout>
                 
                 <!-- Login form - compact layout -->
@@ -50,7 +59,7 @@
                        Padding="0" HasShadow="False" WidthRequest="380" VerticalOptions="Start" Margin="0,5,0,0">
                     <VerticalStackLayout Spacing="10">
                         <!-- Username input -->
-                        <Frame CornerRadius="10" Padding="0" BackgroundColor="#F5F5F7" HasShadow="False" BorderColor="Transparent" HeightRequest="45">
+                        <Frame Style="{StaticResource LoginInputFrameStyle}">
                             <Entry Style="{StaticResource EntryStyle}"
                                    Placeholder="User Name"
                                    Text="{Binding Username}"
@@ -59,7 +68,7 @@
                         </Frame>
 
                         <!-- Password input -->
-                        <Frame CornerRadius="10" Padding="0" BackgroundColor="#F5F5F7" HasShadow="False" BorderColor="Transparent" HeightRequest="45">
+                        <Frame Style="{StaticResource LoginInputFrameStyle}">
                             <Entry Style="{StaticResource EntryStyle}"
                                    Placeholder="Password"
                                    IsPassword="True"
@@ -69,7 +78,7 @@
 
                         <!-- Error message -->
                         <Label Text="{Binding ErrorMessage}"
-                               TextColor="#FF3B30"
+                               TextColor="{AppThemeBinding Light=#FF3B30, Dark=#FF6B60}"
                                IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyConverter}}"
                                HorizontalOptions="Start"
                                FontSize="14"
@@ -87,9 +96,9 @@
                                 Margin="0,10,0,0">
                             <Button.BackgroundColor>
                                 <OnPlatform x:TypeArguments="Color">
-                                    <On Platform="iOS, MacCatalyst" Value="#007AFF" />
-                                    <On Platform="Android" Value="#1a73e8" />
-                                    <On Platform="WinUI" Value="#0078d4" />
+                                    <On Platform="iOS, MacCatalyst" Value="{StaticResource Primary}" />
+                                    <On Platform="Android" Value="{StaticResource Primary}" />
+                                    <On Platform="WinUI" Value="{StaticResource Primary}" />
                                 </OnPlatform>
                             </Button.BackgroundColor>
                         </Button>
@@ -101,9 +110,9 @@
                                Margin="0,5,0,0">
                             <Label.TextColor>
                                 <OnPlatform x:TypeArguments="Color">
-                                    <On Platform="iOS, MacCatalyst" Value="#007AFF" />
-                                    <On Platform="Android" Value="#1a73e8" />
-                                    <On Platform="WinUI" Value="#0078d4" />
+                                    <On Platform="iOS, MacCatalyst" Value="{StaticResource Primary}" />
+                                    <On Platform="Android" Value="{StaticResource Primary}" />
+                                    <On Platform="WinUI" Value="{StaticResource Primary}" />
                                 </OnPlatform>
                             </Label.TextColor>
                             <Label.GestureRecognizers>
@@ -119,16 +128,16 @@
         </Grid>
 
         <!-- Sign up section at bottom - reduced padding -->
-        <VerticalStackLayout Grid.Row="2" BackgroundColor="White" Padding="0,5,0,10">
-            <BoxView HeightRequest="1" BackgroundColor="#E5E5EA" Margin="0,0,0,5" />
+        <VerticalStackLayout Grid.Row="2" BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource DarkBackground}}" Padding="0,5,0,10">
+            <BoxView HeightRequest="1" BackgroundColor="{StaticResource BorderColor}" Margin="0,0,0,5" />
             <Label Text="Don't have an account? Sign Up"
                    HorizontalOptions="Center"
                    FontSize="16">
                 <Label.TextColor>
                     <OnPlatform x:TypeArguments="Color">
-                        <On Platform="iOS, MacCatalyst" Value="#007AFF" />
-                        <On Platform="Android" Value="#1a73e8" />
-                        <On Platform="WinUI" Value="#0078d4" />
+                        <On Platform="iOS, MacCatalyst" Value="{StaticResource Primary}" />
+                        <On Platform="Android" Value="{StaticResource Primary}" />
+                        <On Platform="WinUI" Value="{StaticResource Primary}" />
                     </OnPlatform>
                 </Label.TextColor>
                 <Label.GestureRecognizers>

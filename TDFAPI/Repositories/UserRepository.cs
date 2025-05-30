@@ -127,10 +127,10 @@ namespace TDFAPI.Repositories
             {
                 FullName = newUser.FullName,
                 Annual = 15,
-                CasualLeave = 6,
+                EmergencyLeave = 6,
                 Permissions = 24,
                 AnnualUsed = 0,
-                CasualUsed = 0,
+                EmergencyUsed = 0,
                 PermissionsUsed = 0,
                 UnpaidUsed = 0
             };

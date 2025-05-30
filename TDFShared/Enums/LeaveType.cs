@@ -5,12 +5,13 @@ namespace TDFShared.Enums
     /// <summary>
     /// Supported leave types for requests.
     /// </summary>
+    // NOTE: 'Casual' leave is not supported. Use 'Emergency' for all such cases. Any legacy 'Casual' references are for DB compatibility only.
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum LeaveType
     {
         /// <summary>Annual leave</summary>
         Annual,
-        /// <summary>Emergency leave (also known as Casual Leave)</summary>
+        /// <summary>Emergency leave</summary>
         Emergency,
         /// <summary>Unpaid leave</summary>
         Unpaid,

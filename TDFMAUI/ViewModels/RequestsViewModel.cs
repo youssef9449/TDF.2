@@ -25,6 +25,7 @@ namespace TDFMAUI.ViewModels
         private readonly IAuthService _authService;
         private readonly ILogger<RequestsViewModel> _logger;
         private readonly IErrorHandlingService _errorHandlingService;
+        private readonly ILookupService? _lookupService;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsNotBusy))]
@@ -76,20 +77,25 @@ namespace TDFMAUI.ViewModels
             return user?.IsManager == true;
         }
 
-        public List<string> StatusOptions => RequestOptions.StatusOptions;
-        public List<string> TypeOptions => RequestOptions.TypeOptions;
-        public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
+        // Remove broken DepartmentOptions property and replace with dynamic department loading
+        // public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
+        [ObservableProperty]
+        private ObservableCollection<LookupItem> _departments = new();
+        [ObservableProperty]
+        private LookupItem? _selectedDepartment;
 
         public RequestsViewModel(
             IRequestService requestService,
             IAuthService authService,
             ILogger<RequestsViewModel> logger,
-            IErrorHandlingService errorHandlingService)
+            IErrorHandlingService errorHandlingService,
+            ILookupService lookupService)
         {
             _requestService = requestService;
             _authService = authService;
             _logger = logger;
             _errorHandlingService = errorHandlingService;
+            _lookupService = lookupService;
             _requests = new ObservableCollection<RequestResponseDto>();
             // Title will be set after loading roles
         }
@@ -107,6 +113,7 @@ namespace TDFMAUI.ViewModels
             NotifyCommandsCanExecuteChanged();
 
             await LoadRequestsAsync(); // Load requests after roles are known
+            await LoadDepartmentsAsync(); // Load departments
         }
 
         private async Task LoadUserRolesAsync()
@@ -296,13 +303,30 @@ namespace TDFMAUI.ViewModels
             return currentUser;
         }
 
+        // Remove obsolete ApproveRequestAsync/RejectRequestAsync usages and use new role-specific methods
         [RelayCommand(CanExecute = nameof(CanApproveRejectRequest))]
         private async Task ApproveRequestAsync(RequestResponseDto? request)
         {
             if (request == null) return;
             try
             {
-                var response = await _requestService.ApproveRequestAsync(request.RequestID, "Approved via mobile app");
+                var currentUser = await GetCurrentUserDtoAsync();
+                ApiResponse<RequestResponseDto>? response = null;
+                if (currentUser?.IsManager == true)
+                {
+                    var approvalDto = new ManagerApprovalDto { ManagerRemarks = "Approved via mobile app" };
+                    response = await _requestService.ManagerApproveRequestAsync(request.RequestID, approvalDto);
+                }
+                else if (currentUser?.IsHR == true)
+                {
+                    var approvalDto = new HRApprovalDto { HRRemarks = "Approved via mobile app" };
+                    response = await _requestService.HRApproveRequestAsync(request.RequestID, approvalDto);
+                }
+                else
+                {
+                    await Shell.Current.DisplayAlert("Error", "You do not have permission to approve this request.", "OK");
+                    return;
+                }
                 if (response?.Success == true)
                 {
                     await Shell.Current.DisplayAlert("Success", "Request approved successfully.", "OK");
@@ -327,7 +351,23 @@ namespace TDFMAUI.ViewModels
             if (request == null) return;
             try
             {
-                var response = await _requestService.RejectRequestAsync(request.RequestID, "Rejected via mobile app");
+                var currentUser = await GetCurrentUserDtoAsync();
+                ApiResponse<RequestResponseDto>? response = null;
+                if (currentUser?.IsManager == true)
+                {
+                    var rejectDto = new ManagerRejectDto { ManagerRemarks = "Rejected via mobile app" };
+                    response = await _requestService.ManagerRejectRequestAsync(request.RequestID, rejectDto);
+                }
+                else if (currentUser?.IsHR == true)
+                {
+                    var rejectDto = new HRRejectDto { HRRemarks = "Rejected via mobile app" };
+                    response = await _requestService.HRRejectRequestAsync(request.RequestID, rejectDto);
+                }
+                else
+                {
+                    await Shell.Current.DisplayAlert("Error", "You do not have permission to reject this request.", "OK");
+                    return;
+                }
                 if (response?.Success == true)
                 {
                     await Shell.Current.DisplayAlert("Success", "Request rejected successfully.", "OK");
@@ -402,6 +442,32 @@ namespace TDFMAUI.ViewModels
             RejectRequestCommand.NotifyCanExecuteChanged();
             EditRequestCommand.NotifyCanExecuteChanged();
             DeleteRequestCommand.NotifyCanExecuteChanged();
+        }
+
+        // Add a method to load departments dynamically (similar to SignupViewModel)
+        public async Task LoadDepartmentsAsync()
+        {
+            if (_lookupService == null) return;
+            var allDepartments = await _lookupService.GetDepartmentsAsync();
+            var user = await GetCurrentUserDtoAsync();
+            List<LookupItem> filteredDepartments;
+            if (user == null || user.IsAdmin == true || user.IsHR == true)
+            {
+                filteredDepartments = allDepartments.ToList();
+            }
+            else if (user.IsManager == true)
+            {
+                var accessible = AuthorizationUtilities.GetAccessibleDepartments(user, allDepartments.Select(d => d.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                filteredDepartments = allDepartments.Where(d => accessible.Contains(d.Name)).ToList();
+            }
+            else
+            {
+                filteredDepartments = allDepartments.ToList();
+            }
+            filteredDepartments.Insert(0, new LookupItem { Name = "All", Id = "0" });
+            Departments = new ObservableCollection<LookupItem>(filteredDepartments);
+            if (Departments.Count > 0)
+                SelectedDepartment = Departments[0];
         }
     }
 }

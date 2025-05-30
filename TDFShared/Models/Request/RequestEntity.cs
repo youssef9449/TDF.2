@@ -47,17 +47,7 @@ namespace TDFShared.Models.Request
         /// <summary>
         /// Current status of the request (Pending, Approved, Rejected)
         /// </summary>
-        public RequestStatus RequestStatus { get; set; } = Enums.RequestStatus.Pending;
-
-        /// <summary>
-        /// Person who closed the request (approver or rejecter)
-        /// </summary>
-        public string? RequestCloser { get; set; }
-
-        /// <summary>
-        /// Manager who approved the request
-        /// </summary>
-        public int? ManagerApproverId { get; set; }
+        public RequestStatus RequestManagerStatus { get; set; } = Enums.RequestStatus.Pending;
 
         /// <summary>
         /// HR department status for the request
@@ -65,13 +55,24 @@ namespace TDFShared.Models.Request
         public RequestStatus RequestHRStatus { get; set; } = RequestStatus.Pending;
 
         /// <summary>
-        /// HR person who closed the request
+        /// Manager who approved the request
         /// </summary>
-        public string? RequestHRCloser { get; set; }
+        public int? ManagerApproverId { get; set; }
 
+        /// <summary>
+        /// ID of the HR personnel who approved the request
+        /// </summary>
         public int? HRApproverId { get; set; }
 
+        /// <summary>
+        /// Remarks or comments provided by HR regarding the request
+        /// </summary>
         public string? HRRemarks { get; set; }
+
+        /// <summary>
+        /// Manager's remarks when approving/rejecting the request
+        /// </summary>
+        public string? ManagerRemarks { get; set; }
 
         /// <summary>
         /// Start date of the request period
@@ -95,16 +96,6 @@ namespace TDFShared.Models.Request
         public TimeSpan? RequestEndingTime { get; set; }
 
         /// <summary>
-        /// Reason provided if the request was rejected
-        /// </summary>
-        public string? RequestRejectReason { get; set; }
-
-        /// <summary>
-        /// Manager's remarks when approving/rejecting the request
-        /// </summary>
-        public string? ManagerRemarks { get; set; }
-
-        /// <summary>
         /// Department of the requesting user
         /// </summary>
         public string RequestDepartment { get; set; } = string.Empty;
@@ -116,11 +107,6 @@ namespace TDFShared.Models.Request
         public int RequestNumberOfDays { get; set; }
 
         /// <summary>
-        /// Additional comments from the approver
-        /// </summary>
-        public string? ApproverComment { get; set; }
-
-        /// <summary>
         /// When the request was created
         /// </summary>
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -129,16 +115,6 @@ namespace TDFShared.Models.Request
         /// When the request was last updated
         /// </summary>
         public DateTime? UpdatedAt { get; set; }
-
-        /// <summary>
-        /// When the request was approved
-        /// </summary>
-        public DateTime? ApprovedAt { get; set; }
-
-        /// <summary>
-        /// When the request was rejected
-        /// </summary>
-        public DateTime? RejectedAt { get; set; }
 
         /// <summary>
         /// Row version for optimistic concurrency
@@ -158,9 +134,5 @@ namespace TDFShared.Models.Request
         [JsonPropertyName("user")]
         public UserDto? UserDto { get; set; }
 
-        /// <summary>
-        /// Additional remarks for the request
-        /// </summary>
-        public string? Remarks { get; set; }
     }
 }

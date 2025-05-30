@@ -84,7 +84,7 @@ namespace TDFAPI.Data
                 entity.Property(e => e.RequestBeginningTime).HasColumnType("time(7)");
                 entity.Property(e => e.RequestEndingTime).HasColumnType("time(7)");
                 entity.Property(e => e.RequestReason).HasMaxLength(255);
-                entity.Property(e => e.RequestStatus)
+                entity.Property(e => e.RequestManagerStatus)
                     .IsRequired()
                     .HasMaxLength(50)
                     .HasConversion<string>() // Convert enum to string for DB
@@ -94,22 +94,15 @@ namespace TDFAPI.Data
                     .HasMaxLength(255)
                     .HasConversion<string>() // Convert enum to string for DB
                     .IsUnicode(false);
-                entity.Property(e => e.RequestRejectReason).HasMaxLength(255);
-                entity.Property(e => e.RequestCloser).HasMaxLength(255).IsUnicode(false);
                 entity.Property(e => e.RequestDepartment).IsRequired().HasMaxLength(255).IsUnicode(false);
-                entity.Property(e => e.RequestNumberOfDays).HasColumnName("request_number_of_days");
-                entity.Property(e => e.RequestHRCloser).HasMaxLength(255);
+                entity.Property(e => e.RequestNumberOfDays);
                 entity.Property(e => e.RequestHRStatus)
                     .IsRequired()
                     .HasMaxLength(50)
                     .HasConversion<string>() // Convert enum to string for DB
                     .HasDefaultValue(RequestStatus.Pending); // Set default using enum
-                entity.Property(e => e.CreatedAt).HasColumnName("request_created_at");
-                entity.Property(e => e.ApprovedAt);
-                entity.Property(e => e.RejectedAt);
+                entity.Property(e => e.CreatedAt);
                 entity.Property(e => e.UpdatedAt);
-                entity.Property(e => e.ApproverComment);
-                entity.Property(e => e.Remarks);
                 entity.Property(e => e.RowVersion);
 
                 // Configure the relationship with UserEntity
@@ -181,12 +174,13 @@ namespace TDFAPI.Data
                 entity.Property(e => e.UserID).ValueGeneratedNever();
                 entity.Property(e => e.FullName).HasMaxLength(100);
                 entity.Property(e => e.Annual);
-                entity.Property(e => e.CasualLeave);
+                entity.Property(e => e.EmergencyLeave);
                 entity.Property(e => e.AnnualUsed).HasDefaultValue(0);
-                entity.Property(e => e.CasualUsed).HasDefaultValue(0);
+                entity.Property(e => e.EmergencyUsed).HasDefaultValue(0);
                 entity.Property(e => e.Permissions);
                 entity.Property(e => e.PermissionsUsed);
                 entity.Property(e => e.UnpaidUsed).HasDefaultValue(0);
+                entity.Property(e => e.WorkFromHomeUsed).HasDefaultValue(0);
 
                 entity.HasOne<UserEntity>()
                     .WithOne(p => p.AnnualLeave)

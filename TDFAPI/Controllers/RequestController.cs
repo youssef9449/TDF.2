@@ -283,15 +283,13 @@ namespace TDFAPI.Controllers
                 if (userId == 0) return Unauthorized("User ID could not be determined.");
 
                 // Validate and sanitize input using shared validation service
-                if (_validationService.ContainsDangerousPatterns(createDto.RequestReason) ||
-                    _validationService.ContainsDangerousPatterns(createDto.RequestRemarks))
+                if (_validationService.ContainsDangerousPatterns(createDto.RequestReason))
                 {
                     _logger.LogWarning("User {UserId} attempted to create request with potentially dangerous input", userId);
                     return BadRequest("Invalid input detected. Please check your request details.");
                 }
 
                 createDto.RequestReason = _validationService.SanitizeInput(createDto.RequestReason);
-                createDto.RequestRemarks = _validationService.SanitizeInput(createDto.RequestRemarks);
 
                 _logger.LogInformation("User {UserId} attempting to create request: {@CreateDto}", userId, createDto);
 
@@ -363,7 +361,6 @@ namespace TDFAPI.Controllers
 
                 // Sanitize input using shared validation service
                 updateDto.RequestReason = _validationService.SanitizeInput(updateDto.RequestReason);
-                updateDto.RequestRemarks = _validationService.SanitizeInput(updateDto.RequestRemarks);
 
                 _logger.LogInformation("User {UserId} attempting to update request ID {RequestId} with data: {@UpdateDto}", userId, id, updateDto);
 
@@ -468,160 +465,6 @@ namespace TDFAPI.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting request with ID {RequestId}", id);
-                return StatusCode(500, "Internal server error");
-            }
-        }
-
-        // POST: api/requests/{id}/approve
-        [HttpPost("{id:int}/approve")]
-        [Route(ApiRoutes.Requests.Approve)]
-        [Authorize(Roles = "Admin,Manager,HR")]
-        public async Task<IActionResult> ApproveRequest(int id, [FromBody] RequestApprovalDto approvalDto)
-        {
-            try
-            {
-                int approverId = GetCurrentUserId();
-                var approver = await _userService.GetUserByIdAsync(approverId);
-                if (approver == null) return Unauthorized("Approver not found.");
-
-                // Get the request to check authorization
-                var request = await _requestService.GetByIdAsync(id);
-                if (request == null) return NotFound($"Request with ID {id} not found.");
-
-                // Use shared authorization utilities to check approval rights
-                bool canApprove = RequestStateManager.CanApproveOrRejectRequest(request, approver);
-                if (!canApprove)
-                {
-                    _logger.LogWarning("User {ApproverId} from department '{ApproverDept}' tried to approve request {RequestId} from department '{RequestDept}' but lacks permission",
-                        approverId, approver.Department, id, request.RequestDepartment);
-                    return Forbid("You do not have permission to approve this request.");
-                }
-
-                // Sanitize input using shared validation service
-                approvalDto.Comment = _validationService.SanitizeInput(approvalDto.Comment);
-
-                _logger.LogInformation("{Role} {ApproverName} ({ApproverId}) attempting to approve request {RequestId}: {@ApprovalDto}",
-                    (approver.IsHR ? "HR" : "Manager"), approver.FullName, approverId, id, approvalDto);
-
-                bool success = await _requestService.ApproveRequestAsync(id, approvalDto, approverId, approver.FullName, approver.IsHR);
-
-                if (!success)
-                {
-                    var requestCheck = await _requestService.GetByIdAsync(id);
-                    if (requestCheck == null)
-                    {
-                        _logger.LogWarning("Attempted to approve non-existent request {RequestId}", id);
-                        return NotFound($"Request with ID {id} not found.");
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Failed to approve request {RequestId}. Request status might prevent approval.", id);
-                        return BadRequest("Failed to approve request. It might be in a state that cannot be approved (e.g., already finalized).");
-                    }
-                }
-
-                return Ok(new { message = "Request approved successfully." });
-            }
-            catch (EntityNotFoundException ex)
-            {
-                _logger.LogWarning(ex, "Not found error approving request {RequestId}.", id);
-                return NotFound(ex.Message);
-            }
-            catch (TDFShared.Exceptions.BusinessRuleException ex)
-            {
-                _logger.LogWarning(ex, "Business rule error approving request {RequestId}.", id);
-                return BadRequest(ex.Message);
-            }
-            catch (TDFShared.Exceptions.ValidationException ex)
-            {
-                _logger.LogWarning(ex, "Validation error approving request {RequestId}.", id);
-                return BadRequest(ex.Message);
-            }
-            catch (TDFAPI.Exceptions.UnauthorizedAccessException ex)
-            {
-                _logger.LogWarning(ex, "Unauthorized access attempt in ApproveRequest for ID {RequestId}", id);
-                return Forbid();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error approving request with ID {RequestId}", id);
-                return StatusCode(500, "Internal server error");
-            }
-        }
-
-        // POST: api/requests/{id}/reject
-        [HttpPost("{id:int}/reject")]
-        [Route(ApiRoutes.Requests.Reject)]
-        [Authorize(Roles = "Admin,Manager,HR")]
-        public async Task<IActionResult> RejectRequest(int id, [FromBody] RequestRejectDto rejectDto)
-        {
-            try
-            {
-                int rejecterId = GetCurrentUserId();
-                var rejecter = await _userService.GetUserByIdAsync(rejecterId);
-                if (rejecter == null) return Unauthorized("Rejecter not found.");
-
-                // Get the request to check authorization
-                var request = await _requestService.GetByIdAsync(id);
-                if (request == null) return NotFound($"Request with ID {id} not found.");
-
-                // Use shared authorization utilities to check rejection rights
-                bool canReject = RequestStateManager.CanApproveOrRejectRequest(request, rejecter);
-                if (!canReject)
-                {
-                    _logger.LogWarning("User {RejecterId} from department '{RejecterDept}' tried to reject request {RequestId} from department '{RequestDept}' but lacks permission",
-                        rejecterId, rejecter.Department, id, request.RequestDepartment);
-                    return Forbid("You do not have permission to reject this request.");
-                }
-
-                // Sanitize input using shared validation service
-                rejectDto.RejectReason = _validationService.SanitizeInput(rejectDto.RejectReason);
-
-                _logger.LogInformation("{Role} {RejecterName} ({RejecterId}) attempting to reject request {RequestId}: {@RejectDto}",
-                    (rejecter.IsHR ? "HR" : "Manager"), rejecter.FullName, rejecterId, id, rejectDto);
-
-                bool success = await _requestService.RejectRequestAsync(id, rejectDto, rejecterId, rejecter.FullName, rejecter.IsHR);
-
-                if (!success)
-                {
-                    var requestCheck = await _requestService.GetByIdAsync(id);
-                    if (requestCheck == null)
-                    {
-                        _logger.LogWarning("Attempted to reject non-existent request {RequestId}", id);
-                        return NotFound($"Request with ID {id} not found.");
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Failed to reject request {RequestId}. Request status might prevent rejection.", id);
-                        return BadRequest("Failed to reject request. It might be in a state that cannot be rejected (e.g., already finalized).");
-                    }
-                }
-
-                return Ok(new { message = "Request rejected successfully." });
-            }
-            catch (EntityNotFoundException ex)
-            {
-                _logger.LogWarning(ex, "Not found error rejecting request {RequestId}.", id);
-                return NotFound(ex.Message);
-            }
-            catch (TDFShared.Exceptions.BusinessRuleException ex)
-            {
-                _logger.LogWarning(ex, "Business rule error rejecting request {RequestId}.", id);
-                return BadRequest(ex.Message);
-            }
-            catch (TDFShared.Exceptions.ValidationException ex)
-            {
-                _logger.LogWarning(ex, "Validation error rejecting request {RequestId}.", id);
-                return BadRequest(ex.Message);
-            }
-            catch (TDFAPI.Exceptions.UnauthorizedAccessException ex)
-            {
-                _logger.LogWarning(ex, "Unauthorized access attempt in RejectRequest for ID {RequestId}", id);
-                return Forbid();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error rejecting request with ID {RequestId}", id);
                 return StatusCode(500, "Internal server error");
             }
         }

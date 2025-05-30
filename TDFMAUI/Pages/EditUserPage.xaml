@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:viewmodels="clr-namespace:TDFMAUI.ViewModels"
              x:Class="TDFMAUI.Pages.EditUserPage"
              Title="Edit User"
-             BackgroundColor="{StaticResource Gray100}">
+             x:DataType="viewmodels:UserViewModel"
+             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->
@@ -74,5 +77,9 @@
                           Color="{StaticResource Primary}"
                           HorizontalOptions="Center"
                           VerticalOptions="Center"/>
+
+        <!-- Remove these debug labels for production or position them correctly -->
+        <!-- <Label Grid.Row="2" Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/> -->
+        <!-- <Label Grid.Row="2" Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"/> -->
     </Grid>
-</ContentPage> 
+</ContentPage>

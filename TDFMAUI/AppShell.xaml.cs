@@ -261,5 +261,12 @@ namespace TDFMAUI
             }
             await Shell.Current.GoToAsync("//users", true); // Navigate to the shell item, animate
         }
+        
+        private void ToggleTheme_Clicked(object sender, EventArgs e)
+        {
+            _logger?.LogInformation("ToggleTheme_Clicked called.");
+            ThemeHelper.ToggleTheme();
+            _logger?.LogInformation($"Theme toggled to: {ThemeHelper.CurrentTheme}");
+        }
     }
 }

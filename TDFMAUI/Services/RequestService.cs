@@ -88,7 +88,7 @@ namespace TDFMAUI.Services
                     };
                 }
                 _logger.LogInformation("RequestService: Calling IApiService.GetRequestsAsync for current user ID {UserId}", userIdResponse.Data);
-                var response = await _apiService.GetRequestsAsync(pagination, userIdResponse.Data, null);
+                var response = await _apiService.GetRequestsAsync(pagination, userIdResponse.Data, string.Empty);
                 return response;
             }
             catch (Exception ex)
@@ -108,7 +108,7 @@ namespace TDFMAUI.Services
             _logger.LogInformation("RequestService: Calling IApiService.GetRequestsAsync for all requests");
             try
             {
-                var response = await _apiService.GetRequestsAsync(pagination, null, null);
+                var response = await _apiService.GetRequestsAsync(pagination, null, string.Empty);
                 return response;
             }
             catch (Exception ex)
@@ -178,62 +178,59 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<ApiResponse<RequestResponseDto>> ApproveRequestAsync(int requestId, string comments = null)
+        public async Task<ApiResponse<RequestResponseDto>> ManagerApproveRequestAsync(int requestId, ManagerApprovalDto approvalDto)
         {
-            try
+            var response = await _apiService.ManagerApproveRequestAsync(requestId, approvalDto);
+            if (response.Success)
             {
-                var approvalDto = new RequestApprovalDto 
-                { 
-                    Comment = comments,
-                    ManagerRemarks = comments
-                };
-                var response = await _apiService.ApproveRequestAsync(requestId, approvalDto);
-                if (response.Success)
-                {
-                    return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message };
-                }
-                return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+                // Fetch updated request details if needed
+                var details = await GetRequestByIdAsync(requestId);
+                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
             }
-            catch (Exception ex)
-            {
-                return new ApiResponse<RequestResponseDto>
-                {
-                    Success = false,
-                    Message = $"Error: {ex.Message}"
-                };
-            }
+            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
         }
 
-        public async Task<ApiResponse<RequestResponseDto>> RejectRequestAsync(int requestId, string comments = null)
+        public async Task<ApiResponse<RequestResponseDto>> HRApproveRequestAsync(int requestId, HRApprovalDto approvalDto)
         {
-            try
+            var response = await _apiService.HRApproveRequestAsync(requestId, approvalDto);
+            if (response.Success)
             {
-                var rejectDto = new RequestRejectDto { RejectReason = comments ?? "No reason provided" };
-                var response = await _apiService.RejectRequestAsync(requestId, rejectDto);
-                if (response.Success)
-                {
-                    return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message };
-                }
-                return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+                var details = await GetRequestByIdAsync(requestId);
+                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
             }
-            catch (Exception ex)
+            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+        }
+
+        public async Task<ApiResponse<RequestResponseDto>> ManagerRejectRequestAsync(int requestId, ManagerRejectDto rejectDto)
+        {
+            var response = await _apiService.ManagerRejectRequestAsync(requestId, rejectDto);
+            if (response.Success)
             {
-                return new ApiResponse<RequestResponseDto>
-                {
-                    Success = false,
-                    Message = $"Error: {ex.Message}"
-                };
+                var details = await GetRequestByIdAsync(requestId);
+                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
             }
+            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+        }
+
+        public async Task<ApiResponse<RequestResponseDto>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto)
+        {
+            var response = await _apiService.HRRejectRequestAsync(requestId, rejectDto);
+            if (response.Success)
+            {
+                var details = await GetRequestByIdAsync(requestId);
+                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
+            }
+            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
         }
 
         public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetRequestsForApprovalAsync(
             int pageNumber = 1,
             int pageSize = 10,
-            string status = null,
-            string type = null,
+            string? status = null,
+            string? type = null,
             DateTime? fromDate = null,
             DateTime? toDate = null,
-            string department = null)
+            string? department = null)
         {
             try
             {

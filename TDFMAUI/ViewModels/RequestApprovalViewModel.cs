@@ -14,22 +14,23 @@ using TDFShared.Services;
 using TDFShared.Enums;
 using TDFShared.Utilities;
 using TDFMAUI.Services;
+using TDFShared.DTOs.Common;
 
 namespace TDFMAUI.ViewModels
 {
+
     public static class RequestOptions
     {
         public static readonly List<string> StatusOptions = new List<string> { "All" }.Concat(Enum.GetNames(typeof(RequestStatus))).ToList();
         public static readonly List<string> TypeOptions = new List<string> { "All" }.Concat(Enum.GetNames(typeof(LeaveType))).ToList();
-        public static readonly List<string> DepartmentOptions = new() { "All", "HR", "IT", "Finance", "Marketing", "Operations" };
     }
 
     public partial class RequestApprovalViewModel : ObservableObject, IDisposable
     {
-        private readonly IRequestService _requestService;
-        private readonly Services.INotificationService _notificationService;
-        private readonly IAuthService _authService;
-        private readonly ILogger<RequestApprovalViewModel> _logger;
+        private readonly IRequestService? _requestService;
+        private readonly Services.INotificationService? _notificationService;
+        private readonly IAuthService? _authService;
+        private readonly ILogger<RequestApprovalViewModel>? _logger;
         private readonly CancellationTokenSource _cancellationTokenSource = new();
         private bool _disposed = false;
 
@@ -38,11 +39,13 @@ namespace TDFMAUI.ViewModels
         private DateTime _userCacheExpiry = DateTime.MinValue;
         private readonly TimeSpan _userCacheTimeout = TimeSpan.FromMinutes(5);
 
+        private readonly ILookupService? _lookupService;
+
         [ObservableProperty]
         private ObservableCollection<RequestResponseDto> _requests;
 
         [ObservableProperty]
-        private RequestResponseDto _selectedRequest;
+        private RequestResponseDto? _selectedRequest;
 
         [ObservableProperty]
         private ObservableCollection<RequestResponseDto> _pendingRequests;
@@ -72,7 +75,10 @@ namespace TDFMAUI.ViewModels
         private string _selectedType = "All";
 
         [ObservableProperty]
-        private string _selectedDepartment = "All";
+        private ObservableCollection<LookupItem> _departments = new();
+
+        [ObservableProperty]
+        private LookupItem? _selectedDepartment;
 
         // Role properties using nullable bool
         [ObservableProperty]
@@ -131,13 +137,53 @@ namespace TDFMAUI.ViewModels
 
         public List<string> StatusOptions => RequestOptions.StatusOptions;
         public List<string> TypeOptions => RequestOptions.TypeOptions;
-        public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
 
         // Authorization properties using cached user and RequestStateManager
         public bool CanManageRequests => GetCachedCurrentUser() is UserDto user && RequestStateManager.CanManageRequests(user);
         public bool CanEditDeleteAny => GetCachedCurrentUser() is UserDto user && user.IsAdmin;
-        public bool CanFilterByDepartment => GetCachedCurrentUser() is UserDto user && user.IsManager;
-        public bool CanManageDepartment(string department) => GetCachedCurrentUser() is UserDto user && RequestStateManager.CanManageDepartment(user, department);
+        public bool CanFilterByDepartment => GetCachedCurrentUser() is UserDto user &&
+            (user.IsAdmin || user.IsHR || user.IsManager);
+
+        // UI: Populate Departments based on user role
+        private async Task LoadDepartmentsAsync()
+        {
+            try
+            {
+                var allDepartments = await _lookupService!.GetDepartmentsAsync();
+                var user = GetCachedCurrentUser();
+                List<LookupItem> filteredDepartments;
+                if (user == null)
+                {
+                    filteredDepartments = allDepartments.ToList();
+                }
+                else if (user.IsAdmin || user.IsHR)
+                {
+                    filteredDepartments = allDepartments.ToList();
+                }
+                else if (user.IsManager)
+                {
+                    // Only show departments the manager can manage
+                    var accessible = TDFShared.Utilities.AuthorizationUtilities.GetAccessibleDepartments(
+                        user,
+                        allDepartments.Select(d => d.Name)
+                    ).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    filteredDepartments = allDepartments.Where(d => accessible.Contains(d.Name)).ToList();
+                }
+                else
+                {
+                    filteredDepartments = allDepartments.ToList();
+                }
+                // Always add "All" at the top
+                filteredDepartments.Insert(0, new LookupItem { Name = "All", Id = "0" });
+                Departments = new ObservableCollection<LookupItem>(filteredDepartments);
+                if (Departments.Count > 0)
+                    SelectedDepartment = Departments[0];
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error loading departments");
+            }
+        }
 
         // Commands using RelayCommand for better performance and cancellation support
         [RelayCommand(CanExecute = nameof(CanExecuteApprove))]
@@ -171,6 +217,34 @@ namespace TDFMAUI.ViewModels
             InvalidateUserCache();
             await LoadRequestsInternalAsync(cancellationToken);
         }
+        
+        [RelayCommand(CanExecute = nameof(CanGoToFirstPage))]
+        private async Task FirstPageAsync()
+        {
+            CurrentPage = 1;
+            await LoadRequestsInternalAsync();
+        }
+
+        [RelayCommand(CanExecute = nameof(CanGoToPreviousPage))]
+        private async Task PreviousPageAsync()
+        {
+            CurrentPage--;
+            await LoadRequestsInternalAsync();
+        }
+
+        [RelayCommand(CanExecute = nameof(CanGoToNextPage))]
+        private async Task NextPageAsync()
+        {
+            CurrentPage++;
+            await LoadRequestsInternalAsync();
+        }
+
+        [RelayCommand(CanExecute = nameof(CanGoToLastPage))]
+        private async Task LastPageAsync()
+        {
+            CurrentPage = TotalPages;
+            await LoadRequestsInternalAsync();
+        }
 
         /// <summary>
         /// Public method to refresh user permissions cache
@@ -186,18 +260,21 @@ namespace TDFMAUI.ViewModels
             IRequestService requestService,
             Services.INotificationService notificationService,
             IAuthService authService,
-            ILogger<RequestApprovalViewModel> logger)
+            ILogger<RequestApprovalViewModel> logger,
+            ILookupService lookupService)
         {
             _title = "Request Approval";
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _lookupService = lookupService ?? throw new ArgumentNullException(nameof(lookupService));
 
             Requests = new ObservableCollection<RequestResponseDto>();
             PendingRequests = new ObservableCollection<RequestResponseDto>();
             PageNumbers = new ObservableCollection<int>();
             PageSizeOptions = new ObservableCollection<int> { 5, 10, 20, 50 };
+            _selectedRequest = null;
 
             _logger.LogInformation("RequestApprovalViewModel initialized");
 
@@ -206,7 +283,7 @@ namespace TDFMAUI.ViewModels
             {
                 try
                 {
-                    // Initialize user cache first
+                    await LoadDepartmentsAsync();
                     await RefreshUserCacheAsync();
                     await LoadUserRolesAsync(_cancellationTokenSource.Token);
                     await LoadRequestsInternalAsync(_cancellationTokenSource.Token);
@@ -231,6 +308,14 @@ namespace TDFMAUI.ViewModels
                 _title = "Request Approval";
                 Requests = new ObservableCollection<RequestResponseDto>();
                 PendingRequests = new ObservableCollection<RequestResponseDto>();
+                PageNumbers = new ObservableCollection<int>();
+                PageSizeOptions = new ObservableCollection<int> { 5, 10, 20, 50 };
+                _selectedRequest = null;
+                _requestService = null;
+                _notificationService = null;
+                _authService = null;
+                _logger = null;
+                _lookupService = null;
 
                 // Add sample data for design-time preview
                 Requests.Add(new RequestResponseDto
@@ -249,7 +334,6 @@ namespace TDFMAUI.ViewModels
             else
             {
                 // Production runtime - this should NEVER be called
-                // If this is reached, it indicates a dependency injection configuration error
                 throw new InvalidOperationException(
                     "RequestApprovalViewModel parameterless constructor should only be used for design-time support. " +
                     "In production, use dependency injection with the constructor that accepts IRequestService, " +
@@ -261,15 +345,15 @@ namespace TDFMAUI.ViewModels
         {
             try
             {
-                _logger.LogDebug("Loading user roles");
-                var currentUser = await _authService.GetCurrentUserAsync();
+                _logger?.LogDebug("Loading user roles");
+                var currentUser = _authService != null ? await _authService.GetCurrentUserAsync() : null;
                 if (currentUser != null)
                 {
                     IsAdmin = currentUser.IsAdmin;
                     IsManager = currentUser.IsManager;
                     IsHR = currentUser.IsHR;
 
-                    _logger.LogInformation("User roles loaded: Admin={IsAdmin}, Manager={IsManager}, HR={IsHR}",
+                    _logger?.LogInformation("User roles loaded: Admin={IsAdmin}, Manager={IsManager}, HR={IsHR}",
                         IsAdmin, IsManager, IsHR);
 
                     OnPropertyChanged(nameof(CanManageRequests));
@@ -278,13 +362,14 @@ namespace TDFMAUI.ViewModels
                 }
                 else
                 {
-                    _logger.LogWarning("No current user found when loading roles");
+                    _logger?.LogWarning("No current user found when loading roles");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error loading user roles");
-                await HandleErrorAsync("Error loading user roles", ex);
+                _logger?.LogError(ex, "Error loading user roles");
+                if (_notificationService != null)
+                    await _notificationService.ShowErrorAsync($"Error loading user roles: {ex.Message}");
             }
         }
 
@@ -295,11 +380,12 @@ namespace TDFMAUI.ViewModels
 
             try
             {
-                await _notificationService.ShowErrorAsync($"{message}: {ex.Message}");
+                if (_notificationService != null)
+                    await _notificationService.ShowErrorAsync($"{message}: {ex.Message}");
             }
             catch (Exception notificationEx)
             {
-                _logger.LogError(notificationEx, "Failed to show error notification");
+                _logger?.LogError(notificationEx, "Failed to show error notification");
             }
         }
 
@@ -340,7 +426,7 @@ namespace TDFMAUI.ViewModels
             var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
             if (request == null)
             {
-                _logger.LogWarning($"Attempted to approve non-existent request with ID {requestId}");
+                _logger?.LogWarning($"Attempted to approve non-existent request with ID {requestId}");
                 return;
             }
 
@@ -349,25 +435,62 @@ namespace TDFMAUI.ViewModels
                 ClearError();
                 IsLoading = true;
 
-                _logger.LogInformation($"Approving request {requestId} for user {request.UserName}");
+                _logger?.LogInformation($"Approving request {requestId} for user {request.UserName}");
 
-                var result = await _requestService.ApproveRequestAsync(requestId, "Approved via approval page");
+                var currentUser = GetCachedCurrentUser();
+                if (currentUser == null)
+                {
+                    if (_notificationService != null)
+                        await _notificationService.ShowErrorAsync("User not authenticated");
+                    return;
+                }
+
+                string remarks = await Shell.Current.DisplayPromptAsync(
+                    "Approve Request",
+                    currentUser.IsManager == true ? "Manager remarks (optional):" : "HR remarks (optional):",
+                    "OK",
+                    "Cancel",
+                    keyboard: Keyboard.Text
+                );
+                if (remarks == null) remarks = string.Empty; // User cancelled
+
+                ApiResponse<RequestResponseDto> result = new();
+                if (currentUser.IsManager == true)
+                {
+                    var approvalDto = new ManagerApprovalDto { ManagerRemarks = remarks };
+                    if (_requestService != null)
+                        result = await _requestService.ManagerApproveRequestAsync(requestId, approvalDto);
+                }
+                else if (currentUser.IsHR == true)
+                {
+                    var approvalDto = new HRApprovalDto { HRRemarks = remarks };
+                    if (_requestService != null)
+                        result = await _requestService.HRApproveRequestAsync(requestId, approvalDto);
+                }
+                else
+                {
+                    if (_notificationService != null)
+                        await _notificationService.ShowErrorAsync("You do not have permission to approve this request.");
+                    return;
+                }
+
                 if (result?.Success == true)
                 {
                     var approvedId = result.Data != null ? result.Data.RequestID : requestId;
-                    _logger.LogInformation($"Request {approvedId} approved successfully");
-                    await _notificationService.ShowSuccessAsync("Request approved successfully");
+                    _logger?.LogInformation($"Request {approvedId} approved successfully");
+                    if (_notificationService != null)
+                        await _notificationService.ShowSuccessAsync("Request approved successfully");
                     await LoadRequestsInternalAsync(cancellationToken);
                 }
                 else
                 {
-                    _logger.LogWarning($"Failed to approve request {requestId}");
+                    _logger?.LogWarning($"Failed to approve request {requestId}");
                     await HandleErrorAsync(result?.Message ?? "Failed to approve request", new InvalidOperationException("Approval operation failed"));
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error approving request {requestId}");
+                _logger?.LogError(ex, $"Error approving request {requestId}");
                 await HandleErrorAsync("Error approving request", ex);
             }
             finally
@@ -381,13 +504,21 @@ namespace TDFMAUI.ViewModels
             var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
             if (request == null)
             {
-                _logger.LogWarning("Attempted to reject non-existent request with ID {RequestId}", requestId);
+                _logger?.LogWarning($"Attempted to reject non-existent request with ID {requestId}");
+                return;
+            }
+
+            var currentUser = GetCachedCurrentUser();
+            if (currentUser == null)
+            {
+                if (_notificationService != null)
+                    await _notificationService.ShowErrorAsync("User not authenticated");
                 return;
             }
 
             string reason = await Shell.Current.DisplayPromptAsync(
                 "Reject Request",
-                "Please provide a reason for rejection:",
+                currentUser.IsManager == true ? "Manager rejection reason:" : "HR rejection reason:",
                 "OK",
                 "Cancel",
                 keyboard: Keyboard.Text
@@ -397,8 +528,9 @@ namespace TDFMAUI.ViewModels
             {
                 if (reason != null) // User didn't cancel
                 {
-                    _logger.LogInformation("User attempted to reject request {RequestId} without providing a reason", requestId);
-                    await _notificationService.ShowErrorAsync("A rejection reason is required");
+                    _logger?.LogInformation($"User attempted to reject request {requestId} without providing a reason");
+                    if (_notificationService != null)
+                        await _notificationService.ShowErrorAsync("A rejection reason is required");
                 }
                 return;
             }
@@ -408,25 +540,45 @@ namespace TDFMAUI.ViewModels
                 ClearError();
                 IsLoading = true;
 
-                _logger.LogInformation($"Rejecting request {requestId} for user {request.UserName} with reason: {reason}");
+                _logger?.LogInformation($"Rejecting request {requestId} for user {request.UserName} with reason: {reason}");
 
-                var result = await _requestService.RejectRequestAsync(requestId, reason);
+                ApiResponse<RequestResponseDto> result = new();
+                if (currentUser.IsManager == true)
+                {
+                    var rejectDto = new ManagerRejectDto { ManagerRemarks = reason };
+                    if (_requestService != null)
+                        result = await _requestService.ManagerRejectRequestAsync(requestId, rejectDto);
+                }
+                else if (currentUser.IsHR == true)
+                {
+                    var rejectDto = new HRRejectDto { HRRemarks = reason };
+                    if (_requestService != null)
+                        result = await _requestService.HRRejectRequestAsync(requestId, rejectDto);
+                }
+                else
+                {
+                    if (_notificationService != null)
+                        await _notificationService.ShowErrorAsync("You do not have permission to reject this request.");
+                    return;
+                }
+
                 if (result?.Success == true)
                 {
                     var rejectedId = result.Data != null ? result.Data.RequestID : requestId;
-                    _logger.LogInformation($"Request {rejectedId} rejected successfully");
-                    await _notificationService.ShowSuccessAsync("Request rejected successfully");
+                    _logger?.LogInformation($"Request {rejectedId} rejected successfully");
+                    if (_notificationService != null)
+                        await _notificationService.ShowSuccessAsync("Request rejected successfully");
                     await LoadRequestsInternalAsync(cancellationToken);
                 }
                 else
                 {
-                    _logger.LogWarning($"Failed to reject request {requestId}");
+                    _logger?.LogWarning($"Failed to reject request {requestId}");
                     await HandleErrorAsync(result?.Message ?? "Failed to reject request", new InvalidOperationException("Rejection operation failed"));
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error rejecting request {requestId}");
+                _logger?.LogError(ex, $"Error rejecting request {requestId}");
                 await HandleErrorAsync("Error rejecting request", ex);
             }
             finally
@@ -444,7 +596,7 @@ namespace TDFMAUI.ViewModels
                 ClearError();
                 IsLoading = true;
 
-                _logger.LogDebug($"Loading requests with filters: Status={SelectedStatus}, Type={SelectedType}, Department={SelectedDepartment}");
+                _logger?.LogDebug($"Loading requests with filters: Status={SelectedStatus}, Type={SelectedType}, Department={SelectedDepartment?.Name}");
 
                 Requests.Clear();
 
@@ -459,7 +611,8 @@ namespace TDFMAUI.ViewModels
                         : Enum.TryParse<RequestStatus>(SelectedStatus, true, out var parsedStatus) ? parsedStatus : (RequestStatus?)null,
                     FilterType = (string.IsNullOrEmpty(SelectedType) || SelectedType == "All")
                         ? (LeaveType?)null
-                        : Enum.TryParse<LeaveType>(SelectedType, true, out var parsedType) ? parsedType : (LeaveType?)null
+                        : Enum.TryParse<LeaveType>(SelectedType, true, out var parsedType) ? parsedType : (LeaveType?)null,
+                    Department = SelectedDepartment?.Name == "All" ? null : SelectedDepartment?.Name
                 };
 
                 // Use RequestStateManager to ensure proper access control
@@ -472,7 +625,7 @@ namespace TDFMAUI.ViewModels
                 var currentUser = _cachedCurrentUser;
                 if (currentUser == null)
                 {
-                    _logger.LogWarning("No current user found when loading requests");
+                    _logger?.LogWarning("No current user found when loading requests");
                     await HandleErrorAsync("Authentication required", new UnauthorizedAccessException("No current user"));
                     return;
                 }
@@ -480,23 +633,23 @@ namespace TDFMAUI.ViewModels
                 // Verify user can manage requests using RequestStateManager
                 if (!RequestStateManager.CanManageRequests(currentUser))
                 {
-                    _logger.LogWarning($"User {currentUser.UserID} attempted to access request approval without proper permissions");
+                    _logger?.LogWarning($"User {currentUser.UserID} attempted to access request approval without proper permissions");
                     await HandleErrorAsync("Access denied", new UnauthorizedAccessException("Insufficient permissions to manage requests"));
                     return;
                 }
 
-                var result = await _requestService.GetAllRequestsAsync(requestPagination);
+                var result = _requestService != null ? await _requestService.GetAllRequestsAsync(requestPagination) : null;
 
                 if (result?.Data?.Items != null)
                 {
                     var requestCount = result.Data.Items.Count();
-                    _logger.LogInformation($"Loaded {requestCount} requests");
+                    _logger?.LogInformation($"Loaded {requestCount} requests");
 
                     // Filter requests based on user permissions using RequestStateManager
                     var filteredRequests = result.Data.Items.Where(request =>
                         RequestStateManager.CanViewRequest(request, currentUser)).ToList();
 
-                    _logger.LogDebug($"Filtered to {filteredRequests.Count} viewable requests out of {requestCount} total");
+                    _logger?.LogDebug($"Filtered to {filteredRequests.Count} viewable requests out of {requestCount} total");
 
                     foreach (var request in filteredRequests)
                     {
@@ -505,19 +658,19 @@ namespace TDFMAUI.ViewModels
 
                     // Update statistics based on filtered requests
                     PendingCount = filteredRequests.Count(r => r.Status == RequestStatus.Pending);
-                    ApprovedCount = filteredRequests.Count(r => r.Status == RequestStatus.Approved);
-                    RejectedCount = filteredRequests.Count(r => r.Status == RequestStatus.Rejected);
+                    ApprovedCount = filteredRequests.Count(r => r.Status == RequestStatus.ManagerApproved || r.Status == RequestStatus.HRApproved);
+                    RejectedCount = filteredRequests.Count(r => r.Status == RequestStatus.Rejected || r.Status == RequestStatus.ManagerRejected);
 
-                    _logger.LogDebug($"Request statistics: Pending={PendingCount}, Approved={ApprovedCount}, Rejected={RejectedCount}");
+                    _logger?.LogDebug($"Request statistics: Pending={PendingCount}, Approved={ApprovedCount}, Rejected={RejectedCount}");
                 }
                 else
                 {
-                    _logger.LogWarning("No requests returned from service");
+                    _logger?.LogWarning("No requests returned from service");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error loading requests");
+                _logger?.LogError(ex, "Error loading requests");
                 await HandleErrorAsync("Error loading requests", ex);
             }
             finally
@@ -531,7 +684,7 @@ namespace TDFMAUI.ViewModels
             var request = Requests.FirstOrDefault(r => r.RequestID == requestId);
             if (request == null)
             {
-                _logger.LogWarning($"Attempted to view non-existent request with ID {requestId}");
+                _logger?.LogWarning($"Attempted to view non-existent request with ID {requestId}");
                 return;
             }
 
@@ -539,20 +692,22 @@ namespace TDFMAUI.ViewModels
             var currentUser = GetCachedCurrentUser();
             if (currentUser == null || !RequestStateManager.CanViewRequest(request, currentUser))
             {
-                _logger.LogWarning($"User {currentUser?.UserID} attempted to view request {requestId} without proper permissions");
-                await _notificationService.ShowErrorAsync("You don't have permission to view this request");
+                _logger?.LogWarning($"User {currentUser?.UserID} attempted to view request {requestId} without proper permissions");
+                if (_notificationService != null)
+                    await _notificationService.ShowErrorAsync("You don't have permission to view this request");
                 return;
             }
 
             try
             {
-                _logger.LogInformation($"Viewing request details for request {requestId}");
+                _logger?.LogInformation($"Viewing request details for request {requestId}");
 
-                var requestDetails = await _requestService.GetRequestByIdAsync(requestId);
+                var requestDetails = _requestService != null ? await _requestService.GetRequestByIdAsync(requestId) : null;
                 if (requestDetails?.Data == null)
                 {
-                    _logger.LogWarning($"Could not find request details for ID {requestId}");
-                    await _notificationService.ShowErrorAsync("Could not find request details");
+                    _logger?.LogWarning($"Could not find request details for ID {requestId}");
+                    if (_notificationService != null)
+                        await _notificationService.ShowErrorAsync("Could not find request details");
                     return;
                 }
 
@@ -563,7 +718,7 @@ namespace TDFMAUI.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error viewing request details for ID {requestId}");
+                _logger?.LogError(ex, $"Error viewing request details for ID {requestId}");
                 await HandleErrorAsync("Error viewing request details", ex);
             }
         }
@@ -586,7 +741,7 @@ namespace TDFMAUI.ViewModels
             // For property bindings, we return null and trigger async refresh
             if (_cachedCurrentUser == null)
             {
-                _logger.LogDebug("User cache is empty, triggering async refresh");
+                _logger?.LogDebug("User cache is empty, triggering async refresh");
                 _ = RefreshUserCacheAsync();
             }
 
@@ -600,13 +755,13 @@ namespace TDFMAUI.ViewModels
         {
             try
             {
-                _logger.LogDebug("Refreshing user cache");
-                var user = await _authService.GetCurrentUserAsync();
+                _logger?.LogDebug("Refreshing user cache");
+                var user = _authService != null ? await _authService.GetCurrentUserAsync() : null;
                 if (user != null)
                 {
                     _cachedCurrentUser = user;
                     _userCacheExpiry = DateTime.UtcNow.Add(_userCacheTimeout);
-                    _logger.LogDebug("User cache refreshed successfully");
+                    _logger?.LogDebug("User cache refreshed successfully");
 
                     // Notify property changes for authorization-dependent properties
                     OnPropertyChanged(nameof(CanManageRequests));
@@ -615,12 +770,12 @@ namespace TDFMAUI.ViewModels
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to refresh user cache - no user returned");
+                    _logger?.LogWarning("Failed to refresh user cache - no user returned");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error refreshing user cache");
+                _logger?.LogError(ex, "Error refreshing user cache");
             }
         }
 
@@ -631,7 +786,7 @@ namespace TDFMAUI.ViewModels
         {
             _cachedCurrentUser = null;
             _userCacheExpiry = DateTime.MinValue;
-            _logger.LogDebug("User cache invalidated");
+            _logger?.LogDebug("User cache invalidated");
         }
 
         #endregion
@@ -648,7 +803,7 @@ namespace TDFMAUI.ViewModels
         {
             if (!_disposed && disposing)
             {
-                _logger.LogDebug("Disposing RequestApprovalViewModel");
+                _logger?.LogDebug("Disposing RequestApprovalViewModel");
 
                 try
                 {
@@ -660,7 +815,7 @@ namespace TDFMAUI.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error during RequestApprovalViewModel disposal");
+                    _logger?.LogError(ex, "Error during RequestApprovalViewModel disposal");
                 }
 
                 _disposed = true;

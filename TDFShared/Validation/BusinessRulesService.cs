@@ -39,15 +39,6 @@ namespace TDFShared.Validation
                 errors.AddRange(basicValidation.Errors);
             }
 
-            // Date validation
-            var dateErrors = ValidateRequestDates(request.RequestStartDate, request.RequestEndDate, context);
-            errors.AddRange(dateErrors);
-
-            // Time validation for specific leave types
-            var timeErrors = ValidateRequestTimes(request.LeaveType, request.RequestStartDate,
-                request.RequestEndDate, request.RequestBeginningTime, request.RequestEndingTime);
-            errors.AddRange(timeErrors);
-
             // Leave balance validation
             if (RequiresBalanceCheck(request.LeaveType))
             {
@@ -103,10 +94,6 @@ namespace TDFShared.Validation
                     errors.Add("Only pending requests can be modified.");
                 }
             }
-
-            // Date validation
-            var dateErrors = ValidateRequestDates(request.RequestStartDate, request.RequestEndDate, context);
-            errors.AddRange(dateErrors);
 
             // Conflict validation (excluding current request)
             var conflictResult = await ValidateRequestConflictsAsync(userId, request.RequestStartDate,
@@ -348,67 +335,6 @@ namespace TDFShared.Validation
         }
 
         // Helper methods
-        private List<string> ValidateRequestDates(DateTime startDate, DateTime? endDate, BusinessRuleContext context)
-        {
-            var errors = new List<string>();
-
-            // Use ValidationService for consistent date validation
-            var dateValidationErrors = _validationService.ValidateDateRange(
-                startDate, endDate, "Request date", context.MinAdvanceNoticeDays);
-            errors.AddRange(dateValidationErrors);
-
-            // Check maximum duration
-            DateTime effectiveEndDate = endDate ?? startDate;
-            int duration = (effectiveEndDate.Date - startDate.Date).Days + 1;
-            if (duration > context.MaxRequestDurationDays)
-            {
-                errors.Add($"Requests cannot exceed {context.MaxRequestDurationDays} days.");
-            }
-
-            // Check weekend policy
-            if (!context.AllowWeekendRequests)
-            {
-                if (startDate.DayOfWeek == DayOfWeek.Saturday || startDate.DayOfWeek == DayOfWeek.Sunday ||
-                    (endDate.HasValue && (endDate.Value.DayOfWeek == DayOfWeek.Saturday || endDate.Value.DayOfWeek == DayOfWeek.Sunday)))
-                {
-                    errors.Add("Weekend requests are not allowed.");
-                }
-            }
-
-            return errors;
-        }
-
-        private List<string> ValidateRequestTimes(LeaveType leaveType, DateTime startDate, DateTime? endDate,
-            TimeSpan? startTime, TimeSpan? endTime)
-        {
-            var errors = new List<string>();
-            bool requiresTime = leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment;
-
-            if (requiresTime)
-            {
-                if (!startTime.HasValue || !endTime.HasValue)
-                {
-                    errors.Add($"{leaveType} requires both start and end times.");
-                }
-                else if (endTime <= startTime)
-                {
-                    errors.Add("End time must be after start time.");
-                }
-
-                // For time-based requests, must be same day
-                if (endDate.HasValue && endDate.Value.Date != startDate.Date)
-                {
-                    errors.Add($"{leaveType} must start and end on the same day.");
-                }
-            }
-            else if (startTime.HasValue || endTime.HasValue)
-            {
-                errors.Add($"{leaveType} cannot have specific times, only full days are allowed.");
-            }
-
-            return errors;
-        }
-
         private static bool RequiresBalanceCheck(LeaveType leaveType)
         {
             return leaveType == LeaveType.Annual || leaveType == LeaveType.Emergency;

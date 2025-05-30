@@ -17,7 +17,6 @@ public partial class MainPage : ContentPage
         InitializeComponent();
         _apiService = App.Services.GetService<ApiService>();
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider)); // Assign IServiceProvider
-        LoadUserInfo();
     }
 
     protected override void OnAppearing()
@@ -54,13 +53,6 @@ public partial class MainPage : ContentPage
     {
         var requestsViewModel = App.Services.GetService<RequestsViewModel>();
         await Navigation.PushAsync(new RequestsPage(requestsViewModel));
-    }
-
-    // Added for XAML event handler fix
-    private void OnLeaveRequestClicked(object sender, EventArgs e)
-    {
-        // Call the plural version for compatibility
-        OnLeaveRequestsClicked(sender, e);
     }
 
     private async void OnMessagesClicked(object sender, EventArgs e)

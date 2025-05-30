@@ -5,7 +5,9 @@
              xmlns:converters="clr-namespace:TDFMAUI.Converters"
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              x:Class="TDFMAUI.Pages.UserProfilePage"
-             Title="User Profile">
+             Title="User Profile"
+             x:DataType="viewmodels:UserProfileViewModel"
+             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -83,12 +85,14 @@
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <Grid BackgroundColor="{StaticResource PrimaryBackgroundColor}">
+    <Grid BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
         <ScrollView>
             <VerticalStackLayout Padding="15" Spacing="15" HorizontalOptions="Center">
                 <VerticalStackLayout.MaximumWidthRequest>
                     <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="800" Desktop="700" />
                 </VerticalStackLayout.MaximumWidthRequest>
+                <Label Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/>
+                <Label Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"/>
 
                 <!-- Error message display -->
                 <Border IsVisible="{Binding HasError}"

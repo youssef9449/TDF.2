@@ -14,11 +14,6 @@ namespace TDFShared.Enums
         Pending,
         
         /// <summary>
-        /// Request has been approved
-        /// </summary>
-        Approved,
-
-        /// <summary>
         /// Request has been approved by manager
         /// </summary>
         ManagerApproved,
@@ -32,6 +27,11 @@ namespace TDFShared.Enums
         /// Request has been rejected
         /// </summary>
         Rejected,
+
+                /// <summary>
+        /// Request has been rejected
+        /// </summary>
+        ManagerRejected,
         
         /// <summary>
         /// Request has been canceled

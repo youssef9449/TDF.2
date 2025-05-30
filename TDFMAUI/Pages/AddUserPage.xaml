@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:viewmodels="clr-namespace:TDFMAUI.ViewModels"
              x:Class="TDFMAUI.Pages.AddUserPage"
              Title="Add User"
-             BackgroundColor="{StaticResource Gray100}">
+             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->
@@ -77,5 +79,13 @@
                           Color="{StaticResource Primary}"
                           HorizontalOptions="Center"
                           VerticalOptions="Center"/>
+
+        <!-- Debug layout indicators -->
+        <Label Grid.Row="0" Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}" 
+               VerticalOptions="Start" HorizontalOptions="End" 
+               BackgroundColor="LightBlue" Padding="5" Margin="5"/>
+        <Label Grid.Row="0" Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"
+               VerticalOptions="Start" HorizontalOptions="End" 
+               BackgroundColor="LightGreen" Padding="5" Margin="5"/>
     </Grid>
-</ContentPage> 
+</ContentPage>

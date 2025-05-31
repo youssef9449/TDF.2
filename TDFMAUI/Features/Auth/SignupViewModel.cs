@@ -65,6 +65,9 @@ namespace TDFMAUI.Features.Auth
         [ObservableProperty]
         private bool _hasError;
 
+        [ObservableProperty]
+        private bool _isSigningUp;
+
         public SignupViewModel(IApiService apiService, ILookupService lookupService, ILogger<SignupViewModel> logger, ISecurityService securityService)
         {
             Debug.WriteLine("[SignupViewModel] Constructor - Start");
@@ -194,145 +197,163 @@ namespace TDFMAUI.Features.Auth
             }
         }
 
-        [RelayCommand]
+        [RelayCommand(CanExecute = nameof(CanSignup))]
         private async Task SignupAsync()
         {
-            HasError = false;
-            ErrorMessage = string.Empty;
-
-            // Validation
-            if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password) ||
-                string.IsNullOrWhiteSpace(ConfirmPassword) || string.IsNullOrWhiteSpace(FullName) ||
-                SelectedDepartment == null || string.IsNullOrWhiteSpace(SelectedTitle))
-            {
-                ErrorMessage = "All fields are required.";
-                HasError = true;
-                return;
-            }
-
-            if (Password != ConfirmPassword)
-            {
-                ErrorMessage = "Passwords do not match.";
-                HasError = true;
-                return;
-            }
-
-            // Check password strength using the injected SecurityService
-            if (!_securityService.IsPasswordStrong(Password, out string passwordValidationMessage))
-            {
-                ErrorMessage = passwordValidationMessage;
-                HasError = true;
-                _logger?.LogWarning("Password strength validation failed for user: {Username}", Username);
-                return;
-            }
-
-            var registerRequest = new RegisterRequestDto
-            {
-                Username = Username,
-                Password = Password,
-                ConfirmPassword = ConfirmPassword,
-                FullName = FullName,
-                Department = SelectedDepartment?.Name ?? string.Empty,
-                Title = SelectedTitle ?? string.Empty
-            };
-
+            if (IsSigningUp) return;
+            
             try
             {
-                _logger?.LogInformation("Attempting registration for user: {Username}", Username);
-                var response = await _apiService.RegisterAsync(registerRequest);
+                IsSigningUp = true;
+                HasError = false;
+                ErrorMessage = string.Empty;
 
-                if (response.Success)
+                // Validation
+                if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password) ||
+                    string.IsNullOrWhiteSpace(ConfirmPassword) || string.IsNullOrWhiteSpace(FullName) ||
+                    SelectedDepartment == null || string.IsNullOrWhiteSpace(SelectedTitle))
                 {
-                    _logger?.LogInformation("Registration successful for user: {Username}. Navigating to login.", Username);
-                    
-                    // Ensure registration is fully complete before navigation
-                    await Task.Delay(500); // Add a small delay to ensure backend processing completes
-                    await MainThread.InvokeOnMainThreadAsync(async () => 
-                    {
-                        await Shell.Current.GoToAsync("//LoginPage");
-                    });
+                    ErrorMessage = "All fields are required.";
+                    HasError = true;
+                    return;
                 }
-                else
+
+                // Username validation
+                if (Username.Length < 3)
                 {
-                    // Handle specific error messages
-                    if (response.Message?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true ||
-                        response.Message?.Contains("already taken", StringComparison.OrdinalIgnoreCase) == true)
+                    ErrorMessage = "Username must be at least 3 characters long.";
+                    HasError = true;
+                    return;
+                }
+
+                if (Username.Length > 50)
+                {
+                    ErrorMessage = "Username cannot be longer than 50 characters.";
+                    HasError = true;
+                    return;
+                }
+
+                if (!System.Text.RegularExpressions.Regex.IsMatch(Username, @"^[a-zA-Z0-9_]+$"))
+                {
+                    ErrorMessage = "Username can only contain letters, numbers, and underscores.";
+                    HasError = true;
+                    return;
+                }
+
+                if (Password != ConfirmPassword)
+                {
+                    ErrorMessage = "Passwords do not match.";
+                    HasError = true;
+                    return;
+                }
+
+                // Check password strength using the injected SecurityService
+                if (!_securityService.IsPasswordStrong(Password, out string passwordValidationMessage))
+                {
+                    ErrorMessage = passwordValidationMessage;
+                    HasError = true;
+                    _logger?.LogWarning("Password strength validation failed for user: {Username}", Username);
+                    return;
+                }
+
+                var registerRequest = new RegisterRequestDto
+                {
+                    Username = Username,
+                    Password = Password,
+                    ConfirmPassword = ConfirmPassword,
+                    FullName = FullName,
+                    Department = SelectedDepartment?.Name ?? string.Empty,
+                    Title = SelectedTitle ?? string.Empty
+                };
+
+                try
+                {
+                    _logger?.LogInformation("Attempting registration for user: {Username}", Username);
+                    var response = await _apiService.RegisterAsync(registerRequest);
+
+                    if (response.Success)
                     {
-                        if (response.Message.Contains("Username", StringComparison.OrdinalIgnoreCase) || 
-                            !response.Message.Contains("name", StringComparison.OrdinalIgnoreCase))
+                        _logger?.LogInformation("Registration successful for user: {Username}. Navigating to login.", Username);
+                        
+                        // Clear sensitive data before navigation
+                        Password = string.Empty;
+                        ConfirmPassword = string.Empty;
+                        Username = string.Empty;
+                        FullName = string.Empty;
+                        
+                        // Navigate back to login page immediately
+                        try 
                         {
-                            ErrorMessage = $"Username '{Username}' is already taken. Please choose a different username.";
+                            await Shell.Current.GoToAsync("//LoginPage");
+                            return; // Exit immediately after successful navigation
                         }
-                        else if (response.Message.Contains("Full name", StringComparison.OrdinalIgnoreCase) || 
-                                 response.Message.Contains("name", StringComparison.OrdinalIgnoreCase))
+                        catch (Exception navEx)
                         {
-                            ErrorMessage = $"Full name '{FullName}' is already registered. Please use a different name.";
-                        }
-                        else
-                        {
-                            ErrorMessage = response.Message;
+                            _logger?.LogError(navEx, "Error navigating to login page after successful registration");
+                            // If navigation fails, try alternative method
+                            if (Application.Current?.MainPage?.Navigation != null)
+                            {
+                                await Application.Current.MainPage.Navigation.PopAsync();
+                                return; // Exit after successful navigation
+                            }
                         }
                     }
                     else
                     {
                         ErrorMessage = response.Message ?? "Registration failed. Please try again.";
+                        HasError = true;
+                        _logger?.LogWarning("Registration failed for user: {Username}. Message: {Message}", 
+                            Username, response.Message);
                     }
-                    HasError = true;
-                    _logger?.LogWarning("Registration failed for user: {Username}. API returned: {Message}", Username, response.Message);
                 }
-            }
-            catch (TDFShared.Exceptions.ApiException apiEx)
-            {
-                _logger?.LogError(apiEx, "API error during registration for user: {Username}", Username);
-                
-                // Handle specific API errors
-                if (apiEx.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                catch (TDFShared.Exceptions.ApiException apiEx)
                 {
-                    // Check for username already exists error
+                    // Handle specific API errors
                     if (apiEx.Message?.Contains("Username already exists", StringComparison.OrdinalIgnoreCase) == true)
                     {
                         ErrorMessage = $"Username '{Username}' is already taken. Please choose a different username.";
                     }
-                    // Check for full name already exists error
-                    else if (apiEx.Message?.Contains("Full name", StringComparison.OrdinalIgnoreCase) == true && 
-                             apiEx.Message?.Contains("already taken", StringComparison.OrdinalIgnoreCase) == true)
+                    else if (apiEx.Message?.Contains("invalid", StringComparison.OrdinalIgnoreCase) == true)
                     {
-                        ErrorMessage = $"Full name '{FullName}' is already registered. Please use a different name.";
-                    }
-                    // Generic "already taken" message - assume it's the username
-                    else if (apiEx.Message?.Contains("already taken", StringComparison.OrdinalIgnoreCase) == true ||
-                             apiEx.Message?.Contains("already exists", StringComparison.OrdinalIgnoreCase) == true)
-                    {
-                        // Check if the message mentions "name" to determine if it's about full name
-                        if (apiEx.Message.Contains("name", StringComparison.OrdinalIgnoreCase) && 
-                            !apiEx.Message.Contains("Username", StringComparison.OrdinalIgnoreCase))
+                        // Try to extract specific validation errors from the response
+                        if (apiEx.Message.Contains("username", StringComparison.OrdinalIgnoreCase))
                         {
-                            ErrorMessage = $"Full name '{FullName}' is already registered. Please use a different name.";
+                            ErrorMessage = "Invalid username format. Username can only contain letters, numbers, and underscores.";
+                        }
+                        else if (apiEx.Message.Contains("password", StringComparison.OrdinalIgnoreCase))
+                        {
+                            ErrorMessage = "Invalid password format. Password must meet the security requirements.";
+                        }
+                        else if (apiEx.Message.Contains("full name", StringComparison.OrdinalIgnoreCase))
+                        {
+                            ErrorMessage = "Invalid full name format. Please enter a valid name.";
                         }
                         else
                         {
-                            ErrorMessage = $"Username '{Username}' is already taken. Please choose a different username.";
+                            ErrorMessage = "Invalid input. Please check all fields and try again.";
                         }
                     }
                     else
                     {
-                        ErrorMessage = apiEx.Message ?? "Registration failed. Please check your information and try again.";
+                        ErrorMessage = apiEx.Message ?? "An error occurred during registration. Please try again.";
                     }
+                    HasError = true;
+                    _logger?.LogError(apiEx, "API error during registration for user: {Username}", Username);
                 }
-                else
+                catch (Exception ex)
                 {
-                    ErrorMessage = apiEx.Message ?? "An error occurred during registration. Please try again.";
+                    ErrorMessage = "An error occurred during registration. Please try again.";
+                    HasError = true;
+                    _logger?.LogError(ex, "Error during registration for user: {Username}", Username);
                 }
-                
-                HasError = true;
             }
-            catch (Exception ex)
+            finally
             {
-                _logger?.LogError(ex, "Error during registration for user: {Username}", Username);
-                ErrorMessage = "An unexpected error occurred. Please try again.";
-                HasError = true;
+                IsSigningUp = false;
             }
         }
+
+        private bool CanSignup() => !IsSigningUp;
 
         [RelayCommand]
         private async Task GoToLoginAsync()

@@ -195,8 +195,12 @@ namespace TDFShared.Services
         /// </summary>
         private byte[] GetHashBytes(string password, byte[] salt)
         {
-            // Use backward-compatible constructor for older .NET versions
-            using (var pbkdf2 = new Rfc2898DeriveBytes(password, salt, PBKDF2_ITERATIONS))
+            // Use recommended constructor with explicit hash algorithm and iterations
+            using (var pbkdf2 = new Rfc2898DeriveBytes(
+                password,
+                salt,
+                PBKDF2_ITERATIONS,
+                HashAlgorithmName.SHA256))
             {
                 return pbkdf2.GetBytes(HASH_SIZE_BYTES);
             }

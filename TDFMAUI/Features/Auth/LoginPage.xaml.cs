@@ -182,7 +182,7 @@ namespace TDFMAUI.Features.Auth
                 if (Shell.Current != null)
                 {
                     System.Diagnostics.Debug.WriteLine("[LoginPage] Using Shell navigation");
-                    await Shell.Current.GoToAsync("SignupPage");
+                    await Shell.Current.GoToAsync("//SignupPage");
                 }
                 else
                 {
@@ -191,7 +191,17 @@ namespace TDFMAUI.Features.Auth
                     var signupPage = App.Services?.GetService<SignupPage>();
                     if (signupPage != null)
                     {
-                        await Navigation.PushAsync(signupPage);
+                        try
+                        {
+                            System.Diagnostics.Debug.WriteLine("[LoginPage] Attempting Navigation.PushAsync(signupPage)");
+                            await Navigation.PushAsync(signupPage);
+                            System.Diagnostics.Debug.WriteLine("[LoginPage] Navigation.PushAsync completed.");
+                        }
+                        catch (Exception navEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[LoginPage] Error during Navigation.PushAsync: {navEx.Message}");
+                            await DisplayAlert("Error", $"Navigation failed: {navEx.Message}", "OK");
+                        }
                     }
                     else
                     {

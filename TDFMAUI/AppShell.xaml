@@ -9,6 +9,7 @@
     xmlns:requests="clr-namespace:TDFMAUI.Features.Requests"
     xmlns:dashboard="clr-namespace:TDFMAUI.Features.Dashboard"
     xmlns:settings="clr-namespace:TDFMAUI.Features.Settings"
+    xmlns:auth="clr-namespace:TDFMAUI.Features.Auth"
     Shell.FlyoutBehavior="Flyout"
     FlyoutBackgroundColor="#512BD4"
     Shell.BackgroundColor="White"
@@ -149,5 +150,8 @@
     </ShellItem>
 
     <!-- Hidden ShellContent for SignupPage to enable absolute route navigation -->
+    <ShellItem Route="SignupPage" FlyoutItemIsVisible="False">
+        <ShellContent ContentTemplate="{DataTemplate auth:SignupPage}" />
+    </ShellItem>
 
 </Shell>

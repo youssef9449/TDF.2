@@ -502,7 +502,7 @@ namespace TDFMAUI.Services
             try
             {
                 _logger?.LogInformation("ApiService: Attempting registration for user {Username}", registerRequest.Username);
-                var response = await PostAsync<RegisterRequestDto, ApiResponse<RegisterResponseDto>>(endpoint, registerRequest);
+                var response = await PostAsync<RegisterRequestDto, ApiResponse<RegisterResponseDto>>(endpoint, registerRequest, queueIfUnavailable: false);
                 return response ?? new ApiResponse<RegisterResponseDto> { Success = false, Message = "Registration failed" };
             }
             catch (ApiException ex)

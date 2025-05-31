@@ -10,18 +10,31 @@ namespace TDFMAUI.Services
     public class ConnectivityService : TDFShared.Services.ConnectivityService
     {
         private readonly IConnectivity _connectivity;
+        private bool _isInitialized = false;
 
         /// <summary>
         /// Constructor with dependency injection
         /// </summary>
         public ConnectivityService(ILogger<ConnectivityService> logger) : base(logger)
         {
-            _connectivity = Connectivity.Current;
-
-            // Subscribe to system connectivity changes for real-time updates
-            _connectivity.ConnectivityChanged += OnNativeConnectivityChanged;
-
-            _logger.LogInformation("MAUI ConnectivityService initialized with platform-native monitoring");
+            try
+            {
+                _connectivity = Connectivity.Current;
+                if (_connectivity != null)
+                {
+                    _connectivity.ConnectivityChanged += OnNativeConnectivityChanged;
+                    _isInitialized = true;
+                    _logger.LogInformation("MAUI ConnectivityService initialized with platform-native monitoring");
+                }
+                else
+                {
+                    _logger.LogWarning("MAUI Connectivity.Current is null, falling back to base implementation");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error initializing MAUI ConnectivityService");
+            }
         }
 
         /// <summary>
@@ -32,6 +45,12 @@ namespace TDFMAUI.Services
         {
             try
             {
+                if (!_isInitialized || _connectivity == null)
+                {
+                    _logger.LogDebug("MAUI Connectivity service not initialized, falling back to base implementation");
+                    return base.IsConnected();
+                }
+
                 var isConnected = _connectivity.NetworkAccess == NetworkAccess.Internet;
                 _logger.LogDebug("MAUI platform connectivity check: {IsConnected}", isConnected);
                 return isConnected;
@@ -292,7 +311,7 @@ namespace TDFMAUI.Services
         /// </summary>
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
+            if (disposing && _isInitialized && _connectivity != null)
             {
                 try
                 {

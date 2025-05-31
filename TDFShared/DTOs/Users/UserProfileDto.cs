@@ -86,7 +86,9 @@ namespace TDFShared.DTOs.Users
         
         /// <summary>
         /// Skills/competencies
-
+        /// </summary>
+        public List<string> Skills { get; set; }
+        
         /// <summary>
         /// When the user was created
         /// </summary>

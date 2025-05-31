@@ -1,109 +1,166 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:TDFMAUI.Features.Auth"
+             xmlns:converters="clr-namespace:TDFMAUI.Converters"
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
-             xmlns:local="clr-namespace:TDFMAUI.Features.Auth"
-             x:DataType="local:SignupViewModel"
              x:Class="TDFMAUI.Features.Auth.SignupPage"
-             Title="Signup"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             x:DataType="vm:SignupViewModel"
+             Title="Sign Up">
 
     <ContentPage.Resources>
-        <Style x:Key="EntryStyle" TargetType="Entry">
-            <Setter Property="TextColor" Value="{StaticResource TextColor}" />
-            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F5F5F7, Dark={StaticResource DarkSurfaceVariant}}" />
-            <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light=#999999, Dark={StaticResource DarkTextTertiary}}" />
-            <Setter Property="FontSize" Value="16" />
-            <Setter Property="HeightRequest" Value="45" />
-            <Setter Property="ClearButtonVisibility" Value="WhileEditing" />
-        </Style>
-        <Style x:Key="PickerStyle" TargetType="Picker">
-            <Setter Property="TextColor" Value="{StaticResource TextColor}" />
-            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F5F5F7, Dark={StaticResource DarkSurfaceVariant}}" />
-            <Setter Property="FontSize" Value="16" />
-            <Setter Property="HeightRequest" Value="45" />
-        </Style>
+        <ResourceDictionary>
+            <converters:ValidationStateToColorConverter x:Key="ValidationStateToColorConverter"/>
+            <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        </ResourceDictionary>
     </ContentPage.Resources>
 
-    <!-- Responsive layout with ScrollView to ensure all content is visible -->
-    <ScrollView>
-        <Grid>
-            <Label Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}" 
-                   HorizontalOptions="End" VerticalOptions="Start" Margin="0,10,10,0" FontSize="10" TextColor="{StaticResource Gray600}"/>
-            <Label Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}" 
-                   HorizontalOptions="End" VerticalOptions="Start" Margin="0,10,10,0" FontSize="10" TextColor="{StaticResource Gray600}"/>
-            <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="1*,Auto,1*" Margin="0,20,0,20">
-                <!-- Left column spacer -->
-                <BoxView Grid.Column="0" Grid.RowSpan="3" />
+    <Grid>
+        <ScrollView>
+            <Grid HorizontalOptions="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <VerticalStackLayout Spacing="20" Padding="20" WidthRequest="500">
+                    <!-- Header -->
+                    <Label Text="Create Account"
+                           FontSize="24"
+                           FontAttributes="Bold"
+                           HorizontalOptions="Center"
+                           Margin="0,10,0,20"/>
 
-                <!-- Main content - improved desktop layout -->
-                <Frame Grid.Column="1" Grid.Row="1"
-                       Padding="{OnPlatform Default=32, WinUI=48}"
-                       Margin="0,0,0,0"
-                       HasShadow="True"
-                       CornerRadius="18"
-                       BorderColor="{StaticResource BorderColor}"
-                       BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource DarkSurfaceVariant}}"
-                       MinimumWidthRequest="{OnPlatform Default=420, WinUI=520}"
-                       MaximumWidthRequest="{OnPlatform Default=650, WinUI=700}"
-                       HorizontalOptions="Center"
-                       VerticalOptions="Center">
-                    <VerticalStackLayout Spacing="16">
-                        <Label x:Name="TitleLabel" Text="Create Account" 
-                               TextColor="{StaticResource TextColor}"
-                               FontSize="{OnPlatform Default=28, WinUI=32}"
-                               HorizontalOptions="Center" Margin="0,0,0,15" />
+                    <!-- Form Fields -->
+                    <VerticalStackLayout Spacing="15">
+                        <!-- Username -->
+                        <VerticalStackLayout>
+                            <Label Text="Username" FontSize="16"/>
+                            <Frame BorderColor="{Binding HasError, Converter={StaticResource ValidationStateToColorConverter}}"
+                                   Padding="10"
+                                   CornerRadius="8"
+                                   HasShadow="False">
+                                <Entry Text="{Binding Username}"
+                                       Placeholder="Enter username"
+                                       FontSize="16"/>
+                            </Frame>
+                        </VerticalStackLayout>
 
-                        <!-- Form fields with better spacing -->
-                        <Entry Placeholder="Username" Text="{Binding Username}" Style="{StaticResource EntryStyle}" 
-                               Margin="0,5,0,5" />
-                        <Entry Placeholder="Password" IsPassword="True" Text="{Binding Password}" Style="{StaticResource EntryStyle}" 
-                               Margin="0,5,0,5" />
-                        <Entry Placeholder="Confirm Password" IsPassword="True" Text="{Binding ConfirmPassword}" Style="{StaticResource EntryStyle}" 
-                               Margin="0,5,0,5" />
-                        <Entry Placeholder="Full Name" Text="{Binding FullName}" Style="{StaticResource EntryStyle}" 
-                               Margin="0,5,0,10" />
+                        <!-- Full Name -->
+                        <VerticalStackLayout>
+                            <Label Text="Full Name" FontSize="16"/>
+                            <Frame BorderColor="{Binding HasError, Converter={StaticResource ValidationStateToColorConverter}}"
+                                   Padding="10"
+                                   CornerRadius="8"
+                                   HasShadow="False">
+                                <Entry Text="{Binding FullName}"
+                                       Placeholder="Enter full name"
+                                       FontSize="16"/>
+                            </Frame>
+                        </VerticalStackLayout>
 
-                        <Label Text="Department" TextColor="{StaticResource TextColor}" Margin="0,5,0,0" />
-                        <Picker Title="Select Department"
-                                ItemsSource="{Binding Departments}"
-                                ItemDisplayBinding="{Binding Name}"
-                                SelectedItem="{Binding SelectedDepartment}"
-                                Style="{StaticResource PickerStyle}"
-                                Margin="0,0,0,5"
-                                IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}" />
+                        <!-- Password -->
+                        <VerticalStackLayout>
+                            <Label Text="Password" FontSize="16"/>
+                            <Frame BorderColor="{Binding HasError, Converter={StaticResource ValidationStateToColorConverter}}"
+                                   Padding="10"
+                                   CornerRadius="8"
+                                   HasShadow="False">
+                                <Entry Text="{Binding Password}"
+                                       Placeholder="Enter password"
+                                       IsPassword="True"
+                                       FontSize="16"/>
+                            </Frame>
+                        </VerticalStackLayout>
 
-                        <Label Text="Title" TextColor="{StaticResource TextColor}" Margin="0,5,0,0" />
-                        <Picker Title="Select Title"
-                                ItemsSource="{Binding Titles}"
-                                SelectedItem="{Binding SelectedTitle}"
-                                Style="{StaticResource PickerStyle}"
-                                Margin="0,0,0,10"
-                                IsEnabled="{Binding Titles.Count, Converter={StaticResource IntToBoolConverter}}" />
+                        <!-- Confirm Password -->
+                        <VerticalStackLayout>
+                            <Label Text="Confirm Password" FontSize="16"/>
+                            <Frame BorderColor="{Binding HasError, Converter={StaticResource ValidationStateToColorConverter}}"
+                                   Padding="10"
+                                   CornerRadius="8"
+                                   HasShadow="False">
+                                <Entry Text="{Binding ConfirmPassword}"
+                                       Placeholder="Confirm password"
+                                       IsPassword="True"
+                                       FontSize="16"/>
+                            </Frame>
+                        </VerticalStackLayout>
 
-                        <Button Text="Sign Up" 
-                                Command="{Binding SignupCommand}" 
-                                TextColor="White"
-                                FontAttributes="Bold"
-                                BackgroundColor="{StaticResource Primary}"
-                                Margin="0,15,0,10" 
-                                HeightRequest="50" />
+                        <!-- Department -->
+                        <VerticalStackLayout>
+                            <Label Text="Department" FontSize="16"/>
+                            <Frame BorderColor="{Binding HasError, Converter={StaticResource ValidationStateToColorConverter}}"
+                                   Padding="10"
+                                   CornerRadius="8"
+                                   HasShadow="False"
+                                   HorizontalOptions="Fill">
+                                <Picker Title="Select Department"
+                                        ItemsSource="{Binding Departments}"
+                                        SelectedItem="{Binding SelectedDepartment}"
+                                        ItemDisplayBinding="{Binding Name}"
+                                        FontSize="16"
+                                        HeightRequest="70"
+                                        WidthRequest="450"
+                                        HorizontalOptions="Fill"/>
+                            </Frame>
+                        </VerticalStackLayout>
 
-                        <Label Text="{Binding ErrorMessage}" 
-                               TextColor="{AppThemeBinding Light=#FF3B30, Dark=#FF6B60}"
-                               IsVisible="{Binding HasError}" 
-                               HorizontalOptions="Center" HeightRequest="20" Margin="0,5,0,5" />
-
-                        <Button Text="Already have an account? Login" Command="{Binding GoToLoginCommand}" 
-                                BackgroundColor="Transparent" 
-                                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" 
-                                HorizontalOptions="Center" HeightRequest="45" Margin="0,10,0,0"/>
+                        <!-- Title -->
+                        <VerticalStackLayout>
+                            <Label Text="Title" FontSize="16"/>
+                            <Frame BorderColor="{Binding HasError, Converter={StaticResource ValidationStateToColorConverter}}"
+                                   Padding="10"
+                                   CornerRadius="8"
+                                   HasShadow="False"
+                                   HorizontalOptions="Fill">
+                                <Picker Title="Select Title"
+                                        ItemsSource="{Binding Titles}"
+                                        SelectedItem="{Binding SelectedTitle}"
+                                        FontSize="16"
+                                        HeightRequest="70"
+                                        WidthRequest="450"
+                                        HorizontalOptions="Fill"/>
+                            </Frame>
+                        </VerticalStackLayout>
                     </VerticalStackLayout>
-                </Frame>
 
-                <!-- Right column spacer -->
-                <BoxView Grid.Column="2" Grid.RowSpan="3" />
+                    <!-- Error Message -->
+                    <Frame IsVisible="{Binding HasError}"
+                           BackgroundColor="#FFEBEE"
+                           BorderColor="#EF5350"
+                           Padding="10"
+                           CornerRadius="8"
+                           Margin="0,10,0,0">
+                        <Label Text="{Binding ErrorMessage}"
+                               TextColor="#B71C1C"
+                               FontSize="14"
+                               HorizontalOptions="Center"/>
+                    </Frame>
+
+                    <!-- Sign Up Button -->
+                    <Button Text="Sign Up"
+                            Command="{Binding SignupCommand}"
+                            BackgroundColor="#2196F3"
+                            TextColor="White"
+                            FontSize="16"
+                            HeightRequest="50"
+                            CornerRadius="25"
+                            Margin="0,20,0,0"/>
+
+                    <!-- Login Link -->
+                    <HorizontalStackLayout HorizontalOptions="Center" Spacing="5">
+                        <Label Text="Already have an account?"
+                               FontSize="14"
+                               TextColor="Gray"/>
+                        <Label Text="Login"
+                               FontSize="14"
+                               TextColor="#2196F3">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding GoToLoginCommand}"/>
+                            </Label.GestureRecognizers>
+                        </Label>
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
             </Grid>
-        </Grid>
-    </ScrollView>
+        </ScrollView>
+    </Grid>
 </ContentPage>

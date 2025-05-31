@@ -8,6 +8,9 @@ using TDFShared.Constants;
 using TDFShared.DTOs.Messages;
 using TDFShared.Enums;
 using TDFShared.Helpers;
+using TDFShared.Exceptions;
+using TDFShared.Services;
+using TDFMAUI.Services;
 
 namespace TDFMAUI.Services
 {
@@ -16,6 +19,7 @@ namespace TDFMAUI.Services
         private ClientWebSocket? _webSocket;
         private readonly ILogger<WebSocketService> _logger;
         private readonly SecureStorageService _secureStorage;
+        private readonly TDFShared.Services.IAuthService _authService;
         private string _serverUrl => ApiConfig.WebSocketUrl;
         private CancellationTokenSource? _cancellationTokenSource;
         private readonly SemaphoreSlim _connectionLock = new SemaphoreSlim(1, 1);
@@ -41,145 +45,121 @@ namespace TDFMAUI.Services
 
         public WebSocketService(
             ILogger<WebSocketService> logger,
-            SecureStorageService secureStorage)
+            SecureStorageService secureStorage,
+            TDFShared.Services.IAuthService authService)
         {
-            // Log constructor entry
-            logger?.LogInformation("WebSocketService constructor started.");
-
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _secureStorage = secureStorage;
-
-            // Setup reconnect timer but don't start it yet
+            _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _reconnectTimer = new Timer(ReconnectCallback, null, Timeout.Infinite, Timeout.Infinite);
+        }
 
-            // Log constructor exit
-            logger?.LogInformation("WebSocketService constructor finished.");
+        private async Task<string?> GetValidTokenAsync(string? providedToken = null)
+        {
+            try
+            {
+                // First try the provided token if any
+                if (!string.IsNullOrEmpty(providedToken))
+                {
+                    _logger.LogDebug("Using provided token for WebSocket connection");
+                    return providedToken;
+                }
+
+                // For desktop platforms, try to get the in-memory token
+                if (DeviceHelper.IsDesktop)
+                {
+                    var desktopToken = ApiConfig.CurrentToken;
+                    if (!string.IsNullOrEmpty(desktopToken))
+                    {
+                        _logger.LogDebug("Using in-memory token for desktop platform");
+                        return desktopToken;
+                    }
+                }
+
+                // For mobile platforms, try to get the stored token
+                var storedToken = await _secureStorage.GetTokenAsync();
+                if (!string.IsNullOrEmpty(storedToken))
+                {
+                    _logger.LogDebug("Using stored token from secure storage");
+                    return storedToken;
+                }
+
+                // If no token is available, try to refresh
+                if (await _authService.RefreshTokenAsync())
+                {
+                    // After refresh, try to get the token again
+                    if (DeviceHelper.IsDesktop)
+                    {
+                        return ApiConfig.CurrentToken;
+                    }
+                    else
+                    {
+                        return await _secureStorage.GetTokenAsync();
+                    }
+                }
+
+                _logger.LogWarning("No valid token available for WebSocket connection");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting valid token for WebSocket connection");
+                return null;
+            }
         }
 
         public async Task<bool> ConnectAsync(string? token = null)
         {
-            // Check if already connecting
             if (_isConnecting)
             {
                 _logger.LogInformation("WebSocket connection already in progress");
                 return false;
             }
 
-            // Ensure we're not connecting simultaneously from multiple places
             await _connectionLock.WaitAsync();
             _isConnecting = true;
 
             try
             {
-                // First check if already connected
                 if (_webSocket?.State == WebSocketState.Open)
                 {
                     _logger.LogDebug("WebSocket already connected");
                     return true;
                 }
 
-                // Dispose of existing WebSocket if any
                 await CleanupExistingConnectionAsync();
 
-                // On desktop, use ApiConfig.CurrentToken if no token is provided
-                if (string.IsNullOrEmpty(token))
-                {
-                    if (DeviceHelper.IsDesktop)
-                    {
-                        token = ApiConfig.CurrentToken;
-                        if (string.IsNullOrEmpty(token))
-                        {
-                            _logger.LogWarning("Cannot connect WebSocket: No in-memory authentication token available (desktop)");
-                            return false;
-                        }
-                        else
-                        {
-                            _logger.LogInformation("Using in-memory token from ApiConfig for WebSocket connection (desktop). Token length: {Length}", token.Length);
-                        }
-                    }
-                    else
-                    {
-                        var tokenResult = await _secureStorage.GetTokenAsync();
-                        token = tokenResult.Item1;
-                        if (string.IsNullOrEmpty(token))
-                        {
-                            _logger.LogWarning("Cannot connect WebSocket: No authentication token available");
-                            return false;
-                        }
-                        else
-                        {
-                            _logger.LogInformation("Retrieved token from secure storage for WebSocket connection. Token length: {Length}", token.Length);
-                        }
-                    }
-                }
-                // Additional warning if token is still null or empty
-                if (string.IsNullOrEmpty(token))
-                {
-                    _logger.LogWarning("WebSocketService.ConnectAsync called with no valid token. This may indicate a race condition or missing login.");
-                    return false;
-                }
-                else
-                {
-                    _logger.LogInformation("Using provided token for WebSocket connection. Token length: {Length}", token.Length);
-                }
-
-                // Create new WebSocket and cancellation token
                 _webSocket = new ClientWebSocket();
                 _cancellationTokenSource = new CancellationTokenSource();
 
-                // Add authentication header
-                _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
-
-                // Log token length for debugging (don't log the actual token)
-                _logger.LogInformation("WebSocket using token of length {TokenLength}", token?.Length ?? 0);
-
-                // Log the first and last 5 characters of the token for debugging (but not the whole token)
-                if (token?.Length > 10)
+                // Get a valid token using the new method
+                var authToken = await GetValidTokenAsync(token);
+                if (string.IsNullOrEmpty(authToken))
                 {
-                    string tokenPrefix = token.Substring(0, 5);
-                    string tokenSuffix = token.Substring(token.Length - 5);
-                    _logger.LogInformation("WebSocket token prefix: {Prefix}..., suffix: ...{Suffix}", tokenPrefix, tokenSuffix);
+                    _logger.LogWarning("No authentication token available for WebSocket connection");
+                    return false;
                 }
 
-                // Add explicit certificate validation for development mode
-                if (ApiConfig.DevelopmentMode)
+                _logger.LogInformation("Using token for WebSocket connection. Token length: {Length}", authToken.Length);
+                _logger.LogInformation("WebSocket token prefix: {Prefix}..., suffix: ...{Suffix}", 
+                    authToken.Substring(0, Math.Min(5, authToken.Length)),
+                    authToken.Substring(Math.Max(0, authToken.Length - 5)));
+
+                _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {authToken}");
+
+                if (DeviceHelper.IsDevelopment)
                 {
-                    _webSocket.Options.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
                     _logger.LogWarning("WebSocket configured with development certificate validation (ALLOW ALL)");
+                    _webSocket.Options.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
                 }
 
-                // Connect to the WebSocket server
-                // Add token to URL as a query parameter as a fallback in case the header doesn't work
-                string serverUrlWithToken = _serverUrl;
-                if (!serverUrlWithToken.Contains("?"))
-                {
-                    serverUrlWithToken += $"?token={Uri.EscapeDataString(token)}";
-                }
-                else
-                {
-                    serverUrlWithToken += $"&token={Uri.EscapeDataString(token)}";
-                }
-
-                var serverUri = new Uri(serverUrlWithToken);
-                _logger.LogInformation("Connecting to WebSocket server at {Url}", serverUri.GetLeftPart(UriPartial.Path));
+                _logger.LogInformation("Connecting to WebSocket server at {Url}", _serverUrl);
 
                 try
                 {
-                    // Set a reasonable timeout for the connection
-                    _cancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(15));
-
-                    await _webSocket.ConnectAsync(serverUri, _cancellationTokenSource.Token);
-
-                    // Create a new cancellation token source now that connection succeeded
-                    _cancellationTokenSource.Dispose();
-                    _cancellationTokenSource = new CancellationTokenSource();
-
-                    _logger.LogInformation("Connected to WebSocket server");
-
-                    // Reset reconnect attempts on successful connection
+                    await _webSocket.ConnectAsync(new Uri(_serverUrl), _cancellationTokenSource.Token);
                     _reconnectAttempts = 0;
 
-                    // Raise connection status event on the UI thread
                     MainThread.BeginInvokeOnMainThread(() => {
                         try
                         {
@@ -195,10 +175,8 @@ namespace TDFMAUI.Services
                         }
                     });
 
-                    // Start receiving messages
                     StartReceiving();
 
-                    // Send a ping to verify connection
                     await SendMessageAsync(new
                     {
                         type = ApiRoutes.WebSocket.MessageTypes.Ping,
@@ -207,46 +185,30 @@ namespace TDFMAUI.Services
 
                     return true;
                 }
+                catch (WebSocketException wsEx) when (wsEx.Message.Contains("401"))
+                {
+                    _logger.LogError(wsEx, "Authentication failed (401 Unauthorized) when connecting to WebSocket server");
+                    
+                    // Try to refresh the token
+                    if (await _authService.RefreshTokenAsync())
+                    {
+                        _logger.LogInformation("Token refreshed successfully, attempting to reconnect");
+                        return await ConnectAsync(); // Retry connection with new token
+                    }
+                    
+                    _logger.LogWarning("Token refresh failed, cannot establish WebSocket connection");
+                    return false;
+                }
                 catch (OperationCanceledException)
                 {
                     _logger.LogWarning("WebSocket connection timed out");
-                    await CleanupExistingConnectionAsync();
-                    // Return false but don't throw - allow the app to function without WebSocket
-                    return false;
-                }
-                catch (WebSocketException wsEx) when (wsEx.Message.Contains("401"))
-                {
-                    _logger.LogError(wsEx, "Authentication failed (401 Unauthorized) when connecting to WebSocket server. Token may be invalid or expired.");
-
-                    // Raise error event
-                    MainThread.BeginInvokeOnMainThread(() => {
-                        ErrorReceived?.Invoke(this, new WebSocketErrorEventArgs
-                        {
-                            ErrorCode = "401",
-                            ErrorMessage = "Authentication failed. Please log out and log in again.",
-                            Timestamp = DateTime.UtcNow
-                        });
-                    });
-
                     await CleanupExistingConnectionAsync();
                     return false;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to connect to WebSocket server - continuing app in limited functionality mode");
-
-                    // Raise error event
-                    MainThread.BeginInvokeOnMainThread(() => {
-                        ErrorReceived?.Invoke(this, new WebSocketErrorEventArgs
-                        {
-                            ErrorCode = ex.GetType().Name,
-                            ErrorMessage = ex.Message,
-                            Timestamp = DateTime.UtcNow
-                        });
-                    });
-
+                    _logger.LogError(ex, "Error connecting to WebSocket server");
                     await CleanupExistingConnectionAsync();
-                    // Return false instead of throwing to allow the app to continue
                     return false;
                 }
             }
@@ -1152,7 +1114,6 @@ namespace TDFMAUI.Services
             }
         }
 
-        // Client-side methods for specific operations
         public async Task SendChatMessageAsync(int receiverId, string message)
         {
             await SendMessageAsync(new
@@ -1224,7 +1185,6 @@ namespace TDFMAUI.Services
             });
         }
 
-        // Add new methods to send user status updates
         public async Task UpdatePresenceStatusAsync(string status, string? statusMessage = null)
         {
             await SendMessageAsync(new
@@ -1246,7 +1206,6 @@ namespace TDFMAUI.Services
             });
         }
 
-        // Add the ping method to record activity
         public async Task SendActivityPingAsync()
         {
             await SendMessageAsync(new
@@ -1256,7 +1215,6 @@ namespace TDFMAUI.Services
             });
         }
 
-        // IDisposable Implementation
         public void Dispose()
         {
             Dispose(true);
@@ -1315,161 +1273,5 @@ namespace TDFMAUI.Services
         {
             Dispose(false);
         }
-
-        private void HandleNotificationSeen(JsonElement element)
-        {
-            try
-            {
-                int notificationId = 0;
-
-                if (element.TryGetProperty("notificationId", out var notificationIdElement))
-                {
-                    notificationId = notificationIdElement.GetInt32();
-                }
-
-                // You could raise an event or update UI directly
-                // For now, just log it
-                _logger.LogDebug("Notification {NotificationId} marked as seen", notificationId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error handling notification seen message");
-            }
-        }
-
-        private void HandleNotificationsSeen(JsonElement element)
-        {
-            try
-            {
-                var notificationIds = new List<int>();
-
-                if (element.TryGetProperty("notificationIds", out var idsElement) &&
-                    idsElement.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var idElement in idsElement.EnumerateArray())
-                    {
-                        notificationIds.Add(idElement.GetInt32());
-                    }
-                }
-
-                // You could raise an event or update UI directly
-                _logger.LogDebug("Multiple notifications marked as seen: {NotificationIds}",
-                    string.Join(", ", notificationIds));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error handling notifications seen message");
-            }
-        }
-
-        private void HandleAvailabilitySet(JsonElement element)
-        {
-            try
-            {
-                bool isAvailable = false;
-                DateTime timestamp = DateTime.UtcNow;
-                if (element.TryGetProperty("isAvailable", out var availableElement))
-                {
-                    isAvailable = availableElement.GetBoolean();
-                }
-                if (element.TryGetProperty("timestamp", out var ts) && ts.ValueKind == JsonValueKind.String)
-                {
-                     DateTime.TryParse(ts.GetString(), out timestamp);
-                }
-
-                _logger.LogInformation("Server confirmed availability set to: {IsAvailable}", isAvailable);
-                // Raise the event
-                MainThread.BeginInvokeOnMainThread(() => {
-                    AvailabilitySet?.Invoke(this, new AvailabilitySetEventArgs
-                    {
-                        IsAvailable = isAvailable,
-                        Timestamp = timestamp
-                    });
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error handling availability_set message");
-            }
-        }
-
-        private void HandleStatusUpdated(JsonElement element)
-        {
-             try
-            {
-                string status = "";
-                string statusMessage = null;
-                DateTime timestamp = DateTime.UtcNow;
-
-                if (element.TryGetProperty("status", out var statusElement))
-                {
-                    status = statusElement.GetString();
-                }
-                 if (element.TryGetProperty("statusMessage", out var msgElement) && msgElement.ValueKind == JsonValueKind.String)
-                {
-                    statusMessage = msgElement.GetString();
-                }
-                 if (element.TryGetProperty("timestamp", out var ts) && ts.ValueKind == JsonValueKind.String)
-                {
-                     DateTime.TryParse(ts.GetString(), out timestamp);
-                }
-
-                _logger.LogInformation("Server confirmed status updated to: {Status} ({StatusMessage})", status, statusMessage ?? "null");
-                // Raise the event
-                 MainThread.BeginInvokeOnMainThread(() => {
-                    StatusUpdateConfirmed?.Invoke(this, new StatusUpdateConfirmedEventArgs
-                    {
-                        Status = status,
-                        StatusMessage = statusMessage,
-                        Timestamp = timestamp
-                    });
-                 });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error handling status_updated message");
-            }
-        }
-
-        private void HandleError(JsonElement element)
-        {
-             try
-            {
-                string errorMessage = "An unknown error occurred.";
-                string errorCode = null;
-                DateTime timestamp = DateTime.UtcNow;
-
-                if (element.TryGetProperty("message", out var messageElement))
-                {
-                    errorMessage = messageElement.GetString() ?? errorMessage;
-                }
-                if (element.TryGetProperty("code", out var codeElement))
-                {
-                    errorCode = codeElement.GetString();
-                }
-                 if (element.TryGetProperty("timestamp", out var ts) && ts.ValueKind == JsonValueKind.String)
-                {
-                     DateTime.TryParse(ts.GetString(), out timestamp);
-                }
-
-                _logger.LogError("Received error from server: Code={ErrorCode}, Message={ErrorMessage}", errorCode ?? "N/A", errorMessage);
-
-                // Raise a specific error event
-                 MainThread.BeginInvokeOnMainThread(() => {
-                     ErrorReceived?.Invoke(this, new WebSocketErrorEventArgs
-                     {
-                         ErrorCode = errorCode,
-                         ErrorMessage = errorMessage,
-                         Timestamp = timestamp
-                     });
-                 });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error handling error message");
-            }
-        }
     }
-
-    // EventArgs definitions moved to TDFMAUI/Helpers/WebSocketEventArgs.cs
 }

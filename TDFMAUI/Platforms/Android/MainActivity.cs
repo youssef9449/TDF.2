@@ -9,6 +9,7 @@ using System.Text;
 using JavaThread = Java.Lang.Thread;
 using SystemThread = System.Threading.Thread;
 using AndroidX.Core.App;
+using Plugin.LocalNotification;
 
 namespace TDFMAUI
 {
@@ -28,6 +29,8 @@ namespace TDFMAUI
                 // Continue with normal initialization
                 base.OnCreate(savedInstanceState);
 
+                // Initialize LocalNotification
+                LocalNotificationCenter.CreateNotificationChannel();
                 CreateNotificationChannel();
 
                 LogToFile("MainActivity", "OnCreate completed successfully");

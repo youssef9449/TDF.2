@@ -19,17 +19,17 @@ namespace TDFShared.Exceptions
         /// <summary>
         /// Raw response content from the API
         /// </summary>
-        public string ResponseContent { get; }
+        public string? ResponseContent { get; }
         
         /// <summary>
         /// Validation errors keyed by property name
         /// </summary>
-        public Dictionary<string, string[]> ValidationErrors { get; }
+        public Dictionary<string, string[]> ValidationErrors { get; } = new();
 
         /// <summary>
         /// Creates a new API exception with status code and message
         /// </summary>
-        public ApiException(HttpStatusCode statusCode, string message, string responseContent = null) 
+        public ApiException(HttpStatusCode statusCode, string message, string? responseContent = null) 
             : base(message)
         {
             StatusCode = statusCode;
@@ -39,7 +39,7 @@ namespace TDFShared.Exceptions
         /// <summary>
         /// Creates a new API exception with status code, message, and validation errors
         /// </summary>
-        public ApiException(HttpStatusCode statusCode, string message, Dictionary<string, string[]> validationErrors, string responseContent = null) 
+        public ApiException(HttpStatusCode statusCode, string message, Dictionary<string, string[]> validationErrors, string? responseContent = null) 
             : this(statusCode, message, responseContent)
         {
             ValidationErrors = validationErrors;
@@ -48,7 +48,7 @@ namespace TDFShared.Exceptions
         /// <summary>
         /// Creates a new API exception with a message and inner exception
         /// </summary>
-        public ApiException(string message, Exception innerException = null)
+        public ApiException(string message, Exception? innerException = null)
             : base(message, innerException)
         {
             StatusCode = HttpStatusCode.InternalServerError;

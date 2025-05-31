@@ -119,6 +119,12 @@ namespace TDFMAUI.Helpers
         }
 
         /// <summary>
+        /// Determines if the current platform should handle automatic reconnection and login redirection
+        /// This is true for mobile platforms (iOS/Android) and false for desktop platforms
+        /// </summary>
+        public static bool ShouldHandleAutoReconnect => IsMobile;
+
+        /// <summary>
         /// Gets the current device idiom (phone, tablet, desktop, tv, watch)
         /// </summary>
         public static DeviceIdiom DeviceIdiom => DeviceInfo.Current.Idiom;

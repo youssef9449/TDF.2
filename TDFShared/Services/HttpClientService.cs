@@ -272,47 +272,51 @@ namespace TDFShared.Services
                 var context = new Context(endpoint);
                 context["endpoint"] = endpoint;
 
-                // Create a wrapper that returns HttpResponseMessage for the retry policy
+                T? result = default; // Variable to store the actual result of the operation
+
+                // Create a wrapper that executes the operation and returns an HttpResponseMessage for the retry policy
                 var httpResponseOperation = async (Context ctx) =>
                 {
                     try
                     {
-                        var result = await operation();
+                        result = await operation(); // Execute the actual operation and store its result
 
-                        // If T is HttpResponseMessage, return it directly
+                        // If T is HttpResponseMessage, return it directly for policy evaluation
                         if (result is HttpResponseMessage httpResponse)
                         {
-                            return httpResponse;
+                            // If the response is successful or it's a client error (400-level), don't retry
+                            if (httpResponse.IsSuccessStatusCode || (int)httpResponse.StatusCode < 500)
+                            {
+                                return httpResponse;
+                            }
+                            // Only retry for server errors (500-level)
+                            if (!IsRetryableStatusCode(httpResponse.StatusCode))
+                            {
+                                return httpResponse;
+                            }
                         }
 
-                        // For other types, create a successful response
-                        var response = new HttpResponseMessage(HttpStatusCode.OK);
-                        return response;
+                        // For other types, create a successful HttpResponseMessage for the policy to consider it successful
+                        // The actual 'result' (of type T) is already stored.
+                        return new HttpResponseMessage(HttpStatusCode.OK);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogWarning(ex, "Request to {Endpoint} failed: {Message}", endpoint, ex.Message);
-                        throw;
+                        throw; // Re-throw to allow Polly to handle retries based on the exception
                     }
                 };
 
                 // Execute the operation with retry policy
+                // The policy will execute httpResponseOperation, which in turn executes the original 'operation'
                 var httpResult = await _retryPolicy.ExecuteAsync(httpResponseOperation, context);
 
-                // If we're expecting HttpResponseMessage, return the actual result
-                if (typeof(T) == typeof(HttpResponseMessage))
-                {
-                    stopwatch.Stop();
-                    UpdateStatistics(true, stopwatch.Elapsed, null);
-                    return (T)(object)httpResult;
-                }
-
-                // For other types, execute the original operation again to get the actual result
-                var actualResult = await operation();
-
+                // After the policy has completed (either successfully or after retries),
+                // return the 'result' that was captured during the *last successful* execution of 'operation'.
+                // If the policy failed and re-threw an exception, this part won't be reached.
                 stopwatch.Stop();
                 UpdateStatistics(true, stopwatch.Elapsed, null);
-                return actualResult;
+                return result!; // Use null-forgiving operator as 'result' will be set if no exception was thrown
             }
             catch (Exception ex)
             {
@@ -532,6 +536,7 @@ namespace TDFShared.Services
 
         private static bool IsRetryableStatusCode(HttpStatusCode statusCode)
         {
+            // Only retry for server errors (500-level) and specific network-related status codes
             return statusCode == HttpStatusCode.RequestTimeout ||
                    statusCode == (HttpStatusCode)429 || // TooManyRequests
                    statusCode == HttpStatusCode.InternalServerError ||

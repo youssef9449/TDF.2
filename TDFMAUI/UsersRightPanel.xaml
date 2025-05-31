@@ -4,6 +4,8 @@
              x:Class="TDFMAUI.UsersRightPanel"
              xmlns:viewModels="clr-namespace:TDFMAUI.ViewModels"
              xmlns:converters="clr-namespace:TDFMAUI.Converters"
+             xmlns:local="clr-namespace:TDFMAUI"
+             x:DataType="local:UsersRightPanel"
              BackgroundColor="{AppThemeBinding Light=#F7F7F7, Dark=#2D2D2D}"
              Shell.NavBarIsVisible="False">
     <ContentPage.Resources>

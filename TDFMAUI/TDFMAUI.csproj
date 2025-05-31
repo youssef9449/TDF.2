@@ -3,7 +3,7 @@
 
 	<PropertyGroup>
 		<MauiVersion>8.0.0</MauiVersion>
-		<TargetFrameworks>net8.0-ios;net8.0-maccatalyst;net8.0-android34.0;net8.0-windows10.0.19041.0</TargetFrameworks>
+		<TargetFrameworks>net8.0-ios;net8.0-maccatalyst;net8.0-android34;net8.0-windows10.0.19041.0</TargetFrameworks>
 		<OutputType>WinExe</OutputType>
 		<RootNamespace>TDFMAUI</RootNamespace>
 		<UseMaui>true</UseMaui>
@@ -31,7 +31,7 @@
 	</PropertyGroup>
 
 		<!-- Android specific JAVAC options -->
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-android34.0'">
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-android34'">
 		<AndroidJavacTargetOptions>-Xlint:-options</AndroidJavacTargetOptions>
 		<!-- Ensure all required assemblies are included -->
 		<AndroidLinkMode>None</AndroidLinkMode>
@@ -39,6 +39,12 @@
 		<AndroidUseAapt2>true</AndroidUseAapt2>
 		<AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
 		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+		<AndroidResgenFile>Resources\Resource.designer.cs</AndroidResgenFile>
+		<AndroidResgenClass>Resource</AndroidResgenClass>
+		<AndroidManifest>Properties\AndroidManifest.xml</AndroidManifest>
+		<AndroidUseLatestPlatformSdk>true</AndroidUseLatestPlatformSdk>
+		<AndroidResourceNameCase>Lowercase</AndroidResourceNameCase>
+		<AndroidUseManagedDesignTimeResourceGenerator>True</AndroidUseManagedDesignTimeResourceGenerator>
 	</PropertyGroup>
 	
 	<!-- Platform-specific supported versions -->
@@ -66,7 +72,9 @@
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
 		<MauiImage Include="Resources\Images\*" />
 		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
-		<MauiFont Include="Resources\Fonts\*" />
+		<MauiFont Include="Resources\Fonts\OpenSans-Regular.ttf" />
+		<MauiFont Include="Resources\Fonts\OpenSans-Semibold.ttf" />
+		<MauiFont Include="Resources\Fonts\materialdesignicons-webfont.ttf" />
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
@@ -90,6 +98,7 @@
 
 	<ItemGroup Condition="$(TargetFramework.Contains('-android'))">
 		<PackageReference Include="Plugin.Firebase.CloudMessaging" Version="3.1.2" />
+		<PackageReference Include="Plugin.LocalNotification" Version="12.0.1" />
 	</ItemGroup>
 
 	<ItemGroup Condition="$(TargetFramework.Contains('-ios'))">
@@ -98,7 +107,6 @@
 
 	<ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
 		<PackageReference Include="Plugin.Firebase.CloudMessaging" Version="3.1.2" />
-		<PackageReference Include="Plugin.LocalNotification" Version="12.0.1" />
 		<PackageReference Include="System.Collections" Version="4.3.0" />
 		<PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0" />
 		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" />
@@ -109,7 +117,7 @@
 		<PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop" Version="8.0.14" />
 		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.240211001" />
 		<PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
-
+		<PackageReference Include="Plugin.LocalNotification" Version="12.0.1" />
 	</ItemGroup>
 
 	<!-- Configuration files -->

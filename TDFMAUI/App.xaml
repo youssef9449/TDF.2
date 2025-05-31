@@ -13,6 +13,11 @@
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- Font Resources -->
+            <x:String x:Key="OpenSansRegular">OpenSans-Regular</x:String>
+            <x:String x:Key="OpenSansSemibold">OpenSans-Semibold</x:String>
+            <x:String x:Key="MaterialDesignIcons">MaterialDesignIcons</x:String>
+
             <!-- Converters -->
             <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
             <converters:BoolToThicknessConverter x:Key="BoolToThicknessConverter" />

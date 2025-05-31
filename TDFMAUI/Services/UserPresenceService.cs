@@ -81,26 +81,41 @@ namespace TDFMAUI.Services
         {
             try
             {
+                _logger.LogInformation("Attempting to fetch users from API endpoint: users/all");
+                
                 // Get all users from the API
-                // The GetAsync method in ApiService already unwraps ApiResponse<T> and returns T (the Data property)
                 var allUsersData = await _apiService.GetAsync<IEnumerable<UserDto>>("users/all");
 
                 // Check if data was successfully retrieved
-                if (allUsersData != null)
+                if (allUsersData == null)
                 {
-                    var allUsersDictionary = new Dictionary<int, UserPresenceInfo>();
+                    _logger.LogWarning("GetOnlineUsersAsync: Received null data from API for users/all");
+                    return GetCachedUsers();
+                }
 
-                    // Map UserDto to UserPresenceInfo
-                    foreach (var userDto in allUsersData)
+                var allUsersDictionary = new Dictionary<int, UserPresenceInfo>();
+                int processedCount = 0;
+                int skippedCount = 0;
+
+                // Map UserDto to UserPresenceInfo
+                foreach (var userDto in allUsersData)
+                {
+                    if (userDto == null)
+                    {
+                        skippedCount++;
+                        continue;
+                    }
+
+                    try
                     {
                         var userInfo = new UserPresenceInfo
                         {
                             UserId = userDto.UserID,
-                            Username = userDto.UserName,
-                            FullName = userDto.FullName,
-                            Department = userDto.Department,
+                            Username = userDto.UserName ?? string.Empty,
+                            FullName = userDto.FullName ?? string.Empty,
+                            Department = userDto.Department ?? string.Empty,
                             Status = userDto.PresenceStatus,
-                            StatusMessage = userDto.StatusMessage,
+                            StatusMessage = userDto.StatusMessage ?? string.Empty,
                             IsAvailableForChat = userDto.IsAvailableForChat,
                             LastActivityTime = userDto.LastActivityTime ?? DateTime.UtcNow,
                             ProfilePictureData = userDto.Picture
@@ -108,27 +123,59 @@ namespace TDFMAUI.Services
 
                         allUsersDictionary[userInfo.UserId] = userInfo;
                         _userStatuses[userInfo.UserId] = userInfo; // Update cache
+                        processedCount++;
                     }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error processing user data for user ID: {UserId}", userDto.UserID);
+                        skippedCount++;
+                    }
+                }
 
-                    return allUsersDictionary;
-                }
-                else
+                _logger.LogInformation("Successfully processed {ProcessedCount} users, skipped {SkippedCount} users", 
+                    processedCount, skippedCount);
+
+                if (allUsersDictionary.Count == 0)
                 {
-                    _logger.LogWarning("GetOnlineUsersAsync: Received null data from API for users/all.");
+                    _logger.LogWarning("No users were successfully processed from the API response");
+                    return GetCachedUsers();
                 }
+
+                return allUsersDictionary;
             }
             catch (ApiException apiEx)
             {
-                _logger.LogError(apiEx, "API Error fetching online users: {StatusCode} - {Message}", apiEx.StatusCode, apiEx.Message);
+                _logger.LogError(apiEx, "API Error fetching online users: {StatusCode} - {Message}", 
+                    apiEx.StatusCode, apiEx.Message);
+                
+                // Check if this is a server error (500)
+                if (apiEx.StatusCode == System.Net.HttpStatusCode.InternalServerError)
+                {
+                    _logger.LogWarning("Server error occurred, checking server health...");
+                    try
+                    {
+                        var isHealthy = await _apiService.TestConnectivityAsync();
+                        _logger.LogInformation("Server health check result: {IsHealthy}", isHealthy);
+                    }
+                    catch (Exception healthEx)
+                    {
+                        _logger.LogError(healthEx, "Error checking server health");
+                    }
+                }
+                
+                return GetCachedUsers();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error fetching online users");
+                _logger.LogError(ex, "Unexpected error fetching online users: {Message}", ex.Message);
+                return GetCachedUsers();
             }
+        }
 
-            // Fallback to cached data or empty dictionary if API call fails or returns no data
-            _logger.LogWarning("GetOnlineUsersAsync: Falling back to cached user statuses or empty dictionary.");
-            return _userStatuses.Any() ? _userStatuses.ToDictionary(kv => kv.Key, kv => kv.Value) : new Dictionary<int, UserPresenceInfo>();
+        private Dictionary<int, UserPresenceInfo> GetCachedUsers()
+        {
+            _logger.LogInformation("Returning cached user statuses. Cache contains {Count} users", _userStatuses.Count);
+            return _userStatuses.ToDictionary(kv => kv.Key, kv => kv.Value);
         }
 
         public async Task UpdateStatusAsync(UserPresenceStatus status, string statusMessage, CancellationToken cancellationToken = default)

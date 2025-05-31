@@ -2,9 +2,11 @@ using System;
 using TDFMAUI.Helpers;
 using Microsoft.Extensions.Logging;
 using TDFShared.Enums;
+#if !WINDOWS
 using Plugin.LocalNotification;
 using Plugin.LocalNotification.AndroidOption;
 using Plugin.LocalNotification.iOSOption;
+#endif
 #if MACCATALYST
 using UIKit;
 using Foundation;
@@ -79,10 +81,11 @@ namespace TDFMAUI.Services
         {
             try
             {
+#if !WINDOWS
                 // Register for notification delivery events
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived += OnNotificationReceived;
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped += OnNotificationTapped;
-                
+#endif
                 _logger.LogInformation("Notification event handlers initialized successfully");
             }
             catch (Exception ex)
@@ -91,6 +94,7 @@ namespace TDFMAUI.Services
             }
         }
         
+#if !WINDOWS
         private void OnNotificationReceived(Plugin.LocalNotification.EventArgs.NotificationEventArgs e)
         {
             try
@@ -200,7 +204,7 @@ namespace TDFMAUI.Services
                     }
                     catch (Exception innerEx)
                     {
-                        _logger.LogError(innerEx, "Error updating notification delivery status for tapped notification");
+                        _logger.LogError(innerEx, "Error handling notification tap");
                     }
                 });
             }
@@ -209,6 +213,7 @@ namespace TDFMAUI.Services
                 _logger.LogError(ex, "Error handling notification tapped event");
             }
         }
+#endif
 
         private async Task InitializeScheduledNotificationsAsync()
         {
@@ -998,8 +1003,10 @@ namespace TDFMAUI.Services
             try
             {
                 // Unregister event handlers
+#if !WINDOWS
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived -= OnNotificationReceived;
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped -= OnNotificationTapped;
+#endif
                 
                 // Dispose the cleanup timer
                 _cleanupTimer?.Dispose();

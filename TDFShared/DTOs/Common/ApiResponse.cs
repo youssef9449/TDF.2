@@ -51,48 +51,16 @@ namespace TDFShared.DTOs.Common
     public class ApiResponse<T> : ApiResponseBase
     {
         /// <summary>
-        /// Whether the request was successful
-        /// </summary>
-        [JsonPropertyName("success")]
-        public bool Success { get; set; }
-
-        /// <summary>
-        /// Message describing the result (especially useful for errors)
-        /// </summary>
-        [JsonPropertyName("message")]
-        public string Message { get; set; } = string.Empty; // Initialize to avoid null issues
-
-        /// <summary>
-        /// Optional detailed error message
-        /// </summary>
-        [JsonPropertyName("errorMessage")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? ErrorMessage { get; set; } // Added
-
-        /// <summary>
-        /// HTTP status code associated with the response
-        /// </summary>
-        [JsonPropertyName("statusCode")]
-        public int StatusCode { get; set; } = (int)HttpStatusCode.OK; // Added and initialized
-
-        /// <summary>
         /// The data payload of the response
         /// </summary>
         [JsonPropertyName("data")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-        public T? Data { get; set; } // Changed to nullable T?
-
-        /// <summary>
-        /// Optional validation errors if applicable
-        /// </summary>
-        [JsonPropertyName("errors")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public Dictionary<string, List<string>>? Errors { get; set; } // Changed to nullable dictionary?
+        public T? Data { get; set; }
 
         /// <summary>
         /// Default constructor
         /// </summary>
-        public ApiResponse() { } // Added default constructor
+        public ApiResponse() { }
 
         /// <summary>
         /// Creates a successful response with data

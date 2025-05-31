@@ -22,6 +22,9 @@ using TDFShared.Helpers;
 
 namespace TDFMAUI.Services;
 
+/// <summary>
+/// Implementation of IAuthService that handles token management
+/// </summary>
 public class AuthService : IAuthService
 {
     private readonly SecureStorageService _secureStorageService;
@@ -34,6 +37,8 @@ public class AuthService : IAuthService
     private readonly IRoleService _roleService;
     private readonly IApiService _apiService;
     private readonly ISecureStorage _secureStorage;
+    private string? _currentToken;
+    private DateTime _tokenExpiration = DateTime.MinValue;
 
     public AuthService(
         SecureStorageService secureStorageService,
@@ -827,5 +832,141 @@ public class AuthService : IAuthService
     {
         _logger?.LogInformation("AuthService: Setting authentication token of length {Length}", token?.Length ?? 0);
         await _httpClientService.SetAuthenticationTokenAsync(token);
+    }
+
+    public async Task<string?> GetTokenAsync()
+    {
+        try
+        {
+            // If we have a valid in-memory token, return it
+            if (!string.IsNullOrEmpty(_currentToken) && DateTime.UtcNow < _tokenExpiration)
+            {
+                return _currentToken;
+            }
+
+            // Try to get token from secure storage
+            var storedToken = await _secureStorageService.GetAsync("auth_token");
+            if (!string.IsNullOrEmpty(storedToken))
+            {
+                _currentToken = storedToken;
+                // Set expiration to 1 hour from now (adjust based on your token lifetime)
+                _tokenExpiration = DateTime.UtcNow.AddHours(1);
+                return storedToken;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting authentication token");
+            return null;
+        }
+    }
+
+    public async Task<string?> RefreshTokenAsync()
+    {
+        try
+        {
+            // Get the refresh token
+            var refreshToken = await _secureStorageService.GetAsync("refresh_token");
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                _logger.LogWarning("No refresh token available");
+                return null;
+            }
+
+            // Call your token refresh endpoint
+            // This is a placeholder - implement according to your authentication system
+            var newToken = await RefreshTokenFromServerAsync(refreshToken);
+            if (!string.IsNullOrEmpty(newToken))
+            {
+                // Store the new token
+                await _secureStorageService.SetAsync("auth_token", newToken);
+                _currentToken = newToken;
+                _tokenExpiration = DateTime.UtcNow.AddHours(1); // Adjust based on your token lifetime
+                return newToken;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing authentication token");
+            return null;
+        }
+    }
+
+    public async Task<bool> IsTokenValidAsync()
+    {
+        try
+        {
+            var token = await GetTokenAsync();
+            if (string.IsNullOrEmpty(token))
+            {
+                return false;
+            }
+
+            // Check if token is expired
+            if (DateTime.UtcNow >= _tokenExpiration)
+            {
+                return false;
+            }
+
+            // You might want to add additional validation here
+            // For example, checking the token's signature or claims
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating token");
+            return false;
+        }
+    }
+
+    public async Task<string?> GetValidTokenAsync()
+    {
+        try
+        {
+            // First check if current token is valid
+            if (await IsTokenValidAsync())
+            {
+                return _currentToken;
+            }
+
+            // Try to refresh the token
+            var newToken = await RefreshTokenAsync();
+            if (!string.IsNullOrEmpty(newToken))
+            {
+                return newToken;
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting valid token");
+            return null;
+        }
+    }
+
+    private async Task<string?> RefreshTokenFromServerAsync(string refreshToken)
+    {
+        // Implement your token refresh logic here
+        // This is a placeholder - replace with your actual implementation
+        try
+        {
+            // Example implementation:
+            // var response = await _apiService.PostAsync<TokenRefreshRequest, TokenResponse>("auth/refresh", new TokenRefreshRequest { RefreshToken = refreshToken });
+            // return response?.Token;
+            
+            _logger.LogWarning("Token refresh not implemented");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing token from server");
+            return null;
+        }
     }
 }

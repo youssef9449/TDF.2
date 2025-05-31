@@ -22,6 +22,8 @@ namespace TDFMAUI
     public partial class App : Application
     {
         private static UserDto? _currentUser;
+        private readonly ILogger<App> _logger;
+
         public static UserDto? CurrentUser
         {
             get => _currentUser;
@@ -53,6 +55,10 @@ namespace TDFMAUI
         {
             try
             {
+                // Initialize logger
+                _logger = Services?.GetService<ILogger<App>>() ?? 
+                    throw new InvalidOperationException("Logger service not available");
+
                 // Check if we're starting in safe mode (from intent)
                 CheckSafeMode();
 
@@ -354,7 +360,7 @@ namespace TDFMAUI
                     {
                         logger.LogInformation("User is not authenticated. Showing login page.");
                         var loginPage = Services.GetRequiredService<TDFMAUI.Features.Auth.LoginPage>();
-                        MainPage = loginPage;
+                        MainPage = new NavigationPage(loginPage);
                     }
                 }
                 catch (Exception ex)
@@ -1119,6 +1125,7 @@ namespace TDFMAUI
 
         private void SetupFirebaseCloudMessaging()
         {
+#if ANDROID || IOS
             try
             {
                 // Subscribe to notification received
@@ -1144,61 +1151,50 @@ namespace TDFMAUI
                         System.Diagnostics.Debug.WriteLine($"Error handling FCM notification: {ex.Message}");
                     }
                 };
-                // No direct token event or property; token registration is handled by PushNotificationService
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error setting up FCM: {ex.Message}");
             }
+#else
+            // FCM is not supported on this platform
+            System.Diagnostics.Debug.WriteLine("Firebase Cloud Messaging is not supported on this platform");
+#endif
         }
 
-        private async void OnWebSocketError(object sender, WebSocketErrorEventArgs e)
+        private void OnWebSocketError(object sender, WebSocketErrorEventArgs e)
         {
-            try
+            _logger.LogWarning("WebSocket error received: {ErrorCode} - {ErrorMessage}", e.ErrorCode, e.ErrorMessage);
+
+            // Only redirect to login page on mobile platforms
+            if (e.ErrorCode == "401" && DeviceHelper.ShouldHandleAutoReconnect)
             {
-                DebugService.LogWarning("App", $"WebSocket error received: {e.ErrorCode} - {e.ErrorMessage}");
-
-                // Handle 401 Unauthorized error
-                if (e.ErrorCode == "401")
+                _logger.LogWarning("WebSocket authentication failed, redirecting to login page");
+                if (Services != null)
                 {
-                    DebugService.LogWarning("App", "WebSocket authentication failed, redirecting to login page");
-                    
-                    // Clear current user and token
-                    CurrentUser = null;
-                    if (Services != null)
+                    var loginPage = Services.GetService<LoginPage>();
+                    if (loginPage != null)
                     {
-                        var secureStorage = Services.GetService<SecureStorageService>();
-                        if (secureStorage != null)
-                        {
-                            await secureStorage.RemoveTokenAsync();
-                        }
+                        MainPage = loginPage;
                     }
-
-                    // Navigate to login page
-                    await MainThread.InvokeOnMainThreadAsync(async () =>
+                    else
                     {
-                        try
-                        {
-                            var loginPage = Services?.GetService<TDFMAUI.Features.Auth.LoginPage>();
-                            if (loginPage != null)
-                            {
-                                MainPage = loginPage;
-                            }
-                            else
-                            {
-                                await Shell.Current.GoToAsync("LoginPage");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            DebugService.LogError("App", $"Error navigating to login page: {ex.Message}");
-                        }
-                    });
+                        _logger.LogError("Failed to get LoginPage from service provider");
+                    }
                 }
             }
-            catch (Exception ex)
+            else if (e.ErrorCode == "401")
             {
-                DebugService.LogError("App", $"Error handling WebSocket error: {ex.Message}");
+                _logger.LogInformation("WebSocket authentication failed on desktop platform - skipping login redirect");
+            }
+        }
+        public new Page MainPage
+        {
+            get => base.MainPage;
+            set
+            {
+                System.Diagnostics.Debug.WriteLine($"[App] MainPage setter called. Old: {base.MainPage?.GetType().Name ?? "null"}, New: {value?.GetType().Name ?? "null"}");
+                base.MainPage = value;
             }
         }
     }

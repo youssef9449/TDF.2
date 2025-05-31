@@ -110,9 +110,9 @@ namespace TDFMAUI
                 })
                 .ConfigureFonts(fonts =>
                 {
-                    fonts.AddFont("OpenSans-Regular.ttf", "OpenSans-Regular");
-                    fonts.AddFont("OpenSans-Semibold.ttf", "OpenSans-Semibold");
-                    fonts.AddFont("materialdesignicons-webfont.ttf", "MaterialDesignIcons");
+                    fonts.AddFont("Resources/Fonts/OpenSans-Regular.ttf", "OpenSans-Regular");
+                    fonts.AddFont("Resources/Fonts/OpenSans-Semibold.ttf", "OpenSans-Semibold");
+                    fonts.AddFont("Resources/Fonts/materialdesignicons-webfont.ttf", "MaterialDesignIcons");
                 });
 
             try

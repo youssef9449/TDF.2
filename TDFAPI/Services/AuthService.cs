@@ -44,6 +44,8 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
     private readonly int _maxFailedAttempts;
     private readonly TimeSpan _lockoutDuration;
 
+    private string? _currentToken;
+
     public AuthService(
         IUserRepository userRepository,
         IRevokedTokenRepository revokedTokenRepository,
@@ -642,6 +644,17 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             // In a high-security environment, you might want to fail closed (return true)
             return false;
         }
+    }
+
+    public async Task<string?> GetCurrentTokenAsync()
+    {
+        return await Task.FromResult(_currentToken);
+    }
+
+    public async Task SetAuthenticationTokenAsync(string token)
+    {
+        _currentToken = token;
+        await Task.CompletedTask;
     }
 
     #region IDisposable Implementation

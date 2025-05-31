@@ -66,10 +66,9 @@ namespace TDFMAUI.Features.Dashboard
             }
             
             // Refresh data when the page appears
-            // Use Task.Run for non-blocking UI
             if (_viewModel != null)
             {
-                Task.Run(() => _viewModel.RefreshCommand.Execute(null));
+                Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() => _viewModel.RefreshCommand.Execute(null));
             }
         }
         

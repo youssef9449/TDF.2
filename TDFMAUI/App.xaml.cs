@@ -911,6 +911,7 @@ namespace TDFMAUI
                         webSocketService.ChatMessageReceived += OnChatMessageReceived;
                         webSocketService.ConnectionStatusChanged += OnConnectionStatusChanged;
                         webSocketService.UserStatusChanged += OnUserStatusChanged;
+                        webSocketService.ErrorReceived += OnWebSocketError;
 
                         DebugService.LogInfo("App", "WebSocketService event handlers registered successfully");
                     }
@@ -945,6 +946,7 @@ namespace TDFMAUI
                         webSocketService.ChatMessageReceived -= OnChatMessageReceived;
                         webSocketService.ConnectionStatusChanged -= OnConnectionStatusChanged;
                         webSocketService.UserStatusChanged -= OnUserStatusChanged;
+                        webSocketService.ErrorReceived -= OnWebSocketError;
                     }
                 }
             }
@@ -981,10 +983,39 @@ namespace TDFMAUI
                                 var secureStorage = Services.GetService<SecureStorageService>();
                                 if (secureStorage != null)
                                 {
-                                    var (token, _) = await secureStorage.GetTokenAsync();
-                                    if (!string.IsNullOrEmpty(token))
+                                    var (token, expiration) = await secureStorage.GetTokenAsync();
+                                    if (!string.IsNullOrEmpty(token) && expiration > DateTime.UtcNow)
                                     {
                                         await webSocketService.ConnectAsync(token);
+                                    }
+                                    else
+                                    {
+                                        DebugService.LogWarning("App", "WebSocket reconnect skipped: token missing or expired.");
+                                        // Handle token expiration by redirecting to login
+                                        await MainThread.InvokeOnMainThreadAsync(async () =>
+                                        {
+                                            try
+                                            {
+                                                // Clear current user and token
+                                                CurrentUser = null;
+                                                await secureStorage.RemoveTokenAsync();
+
+                                                // Navigate to login page
+                                                var loginPage = Services?.GetService<LoginPage>();
+                                                if (loginPage != null)
+                                                {
+                                                    MainPage = loginPage;
+                                                }
+                                                else
+                                                {
+                                                    await Shell.Current.GoToAsync("LoginPage");
+                                                }
+                                            }
+                                            catch (Exception ex)
+                                            {
+                                                DebugService.LogError("App", $"Error handling token expiration: {ex.Message}");
+                                            }
+                                        });
                                     }
                                 }
                             }
@@ -1076,7 +1107,7 @@ namespace TDFMAUI
                                     if (shell != null)
                                     {
                                         MainPage = shell;
-                                        await Shell.Current.GoToAsync("//LoginPage");
+                                        await Shell.Current.GoToAsync("LoginPage");
                                     }
                                 }
                             })
@@ -1118,6 +1149,56 @@ namespace TDFMAUI
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error setting up FCM: {ex.Message}");
+            }
+        }
+
+        private async void OnWebSocketError(object sender, WebSocketErrorEventArgs e)
+        {
+            try
+            {
+                DebugService.LogWarning("App", $"WebSocket error received: {e.ErrorCode} - {e.ErrorMessage}");
+
+                // Handle 401 Unauthorized error
+                if (e.ErrorCode == "401")
+                {
+                    DebugService.LogWarning("App", "WebSocket authentication failed, redirecting to login page");
+                    
+                    // Clear current user and token
+                    CurrentUser = null;
+                    if (Services != null)
+                    {
+                        var secureStorage = Services.GetService<SecureStorageService>();
+                        if (secureStorage != null)
+                        {
+                            await secureStorage.RemoveTokenAsync();
+                        }
+                    }
+
+                    // Navigate to login page
+                    await MainThread.InvokeOnMainThreadAsync(async () =>
+                    {
+                        try
+                        {
+                            var loginPage = Services?.GetService<TDFMAUI.Features.Auth.LoginPage>();
+                            if (loginPage != null)
+                            {
+                                MainPage = loginPage;
+                            }
+                            else
+                            {
+                                await Shell.Current.GoToAsync("LoginPage");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            DebugService.LogError("App", $"Error navigating to login page: {ex.Message}");
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugService.LogError("App", $"Error handling WebSocket error: {ex.Message}");
             }
         }
     }

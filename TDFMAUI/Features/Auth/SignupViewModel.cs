@@ -339,18 +339,19 @@ namespace TDFMAUI.Features.Auth
         {
             try
             {
-                // Get the current page's navigation
-                if (Application.Current?.MainPage?.Navigation != null)
+                // Check if Shell.Current is available (when app is in Shell mode)
+                if (Shell.Current != null)
                 {
-                    // Check if we can pop to the root (if LoginPage is the root)
-                    await Application.Current.MainPage.Navigation.PopToRootAsync();
+                    _logger?.LogInformation("Using Shell navigation to go back to LoginPage");
+                    await Shell.Current.GoToAsync("//LoginPage");
                 }
                 else
                 {
-                    // Fallback to Shell navigation if available
-                    if (Shell.Current != null)
+                    // When not in Shell mode, use Navigation.PopAsync to go back
+                    _logger?.LogInformation("Shell.Current is null, using Navigation.PopAsync");
+                    if (Application.Current?.MainPage?.Navigation != null)
                     {
-                        await Shell.Current.GoToAsync("//LoginPage");
+                        await Application.Current.MainPage.Navigation.PopAsync();
                     }
                     else
                     {

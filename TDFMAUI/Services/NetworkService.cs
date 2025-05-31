@@ -72,9 +72,16 @@ namespace TDFMAUI.Services
 
                 var apiConnected = await _apiService.ValidateApiConnectionAsync();
 
-                if (apiConnected)
+                // Only reconnect WebSocket if user is authenticated and token is present
+                var token = TDFMAUI.Config.ApiConfig.CurrentToken;
+                var tokenValid = !string.IsNullOrEmpty(token) && TDFMAUI.Config.ApiConfig.TokenExpiration > DateTime.UtcNow;
+                if (apiConnected && tokenValid)
                 {
-                    await _webSocketService.ConnectAsync();
+                    await _webSocketService.ConnectAsync(token);
+                }
+                else
+                {
+                    _logger.LogInformation("Skipping WebSocket reconnect: user not authenticated or token missing/expired.");
                 }
             }
             else

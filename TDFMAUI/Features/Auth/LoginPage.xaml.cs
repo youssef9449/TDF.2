@@ -176,8 +176,29 @@ namespace TDFMAUI.Features.Auth
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("[LoginPage] Navigating to SignupPage via Shell");
-                await Shell.Current.GoToAsync("SignupPage");
+                System.Diagnostics.Debug.WriteLine("[LoginPage] Navigating to SignupPage");
+                
+                // Check if Shell.Current is available (when app is in Shell mode)
+                if (Shell.Current != null)
+                {
+                    System.Diagnostics.Debug.WriteLine("[LoginPage] Using Shell navigation");
+                    await Shell.Current.GoToAsync("SignupPage");
+                }
+                else
+                {
+                    // When LoginPage is set as MainPage directly (not in Shell), use Navigation.PushAsync
+                    System.Diagnostics.Debug.WriteLine("[LoginPage] Shell.Current is null, using Navigation.PushAsync");
+                    var signupPage = App.Services?.GetService<SignupPage>();
+                    if (signupPage != null)
+                    {
+                        await Navigation.PushAsync(signupPage);
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("[LoginPage] Could not resolve SignupPage from DI container");
+                        await DisplayAlert("Error", "Could not navigate to signup page. Please try again.", "OK");
+                    }
+                }
             }
             catch (Exception ex)
             {

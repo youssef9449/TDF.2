@@ -38,6 +38,7 @@ namespace TDFMAUI.ViewModels
         private ObservableCollection<string> _leaveTypes = new ObservableCollection<string>(); // Use ObservableCollection if types might change
         private string _selectedLeaveType = string.Empty;
         private bool _isBusy;
+        private int _currentUserId = 0; // <-- Add this field
 
         public bool IsEditMode
         {
@@ -148,7 +149,7 @@ namespace TDFMAUI.ViewModels
                     RequestBeginningTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartTime : null,
                     RequestEndingTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? EndTime : null,
                     RequestReason = RequestReason ?? string.Empty,
-                    UserId = 0 // UserId will be set in OnSubmit
+                    UserId = _currentUserId // Use backing field
                 }
                 : new RequestCreateDto();
 
@@ -231,17 +232,12 @@ namespace TDFMAUI.ViewModels
 
         private async Task OnSubmit()
         {
-            if (!Validate())
-            {
-                await Shell.Current.DisplayAlert("Validation Errors", string.Join("\n", ValidationErrors), "OK");
-                return;
-            }
-
             IsBusy = true;
             try
             {
                 RequestResponseDto? response = null;
                 int currentUserId = await _authService.GetCurrentUserIdAsync();
+                _currentUserId = currentUserId; // Set backing field for use in RequestCreateDto
 
                 if (currentUserId == 0)
                 {
@@ -249,6 +245,13 @@ namespace TDFMAUI.ViewModels
                     await Shell.Current.DisplayAlert("Authentication Error", "Could not verify user identity. Please log in again.", "OK");
                     // Optionally navigate to login page: await Shell.Current.GoToAsync("//LoginPage");
                     return; // Stop processing
+                }
+
+                // Validate with correct UserId
+                if (!Validate())
+                {
+                    await Shell.Current.DisplayAlert("Validation Errors", string.Join("\n", ValidationErrors), "OK");
+                    return;
                 }
 
                 if (IsEditMode)
@@ -268,7 +271,6 @@ namespace TDFMAUI.ViewModels
                 else
                 {
                     var createDto = RequestCreateDto;
-                    createDto.UserId = currentUserId; // Set the user ID
                     var createResponse = await _requestService.CreateRequestAsync(createDto);
                     if (createResponse?.Success == true && createResponse.Data != null)
                     {

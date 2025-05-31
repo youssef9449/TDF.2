@@ -112,6 +112,12 @@ namespace TDFMAUI.Services
                         }
                     }
                 }
+                // Additional warning if token is still null or empty
+                if (string.IsNullOrEmpty(token))
+                {
+                    _logger.LogWarning("WebSocketService.ConnectAsync called with no valid token. This may indicate a race condition or missing login.");
+                    return false;
+                }
                 else
                 {
                     _logger.LogInformation("Using provided token for WebSocket connection. Token length: {Length}", token.Length);

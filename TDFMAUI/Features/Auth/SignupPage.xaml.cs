@@ -17,11 +17,11 @@ public partial class SignupPage : ContentPage
     // Constructor for DI (preferred way)
     public SignupPage(SignupViewModel viewModel)
     {
+        Debug.WriteLine($"[SignupPage] Constructor called. ViewModel null? {viewModel == null}");
         InitializeComponent();
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         BindingContext = _viewModel;
         Debug.WriteLine("[SignupPage] DI constructor - ViewModel assigned successfully");
-        
         // Subscribe to window maximization changes
         Helpers.DeviceHelper.WindowMaximizationChanged += OnWindowMaximizationChanged;
     }

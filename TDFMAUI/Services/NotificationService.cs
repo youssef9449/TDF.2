@@ -64,10 +64,13 @@ namespace TDFMAUI.Services
 
                 var userId = App.CurrentUser.UserID;
                 // Use the correct endpoint from the API controller
-                var notificationDtos = await _apiService.GetAsync<List<NotificationDto>>("notifications/unread");
-
-                return notificationDtos?.Select(dto => MapNotificationDtoToEntity(dto)).ToList()
-                       ?? Enumerable.Empty<NotificationEntity>();
+                var notificationDtos = await _apiService.GetAsync<List<NotificationDto>>(TDFShared.Constants.ApiRoutes.Notifications.GetUnread);
+                if (notificationDtos == null)
+                {
+                    _logger.LogWarning("GetUnreadNotificationsAsync: API returned null for notificationDtos");
+                    return Enumerable.Empty<NotificationEntity>();
+                }
+                return notificationDtos.Select(dto => MapNotificationDtoToEntity(dto)).ToList();
             }
             catch (Exception ex)
             {
@@ -87,7 +90,7 @@ namespace TDFMAUI.Services
                 }
 
                 var userId = App.CurrentUser.UserID;
-                var result = await _apiService.PostAsync<object, bool>($"notifications/{notificationId}/seen",
+                var result = await _apiService.PostAsync<object, bool>(string.Format(TDFShared.Constants.ApiRoutes.Notifications.MarkSeen, notificationId),
                     new { userId });
 
                 return result;
@@ -115,7 +118,7 @@ namespace TDFMAUI.Services
                 }
 
                 var userId = App.CurrentUser.UserID;
-                var result = await _apiService.PostAsync<object, bool>("notifications/seen",
+                var result = await _apiService.PostAsync<object, bool>(TDFShared.Constants.ApiRoutes.Notifications.MarkAllSeen,
                     new { userId, notificationIds });
 
                 return result;
@@ -233,7 +236,7 @@ namespace TDFMAUI.Services
                 }
 
                 var receiverId = App.CurrentUser.UserID;
-                var result = await _apiService.PostAsync<object, bool>("messages/read",
+                var result = await _apiService.PostAsync<object, bool>(TDFShared.Constants.ApiRoutes.Messages.MarkBulkRead,
                     new { senderId, receiverId });
 
                 return result;
@@ -256,8 +259,7 @@ namespace TDFMAUI.Services
                 }
 
                 var receiverId = App.CurrentUser.UserID;
-                // Remove the "api/" prefix as ApiService handles this
-                var result = await _apiService.PostAsync<object, bool>("messages/delivered/from-sender",
+                var result = await _apiService.PostAsync<object, bool>(TDFShared.Constants.ApiRoutes.Messages.MarkFromSenderDelivered,
                     new { senderId });
 
                 return result;
@@ -285,8 +287,7 @@ namespace TDFMAUI.Services
                     return false;
                 }
 
-                // Remove the "api/" prefix as ApiService handles this
-                var result = await _apiService.PostAsync<object, bool>("messages/delivered/bulk",
+                var result = await _apiService.PostAsync<object, bool>(TDFShared.Constants.ApiRoutes.Messages.MarkBulkDelivered,
                     new { messageIds = messageIds.ToList() });
 
                 return result;
@@ -309,8 +310,7 @@ namespace TDFMAUI.Services
                 }
 
                 var userId = App.CurrentUser.UserID;
-                // Remove the "api/" prefix as ApiService handles this
-                var count = await _apiService.GetAsync<int>($"messages/unread/count/{userId}");
+                var count = await _apiService.GetAsync<int>(string.Format(TDFShared.Constants.ApiRoutes.Messages.GetUnreadCount, userId));
 
                 return count;
             }

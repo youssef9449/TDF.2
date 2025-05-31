@@ -148,4 +148,6 @@
                      Shell.NavBarIsVisible="False" />
     </ShellItem>
 
+    <!-- Hidden ShellContent for SignupPage to enable absolute route navigation -->
+
 </Shell>

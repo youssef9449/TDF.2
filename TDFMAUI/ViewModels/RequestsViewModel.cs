@@ -16,6 +16,7 @@ using TDFMAUI.Features.Requests; // For AddRequestPage navigation
 using TDFShared.Exceptions;
 using TDFShared.Enums;
 using TDFShared.Utilities;
+using TDFMAUI.Helpers;
 
 namespace TDFMAUI.ViewModels
 {
@@ -200,6 +201,14 @@ namespace TDFMAUI.ViewModels
             TDFMAUI.Services.DebugService.StartTimer("LoadRequests");
             try
             {
+                if (DeviceHelper.IsDesktop)
+                {
+                    var token = TDFMAUI.Config.ApiConfig.CurrentToken;
+                    if (!string.IsNullOrEmpty(token))
+                    {
+                        await _authService.SetAuthenticationTokenAsync(token);
+                    }
+                }
                 if (_currentUserId == 0 && !(IsAdmin == true || IsHR == true || IsManager == true))
                 {
                     _logger.LogWarning("Cannot load requests: User not authenticated.");

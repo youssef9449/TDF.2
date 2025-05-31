@@ -54,9 +54,16 @@ namespace TDFMAUI.Features.Dashboard
             SizeChanged += OnPageSizeChanged;
         }
         
-        protected override void OnAppearing()
+        protected override async void OnAppearing()
         {
             base.OnAppearing();
+            
+            // If not authenticated, redirect to login page
+            if (App.CurrentUser == null)
+            {
+                await Shell.Current.GoToAsync("LoginPage");
+                return;
+            }
             
             // Refresh data when the page appears
             // Use Task.Run for non-blocking UI

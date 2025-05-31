@@ -259,7 +259,7 @@ namespace TDFMAUI
                 {
                     var mainWindow = Application.Current.Windows[0];
                     WindowManager.ConfigureMainWindow(mainWindow);
-                    DebugService.LogInfo("App", $"Window configured with fixed size {WindowManager.DefaultWidth}x{WindowManager.DefaultHeight}");
+                    DebugService.LogInfo("App", "Window configured.");
                 }
 
                 // MainPage is now set here instead of the constructor
@@ -315,7 +315,6 @@ namespace TDFMAUI
         {
             try
             {
-                // Check if Services was initialized correctly
                 if (Services == null)
                 {
                     DebugService.LogError("App", "Services not initialized, cannot set up initial page");
@@ -323,89 +322,46 @@ namespace TDFMAUI
                     return;
                 }
 
-                // Configure global SSL settings - DISABLED
-                // ApiConfig.ConfigureGlobalSslSettings();
-
-                // Initialize API config with safe mode if needed - DISABLED
-                // ApiConfig.Initialize(isDevelopment: true, safeMode: SafeMode);
-
-                // Just set the development mode flag without running connectivity tests
                 ApiConfig.IsDevelopmentMode = true;
 
                 if (SafeMode)
                 {
                     DebugService.LogWarning("App", "*** STARTING IN SAFE MODE ***");
                     DebugService.LogWarning("App", "Some features will be disabled for stability");
+                    await Shell.Current.GoToAsync("DiagnosticsPage");
+                    return;
                 }
 
-                // First, show the diagnostic page to help troubleshoot any startup issues
-                // This is especially helpful for Android where we're experiencing crashes
-                var diagnosticPage = new StartupDiagnosticPage();
-                var navPage = new NavigationPage(diagnosticPage);
-                MainPage = navPage;
-
-                DebugService.LogInfo("App", "Showing startup diagnostic page");
-
-                // Continue with normal startup after diagnostic page
                 try
                 {
-                    // Get required services
                     var authService = Services.GetRequiredService<IAuthService>();
                     var secureStorage = Services.GetRequiredService<SecureStorageService>();
                     var logger = Services.GetRequiredService<ILogger<App>>();
 
-                    // In safe mode, skip authentication check and go straight to diagnostic page
-                    if (SafeMode)
-                    {
-                        logger.LogInformation("Safe mode active - staying on diagnostic page");
-                        // Don't set NextPage so we stay on the diagnostic page
-                        return;
-                    }
-
-                    // Check if we should persist token based on platform
                     bool hasValidToken = await secureStorage.HandleTokenPersistenceAsync();
-
-                    // For desktop platforms, HandleTokenPersistenceAsync will always return false
-                    // and clear any existing tokens
-
-                    // For mobile platforms, it will check if a valid token exists
-
-                    // Only try to get the current user if we have a valid token
                     UserDto currentUser = hasValidToken ? await authService.GetCurrentUserAsync() : null;
                     bool isAuthenticated = currentUser != null;
 
-                    // Store the page we'll navigate to after diagnostics
-                    Page nextPage;
-
                     if (isAuthenticated)
                     {
-                        logger.LogInformation("User is authenticated. Will set MainPage to AppShell after diagnostics.");
-                        // Resolve AppShell from DI container
-                        nextPage = Services.GetRequiredService<AppShell>();
+                        logger.LogInformation("User is authenticated. Showing main shell.");
+                        var shell = Services.GetRequiredService<AppShell>();
+                        MainPage = shell;
+                        RegisterWebSocketEventHandlers();
+                        await Shell.Current.GoToAsync("DashboardPage");
                     }
                     else
                     {
-                        logger.LogInformation("User is not authenticated. Will set MainPage to LoginPage after diagnostics.");
-                        // Resolve LoginPage from DI container
-                        nextPage = Services.GetRequiredService<LoginPage>();
-                    }
-
-                    // Store the next page in the diagnostic page so it can navigate when ready
-                    diagnosticPage.NextPage = nextPage;
-
-                    logger.LogInformation($"Next page prepared: {nextPage.GetType().Name}");
-
-                    // Register for WebSocketService events
-                    if (isAuthenticated)
-                    {
-                        RegisterWebSocketEventHandlers();
+                        logger.LogInformation("User is not authenticated. Showing login page.");
+                        var loginPage = Services.GetRequiredService<TDFMAUI.Features.Auth.LoginPage>();
+                        MainPage = loginPage;
                     }
                 }
                 catch (Exception ex)
                 {
                     DebugService.LogError("App", $"Error preparing next page: {ex.Message}");
                     DebugService.LogError("App", $"Stack trace: {ex.StackTrace}");
-                    // We'll stay on the diagnostic page if there's an error
+                    await Shell.Current.GoToAsync("DiagnosticsPage");
                 }
             }
             catch (Exception ex)
@@ -1112,9 +1068,17 @@ namespace TDFMAUI
                         new Button
                         {
                             Text = "Retry",
-                            Command = new Command(() => {
-                                var loginViewModel = Services.GetService<LoginPageViewModel>();
-                                Application.Current.MainPage = new NavigationPage(new LoginPage(loginViewModel));
+                            Command = new Command(async () => {
+                                // Always use Shell navigation for retry
+                                if (Services != null)
+                                {
+                                    var shell = Services.GetService<AppShell>();
+                                    if (shell != null)
+                                    {
+                                        MainPage = shell;
+                                        await Shell.Current.GoToAsync("//LoginPage");
+                                    }
+                                }
                             })
                         }
                     }

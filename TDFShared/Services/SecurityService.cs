@@ -304,20 +304,21 @@ namespace TDFShared.Services
         /// </summary>
         private List<Claim> BuildUserClaims(UserDto user)
         {
+            var userIdString = user.UserID.ToString();
             var claims = new List<Claim>
             {
                 // Standard JWT claims
-                new Claim(JwtRegisteredClaimNames.Sub, user.UserID.ToString()),
+                new Claim(JwtRegisteredClaimNames.Sub, userIdString),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
 
                 // Standard identity claims
-                new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, userIdString),
                 new Claim(ClaimTypes.Name, user.UserName),
                 new Claim(ClaimTypes.GivenName, user.FullName ?? string.Empty),
 
                 // Application-specific claims
-                new Claim("userId", user.UserID.ToString()),
+                new Claim("userId", userIdString),
                 new Claim("username", user.UserName),
                 new Claim("fullName", user.FullName ?? string.Empty),
                 new Claim("department", user.Department),

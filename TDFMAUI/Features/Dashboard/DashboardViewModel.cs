@@ -142,8 +142,10 @@ namespace TDFMAUI.Features.Dashboard
         {
             if (IsBusy) return;
 
-            IsBusy = true;
-            IsRefreshing = true;
+            await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
+                IsBusy = true;
+                IsRefreshing = true;
+            });
 
             try
             {
@@ -173,8 +175,10 @@ namespace TDFMAUI.Features.Dashboard
             }
             finally
             {
-                IsBusy = false;
-                IsRefreshing = false;
+                await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
+                    IsBusy = false;
+                    IsRefreshing = false;
+                });
             }
         }
 
@@ -185,6 +189,9 @@ namespace TDFMAUI.Features.Dashboard
                 if (App.CurrentUser == null)
                 {
                     _logger.LogWarning("Cannot load stats: Current user is null");
+                    PendingRequestsCount = 0;
+                    UnreadNotificationsCount = 0;
+                    UnreadMessagesCount = 0;
                     return;
                 }
 
@@ -203,10 +210,19 @@ namespace TDFMAUI.Features.Dashboard
 
                 // Get unread notifications count
                 var notifications = await _notificationService.GetUnreadNotificationsAsync();
-                UnreadNotificationsCount = notifications?.Count() ?? 0;
+                if (notifications == null)
+                {
+                    _logger.LogWarning("LoadStatsAsync: API returned null for notifications");
+                    UnreadNotificationsCount = 0;
+                }
+                else
+                {
+                    UnreadNotificationsCount = notifications.Count();
+                }
 
                 // Get unread messages count
-                UnreadMessagesCount = await _notificationService.GetUnreadMessagesCountAsync();
+                var unreadMessagesCount = await _notificationService.GetUnreadMessagesCountAsync();
+                UnreadMessagesCount = unreadMessagesCount;
 
                 _logger.LogInformation("Stats loaded: {PendingRequests} pending requests, {UnreadNotifications} unread notifications, {UnreadMessages} unread messages",
                     PendingRequestsCount, UnreadNotificationsCount, UnreadMessagesCount);

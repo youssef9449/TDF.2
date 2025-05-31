@@ -516,22 +516,8 @@ public class AuthService : IAuthService
     {
         try
         {
-            // Check if we should persist token based on platform
-            if (DeviceHelper.IsDesktop)
-            {
-                _logger.LogInformation("GetCurrentUserIdAsync: Desktop platform detected, checking token persistence");
-                // For desktop platforms, check if we should clear tokens
-                bool shouldPersist = _secureStorageService.ShouldPersistToken();
-                if (!shouldPersist)
-                {
-                    _logger.LogInformation("GetCurrentUserIdAsync: Token persistence disabled for desktop platform");
-                    // This will ensure we don't use any stored tokens on desktop platforms
-                    await _secureStorageService.HandleTokenPersistenceAsync();
-                    return 0;
-                }
-            }
-
-
+            // On app start, token persistence is handled by HandleTokenPersistenceAsync.
+            // Here, always use the in-memory token if present, even on desktop.
             var (token, _) = await _secureStorageService.GetTokenAsync();
             if (string.IsNullOrEmpty(token))
             {
@@ -674,21 +660,8 @@ public class AuthService : IAuthService
     {
         try
         {
-            // Check if we should persist token based on platform
-            if (DeviceHelper.IsDesktop)
-            {
-                _logger.LogInformation("GetCurrentUserAsync: Desktop platform detected, checking token persistence");
-                // For desktop platforms, check if we should clear tokens
-                bool shouldPersist = _secureStorageService.ShouldPersistToken();
-                if (!shouldPersist)
-                {
-                    _logger.LogInformation("GetCurrentUserAsync: Token persistence disabled for desktop platform");
-                    // This will ensure we don't use any stored tokens on desktop platforms
-                    await _secureStorageService.HandleTokenPersistenceAsync();
-                    return null;
-                }
-            }
-
+            // On app start, token persistence is handled by HandleTokenPersistenceAsync.
+            // Here, always use the in-memory token if present, even on desktop.
             var userId = await GetCurrentUserIdAsync();
             if (userId <= 0)
             {
@@ -839,5 +812,20 @@ public class AuthService : IAuthService
             _logger.LogError(ex, "Error checking if token with JTI {Jti} is revoked", jti);
             return true; // Default to considering token as revoked if there's an error
         }
+    }
+
+    /// <summary>
+    /// Returns the current in-memory authentication token (if any)
+    /// </summary>
+    public async Task<string?> GetCurrentTokenAsync()
+    {
+        var (token, _) = await _secureStorageService.GetTokenAsync();
+        return string.IsNullOrEmpty(token) ? null : token;
+    }
+
+    public async Task SetAuthenticationTokenAsync(string token)
+    {
+        _logger?.LogInformation("AuthService: Setting authentication token of length {Length}", token?.Length ?? 0);
+        await _httpClientService.SetAuthenticationTokenAsync(token);
     }
 }

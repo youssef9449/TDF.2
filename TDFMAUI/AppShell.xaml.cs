@@ -64,8 +64,10 @@ namespace TDFMAUI
 
                 App.UserChanged += OnUserChanged;
                 this.Navigated += OnShellNavigated; // Setup gestures on first navigation and subsequent ones
+                this.Navigating += OnShellNavigating; // Add navigation guard
 
                 _logger?.LogInformation("AppShell constructor completed successfully. Gestures will be set up in OnShellNavigated.");
+
             }
             catch (Exception ex)
             {
@@ -76,8 +78,11 @@ namespace TDFMAUI
 
         private void RegisterRoutes()
         {
+            System.Diagnostics.Debug.WriteLine("[AppShell] Registering Shell routes...");
             Routing.RegisterRoute(nameof(LoginPage), typeof(LoginPage));
+            System.Diagnostics.Debug.WriteLine("[AppShell] Registered route: LoginPage");
             Routing.RegisterRoute(nameof(SignupPage), typeof(SignupPage));
+            System.Diagnostics.Debug.WriteLine("[AppShell] Registered route: SignupPage");
             Routing.RegisterRoute(nameof(MainPage), typeof(MainPage));
             Routing.RegisterRoute(nameof(ProfilePage), typeof(ProfilePage));
             Routing.RegisterRoute(nameof(AddRequestPage), typeof(AddRequestPage));
@@ -88,6 +93,7 @@ namespace TDFMAUI
             Routing.RegisterRoute(nameof(UsersPage), typeof(UsersPage));
             Routing.RegisterRoute("DashboardPage", typeof(Features.Dashboard.DashboardPage));
             Routing.RegisterRoute(nameof(UserDetailsPage), typeof(UserDetailsPage));
+            System.Diagnostics.Debug.WriteLine("[AppShell] All routes registered.");
         }
 
         private void OnUserChanged(object sender, EventArgs e)
@@ -267,6 +273,36 @@ namespace TDFMAUI
             _logger?.LogInformation("ToggleTheme_Clicked called.");
             ThemeHelper.ToggleTheme();
             _logger?.LogInformation($"Theme toggled to: {ThemeHelper.CurrentTheme}");
+        }
+
+        /// <summary>
+        /// Navigation guard: blocks navigation to protected pages if not authenticated
+        /// </summary>
+        private void OnShellNavigating(object sender, ShellNavigatingEventArgs e)
+        {
+            try
+            {
+                // Allow navigation to these pages without authentication
+                var publicRoutes = new[] { "//LoginPage", "//SignupPage", "//DiagnosticsPage" };
+                var target = e.Target?.Location?.OriginalString;
+                if (string.IsNullOrEmpty(target)) return;
+
+                // If not authenticated and not navigating to a public route, block and redirect
+                if (App.CurrentUser == null && !publicRoutes.Any(r => target.StartsWith(r, StringComparison.OrdinalIgnoreCase)))
+                {
+                    _logger?.LogInformation($"Navigation to {target} blocked: user not authenticated. Redirecting to login page.");
+                    e.Cancel();
+                    // Redirect to login page
+                    MainThread.BeginInvokeOnMainThread(async () =>
+                    {
+                        try { await Shell.Current.GoToAsync("//LoginPage"); } catch { }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error in navigation guard");
+            }
         }
     }
 }

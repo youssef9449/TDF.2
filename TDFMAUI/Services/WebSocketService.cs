@@ -81,19 +81,35 @@ namespace TDFMAUI.Services
                 // Dispose of existing WebSocket if any
                 await CleanupExistingConnectionAsync();
 
-                // Get the current token if one wasn't provided
+                // On desktop, use ApiConfig.CurrentToken if no token is provided
                 if (string.IsNullOrEmpty(token))
                 {
-                    var tokenResult = await _secureStorage.GetTokenAsync();
-                    token = tokenResult.Item1;
-                    if (string.IsNullOrEmpty(token))
+                    if (DeviceHelper.IsDesktop)
                     {
-                        _logger.LogWarning("Cannot connect WebSocket: No authentication token available");
-                        return false;
+                        token = ApiConfig.CurrentToken;
+                        if (string.IsNullOrEmpty(token))
+                        {
+                            _logger.LogWarning("Cannot connect WebSocket: No in-memory authentication token available (desktop)");
+                            return false;
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Using in-memory token from ApiConfig for WebSocket connection (desktop). Token length: {Length}", token.Length);
+                        }
                     }
                     else
                     {
-                        _logger.LogInformation("Retrieved token from secure storage for WebSocket connection. Token length: {Length}", token.Length);
+                        var tokenResult = await _secureStorage.GetTokenAsync();
+                        token = tokenResult.Item1;
+                        if (string.IsNullOrEmpty(token))
+                        {
+                            _logger.LogWarning("Cannot connect WebSocket: No authentication token available");
+                            return false;
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Retrieved token from secure storage for WebSocket connection. Token length: {Length}", token.Length);
+                        }
                     }
                 }
                 else

@@ -305,8 +305,7 @@ namespace TDFMAUI.Services
             _logger?.LogDebug("Executing Raw GET request to {Endpoint}", endpoint);
             try
             {
-                // Ensure relative path and pass directly to HttpClientService
-                endpoint = ApiRoutes.RemoveBasePrefix(endpoint);
+                // Pass endpoint as-is
                 var response = await _httpClientService.GetRawAsync(endpoint);
                 return response;
             }
@@ -328,8 +327,7 @@ namespace TDFMAUI.Services
 
             try
             {
-                // Ensure relative path and pass directly to HttpClientService
-                endpoint = ApiRoutes.RemoveBasePrefix(endpoint);
+                // Pass endpoint as-is
                 var response = await _httpClientService.GetAsync<T>(endpoint);
                 return response;
             }
@@ -358,8 +356,7 @@ namespace TDFMAUI.Services
 
             try
             {
-                // Ensure relative path and pass directly to HttpClientService
-                endpoint = ApiRoutes.RemoveBasePrefix(endpoint);
+                // Pass endpoint as-is
                 var response = await _httpClientService.PostAsync<TRequest, TResponse>(endpoint, data);
                 return response;
             }
@@ -389,8 +386,7 @@ namespace TDFMAUI.Services
 
             try
             {
-                // Ensure relative path and pass directly to HttpClientService
-                endpoint = ApiRoutes.RemoveBasePrefix(endpoint);
+                // Pass endpoint as-is
                 var response = await _httpClientService.PutAsync<TRequest, TResponse>(endpoint, data);
                 return response;
             }
@@ -430,10 +426,9 @@ namespace TDFMAUI.Services
 
             try
             {
-                // Ensure relative path and pass directly to HttpClientService
-                endpoint = ApiRoutes.RemoveBasePrefix(endpoint);
-                HttpResponseMessage httpResponse = await _httpClientService.DeleteAsync(endpoint);
-                return httpResponse;
+                // Pass endpoint as-is
+                var response = await _httpClientService.DeleteAsync(endpoint);
+                return response;
             }
             catch (HttpRequestException httpEx)
             {
@@ -441,15 +436,20 @@ namespace TDFMAUI.Services
                 _isNetworkAvailable = false;
                 if (queueIfUnavailable)
                 {
-                    await QueueRequestAsync<object>(endpoint, null, "DELETE"); // Queue the delete
-                     return new HttpResponseMessage(HttpStatusCode.Accepted) { ReasonPhrase = "Request queued for later execution" }; // Return Accepted
+                    // Queue returns Task<object>, but Delete returns HttpResponseMessage, so we await and convert
+                    var result = await QueueRequestAsync<object>(endpoint, null, "DELETE");
+                    // Return a fake success response since the request is queued
+                    return new HttpResponseMessage(HttpStatusCode.Accepted)
+                    {
+                        ReasonPhrase = "Request queued for later execution"
+                    };
                 }
                 throw new ApiException($"Connection error: {httpEx.Message}", httpEx);
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "ApiService: Error in DeleteAsync for {Endpoint}: {Message}", endpoint, ex.Message);
-                throw new ApiException($"Error deleting resource at {endpoint}: {ex.Message}", ex);
+                throw new ApiException($"Error deleting data from {endpoint}: {ex.Message}", ex);
             }
         }
         #endregion

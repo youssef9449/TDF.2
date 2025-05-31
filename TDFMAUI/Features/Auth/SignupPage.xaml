@@ -35,67 +35,72 @@
             <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="1*,Auto,1*" Margin="0,20,0,20">
                 <!-- Left column spacer -->
                 <BoxView Grid.Column="0" Grid.RowSpan="3" />
-                
-                <!-- Main content - fully responsive layout that adapts to window size -->
-                <VerticalStackLayout Grid.Column="1" Grid.Row="1" Padding="20" Spacing="10" 
-                                     VerticalOptions="Center" HorizontalOptions="Center" 
-                                     MinimumWidthRequest="450" MaximumWidthRequest="750">
 
-                    <Label x:Name="TitleLabel" Text="Create Account" 
-                           TextColor="{StaticResource TextColor}"
-                           FontSize="28" HorizontalOptions="Center" Margin="0,0,0,15" />
+                <!-- Main content - improved desktop layout -->
+                <Frame Grid.Column="1" Grid.Row="1"
+                       Padding="{OnPlatform Default=32, WinUI=48}"
+                       Margin="0,0,0,0"
+                       HasShadow="True"
+                       CornerRadius="18"
+                       BorderColor="{StaticResource BorderColor}"
+                       BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource DarkSurfaceVariant}}"
+                       MinimumWidthRequest="{OnPlatform Default=420, WinUI=520}"
+                       MaximumWidthRequest="{OnPlatform Default=650, WinUI=700}"
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center">
+                    <VerticalStackLayout Spacing="16">
+                        <Label x:Name="TitleLabel" Text="Create Account" 
+                               TextColor="{StaticResource TextColor}"
+                               FontSize="{OnPlatform Default=28, WinUI=32}"
+                               HorizontalOptions="Center" Margin="0,0,0,15" />
 
-                    <!-- Form fields with better spacing -->
-                    <Entry Placeholder="Username" Text="{Binding Username}" Style="{StaticResource EntryStyle}" 
-                           Margin="0,5,0,5" />
-                           
-                    <Entry Placeholder="Password" IsPassword="True" Text="{Binding Password}" Style="{StaticResource EntryStyle}" 
-                           Margin="0,5,0,5" />
-                           
-                    <Entry Placeholder="Confirm Password" IsPassword="True" Text="{Binding ConfirmPassword}" Style="{StaticResource EntryStyle}" 
-                           Margin="0,5,0,5" />
-                           
-                    <Entry Placeholder="Full Name" Text="{Binding FullName}" Style="{StaticResource EntryStyle}" 
-                           Margin="0,5,0,10" />
+                        <!-- Form fields with better spacing -->
+                        <Entry Placeholder="Username" Text="{Binding Username}" Style="{StaticResource EntryStyle}" 
+                               Margin="0,5,0,5" />
+                        <Entry Placeholder="Password" IsPassword="True" Text="{Binding Password}" Style="{StaticResource EntryStyle}" 
+                               Margin="0,5,0,5" />
+                        <Entry Placeholder="Confirm Password" IsPassword="True" Text="{Binding ConfirmPassword}" Style="{StaticResource EntryStyle}" 
+                               Margin="0,5,0,5" />
+                        <Entry Placeholder="Full Name" Text="{Binding FullName}" Style="{StaticResource EntryStyle}" 
+                               Margin="0,5,0,10" />
 
-                    <Label Text="Department" TextColor="{StaticResource TextColor}" Margin="0,5,0,0" />
+                        <Label Text="Department" TextColor="{StaticResource TextColor}" Margin="0,5,0,0" />
+                        <Picker Title="Select Department"
+                                ItemsSource="{Binding Departments}"
+                                ItemDisplayBinding="{Binding Name}"
+                                SelectedItem="{Binding SelectedDepartment}"
+                                Style="{StaticResource PickerStyle}"
+                                Margin="0,0,0,5"
+                                IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}" />
 
-                    <!-- Department picker -->
-                    <Picker Title="Select Department"
-                            ItemsSource="{Binding Departments}"
-                            ItemDisplayBinding="{Binding Name}"
-                            SelectedItem="{Binding SelectedDepartment}"
-                            Style="{StaticResource PickerStyle}"
-                            Margin="0,0,0,5"
-                            IsEnabled="{Binding Departments.Count, Converter={StaticResource IntToBoolConverter}}" />
+                        <Label Text="Title" TextColor="{StaticResource TextColor}" Margin="0,5,0,0" />
+                        <Picker Title="Select Title"
+                                ItemsSource="{Binding Titles}"
+                                SelectedItem="{Binding SelectedTitle}"
+                                Style="{StaticResource PickerStyle}"
+                                Margin="0,0,0,10"
+                                IsEnabled="{Binding Titles.Count, Converter={StaticResource IntToBoolConverter}}" />
 
-                    <Label Text="Title" TextColor="{StaticResource TextColor}" Margin="0,5,0,0" />
-                    <Picker Title="Select Title"
-                            ItemsSource="{Binding Titles}"
-                            SelectedItem="{Binding SelectedTitle}"
-                            Style="{StaticResource PickerStyle}"
-                            Margin="0,0,0,10"
-                            IsEnabled="{Binding Titles.Count, Converter={StaticResource IntToBoolConverter}}" />
+                        <Button Text="Sign Up" 
+                                Command="{Binding SignupCommand}" 
+                                TextColor="White"
+                                FontAttributes="Bold"
+                                BackgroundColor="{StaticResource Primary}"
+                                Margin="0,15,0,10" 
+                                HeightRequest="50" />
 
-                    <Button Text="Sign Up" 
-                            Command="{Binding SignupCommand}" 
-                            TextColor="White"
-                            FontAttributes="Bold"
-                            BackgroundColor="{StaticResource Primary}"
-                            Margin="0,15,0,10" 
-                            HeightRequest="50" />
+                        <Label Text="{Binding ErrorMessage}" 
+                               TextColor="{AppThemeBinding Light=#FF3B30, Dark=#FF6B60}"
+                               IsVisible="{Binding HasError}" 
+                               HorizontalOptions="Center" HeightRequest="20" Margin="0,5,0,5" />
 
-                    <Label Text="{Binding ErrorMessage}" 
-                           TextColor="{AppThemeBinding Light=#FF3B30, Dark=#FF6B60}"
-                           IsVisible="{Binding HasError}" 
-                           HorizontalOptions="Center" HeightRequest="20" Margin="0,5,0,5" />
+                        <Button Text="Already have an account? Login" Command="{Binding GoToLoginCommand}" 
+                                BackgroundColor="Transparent" 
+                                TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" 
+                                HorizontalOptions="Center" HeightRequest="45" Margin="0,10,0,0"/>
+                    </VerticalStackLayout>
+                </Frame>
 
-                    <Button Text="Already have an account? Login" Command="{Binding GoToLoginCommand}" 
-                            BackgroundColor="Transparent" 
-                            TextColor="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource White}}" 
-                            HorizontalOptions="Center" HeightRequest="45" Margin="0,10,0,0"/>
-                </VerticalStackLayout>
-                
                 <!-- Right column spacer -->
                 <BoxView Grid.Column="2" Grid.RowSpan="3" />
             </Grid>

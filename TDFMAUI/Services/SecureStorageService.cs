@@ -47,6 +47,16 @@ namespace TDFMAUI.Services
 
         public async Task<(string Token, DateTime Expiration)> GetTokenAsync()
         {
+            // On desktop, check in-memory token first
+            if (DeviceHelper.IsDesktop)
+            {
+                if (!string.IsNullOrEmpty(ApiConfig.CurrentToken) && ApiConfig.TokenExpiration > DateTime.UtcNow)
+                {
+                    return (ApiConfig.CurrentToken, ApiConfig.TokenExpiration);
+                }
+                // If not set, fall through to try SecureStorage (should be empty)
+            }
+
             try
             {
                 string token = await SecureStorage.GetAsync(TokenKey);

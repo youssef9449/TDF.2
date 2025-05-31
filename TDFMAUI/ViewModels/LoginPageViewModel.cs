@@ -74,6 +74,44 @@ namespace TDFMAUI.ViewModels
 
                 if (userDetails != null)
                 {
+                    // Set the token in the HTTP client for desktop
+                    if (TDFMAUI.Helpers.DeviceHelper.IsDesktop)
+                    {
+                        var token = await _authService.GetCurrentTokenAsync();
+                        if (!string.IsNullOrEmpty(token))
+                        {
+                            await _authService.SetAuthenticationTokenAsync(token);
+                            // Set in-memory token for the session
+                            TDFMAUI.Config.ApiConfig.CurrentToken = token;
+                            TDFMAUI.Config.ApiConfig.TokenExpiration = userDetails.Expiration;
+                            // Defensive: Set token in ApiService's HttpClientService as well
+                            var apiService = _serviceProvider.GetRequiredService<IApiService>();
+                            if (apiService is TDFMAUI.Services.ApiService concreteApiService)
+                            {
+                                var httpClientServiceField = typeof(TDFMAUI.Services.ApiService).GetField("_httpClientService", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                                if (httpClientServiceField != null)
+                                {
+                                    var httpClientService = httpClientServiceField.GetValue(concreteApiService) as TDFShared.Services.IHttpClientService;
+                                    if (httpClientService != null)
+                                    {
+                                        await httpClientService.SetAuthenticationTokenAsync(token);
+                                        _logger.LogInformation("LoginPageViewModel: Set token in ApiService's HttpClientService (defensive)");
+                                    }
+                                }
+                            }
+                        }
+                        // Explicitly connect WebSocket with the token
+                        var webSocketService = _serviceProvider.GetRequiredService<IWebSocketService>();
+                        await webSocketService.ConnectAsync(token);
+                    }
+                    else
+                    {
+                        // Connect to WebSocket (mobile: token is persisted)
+                        _logger.LogInformation("Setting up WebSocket connection after successful login");
+                        var webSocketService = _serviceProvider.GetRequiredService<IWebSocketService>();
+                        await webSocketService.ConnectAsync();
+                    }
+
                     // Guard against null properties with null conditional operators and default values
                     _logger.LogInformation("Login successful for user ID: {UserId}, Name: {FullName}",
                         userDetails.UserId,
@@ -82,11 +120,6 @@ namespace TDFMAUI.ViewModels
                     // Store needed data in a try-catch to handle any issues
                     try
                     {
-                        // Connect to WebSocket
-                        _logger.LogInformation("Setting up WebSocket connection after successful login");
-                        var webSocketService = _serviceProvider.GetRequiredService<IWebSocketService>();
-                        await webSocketService.ConnectAsync();
-
                         // Update user status to Online
                         _logger.LogInformation("Updating user status to Online after login");
                         var userPresenceService = _serviceProvider.GetRequiredService<IUserPresenceService>();
@@ -110,23 +143,14 @@ namespace TDFMAUI.ViewModels
                                 // Now try to navigate if Shell.Current is available
                                 if (Shell.Current != null)
                                 {
-                                    _logger.LogInformation("Shell.Current is now available, navigating to Home tab");
-                                    // Navigate to the first tab (Home) which now contains DashboardPage
-                                    // Use a try-catch block to handle potential navigation errors
+                                    _logger.LogInformation("Shell.Current is now available, navigating to Dashboard tab");
+                                    // Navigate to the DashboardPage tab (Home) using relative route
                                     try {
-                                        // Use a more specific route to avoid index out of range errors
-                                        await Shell.Current.GoToAsync("//Home");
+                                        await Shell.Current.GoToAsync("DashboardPage");
                                     }
                                     catch (Exception navEx) {
-                                        _logger.LogWarning(navEx, "Error navigating to //Home, trying fallback navigation");
-                                        try {
-                                            // Try the root route as a fallback
-                                            await Shell.Current.GoToAsync("/");
-                                        }
-                                        catch (Exception fallbackEx) {
-                                            _logger.LogError(fallbackEx, "Fallback navigation also failed");
-                                            // Don't throw - we're already in the AppShell, so the user can navigate manually
-                                        }
+                                        _logger.LogWarning(navEx, "Error navigating to DashboardPage, trying fallback navigation");
+                                        try { await Shell.Current.GoToAsync("/DashboardPage"); } catch (Exception fallbackEx) { _logger.LogError(fallbackEx, "Fallback navigation also failed"); }
                                     }
                                 }
                             }
@@ -164,15 +188,13 @@ namespace TDFMAUI.ViewModels
                                 // Now try to navigate if Shell.Current is available
                                 if (Shell.Current != null)
                                 {
-                                    _logger.LogInformation("Shell.Current is now available, navigating to Home tab (secondary navigation)");
-                                    // Navigate to the first tab (Home) which now contains DashboardPage
-                                    // Use a try-catch block to handle potential navigation errors
+                                    _logger.LogInformation("Shell.Current is now available, navigating to Dashboard tab (secondary navigation)");
+                                    // Navigate to the DashboardPage tab (Home)
                                     try {
-                                        // Use a more specific route to avoid index out of range errors
-                                        await Shell.Current.GoToAsync("//Home");
+                                        await Shell.Current.GoToAsync("//DashboardPage");
                                     }
                                     catch (Exception navEx) {
-                                        _logger.LogWarning(navEx, "Error navigating to //Home in secondary navigation, trying fallback");
+                                        _logger.LogWarning(navEx, "Error navigating to //DashboardPage in secondary navigation, trying fallback");
                                         try {
                                             // Try the root route as a fallback
                                             await Shell.Current.GoToAsync("/");
@@ -200,6 +222,20 @@ namespace TDFMAUI.ViewModels
                 {
                     _logger.LogWarning("Login failed for user: {Username}", Username);
                     ErrorMessage = "Login failed. Please check your username and password.";
+                }
+            }
+            catch (TDFShared.Exceptions.ApiException apiEx)
+            {
+                _logger.LogError(apiEx, "API error during login for user: {Username}", Username);
+                if (apiEx.StatusCode == System.Net.HttpStatusCode.BadRequest ||
+                    apiEx.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+                    apiEx.StatusCode == System.Net.HttpStatusCode.Forbidden)
+                {
+                    ErrorMessage = "Login failed. Please check your username and password.";
+                }
+                else
+                {
+                    ErrorMessage = "An unexpected error occurred. Please try again.";
                 }
             }
             catch (Exception ex)

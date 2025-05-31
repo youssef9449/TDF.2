@@ -29,7 +29,12 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+                {
+                    _logger.LogWarning("UnreadNotifications: Missing or invalid userId claim. Claims: {Claims}", string.Join(", ", User.Claims.Select(c => $"{c.Type}:{c.Value}")));
+                    return BadRequest(ApiResponse<IEnumerable<NotificationDto>>.ErrorResponse("User ID claim missing or invalid in token."));
+                }
                 var notifications = await _notificationService.GetUnreadNotificationsAsync(userId);
                 var notificationDtos = notifications.Select(MapToNotificationDto);
                 return Ok(ApiResponse<IEnumerable<NotificationDto>>.SuccessResponse(notificationDtos));

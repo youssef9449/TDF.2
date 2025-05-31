@@ -17,9 +17,6 @@ namespace TDFMAUI.Helpers
     /// </summary>
     public static class WindowManager
     {
-        // Default window size
-        public const int DefaultWidth = 1280;
-        public const int DefaultHeight = 720;
 
 #if WINDOWS
         // Constants for window styles (Windows-specific)
@@ -52,28 +49,6 @@ namespace TDFMAUI.Helpers
             var mauiWindow = window as Microsoft.Maui.Controls.Window;
             if (mauiWindow != null)
             {
-                // Set initial window size using CreateWindow event
-                mauiWindow.Created += (s, e) =>
-                {
-                    // Get the native window handle
-                    var nativeWindow = GetNativeWindow(mauiWindow);
-                    if (nativeWindow != null)
-                    {
-                        // Set size and position
-                        var displayInfo = DeviceDisplay.Current.MainDisplayInfo;
-                        var screenWidth = displayInfo.Width / displayInfo.Density;
-                        var screenHeight = displayInfo.Height / displayInfo.Density;
-                        
-                        // Calculate center position
-                        var x = (int)((screenWidth - DefaultWidth) / 2);
-                        var y = (int)((screenHeight - DefaultHeight) / 2);
-                        
-                        // Set window bounds using RectInt32
-                        var rect = new Windows.Graphics.RectInt32(x, y, DefaultWidth, DefaultHeight);
-                        nativeWindow.MoveAndResize(rect);
-                    }
-                };
-                
                 // Monitor window size changes
                 mauiWindow.SizeChanged += (s, e) =>
                 {
@@ -83,9 +58,8 @@ namespace TDFMAUI.Helpers
                     var currentScreenHeight = currentDisplayInfo.Height / currentDisplayInfo.Density;
 
                     // Consider a window maximized if it's close to the screen size or significantly larger than default
-                    bool isMaximized = (Math.Abs(mauiWindow.Width - currentScreenWidth) < 20 && 
-                                       Math.Abs(mauiWindow.Height - currentScreenHeight) < 20) ||
-                                       (mauiWindow.Width > DefaultWidth + 100 && mauiWindow.Height > DefaultHeight + 100);
+                    bool isMaximized = (Math.Abs(mauiWindow.Width - currentScreenWidth) < 20 &&
+                                       Math.Abs(mauiWindow.Height - currentScreenHeight) < 20);
                     
                     // Update the maximized state
                     DeviceHelper.SetWindowMaximized(isMaximized);
@@ -96,22 +70,18 @@ namespace TDFMAUI.Helpers
             var mauiWindow = window as Microsoft.Maui.Controls.Window;
             if (mauiWindow != null)
             {
-                // Set min/max size to prevent resizing
-                mauiWindow.MinimumWidth = DefaultWidth;
-                mauiWindow.MinimumHeight = DefaultHeight;
-                mauiWindow.MaximumWidth = DefaultWidth;
-                mauiWindow.MaximumHeight = DefaultHeight;
-
                 // Set initial size and position
-                mauiWindow.Width = DefaultWidth;
-                mauiWindow.Height = DefaultHeight;
-
-                // Center the window
                 var displayInfo = DeviceDisplay.Current.MainDisplayInfo;
                 var screenWidth = displayInfo.Width / displayInfo.Density;
                 var screenHeight = displayInfo.Height / displayInfo.Density;
-                mauiWindow.X = (screenWidth - DefaultWidth) / 2;
-                mauiWindow.Y = (screenHeight - DefaultHeight) / 2;
+                
+                // Set initial size to screen size
+                mauiWindow.Width = screenWidth;
+                mauiWindow.Height = screenHeight;
+
+                // Center the window
+                mauiWindow.X = 0;
+                mauiWindow.Y = 0;
 
                 // Monitor window size changes
                 mauiWindow.SizeChanged += (s, e) =>
@@ -122,8 +92,7 @@ namespace TDFMAUI.Helpers
                     var currentScreenHeight = currentDisplayInfo.Height / currentDisplayInfo.Density;
 
                     bool isMaximized = (Math.Abs(mauiWindow.Width - currentScreenWidth) < 20 &&
-                                       Math.Abs(mauiWindow.Height - currentScreenHeight) < 20) ||
-                                       (mauiWindow.Width > DefaultWidth + 100 && mauiWindow.Height > DefaultHeight + 100);
+                                       Math.Abs(mauiWindow.Height - currentScreenHeight) < 20);
 
                     DeviceHelper.SetWindowMaximized(isMaximized);
                 };
@@ -140,7 +109,7 @@ namespace TDFMAUI.Helpers
         private static void ConfigurePlatformWindow(IWindow window)
         {
 #if WINDOWS
-            // On Windows, disable resizing by removing the WS_THICKFRAME style
+            // On Windows, allow resizing by keeping the WS_THICKFRAME style
             var platformWindow = window.Handler?.PlatformView;
             if (platformWindow != null)
             {
@@ -149,14 +118,14 @@ namespace TDFMAUI.Helpers
                 // Get current style
                 int style = GetWindowLong(hwnd, GWL_STYLE);
                 
-                // Remove resizing border but keep maximize button
-                style &= ~WS_THICKFRAME;
+                // Ensure resizing border is present
+                style |= WS_THICKFRAME;
                 
                 // Apply the new style
                 SetWindowLong(hwnd, GWL_STYLE, style);
                 
                 // Force window to update
-                SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, 
+                SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
                     0x0001 | // SWP_NOSIZE
                     0x0002 | // SWP_NOMOVE
                     0x0020 | // SWP_FRAMECHANGED

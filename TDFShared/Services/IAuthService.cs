@@ -76,5 +76,8 @@ namespace TDFShared.Services
         /// Gets the current user's details
         /// </summary>
         Task<UserDto?> GetCurrentUserAsync();
+
+        Task<string?> GetCurrentTokenAsync();
+        Task SetAuthenticationTokenAsync(string token);
     }
 }

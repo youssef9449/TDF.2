@@ -176,18 +176,8 @@ namespace TDFMAUI.Features.Auth
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("[LoginPage] Navigating to SignupPage");
-                var signupPage = App.Services?.GetService<SignupPage>();
-
-                if (signupPage != null)
-                {
-                    await Navigation.PushAsync(signupPage);
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("Error: Could not resolve SignupPage from DI container");
-                    await DisplayAlert("Error", "Could not navigate to signup page. Please try again.", "OK");
-                }
+                System.Diagnostics.Debug.WriteLine("[LoginPage] Navigating to SignupPage via Shell");
+                await Shell.Current.GoToAsync("SignupPage");
             }
             catch (Exception ex)
             {

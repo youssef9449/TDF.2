@@ -80,14 +80,9 @@ namespace TDFShared.Services
 
         public async Task SetAuthenticationTokenAsync(string token)
         {
-            if (string.IsNullOrEmpty(token))
-            {
-                await ClearAuthenticationTokenAsync();
-                return;
-            }
-
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            _logger.LogDebug("Authentication token set");
+            _logger?.LogInformation("HttpClientService: Setting Authorization header with token of length {Length}", token?.Length ?? 0);
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            await Task.CompletedTask;
         }
 
         public async Task ClearAuthenticationTokenAsync()

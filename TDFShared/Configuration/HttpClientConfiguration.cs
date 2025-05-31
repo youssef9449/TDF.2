@@ -184,6 +184,9 @@ namespace TDFShared.Configuration
         /// </summary>
         public int LifetimeSeconds { get; set; } = 600;
 
+        /// <summary>
+        /// Validates the connection pool settings and throws if invalid.
+        /// </summary>
         public void Validate()
         {
             if (MaxConnectionsPerEndpoint <= 0)

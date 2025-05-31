@@ -10,8 +10,8 @@ namespace TDFMAUI.Helpers
     /// </summary>
     public static class NotificationHelper
     {
-        private static IExtendedNotificationService _notificationService;
-        private static IPlatformNotificationService _platformNotificationService;
+        private static IExtendedNotificationService? _notificationService;
+        private static IPlatformNotificationService? _platformNotificationService;
         private static readonly List<NotificationRecord> _notificationHistory = new List<NotificationRecord>();
         
         /// <summary>
@@ -23,13 +23,13 @@ namespace TDFMAUI.Helpers
             _platformNotificationService = serviceProvider.GetRequiredService<IPlatformNotificationService>();
             
             // Subscribe to in-app notification requests
-            _platformNotificationService.InAppNotificationRequested += OnInAppNotificationRequested;
+            _platformNotificationService.LocalNotificationRequested += OnLocalNotificationRequested;
         }
         
         /// <summary>
         /// Handle in-app notification requests from the platform notification service
         /// </summary>
-        private static void OnInAppNotificationRequested(object sender, NotificationEventArgs args)
+        private static void OnLocalNotificationRequested(object? sender, TDFShared.DTOs.Messages.NotificationEventArgs args)
         {
             try
             {
@@ -53,7 +53,7 @@ namespace TDFMAUI.Helpers
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error displaying in-app notification: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error displaying local notification: {ex.Message}");
             }
         }
         
@@ -66,37 +66,57 @@ namespace TDFMAUI.Helpers
             NotificationType type = NotificationType.Info,
             string? data = null)
         {
-            // Record the notification
-            _notificationHistory.Add(new NotificationRecord
+            try
             {
-                Title = title,
-                Message = message,
-                Type = type,
-                Timestamp = DateTime.Now,
-                Data = data
-            });
-
-            // Assuming the operation is successful if no exceptions occur
-            // Actual notification display logic might be asynchronous and return a more meaningful boolean
-            // return await Task.FromResult(true); // This line made the subsequent code unreachable
-
-            if (_platformNotificationService != null)
-            {
-                return await _platformNotificationService.ShowNotificationAsync(title, message, type, data);
-            }
-            
-            // Fallback if service not initialized
-            if (Application.Current?.MainPage != null)
-            {
-                var currentPage = GetCurrentContentPage(Application.Current.MainPage);
-                if (currentPage != null)
+                System.Diagnostics.Debug.WriteLine($"NotificationHelper: Showing notification: {title}");
+                
+                // We no longer need to manually record the notification here since
+                // PlatformNotificationService.ShowNotificationAsync will log it to history
+                // with proper delivery status tracking
+                
+                if (_platformNotificationService != null)
                 {
-                    await NotificationToast.ShowToastAsync(currentPage, title, message, type);
-                    return true;
+                    // Use the platform notification service which now properly tracks delivery status
+                    bool result = await _platformNotificationService.ShowNotificationAsync(title, message, type, data);
+                    
+                    System.Diagnostics.Debug.WriteLine($"NotificationHelper: Platform notification result: {result}");
+                    return result;
                 }
+                
+                // Fallback if service not initialized - show in-app notification
+                if (Application.Current?.MainPage != null)
+                {
+                    var currentPage = GetCurrentContentPage(Application.Current.MainPage);
+                    if (currentPage != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"NotificationHelper: Showing toast notification");
+                        await NotificationToast.ShowToastAsync(currentPage, title, message, type);
+                        
+                        // Since we're showing the notification directly, we should record it manually
+                        // Note: This is a fallback path that should rarely be used
+                        _notificationHistory.Add(new NotificationRecord
+                        {
+                            Title = title,
+                            Message = message,
+                            Type = type,
+                            Timestamp = DateTime.Now,
+                            Data = data ?? string.Empty,
+                            WasDelivered = true,
+                            DeliveryTime = DateTime.Now
+                        });
+                        
+                        return true;
+                    }
+                }
+                
+                System.Diagnostics.Debug.WriteLine($"NotificationHelper: Failed to show notification - no valid page found");
+                return false;
             }
-            
-            return false;
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"NotificationHelper: Error showing notification: {ex.Message}");
+                return false;
+            }
         }
         
         /// <summary>
@@ -104,7 +124,37 @@ namespace TDFMAUI.Helpers
         /// </summary>
         public static async Task<List<NotificationRecord>> GetNotificationHistoryAsync()
         {
-            return Task.FromResult(_notificationHistory.ToList()).Result;
+            try
+            {
+                if (_platformNotificationService != null)
+                {
+                    // Get notification history from the platform service
+                    // This will include delivery status information
+                    var sharedRecords = await _platformNotificationService.GetNotificationHistoryAsync();
+                    
+                    // Convert from shared DTOs to local NotificationRecord objects
+                    var records = sharedRecords.Select(r => new NotificationRecord
+                    {
+                        Id = r.Id,
+                        Title = r.Title,
+                        Message = r.Message,
+                        Type = r.Type,
+                        Timestamp = r.Timestamp,
+                        Data = r.Data
+                        // Note: Delivery status fields aren't available in the shared DTO
+                    }).ToList();
+                    
+                    return records;
+                }
+                
+                // Fallback to local history if service not initialized
+                return _notificationHistory;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"NotificationHelper: Error getting notification history: {ex.Message}");
+                return new List<NotificationRecord>();
+            }
         }
         
         /// <summary>
@@ -151,4 +201,4 @@ namespace TDFMAUI.Helpers
             return null;
         }
     }
-} 
+}

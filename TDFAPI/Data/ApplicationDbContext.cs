@@ -6,6 +6,7 @@ using TDFShared.Models.Request;
 using TDFShared.Models.Department;
 using TDFAPI.Domain.Auth;
 using TDFShared.Enums;
+using TDFAPI.Models;
 
 namespace TDFAPI.Data
 {
@@ -23,6 +24,7 @@ namespace TDFAPI.Data
         public DbSet<AnnualLeaveEntity> AnnualLeaves { get; set; }
         public DbSet<RevokedToken> RevokedTokens { get; set; }
         public DbSet<DepartmentEntity> Departments { get; set; }
+        public DbSet<PushToken> PushTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -170,7 +172,7 @@ namespace TDFAPI.Data
             builder.Entity<AnnualLeaveEntity>(entity =>
             {
                 entity.ToTable("AnnualLeave");
-                 entity.HasKey(e => e.UserID);
+                entity.HasKey(e => e.UserID);
                 entity.Property(e => e.UserID).ValueGeneratedNever();
                 entity.Property(e => e.FullName).HasMaxLength(100);
                 entity.Property(e => e.Annual);
@@ -180,7 +182,17 @@ namespace TDFAPI.Data
                 entity.Property(e => e.Permissions);
                 entity.Property(e => e.PermissionsUsed);
                 entity.Property(e => e.UnpaidUsed).HasDefaultValue(0);
-                entity.Property(e => e.WorkFromHomeUsed).HasDefaultValue(0);
+                
+                // Explicitly include WorkFromHomeUsed in INSERT statements
+                entity.Property(e => e.WorkFromHomeUsed)
+                    .HasColumnName("WorkFromHomeUsed")
+                    .HasDefaultValue(0)
+                    .ValueGeneratedNever();
+                
+                // Ignore computed columns from the database
+                entity.Ignore("AnnualBalance");
+                entity.Ignore("EmergencyBalance");
+                entity.Ignore("PermissionsBalance");
 
                 entity.HasOne<UserEntity>()
                     .WithOne(p => p.AnnualLeave)
@@ -240,6 +252,22 @@ namespace TDFAPI.Data
                 // Index for cleanup of expired tokens
                 entity.HasIndex(e => e.ExpiryDate)
                     .HasDatabaseName("IX_RevokedTokens_ExpiryDate");
+            });
+
+            // Configure PushToken
+            builder.Entity<PushToken>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Token).IsRequired().HasMaxLength(500);
+                entity.Property(e => e.Platform).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.DeviceName).HasMaxLength(100);
+                entity.Property(e => e.DeviceModel).HasMaxLength(100);
+                entity.Property(e => e.AppVersion).HasMaxLength(50);
+
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

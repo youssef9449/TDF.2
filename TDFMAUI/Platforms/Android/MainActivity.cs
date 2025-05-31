@@ -8,6 +8,7 @@ using Microsoft.Maui.Controls;
 using System.Text;
 using JavaThread = Java.Lang.Thread;
 using SystemThread = System.Threading.Thread;
+using AndroidX.Core.App;
 
 namespace TDFMAUI
 {
@@ -26,6 +27,8 @@ namespace TDFMAUI
 
                 // Continue with normal initialization
                 base.OnCreate(savedInstanceState);
+
+                CreateNotificationChannel();
 
                 LogToFile("MainActivity", "OnCreate completed successfully");
             }
@@ -49,6 +52,24 @@ namespace TDFMAUI
                     throw;
                 }
             }
+        }
+
+        private void CreateNotificationChannel()
+        {
+            if (Build.VERSION.SdkInt < BuildVersionCodes.O)
+                return;
+
+            var channelName = "General Notifications";
+            var channelDescription = "General notifications for TDF app";
+            var channel = new NotificationChannel(
+                "default_channel",
+                channelName,
+                NotificationImportance.Default)
+            {
+                Description = channelDescription
+            };
+            var notificationManager = (NotificationManager)GetSystemService(NotificationService);
+            notificationManager.CreateNotificationChannel(channel);
         }
 
         public static void LogToFile(string tag, string message)

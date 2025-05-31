@@ -10,7 +10,9 @@ namespace TDFMAUI.Converters
         {
             if (value is AppTheme theme)
             {
-                return theme == AppTheme.Dark ? Application.Current.Resources["BackgroundColor"] : Application.Current.Resources["BackgroundColor"];
+                return theme == AppTheme.Dark 
+                    ? Application.Current.Resources["DarkBackground"] 
+                    : Application.Current.Resources["BackgroundColor"];
             }
             return Application.Current.Resources["BackgroundColor"];
         }

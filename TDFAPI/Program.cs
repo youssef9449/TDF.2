@@ -598,14 +598,20 @@ builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<IRequestService, RequestService>();
 builder.Services.AddScoped<IUserPresenceService, UserPresenceService>();
-builder.Services.AddScoped<TDFShared.Services.INotificationService, NotificationService>();
+// Register both notification services
+builder.Services.AddScoped<TDFAPI.Services.INotificationService, TDFAPI.Services.NotificationService>();
+// For shared interface, create an adapter that implements TDFShared.Services.INotificationService
+builder.Services.AddScoped<TDFShared.Services.INotificationService, NotificationServiceAdapter>();
 
 // Register services
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IRequestRepository, RequestRepository>();
+builder.Services.AddScoped<IPushTokenService, PushTokenService>();
+builder.Services.AddScoped<IBackgroundJobService, BackgroundJobService>();
 
 // Add background services
 builder.Services.AddHostedService<UserInactivityBackgroundService>();
+builder.Services.AddHostedService<BackgroundJobService>();
 
 // Add API versioning
 builder.Services.AddApiVersioning(options =>

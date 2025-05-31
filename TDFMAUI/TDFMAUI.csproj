@@ -12,7 +12,7 @@
 		<Nullable>enable</Nullable>
 		<WarningsNotAsErrors>NU1605</WarningsNotAsErrors>
 		<ApplicationTitle>TDF</ApplicationTitle>
-		<ApplicationId>com.companyname.tdfmaui</ApplicationId>
+		<ApplicationId>com.TDF.TDFMAUI</ApplicationId>
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 		<AssemblyName>TDF</AssemblyName>
@@ -31,7 +31,7 @@
 	</PropertyGroup>
 
 		<!-- Android specific JAVAC options -->
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-android34.0'">
 		<AndroidJavacTargetOptions>-Xlint:-options</AndroidJavacTargetOptions>
 		<!-- Ensure all required assemblies are included -->
 		<AndroidLinkMode>None</AndroidLinkMode>
@@ -40,6 +40,12 @@
 		<AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
 		<EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
 	</PropertyGroup>
+	
+	<!-- Android-specific packages -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-android34.0'">
+		<PackageReference Include="Plugin.Firebase.Android" Version="3.1.4" />
+		<PackageReference Include="Plugin.Firebase.CloudMessaging.Android" Version="3.1.2" />
+	</ItemGroup>
 
 	<!-- Platform-specific supported versions -->
 	<PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
@@ -61,14 +67,7 @@
 	<!-- Assets and resources -->
 	<ItemGroup>
 		<!-- Updated to generate round and adaptive Android icons -->
-		<MauiIcon
-		  Include="Resources\AppIcon\appicon.svg"
-		  ForegroundFile="Resources\AppIcon\appiconfg.svg"
-		  Color="#512BD4"
-		  AndroidIcon="Resources\AppIcon\appicon.svg"
-		  AndroidRoundIcon="Resources\AppIcon\appicon.svg"
-		  AndroidAdaptiveIconForeground="Resources\AppIcon\appiconfg.svg"
-		  AndroidAdaptiveIconBackground="Resources\AppIcon\appicon.svg" />
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" AndroidIcon="Resources\AppIcon\appicon.svg" AndroidRoundIcon="Resources\AppIcon\appicon.svg" AndroidAdaptiveIconForeground="Resources\AppIcon\appiconfg.svg" AndroidAdaptiveIconBackground="Resources\AppIcon\appicon.svg" />
 
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
 		<MauiImage Include="Resources\Images\*" />
@@ -76,6 +75,10 @@
 		<MauiFont Include="Resources\Fonts\*" />
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
+
+	<ItemGroup>
+    <GoogleServicesJson Include="google-services.json" />
+    </ItemGroup>
 
 	<!-- NuGet package references -->
 	<ItemGroup>
@@ -88,6 +91,9 @@
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="Plugin.Firebase" Version="3.1.4" />
+		<PackageReference Include="Plugin.Firebase.CloudMessaging" Version="3.1.2" />
+		<PackageReference Include="Plugin.LocalNotification" Version="12.0.1" />
 		<PackageReference Include="System.Collections" Version="4.3.0" />
 		<PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0" />
 		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" />
@@ -98,6 +104,8 @@
 		<PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop" Version="8.0.14" />
 		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.240211001" />
 		<PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
+		<PackageReference Include="Plugin.Firebase.Windows" Version="3.1.4" />
+		<PackageReference Include="Plugin.Firebase.CloudMessaging.Windows" Version="3.1.2" />
 	</ItemGroup>
 
 	<!-- Configuration files -->

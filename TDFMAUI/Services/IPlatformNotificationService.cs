@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using TDFMAUI.Helpers;
+using TDFShared.DTOs.Messages;
 using TDFShared.Enums;
 
 namespace TDFMAUI.Services
@@ -15,8 +15,9 @@ namespace TDFMAUI.Services
         /// <param name="message">The notification message body</param>
         /// <param name="notificationType">The type/severity of the notification</param>
         /// <param name="data">Additional data for the notification</param>
-        /// <returns>True if the notification was successfully shown</returns>
-        Task<bool> ShowNotificationAsync(string title, string message, NotificationType notificationType = NotificationType.Info, string? data = null);
+        /// <param name="fireAt">Optional: The time to schedule the notification. If null, show immediately.</param>
+        /// <returns>True if the notification was successfully shown or scheduled</returns>
+        Task<bool> ShowNotificationAsync(string title, string message, NotificationType notificationType = NotificationType.Info, string? data = null, DateTime? fireAt = null);
         
         /// <summary>
         /// Shows a local platform-specific notification
@@ -46,6 +47,17 @@ namespace TDFMAUI.Services
         Task<bool> CancelScheduledNotificationAsync(string id);
         
         /// <summary>
+        /// Updates an existing scheduled notification
+        /// </summary>
+        /// <param name="id">The ID of the scheduled notification to update</param>
+        /// <param name="title">The new notification title</param>
+        /// <param name="message">The new notification message</param>
+        /// <param name="newDeliveryTime">The new delivery time</param>
+        /// <param name="data">Additional data for the notification</param>
+        /// <returns>True if the notification was updated successfully</returns>
+        Task<bool> UpdateScheduledNotificationAsync(string id, string title, string message, DateTime newDeliveryTime, string? data = null);
+        
+        /// <summary>
         /// Gets the IDs of all scheduled notifications
         /// </summary>
         /// <returns>A list of scheduled notification IDs</returns>
@@ -71,6 +83,6 @@ namespace TDFMAUI.Services
         /// <summary>
         /// Event that is triggered when an in-app notification should be shown
         /// </summary>
-        event EventHandler<NotificationEventArgs> InAppNotificationRequested;
+        event EventHandler<TDFShared.DTOs.Messages.NotificationEventArgs> LocalNotificationRequested;
     }
-} 
+}

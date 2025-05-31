@@ -4,8 +4,15 @@ using TDFShared.Enums;
 namespace TDFMAUI.Helpers
 {
     /// <summary>
-    /// Record for storing notification history
+    /// Local notification record used for tracking notification delivery and history within the MAUI application.
+    /// This class is specifically designed for local storage and UI display, containing additional properties
+    /// for tracking delivery status and retry attempts that are not relevant to API communication.
     /// </summary>
+    /// <remarks>
+    /// This class is separate from TDFShared.DTOs.Messages.NotificationRecord which is used for API communication.
+    /// The local version includes additional properties for tracking delivery status and retry attempts
+    /// that are specific to the MAUI application's needs.
+    /// </remarks>
     public class NotificationRecord
     {
         /// <summary>
@@ -37,61 +44,41 @@ namespace TDFMAUI.Helpers
         /// Additional data associated with the notification
         /// </summary>
         public string Data { get; set; }
-    }
 
-    /// <summary>
-    /// Event arguments for notification-related events
-    /// </summary>
-    public class NotificationEventArgs : EventArgs
-    {
         /// <summary>
-        /// Title of the notification
+        /// Whether the notification was successfully delivered to the user
         /// </summary>
-        public string Title { get; set; }
-        
+        /// <remarks>
+        /// This property is used to track the delivery status of local notifications
+        /// and is not relevant to API communication.
+        /// </remarks>
+        public bool WasDelivered { get; set; }
+
         /// <summary>
-        /// Content/message of the notification
+        /// When the notification was successfully delivered to the user
         /// </summary>
-        public string Message { get; set; }
-        
+        /// <remarks>
+        /// This property is used to track the delivery timing of local notifications
+        /// and is not relevant to API communication.
+        /// </remarks>
+        public DateTime? DeliveryTime { get; set; }
+
         /// <summary>
-        /// Type/severity of the notification
+        /// Error message if the notification delivery failed
         /// </summary>
-        public NotificationType Type { get; set; }
-        
+        /// <remarks>
+        /// This property is used to track delivery failures of local notifications
+        /// and is not relevant to API communication.
+        /// </remarks>
+        public string DeliveryError { get; set; }
+
         /// <summary>
-        /// When the notification was created
+        /// Number of retry attempts made to deliver the notification
         /// </summary>
-        public DateTime Timestamp { get; set; }
-        
-        /// <summary>
-        /// ID of the notification in the database
-        /// </summary>
-        public int NotificationId { get; set; }
-        
-        /// <summary>
-        /// ID of the user who sent the notification (if any)
-        /// </summary>
-        public int? SenderId { get; set; }
-        
-        /// <summary>
-        /// Name of the user who sent the notification
-        /// </summary>
-        public string SenderName { get; set; }
-        
-        /// <summary>
-        /// Whether this is a broadcast notification
-        /// </summary>
-        public bool IsBroadcast { get; set; }
-        
-        /// <summary>
-        /// Department the notification is targeting (for broadcasts)
-        /// </summary>
-        public string Department { get; set; }
-        
-        /// <summary>
-        /// Additional data associated with the notification
-        /// </summary>
-        public string Data { get; set; }
+        /// <remarks>
+        /// This property is used to track retry attempts for local notifications
+        /// and is not relevant to API communication.
+        /// </remarks>
+        public int RetryCount { get; set; }
     }
-} 
+}

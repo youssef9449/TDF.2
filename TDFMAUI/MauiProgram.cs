@@ -18,16 +18,96 @@ using TDFShared.Validation;
 using TDFShared.Services;
 
 
+using Plugin.LocalNotification;
+using Plugin.LocalNotification.EventArgs;
+using Plugin.Firebase;
+
 namespace TDFMAUI
 {
     public static class MauiProgram
     {
+        // Event handlers for notification delivery tracking
+        private static void OnLocalNotificationReceived(NotificationEventArgs e)
+        {
+            try
+            {
+                // Get the notification ID and tracking data
+                var notificationId = e.Request.NotificationId;
+                var trackingId = e.Request.ReturningData;
+                
+                // Log notification delivery
+                System.Diagnostics.Debug.WriteLine($"Notification received: ID={notificationId}, TrackingID={trackingId}");
+                
+                // Update delivery status in platform notification service
+                // This will be handled by the service when it's initialized
+                if (!string.IsNullOrEmpty(trackingId))
+                {
+                    // The PlatformNotificationService will handle this via its own event handlers
+                    // We're adding this here as a backup to ensure delivery tracking
+                    var notificationService = Application.Current?.Handler?.MauiContext?.Services?.GetService<IPlatformNotificationService>();
+                    if (notificationService != null)
+                    {
+                        Task.Run(async () => {
+                            bool success = await ((PlatformNotificationService)notificationService).UpdateNotificationDeliveryStatusAsync(trackingId, true);
+                            if (!success) {
+                                System.Diagnostics.Debug.WriteLine($"Failed to update delivery status for received notification {trackingId}");
+                            }
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in OnLocalNotificationReceived: {ex.Message}");
+            }
+        }
+        
+        private static void OnLocalNotificationTapped(NotificationEventArgs e)
+        {
+            try
+            {
+                // Get the notification ID and tracking data
+                var notificationId = e.Request.NotificationId;
+                var trackingId = e.Request.ReturningData;
+                
+                // Log notification interaction
+                System.Diagnostics.Debug.WriteLine($"Notification tapped: ID={notificationId}, TrackingID={trackingId}");
+                
+                // Update delivery status in platform notification service
+                if (!string.IsNullOrEmpty(trackingId))
+                {
+                    // The PlatformNotificationService will handle this via its own event handlers
+                    // We're adding this here as a backup to ensure delivery tracking
+                    var notificationService = Application.Current?.Handler?.MauiContext?.Services?.GetService<IPlatformNotificationService>();
+                    if (notificationService != null)
+                    {
+                        Task.Run(async () => {
+                            bool success = await ((PlatformNotificationService)notificationService).UpdateNotificationDeliveryStatusAsync(trackingId, true);
+                            if (!success) {
+                                System.Diagnostics.Debug.WriteLine($"Failed to update delivery status for tapped notification {trackingId}");
+                            }
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in OnLocalNotificationTapped: {ex.Message}");
+            }
+        }
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
                 .UseMauiCommunityToolkit()
+                .UseLocalNotification(config => {
+                    // Register notification delivery events
+                    config.AddCategory(new NotificationCategory(NotificationCategoryType.Status));
+                    // Register event handlers for notification delivery tracking
+                    Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived += OnLocalNotificationReceived;
+                    Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped += OnLocalNotificationTapped;
+                })
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -252,12 +332,15 @@ namespace TDFMAUI
             // Register MessageService with shared HTTP client service
             builder.Services.AddSingleton<MessageService>();
 
-
             // Register NotificationService hierarchy
             builder.Services.AddSingleton<IPlatformNotificationService, PlatformNotificationService>();
             builder.Services.AddSingleton<NotificationService>();
             builder.Services.AddSingleton<IExtendedNotificationService>(sp => sp.GetRequiredService<NotificationService>());
             builder.Services.AddSingleton<TDFMAUI.Services.INotificationService>(sp => sp.GetRequiredService<IExtendedNotificationService>());
+            
+            // Register push notification service
+            builder.Services.AddSingleton<PushNotificationService>();
+            builder.Services.AddSingleton<IPushNotificationService>(sp => sp.GetRequiredService<PushNotificationService>());
 
             // Register ViewModels
             builder.Services.AddTransient<UserProfileViewModel>();
@@ -319,6 +402,10 @@ namespace TDFMAUI
 
             // HTTP client service already registered above with TDFShared.Services.IHttpClientService
             // ConnectivityService already registered above with TDFShared.Services.IConnectivityService
+
+            #if IOS
+            builder.Services.AddSingleton<INotificationPermissionPlatformService, TDFMAUI.Platforms.iOS.NotificationPermissionPlatformService>();
+            #endif
 
             MauiApp app = null; // Declare app outside try block
             try // Wrap builder.Build() and subsequent initialization

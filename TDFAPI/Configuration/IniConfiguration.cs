@@ -73,11 +73,11 @@ namespace TDFAPI.Configuration
                             _iniFile.Write("Jwt", "Audience", "TDFClient");
                             _iniFile.Write("App", "AllowedOrigins", "");
                             _iniFile.Write("App", "DevelopmentAllowedOrigins", "http://localhost:3000,http://localhost:8080");
-                            _iniFile.Write("Security", "MaxFailedLoginAttempts", "5");
-                            _iniFile.Write("Security", "LockoutDurationMinutes", "15");
-                            _iniFile.Write("WebSockets", "TimeoutMinutes", "30");
                             _iniFile.Write("WebSockets", "KeepAliveMinutes", "2");
                             _iniFile.Write("RateLimiting", "GlobalLimitPerMinute", "100");
+                            _iniFile.Write("RateLimiting", "AuthLimitPerMinute", "10");
+                            _iniFile.Write("RateLimiting", "ApiLimitPerMinute", "60");
+                            _iniFile.Write("RateLimiting", "StaticLimitPerMinute", "200");
 
                             Console.WriteLine("Created new configuration file with default values");
                         }
@@ -92,8 +92,6 @@ namespace TDFAPI.Configuration
                             // JWT SecretKey should be provided via environment variable JWT_SECRET_KEY
                             _iniFile.Write("Jwt", "Issuer", "TDFAPI");
                             _iniFile.Write("Jwt", "Audience", "TDFClient");
-                            _iniFile.Write("Security", "MaxFailedLoginAttempts", "5");
-                            _iniFile.Write("Security", "LockoutDurationMinutes", "15");
                         }
                     }
                     else
@@ -326,10 +324,7 @@ namespace TDFAPI.Configuration
                 if (!currentSettings.ContainsKey("WebSockets"))
                 {
                     Console.WriteLine("Adding WebSockets section to config.ini");
-                    _iniFile.Write("WebSockets", "TimeoutMinutes", "30");
                     _iniFile.Write("WebSockets", "KeepAliveMinutes", "2");
-                    _iniFile.Write("WebSockets", "MaxMessagesPerMinute", "120");
-                    _iniFile.Write("WebSockets", "ReceiveBufferSize", "65536");
                 }
 
                 EnsureInitialized();

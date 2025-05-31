@@ -1,4 +1,4 @@
-﻿using Android.App;
+﻿﻿using Android.App;
 using Android.Runtime;
 
 namespace TDFMAUI
@@ -12,5 +12,11 @@ namespace TDFMAUI
         }
 
         protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
+
+        public override void OnCreate()
+        {
+            base.OnCreate();
+            // Firebase initialization is now handled by Plugin.Firebase in shared code
+        }
     }
 }

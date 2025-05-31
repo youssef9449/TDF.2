@@ -2,6 +2,7 @@ using System;
 using TDFMAUI.Helpers;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using TDFShared.DTOs.Messages;
 
 namespace TDFMAUI.Services
 {
@@ -39,4 +40,4 @@ namespace TDFMAUI.Services
         Task SetAvailableForChatAsync(bool isAvailable);
         Task SendActivityPingAsync();
     }
-} 
+}

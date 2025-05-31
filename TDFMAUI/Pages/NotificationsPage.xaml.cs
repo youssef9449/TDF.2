@@ -197,7 +197,7 @@ namespace TDFMAUI.Pages
             return $"User {senderId}";
         }
 
-        private async void OnNotificationReceived(object sender, NotificationEventArgs e)
+        private async void OnNotificationReceived(object sender, TDFShared.DTOs.Messages.NotificationEventArgs e)
         {
             // Add the notification to our list if it's not already there
             // Check by NotificationId to prevent duplicates from WebSocket

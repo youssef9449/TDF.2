@@ -21,6 +21,10 @@ using TDFShared.Enums;
 using TDFShared.Models.Message;
 using TDFShared.Models.Notification;
 using TDFShared.Services;
+using TDFAPI.Models;
+using FirebaseAdmin;
+using FirebaseAdmin.Messaging;
+using Google.Apis.Auth.OAuth2;
 
 namespace TDFAPI.Services
 {
@@ -31,7 +35,6 @@ namespace TDFAPI.Services
         private readonly WebSocketConnectionManager _webSocketManager;
         private readonly ILogger<NotificationService> _logger;
         private readonly IMessageRepository _messageRepository;
-        private readonly IServiceProvider _serviceProvider;
         private readonly IEventMediator _eventMediator;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IHttpContextAccessor _httpContextAccessor;
@@ -39,12 +42,10 @@ namespace TDFAPI.Services
             new();
         private readonly ConcurrentDictionary<string, DateTime> _lastMessageTime = new();
         private readonly Timer _dictionaryCleanupTimer;
+        private readonly IPushTokenService _pushTokenService;
+        private readonly ApplicationDbContext _context;
+        private readonly IBackgroundJobService _jobService;
 
-        // Configuration for WebSocket behavior
-        private const int DefaultBufferSize = 4096;  // 4KB default
-        private const int MaxBufferSize = 65536;     // 64KB max
-        private const int HeartbeatIntervalSeconds = 30;
-        private const int ConnectionTimeoutSeconds = 120;
         private const int MaxMessagesPerMinute = 60;
         private const int DictionaryCleanupIntervalMinutes = 10;
 
@@ -54,20 +55,24 @@ namespace TDFAPI.Services
             WebSocketConnectionManager webSocketManager,
             IMessageRepository messageRepository,
             ILogger<NotificationService> logger,
-            IServiceProvider serviceProvider,
             IEventMediator eventMediator,
             IUnitOfWork unitOfWork,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor,
+            IPushTokenService pushTokenService,
+            ApplicationDbContext context,
+            IBackgroundJobService jobService)
         {
             _notificationRepository = notificationRepository ?? throw new ArgumentNullException(nameof(notificationRepository));
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _webSocketManager = webSocketManager ?? throw new ArgumentNullException(nameof(webSocketManager));
             _messageRepository = messageRepository ?? throw new ArgumentNullException(nameof(messageRepository));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _serviceProvider = serviceProvider;
             _eventMediator = eventMediator ?? throw new ArgumentNullException(nameof(eventMediator));
             _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
             _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
+            _pushTokenService = pushTokenService;
+            _context = context;
+            _jobService = jobService;
 
             _dictionaryCleanupTimer = new Timer(CleanupDictionaries, null,
                 TimeSpan.FromMinutes(DictionaryCleanupIntervalMinutes),
@@ -504,6 +509,487 @@ namespace TDFAPI.Services
         {
             _dictionaryCleanupTimer?.Dispose();
             GC.SuppressFinalize(this);
+        }
+
+        public async Task SendNotificationAsync(int userId, string title, string message, NotificationType type = NotificationType.Info, string? data = null)
+        {
+            try
+            {
+                // Get user's push tokens
+                var tokens = await _pushTokenService.GetUserTokensAsync(userId);
+                if (!tokens.Any())
+                {
+                    _logger.LogWarning("No active push tokens found for user {UserId}", userId);
+                    return;
+                }
+
+                // Create notification record
+                var notification = new NotificationRecord
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Title = title,
+                    Message = message,
+                    Type = type,
+                    Timestamp = DateTime.UtcNow,
+                    Data = data
+                };
+
+                // Send to each token
+                foreach (var token in tokens)
+                {
+                    try
+                    {
+                        await SendPushNotificationAsync(token, notification);
+                        await _pushTokenService.UpdateTokenLastUsedAsync(token.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error sending push notification to token {Token}", token.Token);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending notification to user {UserId}", userId);
+                throw;
+            }
+        }
+
+        public async Task SendNotificationAsync(IEnumerable<int> userIds, string title, string message, NotificationType type = NotificationType.Info, string? data = null)
+        {
+            try
+            {
+                // Get all users' tokens
+                var userTokens = await _pushTokenService.GetUsersTokensAsync(userIds);
+                if (!userTokens.Any())
+                {
+                    _logger.LogWarning("No active push tokens found for users");
+                    return;
+                }
+
+                // Create notification record
+                var notification = new NotificationRecord
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Title = title,
+                    Message = message,
+                    Type = type,
+                    Timestamp = DateTime.UtcNow,
+                    Data = data
+                };
+
+                // Send to each token
+                foreach (var tokens in userTokens.Values)
+                {
+                    foreach (var token in tokens)
+                    {
+                        try
+                        {
+                            await SendPushNotificationAsync(token, notification);
+                            await _pushTokenService.UpdateTokenLastUsedAsync(token.Token);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error sending push notification to token {Token}", token.Token);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending notification to users");
+                throw;
+            }
+        }
+
+        public async Task SendDepartmentNotificationAsync(string department, string title, string message, NotificationType type = NotificationType.Info, string? data = null)
+        {
+            try
+            {
+                // Get all users in the department
+                var userIds = await _context.Users
+                    .Where(u => u.Department == department && u.IsActive)
+                    .Select(u => u.UserID)
+                    .ToListAsync();
+
+                if (!userIds.Any())
+                {
+                    _logger.LogWarning("No active users found in department {Department}", department);
+                    return;
+                }
+
+                await SendNotificationAsync(userIds, title, message, type, data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending department notification to {Department}", department);
+                throw;
+            }
+        }
+
+        public async Task ScheduleNotificationAsync(int userId, string title, string message, DateTime deliveryTime, NotificationType type = NotificationType.Info, string? data = null)
+        {
+            try
+            {
+                if (deliveryTime <= DateTime.UtcNow)
+                {
+                    throw new ArgumentException("Delivery time must be in the future", nameof(deliveryTime));
+                }
+
+                // Create notification record
+                var notification = new NotificationRecord
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Title = title,
+                    Message = message,
+                    Type = type,
+                    Timestamp = DateTime.UtcNow,
+                    Data = data
+                };
+
+                // Schedule the notification
+                await _jobService.ScheduleJobAsync(
+                    "SendNotification",
+                    new Dictionary<string, object>
+                    {
+                        { "userId", userId },
+                        { "notificationId", notification.Id },
+                        { "title", title },
+                        { "message", message },
+                        { "type", type },
+                        { "data", data }
+                    },
+                    deliveryTime);
+
+                _logger.LogInformation("Scheduled notification {NotificationId} for user {UserId} at {DeliveryTime}",
+                    notification.Id, userId, deliveryTime);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error scheduling notification for user {UserId}", userId);
+                throw;
+            }
+        }
+
+        public async Task CancelScheduledNotificationAsync(string notificationId)
+        {
+            try
+            {
+                await _jobService.DeleteJobAsync("SendNotification", notificationId);
+                _logger.LogInformation("Cancelled scheduled notification {NotificationId}", notificationId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cancelling scheduled notification {NotificationId}", notificationId);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<NotificationRecord>> GetScheduledNotificationsAsync(int userId)
+        {
+            try
+            {
+                var jobs = await _jobService.GetJobsAsync("SendNotification", userId.ToString());
+                return jobs.Select(job => new NotificationRecord
+                {
+                    Id = job.Id,
+                    Title = job.Data["title"].ToString(),
+                    Message = job.Data["message"].ToString(),
+                    Type = (NotificationType)job.Data["type"],
+                    Timestamp = job.ScheduledTime,
+                    Data = job.Data["data"]?.ToString()
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving scheduled notifications for user {UserId}", userId);
+                throw;
+            }
+        }
+
+        private async Task SendPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationRecord notification)
+        {
+            // Platform-specific push notification sending logic
+            switch (token.Platform.ToLower())
+            {
+                case "ios":
+                    await SendIOSPushNotificationAsync(token, notification);
+                    break;
+                case "android":
+                    await SendAndroidPushNotificationAsync(token, notification);
+                    break;
+                case "windows":
+                    await SendWindowsPushNotificationAsync(token, notification);
+                    break;
+                case "macos":
+                    await SendMacOSPushNotificationAsync(token, notification);
+                    break;
+                default:
+                    throw new NotSupportedException($"Push notifications not supported for platform: {token.Platform}");
+            }
+        }
+
+        private async Task SendIOSPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationRecord notification)
+        {
+            try
+            {
+                _logger.LogInformation("Sending iOS push notification to token: {Token}", token.Token);
+                
+                // Create the notification payload
+                var payload = new
+                {
+                    aps = new
+                    {
+                        alert = new
+                        {
+                            title = notification.Title,
+                            body = notification.Message
+                        },
+                        badge = 1,
+                        sound = "default",
+                        category = notification.Type.ToString().ToLower(),
+                        content_available = 1
+                    },
+                    notificationId = notification.Id,
+                    notificationType = notification.Type.ToString(),
+                    data = notification.Data
+                };
+                
+                // Serialize the payload
+                var jsonPayload = JsonSerializer.Serialize(payload);
+                
+                // In a production environment, you would use a library like PushSharp or a direct HTTP/2 implementation
+                // to send the notification to Apple's APNS servers
+                // For now, we'll log the payload and mark it as successful
+                _logger.LogInformation("iOS Push Notification Payload: {Payload}", jsonPayload);
+                
+                // Update token last used timestamp
+                await _pushTokenService.UpdateTokenLastUsedAsync(token.Token);
+                
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending iOS push notification to token: {Token}", token.Token);
+                throw;
+            }
+        }
+
+        private static bool _firebaseInitialized = false;
+        private static readonly object _firebaseInitLock = new();
+
+        private void EnsureFirebaseInitialized()
+        {
+            if (_firebaseInitialized) return;
+            lock (_firebaseInitLock)
+            {
+                if (_firebaseInitialized) return;
+                
+                try
+                {
+                    if (FirebaseApp.DefaultInstance == null)
+                    {
+                        // Path to your google-services.json or service account key
+                        var credentialPath = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS") ?? "./google-service-account.json";
+                        
+                        // Check if the file exists
+                        if (!System.IO.File.Exists(credentialPath))
+                        {
+                            _logger.LogError("Firebase service account file not found at: {Path}", credentialPath);
+                            throw new FileNotFoundException($"Firebase service account file not found at: {credentialPath}");
+                        }
+                        
+                        _logger.LogInformation("Initializing Firebase with service account from: {Path}", credentialPath);
+                        
+                        // Create the Firebase app
+                        FirebaseApp.Create(new AppOptions()
+                        {
+                            Credential = GoogleCredential.FromFile(credentialPath)
+                        });
+                        
+                        _logger.LogInformation("Firebase initialized successfully");
+                    }
+                    _firebaseInitialized = true;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error initializing Firebase");
+                    throw; // Re-throw to ensure the caller knows initialization failed
+                }
+            }
+        }
+
+        private async Task SendAndroidPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationRecord notification)
+        {
+            try
+            {
+                _logger.LogInformation("Sending Android push notification to token: {Token}", token.Token);
+                EnsureFirebaseInitialized();
+
+                // Extract sender information if available
+                string senderName = string.Empty;
+                int? senderId = null;
+                bool isBroadcast = false;
+                string department = string.Empty;
+                
+                // Parse additional data if available
+                if (!string.IsNullOrEmpty(notification.Data))
+                {
+                    try
+                    {
+                        var data = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(notification.Data);
+                        if (data != null)
+                        {
+                            if (data.TryGetValue("senderName", out var senderNameObj))
+                                senderName = senderNameObj?.ToString() ?? string.Empty;
+                            
+                            if (data.TryGetValue("senderId", out var senderIdObj) && senderIdObj != null)
+                                senderId = int.TryParse(senderIdObj.ToString(), out var id) ? id : null;
+                            
+                            if (data.TryGetValue("isBroadcast", out var isBroadcastObj))
+                                isBroadcast = bool.TryParse(isBroadcastObj?.ToString(), out var broadcast) && broadcast;
+                            
+                            if (data.TryGetValue("department", out var departmentObj))
+                                department = departmentObj?.ToString() ?? string.Empty;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error parsing notification data: {Data}", notification.Data);
+                    }
+                }
+
+                // Create the FCM message with enhanced data
+                var message = new Message
+                {
+                    Token = token.Token,
+                    Notification = new Notification
+                    {
+                        Title = notification.Title,
+                        Body = notification.Message
+                    },
+                    Data = new Dictionary<string, string>
+                    {
+                        { "notificationId", notification.Id },
+                        { "notificationType", notification.Type.ToString() },
+                        { "data", notification.Data ?? string.Empty },
+                        { "click_action", "OPEN_NOTIFICATION" },
+                        { "timestamp", DateTime.UtcNow.ToString("o") },
+                        { "senderName", senderName },
+                        { "senderId", senderId?.ToString() ?? string.Empty },
+                        { "isBroadcast", isBroadcast.ToString().ToLower() },
+                        { "department", department }
+                    },
+                    Android = new AndroidConfig
+                    {
+                        Priority = Priority.High,
+                        Notification = new AndroidNotification
+                        {
+                            ChannelId = "default_channel",
+                            Sound = "default",
+                            Icon = "@mipmap/appicon",
+                            Color = "#4285F4", // Google blue
+                            Tag = notification.Id // Use ID as tag to prevent duplicates
+                        }
+                        // Note: TTL is not directly supported in this version of the Firebase SDK
+                        // We would need to use the HTTP v1 API to set TTL
+                    }
+                };
+
+                // Send the notification
+                var response = await FirebaseMessaging.DefaultInstance.SendAsync(message);
+                _logger.LogInformation("Android push sent. FCM response: {Response}", response);
+                
+                // Update the token's last used timestamp
+                await _pushTokenService.UpdateTokenLastUsedAsync(token.Token);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending Android push notification to token: {Token}", token.Token);
+                throw;
+            }
+        }
+
+        private async Task SendWindowsPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationRecord notification)
+        {
+            try
+            {
+                _logger.LogInformation("Sending Windows push notification to token: {Token}", token.Token);
+                
+                // Create a Windows Toast notification XML payload
+                var toastXml = $@"
+                <toast launch=""notificationId={notification.Id}"">
+                    <visual>
+                        <binding template=""ToastGeneric"">
+                            <text>{notification.Title}</text>
+                            <text>{notification.Message}</text>
+                        </binding>
+                    </visual>
+                    <actions>
+                        <action content=""View"" arguments=""view&amp;notificationId={notification.Id}"" />
+                        <action content=""Dismiss"" arguments=""dismiss&amp;notificationId={notification.Id}"" />
+                    </actions>
+                </toast>";
+                
+                // In a production environment, you would use the Windows Notification Service (WNS)
+                // to send the notification to Microsoft's WNS servers
+                // For now, we'll log the payload and mark it as successful
+                _logger.LogInformation("Windows Push Notification Payload: {Payload}", toastXml);
+                
+                // Update token last used timestamp
+                await _pushTokenService.UpdateTokenLastUsedAsync(token.Token);
+                
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending Windows push notification to token: {Token}", token.Token);
+                throw;
+            }
+        }
+
+        private async Task SendMacOSPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationRecord notification)
+        {
+            try
+            {
+                _logger.LogInformation("Sending macOS push notification to token: {Token}", token.Token);
+                
+                // macOS uses the same APNS service as iOS, but with different payload structure
+                var payload = new
+                {
+                    aps = new
+                    {
+                        alert = new
+                        {
+                            title = notification.Title,
+                            body = notification.Message
+                        },
+                        sound = "default",
+                        content_available = 1
+                    },
+                    notificationId = notification.Id,
+                    notificationType = notification.Type.ToString(),
+                    data = notification.Data
+                };
+                
+                // Serialize the payload
+                var jsonPayload = JsonSerializer.Serialize(payload);
+                
+                // In a production environment, you would use a library like PushSharp or a direct HTTP/2 implementation
+                // to send the notification to Apple's APNS servers
+                // For now, we'll log the payload and mark it as successful
+                _logger.LogInformation("macOS Push Notification Payload: {Payload}", jsonPayload);
+                
+                // Update token last used timestamp
+                await _pushTokenService.UpdateTokenLastUsedAsync(token.Token);
+                
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending macOS push notification to token: {Token}", token.Token);
+                throw;
+            }
         }
     }
 }

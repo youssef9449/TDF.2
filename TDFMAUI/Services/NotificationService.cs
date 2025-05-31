@@ -13,14 +13,27 @@ namespace TDFMAUI.Services
         private readonly WebSocketService _webSocketService;
         private readonly ILogger<NotificationService> _logger;
         private readonly ILocalStorageService _localStorage;
+        private readonly IPlatformNotificationService _platformNotificationService;
+        private const int MAX_RETRY_ATTEMPTS = 3;
+        private const int RETRY_DELAY_MS = 1000;
 
         public event EventHandler<NotificationDto> NotificationReceived;
+        public event EventHandler<NotificationErrorEventArgs> NotificationError;
+
+        public class NotificationErrorEventArgs : EventArgs
+        {
+            public string ErrorMessage { get; set; }
+            public Exception Exception { get; set; }
+            public NotificationType? NotificationType { get; set; }
+            public bool IsRecoverable { get; set; }
+        }
 
         public NotificationService(
             ApiService apiService,
             WebSocketService webSocketService,
             ILocalStorageService localStorage,
-            ILogger<NotificationService> logger)
+            ILogger<NotificationService> logger,
+            IPlatformNotificationService platformNotificationService)
         {
             // Log constructor entry
             logger?.LogInformation("NotificationService constructor started.");
@@ -29,6 +42,7 @@ namespace TDFMAUI.Services
             _webSocketService = webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
             _localStorage = localStorage ?? throw new ArgumentNullException(nameof(localStorage));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _platformNotificationService = platformNotificationService ?? throw new ArgumentNullException(nameof(platformNotificationService));
 
             // Subscribe to WebSocket notifications
             _webSocketService.NotificationReceived += OnWebSocketNotificationReceived;
@@ -113,24 +127,51 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<bool> CreateNotificationAsync(int receiverId, string message, int? senderId = null)
+        /// <summary>
+        /// Creates a notification for a user, optionally scheduled for a future time.
+        /// </summary>
+        /// <param name="receiverId">The user to receive the notification.</param>
+        /// <param name="message">The notification message.</param>
+        /// <param name="senderId">The sender's user ID (optional).</param>
+        /// <param name="fireAt">Optional: The time to schedule the notification. If null, send immediately.</param>
+        /// <returns>True if the notification was created or scheduled successfully.</returns>
+        public virtual async Task<bool> CreateNotificationAsync(int receiverId, string message, int? senderId = null, DateTime? fireAt = null)
         {
             try
             {
-                // If senderId is not provided, use current user's ID
-                if (!senderId.HasValue && App.CurrentUser != null)
+                ValidateNotificationParameters(message, receiverId);
+
+                if (fireAt.HasValue && fireAt.Value <= DateTime.UtcNow)
                 {
-                    senderId = App.CurrentUser.UserID;
+                    _logger.LogWarning("Attempted to schedule notification in the past: {FireAt}", fireAt.Value);
+                    return false;
                 }
 
-                var result = await _apiService.PostAsync<object, bool>("notifications",
-                    new { receiverId, message, senderId });
+                return await RetryOperationAsync(async () =>
+                {
+                    if (fireAt == null)
+                    {
+                        return await CreateNotificationAsync(receiverId, message, senderId);
+                    }
 
-                return result;
+                    // Schedule the notification using the platform notification service
+                    return await _platformNotificationService.ShowNotificationAsync(
+                        "Scheduled Notification",
+                        message,
+                        NotificationType.Info,
+                        null,
+                        fireAt);
+                }, "create notification");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating notification for user {ReceiverId}", receiverId);
+                NotificationError?.Invoke(this, new NotificationErrorEventArgs
+                {
+                    ErrorMessage = "Failed to create notification",
+                    Exception = ex,
+                    IsRecoverable = true
+                });
                 return false;
             }
         }
@@ -578,6 +619,45 @@ namespace TDFMAUI.Services
                 case NotificationType.Info:
                 default: return NotificationLevel.Low;
             }
+        }
+
+        private async Task<bool> RetryOperationAsync(Func<Task<bool>> operation, string operationName)
+        {
+            for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++)
+            {
+                try
+                {
+                    return await operation();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Attempt {Attempt} of {MaxAttempts} failed for {Operation}", 
+                        attempt, MAX_RETRY_ATTEMPTS, operationName);
+                    
+                    if (attempt == MAX_RETRY_ATTEMPTS)
+                    {
+                        NotificationError?.Invoke(this, new NotificationErrorEventArgs
+                        {
+                            ErrorMessage = $"Failed to {operationName} after {MAX_RETRY_ATTEMPTS} attempts",
+                            Exception = ex,
+                            IsRecoverable = false
+                        });
+                        return false;
+                    }
+                    
+                    await Task.Delay(RETRY_DELAY_MS * attempt);
+                }
+            }
+            return false;
+        }
+
+        private void ValidateNotificationParameters(string message, int receiverId)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                throw new ArgumentException("Notification message cannot be empty", nameof(message));
+            
+            if (receiverId <= 0)
+                throw new ArgumentException("Invalid receiver ID", nameof(receiverId));
         }
     }
 }

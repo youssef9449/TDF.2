@@ -13,11 +13,11 @@ namespace TDFMAUI.Services
 {
     public class WebSocketService : IWebSocketService, IDisposable
     {
-        private ClientWebSocket _webSocket;
+        private ClientWebSocket? _webSocket;
         private readonly ILogger<WebSocketService> _logger;
         private readonly SecureStorageService _secureStorage;
         private string _serverUrl => ApiConfig.WebSocketUrl;
-        private CancellationTokenSource _cancellationTokenSource;
+        private CancellationTokenSource? _cancellationTokenSource;
         private readonly SemaphoreSlim _connectionLock = new SemaphoreSlim(1, 1);
         private bool _isConnecting = false;
         private Timer _reconnectTimer;
@@ -26,16 +26,16 @@ namespace TDFMAUI.Services
         private bool _disposed = false;
 
         // Events for different types of messages
-        public event EventHandler<NotificationEventArgs> NotificationReceived;
-        public event EventHandler<ChatMessageEventArgs> ChatMessageReceived;
-        public event EventHandler<MessageStatusEventArgs> MessageStatusChanged;
-        public event EventHandler<ConnectionStatusEventArgs> ConnectionStatusChanged;
-        public event EventHandler<UserStatusEventArgs> UserStatusChanged;
-        public event EventHandler<UserAvailabilityEventArgs> UserAvailabilityChanged;
+        public event EventHandler<TDFShared.DTOs.Messages.NotificationEventArgs> NotificationReceived = delegate { };
+        public event EventHandler<ChatMessageEventArgs>? ChatMessageReceived;
+        public event EventHandler<MessageStatusEventArgs>? MessageStatusChanged;
+        public event EventHandler<ConnectionStatusEventArgs>? ConnectionStatusChanged;
+        public event EventHandler<UserStatusEventArgs>? UserStatusChanged;
+        public event EventHandler<UserAvailabilityEventArgs>? UserAvailabilityChanged;
         // New Events Added:
-        public event EventHandler<AvailabilitySetEventArgs> AvailabilitySet;
-        public event EventHandler<StatusUpdateConfirmedEventArgs> StatusUpdateConfirmed;
-        public event EventHandler<WebSocketErrorEventArgs> ErrorReceived;
+        public event EventHandler<AvailabilitySetEventArgs>? AvailabilitySet;
+        public event EventHandler<StatusUpdateConfirmedEventArgs>? StatusUpdateConfirmed;
+        public event EventHandler<WebSocketErrorEventArgs>? ErrorReceived;
 
         public bool IsConnected => _webSocket?.State == WebSocketState.Open;
 
@@ -56,7 +56,7 @@ namespace TDFMAUI.Services
             logger?.LogInformation("WebSocketService constructor finished.");
         }
 
-        public async Task<bool> ConnectAsync(string token = null)
+        public async Task<bool> ConnectAsync(string? token = null)
         {
             // Check if already connecting
             if (_isConnecting)
@@ -286,7 +286,8 @@ namespace TDFMAUI.Services
             {
                 while (_webSocket != null && _webSocket.State == WebSocketState.Open)
                 {
-                    WebSocketReceiveResult receiveResult = null;
+                    // For WebSocketReceiveResult, allow nullable
+                    dynamic? receiveResult = null;
 
                     try
                     {
@@ -370,6 +371,8 @@ namespace TDFMAUI.Services
 
         private async Task ProcessMessageAsync(string jsonMessage)
         {
+            await Task.Yield();
+
             try
             {
                 using var jsonDocument = JsonDocument.Parse(jsonMessage);
@@ -497,7 +500,7 @@ namespace TDFMAUI.Services
                     }
 
                     // Create notification event args
-                    var eventArgs = new NotificationEventArgs
+                    var eventArgs = new TDFShared.DTOs.Messages.NotificationEventArgs
                     {
                         NotificationId = notificationId,
                         SenderId = senderId,
@@ -531,7 +534,8 @@ namespace TDFMAUI.Services
 
                 if (element.TryGetProperty("message", out var messageElement))
                 {
-                    message = messageElement.GetString();
+                    // When assigning from .GetString(), use ?? string.Empty
+                    message = messageElement.GetString() ?? string.Empty;
                 }
 
                 if (element.TryGetProperty("senderId", out var senderIdElement))
@@ -541,7 +545,8 @@ namespace TDFMAUI.Services
 
                 if (element.TryGetProperty("senderName", out var senderNameElement))
                 {
-                    senderName = senderNameElement.GetString();
+                    // When assigning from .GetString(), use ?? string.Empty
+                    senderName = senderNameElement.GetString() ?? string.Empty;
                 }
 
                 if (element.TryGetProperty("timestamp", out var timestampElement))
@@ -560,7 +565,7 @@ namespace TDFMAUI.Services
                     });
 
                     // Also raise as generic notification for systems that don't handle chat specifically
-                    NotificationReceived?.Invoke(this, new NotificationEventArgs
+                    NotificationReceived?.Invoke(this, new TDFShared.DTOs.Messages.NotificationEventArgs
                     {
                         SenderId = senderId,
                         SenderName = senderName,
@@ -595,7 +600,8 @@ namespace TDFMAUI.Services
 
                 if (element.TryGetProperty("message", out var messageElement))
                 {
-                    message = messageElement.GetString();
+                    // When assigning from .GetString(), use ?? string.Empty
+                    message = messageElement.GetString() ?? string.Empty;
                 }
 
                 if (element.TryGetProperty("senderId", out var senderIdElement))
@@ -605,7 +611,8 @@ namespace TDFMAUI.Services
 
                 if (element.TryGetProperty("senderName", out var senderNameElement))
                 {
-                    senderName = senderNameElement.GetString();
+                    // When assigning from .GetString(), use ?? string.Empty
+                    senderName = senderNameElement.GetString() ?? string.Empty;
                 }
 
                 if (element.TryGetProperty("timestamp", out var timestampElement))
@@ -726,7 +733,8 @@ namespace TDFMAUI.Services
 
                 if (element.TryGetProperty("username", out var usernameElement))
                 {
-                    username = usernameElement.GetString();
+                    // When assigning from .GetString(), use ?? string.Empty
+                    username = usernameElement.GetString() ?? string.Empty;
                 }
 
                 if (element.TryGetProperty("isConnected", out var isConnectedElement))
@@ -737,7 +745,8 @@ namespace TDFMAUI.Services
                 if (element.TryGetProperty("machineName", out var machineNameElement) &&
                     machineNameElement.ValueKind != JsonValueKind.Null)
                 {
-                    machineName = machineNameElement.GetString();
+                    // When assigning from .GetString(), use ?? string.Empty
+                    machineName = machineNameElement.GetString() ?? string.Empty;
                 }
 
                 if (element.TryGetProperty("presenceStatus", out var presenceStatusElement) &&
@@ -749,7 +758,8 @@ namespace TDFMAUI.Services
                 if (element.TryGetProperty("statusMessage", out var statusMessageElement) &&
                     statusMessageElement.ValueKind != JsonValueKind.Null)
                 {
-                    statusMessage = statusMessageElement.GetString();
+                    // When assigning from .GetString(), use ?? string.Empty
+                    statusMessage = statusMessageElement.GetString() ?? string.Empty;
                 }
 
                 // Raise event on the UI thread
@@ -843,7 +853,8 @@ namespace TDFMAUI.Services
 
                 if (element.TryGetProperty("username", out var usernameElement))
                 {
-                    username = usernameElement.GetString();
+                    // When assigning from .GetString(), use ?? string.Empty
+                    username = usernameElement.GetString() ?? string.Empty;
                 }
 
                 if (element.TryGetProperty("isConnected", out var isConnectedElement))
@@ -860,7 +871,8 @@ namespace TDFMAUI.Services
                 if (element.TryGetProperty("statusMessage", out var statusMessageElement) &&
                     statusMessageElement.ValueKind != JsonValueKind.Null)
                 {
-                    statusMessage = statusMessageElement.GetString();
+                    // When assigning from .GetString(), use ?? string.Empty
+                    statusMessage = statusMessageElement.GetString() ?? string.Empty;
                 }
 
                 // Log the update
@@ -1191,7 +1203,7 @@ namespace TDFMAUI.Services
         }
 
         // Add new methods to send user status updates
-        public async Task UpdatePresenceStatusAsync(string status, string statusMessage = null)
+        public async Task UpdatePresenceStatusAsync(string status, string? statusMessage = null)
         {
             await SendMessageAsync(new
             {

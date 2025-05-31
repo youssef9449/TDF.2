@@ -115,10 +115,10 @@ namespace TDFAPI.Repositories
                 IsManager = userDto.IsManager,
                 IsHR = false,
                 CreatedAt = DateTime.UtcNow,
-                IsActive = true,
+                IsActive = false,
                 IsConnected = false,
                 PresenceStatus = UserPresenceStatus.Offline,
-                IsAvailableForChat = true,
+                IsAvailableForChat = false,
                 FailedLoginAttempts = 0,
                 IsLocked = false
             };
@@ -132,7 +132,8 @@ namespace TDFAPI.Repositories
                 AnnualUsed = 0,
                 EmergencyUsed = 0,
                 PermissionsUsed = 0,
-                UnpaidUsed = 0
+                UnpaidUsed = 0,
+                WorkFromHomeUsed = 0  // Explicitly set this property
             };
             newUser.AnnualLeave = annualLeave;
 

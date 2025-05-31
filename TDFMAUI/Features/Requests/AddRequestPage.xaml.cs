@@ -2,6 +2,7 @@ using System;
 using TDFMAUI.ViewModels;
 using Microsoft.Maui.Controls;
 using TDFShared.DTOs.Requests;
+using TDFMAUI.Helpers;
 
 namespace TDFMAUI.Features.Requests;
 
@@ -37,13 +38,45 @@ public partial class AddRequestPage : ContentPage
         BindingContext = viewModel;
         // The ViewModel constructor now handles initializing state based on existingRequest 
         // (if passed correctly via DI or navigation parameter handling)
+        
+        // Configure UI for current device
+        ConfigureForCurrentDevice();
+        
+        // Listen for size changes to reconfigure UI
+        SizeChanged += OnPageSizeChanged;
     }
+    
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        ConfigureForCurrentDevice();
+    }
+    
+    private void OnPageSizeChanged(object sender, EventArgs e)
+    {
+        ConfigureForCurrentDevice();
+    }
+    
+    private void ConfigureForCurrentDevice()
+    {
+        bool isDesktop = DeviceHelper.IsDesktop;
+        bool isMobile = !isDesktop && (DeviceHelper.IsAndroid || DeviceHelper.IsIOS);
 
-    // Removed OnAppearing - ViewModel initialization is handled in constructor
-    // Removed SetupFormControls - Handled by XAML bindings and OnIdiom
-    // Removed InitializeFormValues - Handled by XAML bindings and ViewModel constructor
-    // Removed OnSaveClicked - Logic moved to AddRequestViewModel.SubmitRequestCommand
-    // Removed UpdateViewModelFromControls - Handled by two-way XAML bindings
-    // Removed OnSubmitClicked - Button should use Command binding in XAML
-    // Removed OnCancelClicked - Button should use Command binding in XAML
+        if (isDesktop)
+        {
+            VisualStateManager.GoToState(this, "Desktop");
+            VisualStateManager.GoToState(FormFrame, "Desktop");
+        }
+        else if (isMobile)
+        {
+            VisualStateManager.GoToState(this, "Mobile");
+            VisualStateManager.GoToState(FormFrame, "Mobile");
+        }
+        else
+        {
+            // Default state for other platforms
+            VisualStateManager.GoToState(this, "Mobile");
+            VisualStateManager.GoToState(FormFrame, "Mobile");
+        }
+    }
 }

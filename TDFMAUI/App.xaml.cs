@@ -1,7 +1,6 @@
 using TDFMAUI.Pages;
 using TDFMAUI.Services;
 using TDFShared.Services;
-using TDFMAUI.Helpers;
 using System.Collections.ObjectModel;
 using TDFMAUI.Config;
 using TDFMAUI.Features.Auth;
@@ -13,15 +12,17 @@ using TDFMAUI.ViewModels;
 using Microsoft.Extensions.Logging;
 using TDFShared.Enums;
 using System.Linq;
-using System.Reflection;
+using TDFMAUI.Helpers;
 using TDFMAUI.Features.Dashboard;
+using Plugin.Firebase.CloudMessaging;
+using Plugin.Firebase.CloudMessaging.EventArgs;
 
 namespace TDFMAUI
 {
     public partial class App : Application
     {
-        private static UserDto _currentUser;
-        public static UserDto CurrentUser
+        private static UserDto? _currentUser;
+        public static UserDto? CurrentUser
         {
             get => _currentUser;
             set
@@ -35,14 +36,14 @@ namespace TDFMAUI
         }
 
         // Event to notify when the user changes
-        public static event EventHandler UserChanged;
+        public static event EventHandler? UserChanged;
 
         protected static void OnUserChanged()
         {
             UserChanged?.Invoke(null, EventArgs.Empty);
         }
 
-        public static IServiceProvider Services { get; internal set; }
+        public static IServiceProvider? Services { get; internal set; }
         public static ObservableCollection<NotificationDto> Notifications { get; } = new ObservableCollection<NotificationDto>();
 
         // Flag to indicate if we're in safe mode (passed from Android activity)
@@ -186,8 +187,11 @@ namespace TDFMAUI
                 // Use standard console logging until DebugService is ready
                 System.Diagnostics.Debug.WriteLine("App constructor starting");
 
-                System.Diagnostics.Debug.WriteLine("App constructor finished");
+                // --- Plugin.Firebase v3+ push notification event handlers ---
+                SetupFirebaseCloudMessaging();
+                // --- End Plugin.Firebase push notification event handlers ---
 
+                System.Diagnostics.Debug.WriteLine("App constructor finished");
             }
             catch (Exception ex)
             {
@@ -412,7 +416,7 @@ namespace TDFMAUI
             }
         }
 
-        private void OnNotificationReceived(object sender, NotificationEventArgs e)
+        private void OnNotificationReceived(object sender, TDFShared.DTOs.Messages.NotificationEventArgs e)
         {
             try
             {
@@ -947,7 +951,7 @@ namespace TDFMAUI
                         UnregisterWebSocketEventHandlers();
 
                         // Register event handlers
-                        webSocketService.NotificationReceived += OnNotificationReceived;
+                        webSocketService.NotificationReceived += new EventHandler<TDFShared.DTOs.Messages.NotificationEventArgs>(OnNotificationReceived);
                         webSocketService.ChatMessageReceived += OnChatMessageReceived;
                         webSocketService.ConnectionStatusChanged += OnConnectionStatusChanged;
                         webSocketService.UserStatusChanged += OnUserStatusChanged;
@@ -981,7 +985,7 @@ namespace TDFMAUI
                         DebugService.LogInfo("App", "Unregistering WebSocketService event handlers");
 
                         // Unregister event handlers
-                        webSocketService.NotificationReceived -= OnNotificationReceived;
+                        webSocketService.NotificationReceived -= new EventHandler<TDFShared.DTOs.Messages.NotificationEventArgs>(OnNotificationReceived);
                         webSocketService.ChatMessageReceived -= OnChatMessageReceived;
                         webSocketService.ConnectionStatusChanged -= OnConnectionStatusChanged;
                         webSocketService.UserStatusChanged -= OnUserStatusChanged;
@@ -1116,6 +1120,41 @@ namespace TDFMAUI
                     }
                 }
             };
+        }
+
+        private void SetupFirebaseCloudMessaging()
+        {
+            try
+            {
+                // Subscribe to notification received
+                CrossFirebaseCloudMessaging.Current.NotificationReceived += async (sender, e) =>
+                {
+                    try
+                    {
+                        var notification = e.Notification;
+                        System.Diagnostics.Debug.WriteLine($"FCM Notification Received: {notification.Title} - {notification.Body}");
+                        var notificationService = Application.Current?.Handler?.MauiContext?.Services?.GetService<IPushNotificationService>();
+                        if (notificationService != null && notification != null)
+                        {
+                            await notificationService.ShowLocalNotificationAsync(
+                                notification.Title ?? "New Message",
+                                notification.Body ?? string.Empty,
+                                NotificationType.Info,
+                                notification.Data?.ToString()
+                            );
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error handling FCM notification: {ex.Message}");
+                    }
+                };
+                // No direct token event or property; token registration is handled by PushNotificationService
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error setting up FCM: {ex.Message}");
+            }
         }
     }
 }

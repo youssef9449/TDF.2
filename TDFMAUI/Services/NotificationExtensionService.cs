@@ -54,6 +54,11 @@ namespace TDFMAUI.Services
 
         public async Task<bool> CreateNotificationAsync(int receiverId, string message, int? senderId = null)
         {
+            return await CreateNotificationAsync(receiverId, message, senderId, null);
+        }
+
+        public async Task<bool> CreateNotificationAsync(int receiverId, string message, int? senderId = null, DateTime? fireAt = null)
+        {
             // Use the base service to create the notification on the server
             var result = await _notificationService.CreateNotificationAsync(receiverId, message, senderId);
 
@@ -69,7 +74,9 @@ namespace TDFMAUI.Services
                     await _platformService.ShowNotificationAsync(
                         $"New notification from {senderName}",
                         message,
-                        NotificationType.Info);
+                        NotificationType.Info,
+                        null,
+                        fireAt);
                 }
                 catch (Exception ex)
                 {
@@ -294,13 +301,31 @@ namespace TDFMAUI.Services
             await ShowLocalNotificationAsync("Warning", message, NotificationType.Warning);
         }
 
-        public async Task<bool> ScheduleNotificationAsync(string title, string message, DateTime deliveryTime, string data = null)
+        public async Task<bool> ScheduleNotificationAsync(string title, string message, DateTime deliveryTime, string? data = null)
         {
-            _logger.LogInformation("Scheduling notification: {Title} for {DeliveryTime}", title, deliveryTime);
-
+            _logger.LogInformation("Scheduling notification for {DeliveryTime}", deliveryTime);
             try
             {
-                return await _platformService.ScheduleNotificationAsync(title, message, deliveryTime, data);
+                // Validate delivery time
+                if (deliveryTime <= DateTime.Now)
+                {
+                    _logger.LogWarning("Attempted to schedule notification in the past: {DeliveryTime}", deliveryTime);
+                    return false;
+                }
+
+                // Use platform service to schedule the notification
+                var result = await _platformService.ScheduleNotificationAsync(title, message, deliveryTime, data);
+                
+                if (result)
+                {
+                    _logger.LogInformation("Successfully scheduled notification for {DeliveryTime}", deliveryTime);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to schedule notification for {DeliveryTime}", deliveryTime);
+                }
+
+                return result;
             }
             catch (Exception ex)
             {
@@ -311,14 +336,58 @@ namespace TDFMAUI.Services
 
         public async Task<bool> CancelScheduledNotificationAsync(string id)
         {
-            _logger.LogInformation("Cancelling scheduled notification ID: {Id}", id);
+            _logger.LogInformation("Canceling scheduled notification {Id}", id);
             try
             {
-                return await _platformService.CancelScheduledNotificationAsync(id);
+                var result = await _platformService.CancelScheduledNotificationAsync(id);
+                
+                if (result)
+                {
+                    _logger.LogInformation("Successfully canceled scheduled notification {Id}", id);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to cancel scheduled notification {Id}", id);
+                }
+
+                return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error cancelling scheduled notification ID: {id}");
+                _logger.LogError(ex, "Error canceling scheduled notification {Id}", id);
+                return false;
+            }
+        }
+
+        public async Task<bool> UpdateScheduledNotificationAsync(string id, string title, string message, DateTime newDeliveryTime, string? data = null)
+        {
+            _logger.LogInformation("Updating scheduled notification {Id} for {NewDeliveryTime}", id, newDeliveryTime);
+            try
+            {
+                // Validate delivery time
+                if (newDeliveryTime <= DateTime.Now)
+                {
+                    _logger.LogWarning("Attempted to update notification to past time: {NewDeliveryTime}", newDeliveryTime);
+                    return false;
+                }
+
+                // Use platform service to update the notification
+                var result = await _platformService.UpdateScheduledNotificationAsync(id, title, message, newDeliveryTime, data);
+                
+                if (result)
+                {
+                    _logger.LogInformation("Successfully updated scheduled notification {Id}", id);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to update scheduled notification {Id}", id);
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating scheduled notification {Id}", id);
                 return false;
             }
         }
@@ -328,7 +397,9 @@ namespace TDFMAUI.Services
             _logger.LogInformation("Getting scheduled notification IDs");
             try
             {
-                return await _platformService.GetScheduledNotificationIdsAsync();
+                var ids = await _platformService.GetScheduledNotificationIdsAsync();
+                _logger.LogInformation("Retrieved {Count} scheduled notification IDs", ids.Count());
+                return ids;
             }
             catch (Exception ex)
             {
@@ -342,7 +413,18 @@ namespace TDFMAUI.Services
             _logger.LogInformation("Clearing all scheduled notifications");
             try
             {
-                return await _platformService.ClearAllScheduledNotificationsAsync();
+                var result = await _platformService.ClearAllScheduledNotificationsAsync();
+                
+                if (result)
+                {
+                    _logger.LogInformation("Successfully cleared all scheduled notifications");
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to clear all scheduled notifications");
+                }
+
+                return result;
             }
             catch (Exception ex)
             {

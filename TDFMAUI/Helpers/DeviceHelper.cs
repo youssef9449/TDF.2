@@ -1,5 +1,8 @@
 using Microsoft.Maui.Devices;
 using Microsoft.Maui.Controls;
+using System;
+using System.Reflection;
+using System.Collections.Generic;
 
 namespace TDFMAUI.Helpers
 {

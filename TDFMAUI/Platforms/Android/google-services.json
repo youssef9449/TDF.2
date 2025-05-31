@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "64655018445",
+    "project_id": "tdfmaui-132b6",
+    "storage_bucket": "tdfmaui-132b6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:64655018445:android:1575669e4dc223fbeadc84",
+        "android_client_info": {
+          "package_name": "com.TDF.TDFMAUI"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDp-1XbyUC7hVaC95V88qOBkA7dWbQq3h0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

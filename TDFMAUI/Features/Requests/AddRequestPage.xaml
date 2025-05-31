@@ -10,7 +10,6 @@
              Title="{Binding IsEditMode, Converter={StaticResource BoolToStringConverter}, ConverterParameter='Edit Leave Request|Add Leave Request'}"
              BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
-    <!-- Define Converters if needed, e.g., for Title -->
     <ContentPage.Resources>
         <ResourceDictionary>
             <helpers:BoolToStringConverter x:Key="BoolToStringConverter" />
@@ -22,14 +21,13 @@
                 <Setter Property="FontAttributes" Value="Bold" />
                 <Setter Property="TextColor" Value="White" />
                 <Setter Property="VerticalOptions" Value="Center" />
-                <Setter Property="Margin" Value="0,0,0,5" /> <!-- Add some bottom margin for stacked layout -->
+                <Setter Property="Margin" Value="0,0,0,5" />
             </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto,*,Auto" Padding="{OnIdiom Phone='15', Default='20'}">
-        <Label Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/>
-        <Label Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"/>
+        <!-- Page Title -->
         <Label Grid.Row="0"
                Text="{Binding Title, Source={RelativeSource AncestorType={x:Type ContentPage}}}"
                FontSize="{OnIdiom Phone=20, Default=24}"
@@ -39,7 +37,7 @@
                Margin="0,0,0,20"/>
 
         <ScrollView Grid.Row="1">
-            <VerticalStackLayout Spacing="15">
+            <VerticalStackLayout Spacing="15" x:Name="FormContainer">
                 <VerticalStackLayout.MaximumWidthRequest>
                     <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="700" Desktop="600" />
                 </VerticalStackLayout.MaximumWidthRequest>
@@ -47,36 +45,48 @@
                      <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
                 </VerticalStackLayout.HorizontalOptions>
 
-                <!-- Validation Errors Summary Removed -->
-                <!-- 
-                <CollectionView ItemsSource="{Binding ValidationErrors}"
-                                IsVisible="{Binding HasErrors}"
-                                Margin="0,0,0,10">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <Label Text="{Binding .}" TextColor="OrangeRed" FontSize="Small" Padding="15,5" BackgroundColor="#40000000"/>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                     <CollectionView.EmptyView>
-                        <Label Text=""/>
-                    </CollectionView.EmptyView>
-                </CollectionView>
-                -->
-
-                <Frame BackgroundColor="#0d47a1"
+                <Frame x:Name="FormFrame"
+                       BackgroundColor="#0d47a1"
                        Padding="{OnIdiom Phone='12', Default='15'}"
                        CornerRadius="15"
                        HasShadow="True">
+                    <VisualStateManager.VisualStateGroups>
+                        <VisualStateGroup Name="DeviceStates">
+                            <VisualState Name="Desktop">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="#1976d2" />
+                                </VisualState.Setters>
+                            </VisualState>
+                            <VisualState Name="Mobile">
+                                <VisualState.Setters>
+                                    <Setter Property="BackgroundColor" Value="#0d47a1" />
+                                </VisualState.Setters>
+                            </VisualState>
+                        </VisualStateGroup>
+                    </VisualStateManager.VisualStateGroups>
+                    
                     <VerticalStackLayout Spacing="{OnIdiom Phone='12', Default='15'}">
 
                         <!-- Layout for Desktop/Tablet (Grid) -->
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" RowSpacing="15"
-                              IsVisible="{Binding Source={x:Static helpers:DeviceHelper.UseCompactUI}, Converter={StaticResource InverseBoolConverter}}">
-                            <!-- User Picker - Commented out -->
-                            <!--
-                            <Label Grid.Row="0" Grid.Column="0" Text="User" Style="{StaticResource FormFieldTitleLabelStyle}"/>
-                            <Picker Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Users}" SelectedItem="{Binding SelectedUser}" Title="Select User" TextColor="White" BackgroundColor="#1565c0"/>
-                            -->
+                        <Grid x:Name="DesktopLayout" 
+                              ColumnDefinitions="Auto,*" 
+                              ColumnSpacing="10" 
+                              RowSpacing="15"
+                              IsVisible="False">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup Name="DeviceStates">
+                                    <VisualState Name="Desktop">
+                                        <VisualState.Setters>
+                                            <Setter Property="IsVisible" Value="True" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState Name="Mobile">
+                                        <VisualState.Setters>
+                                            <Setter Property="IsVisible" Value="False" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
 
                             <Label Grid.Row="1" Grid.Column="0" Text="Leave Type" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                             <Border Grid.Row="1" Grid.Column="1" StrokeThickness="1"
@@ -134,13 +144,23 @@
                         </Grid>
 
                         <!-- Layout for Phone (VerticalStackLayout) -->
-                        <VerticalStackLayout Spacing="10"
-                                             IsVisible="{Binding Source={x:Static helpers:DeviceHelper.UseCompactUI}}">
-                            <!-- User Picker - Commented out -->
-                            <!--
-                            <Label Text="User" Style="{StaticResource FormFieldTitleLabelStyle}"/>
-                            <Picker ItemsSource="{Binding Users}" SelectedItem="{Binding SelectedUser}" Title="Select User" TextColor="White" BackgroundColor="#1565c0"/>
-                            -->
+                        <VerticalStackLayout x:Name="MobileLayout" 
+                                             Spacing="10"
+                                             IsVisible="True">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup Name="DeviceStates">
+                                    <VisualState Name="Desktop">
+                                        <VisualState.Setters>
+                                            <Setter Property="IsVisible" Value="False" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState Name="Mobile">
+                                        <VisualState.Setters>
+                                            <Setter Property="IsVisible" Value="True" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
 
                             <Label Text="Leave Type" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                             <Border StrokeThickness="1"

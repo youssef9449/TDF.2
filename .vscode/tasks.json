@@ -54,7 +54,7 @@
                 "-f:net8.0-windows10.0.19041.0",
                 "-c:Debug",
                 "/p:BuildForWindowsDesktop=true",
-                "--no-restore"
+                "/p:WarningLevel=0"
             ],
             "problemMatcher": "$msCompile",
             "detail": "Build TDFMAUI for Windows",

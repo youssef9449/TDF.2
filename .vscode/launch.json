@@ -48,17 +48,11 @@
             "preLaunchTask": "maui: Build for Windows",
             "program": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-windows10.0.19041.0/win10-x64/TDF.exe",
             "cwd": "${workspaceFolder}/TDFMAUI",
-            "console": "internalConsole"
+            "console": "internalConsole",
+              "logging": {
+             "moduleLoad": false
+              }
         },
-        {
-            "name": "TDFMAUI: Windows (Basic)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "maui: Basic Windows Build",
-            "program": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-windows10.0.19041.0/TDF.dll",
-            "cwd": "${workspaceFolder}/TDFMAUI",
-            "console": "internalConsole"
-        }
     ],
     "compounds": [
         {

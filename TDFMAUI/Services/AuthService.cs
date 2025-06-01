@@ -845,12 +845,11 @@ public class AuthService : IAuthService
             }
 
             // Try to get token from secure storage
-            var storedToken = await _secureStorageService.GetAsync("auth_token");
+            var (storedToken, expiration) = await _secureStorageService.GetTokenAsync();
             if (!string.IsNullOrEmpty(storedToken))
             {
                 _currentToken = storedToken;
-                // Set expiration to 1 hour from now (adjust based on your token lifetime)
-                _tokenExpiration = DateTime.UtcNow.AddHours(1);
+                _tokenExpiration = expiration;
                 return storedToken;
             }
 
@@ -868,7 +867,7 @@ public class AuthService : IAuthService
         try
         {
             // Get the refresh token
-            var refreshToken = await _secureStorageService.GetAsync("refresh_token");
+            var (refreshToken, refreshExpiration) = await _secureStorageService.GetRefreshTokenAsync();
             if (string.IsNullOrEmpty(refreshToken))
             {
                 _logger.LogWarning("No refresh token available");
@@ -881,7 +880,7 @@ public class AuthService : IAuthService
             if (!string.IsNullOrEmpty(newToken))
             {
                 // Store the new token
-                await _secureStorageService.SetAsync("auth_token", newToken);
+                await _secureStorageService.SaveTokenAsync(newToken, DateTime.UtcNow.AddHours(1));
                 _currentToken = newToken;
                 _tokenExpiration = DateTime.UtcNow.AddHours(1); // Adjust based on your token lifetime
                 return newToken;

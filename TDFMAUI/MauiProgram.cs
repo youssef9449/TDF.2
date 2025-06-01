@@ -17,9 +17,10 @@ using TDFShared.Constants;
 using TDFShared.Validation;
 using TDFShared.Services;
 
-
+#if !WINDOWS && !MACCATALYST
 using Plugin.LocalNotification;
 using Plugin.LocalNotification.EventArgs;
+#endif
 using Plugin.Firebase;
 
 namespace TDFMAUI
@@ -27,6 +28,7 @@ namespace TDFMAUI
     public static class MauiProgram
     {
         // Event handlers for notification delivery tracking
+#if !WINDOWS && !MACCATALYST
         private static void OnLocalNotificationReceived(NotificationEventArgs e)
         {
             try
@@ -95,12 +97,25 @@ namespace TDFMAUI
                 System.Diagnostics.Debug.WriteLine($"Error in OnLocalNotificationTapped: {ex.Message}");
             }
         }
+#else
+        // Stub methods for Windows and macOS platforms
+        private static void OnLocalNotificationReceived(object e)
+        {
+            System.Diagnostics.Debug.WriteLine("Local notifications not supported on Windows or macOS platforms");
+        }
+        
+        private static void OnLocalNotificationTapped(object e)
+        {
+            System.Diagnostics.Debug.WriteLine("Local notifications not supported on Windows or macOS platforms");
+        }
+#endif
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
                 .UseMauiCommunityToolkit()
+#if !WINDOWS && !MACCATALYST
                 .UseLocalNotification(config => {
                     // Register notification delivery events
                     config.AddCategory(new NotificationCategory(NotificationCategoryType.Status));
@@ -108,6 +123,7 @@ namespace TDFMAUI
                     Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived += OnLocalNotificationReceived;
                     Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped += OnLocalNotificationTapped;
                 })
+#endif
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("Resources/Fonts/OpenSans-Regular.ttf", "OpenSans-Regular");

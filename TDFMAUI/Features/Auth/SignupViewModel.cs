@@ -281,7 +281,10 @@ namespace TDFMAUI.Features.Auth
                         Username = string.Empty;
                         FullName = string.Empty;
                         
-                        // Navigate back to login page immediately
+                        // Show success message before navigation
+                        await Application.Current.MainPage.DisplayAlert("Success", "Registration successful! You can now log in with your credentials.", "OK");
+                        
+                        // Navigate back to login page
                         try 
                         {
                             await Shell.Current.GoToAsync("//LoginPage");

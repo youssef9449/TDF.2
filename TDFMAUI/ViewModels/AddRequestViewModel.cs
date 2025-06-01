@@ -59,6 +59,20 @@ namespace TDFMAUI.ViewModels
                 SetProperty(ref _selectedLeaveType, value);
                 // Optionally update the internal _requestType if DTO mapping relies on it
                 _requestType = value;
+                
+                // Initialize time values for Permission and External Assignment
+                if (value == "Permission" || value == "ExternalAssignment")
+                {
+                    if (!StartTime.HasValue)
+                        StartTime = new TimeSpan(9, 0, 0); // Default to 9:00 AM
+                        
+                    if (!EndTime.HasValue)
+                        EndTime = new TimeSpan(17, 0, 0); // Default to 5:00 PM
+                        
+                    // For these types, EndDate should always equal StartDate
+                    EndDate = StartDate;
+                }
+                
                 OnPropertyChanged(nameof(RequestCreateDto)); // Ensure DTO updates
                 OnPropertyChanged(nameof(RequestUpdateDto)); // Ensure DTO updates
             }
@@ -83,6 +97,12 @@ namespace TDFMAUI.ViewModels
                 SetProperty(ref _requestFromDay, value);
                 // Ensure EndDate is not before StartDate
                 if (EndDate.HasValue && EndDate.Value < value)
+                {
+                    EndDate = value;
+                }
+                
+                // For Permission and External Assignment, EndDate should always equal StartDate
+                if (SelectedLeaveType == "Permission" || SelectedLeaveType == "ExternalAssignment")
                 {
                     EndDate = value;
                 }
@@ -145,7 +165,7 @@ namespace TDFMAUI.ViewModels
                 ? new RequestCreateDto {
                     LeaveType = leaveType,
                     RequestStartDate = StartDate,
-                    RequestEndDate = EndDate ?? StartDate,
+                    RequestEndDate = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartDate : EndDate ?? StartDate,
                     RequestBeginningTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartTime : null,
                     RequestEndingTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? EndTime : null,
                     RequestReason = RequestReason ?? string.Empty,
@@ -158,7 +178,7 @@ namespace TDFMAUI.ViewModels
                 ? new RequestUpdateDto {
                     LeaveType = leaveType,
                     RequestStartDate = StartDate,
-                    RequestEndDate = EndDate ?? StartDate,
+                    RequestEndDate = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartDate : EndDate ?? StartDate,
                     RequestBeginningTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartTime : null,
                     RequestEndingTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? EndTime : null,
                     RequestReason = RequestReason ?? string.Empty
@@ -408,9 +428,13 @@ namespace TDFMAUI.ViewModels
                 errors.Add("Start date cannot be in the past.");
             }
 
-            if (EndDate.HasValue && EndDate.Value.Date < StartDate.Date)
+            // Only validate end date for leave types that use it
+            if (!(leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment))
             {
-                errors.Add("End date must be on or after start date.");
+                if (EndDate.HasValue && EndDate.Value.Date < StartDate.Date)
+                {
+                    errors.Add("End date must be on or after start date.");
+                }
             }
 
             // Time validation for specific leave types

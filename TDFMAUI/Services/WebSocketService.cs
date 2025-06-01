@@ -77,24 +77,31 @@ namespace TDFMAUI.Services
                 }
 
                 // For mobile platforms, try to get the stored token
-                var storedToken = await _secureStorage.GetTokenAsync();
-                if (!string.IsNullOrEmpty(storedToken))
+                var (storedToken, expiration) = await _secureStorage.GetTokenAsync();
+                if (!string.IsNullOrEmpty(storedToken) && expiration > DateTime.UtcNow)
                 {
                     _logger.LogDebug("Using stored token from secure storage");
                     return storedToken;
                 }
 
                 // If no token is available, try to refresh
-                if (await _authService.RefreshTokenAsync())
+                var (currentToken, _) = await _secureStorage.GetTokenAsync();
+                var (currentRefreshToken, _) = await _secureStorage.GetRefreshTokenAsync();
+                if (!string.IsNullOrEmpty(currentToken) && !string.IsNullOrEmpty(currentRefreshToken))
                 {
-                    // After refresh, try to get the token again
-                    if (DeviceHelper.IsDesktop)
+                    var refreshResult = await _authService.RefreshTokenAsync(currentToken, currentRefreshToken);
+                    if (refreshResult != null)
                     {
-                        return ApiConfig.CurrentToken;
-                    }
-                    else
-                    {
-                        return await _secureStorage.GetTokenAsync();
+                        // After refresh, try to get the token again
+                        if (DeviceHelper.IsDesktop)
+                        {
+                            return ApiConfig.CurrentToken;
+                        }
+                        else
+                        {
+                            var (newToken, _) = await _secureStorage.GetTokenAsync();
+                            return newToken;
+                        }
                     }
                 }
 
@@ -147,7 +154,7 @@ namespace TDFMAUI.Services
 
                 _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {authToken}");
 
-                if (DeviceHelper.IsDevelopment)
+                if (ApiConfig.DevelopmentMode)
                 {
                     _logger.LogWarning("WebSocket configured with development certificate validation (ALLOW ALL)");
                     _webSocket.Options.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
@@ -190,10 +197,16 @@ namespace TDFMAUI.Services
                     _logger.LogError(wsEx, "Authentication failed (401 Unauthorized) when connecting to WebSocket server");
                     
                     // Try to refresh the token
-                    if (await _authService.RefreshTokenAsync())
+                    var (currentToken, _) = await _secureStorage.GetTokenAsync();
+                    var (currentRefreshToken, _) = await _secureStorage.GetRefreshTokenAsync();
+                    if (!string.IsNullOrEmpty(currentToken) && !string.IsNullOrEmpty(currentRefreshToken))
                     {
-                        _logger.LogInformation("Token refreshed successfully, attempting to reconnect");
-                        return await ConnectAsync(); // Retry connection with new token
+                        var refreshResult = await _authService.RefreshTokenAsync(currentToken, currentRefreshToken);
+                        if (refreshResult != null)
+                        {
+                            _logger.LogInformation("Token refreshed successfully, attempting to reconnect");
+                            return await ConnectAsync(); // Retry connection with new token
+                        }
                     }
                     
                     _logger.LogWarning("Token refresh failed, cannot establish WebSocket connection");
@@ -1213,6 +1226,145 @@ namespace TDFMAUI.Services
                 type = ApiRoutes.WebSocket.MessageTypes.Ping,
                 timestamp = DateTime.UtcNow
             });
+        }
+
+        private void HandleNotificationSeen(JsonElement element)
+        {
+            try
+            {
+                var notificationId = element.GetProperty("notificationId").GetInt32();
+                var timestamp = element.GetProperty("timestamp").GetDateTime();
+
+                MainThread.BeginInvokeOnMainThread(() => {
+                    try
+                    {
+                        NotificationReceived?.Invoke(this, new TDFShared.DTOs.Messages.NotificationEventArgs
+                        {
+                            Type = TDFShared.Enums.NotificationType.Info,
+                            Message = $"Notification {notificationId} marked as seen",
+                            Timestamp = timestamp
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error invoking NotificationReceived event");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling notification seen event");
+            }
+        }
+
+        private void HandleNotificationsSeen(JsonElement element)
+        {
+            try
+            {
+                var notificationIds = element.GetProperty("notificationIds").EnumerateArray()
+                    .Select(x => x.GetInt32())
+                    .ToList();
+                var timestamp = element.GetProperty("timestamp").GetDateTime();
+
+                MainThread.BeginInvokeOnMainThread(() => {
+                    try
+                    {
+                        NotificationReceived?.Invoke(this, new TDFShared.DTOs.Messages.NotificationEventArgs
+                        {
+                            Type = TDFShared.Enums.NotificationType.Info,
+                            Message = $"Notifications {string.Join(", ", notificationIds)} marked as seen",
+                            Timestamp = timestamp
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error invoking NotificationReceived event");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling notifications seen event");
+            }
+        }
+
+        private void HandleAvailabilitySet(JsonElement element)
+        {
+            try
+            {
+                var isAvailable = element.GetProperty("isAvailable").GetBoolean();
+                var timestamp = element.GetProperty("timestamp").GetDateTime();
+
+                MainThread.BeginInvokeOnMainThread(() => {
+                    try
+                    {
+                        AvailabilitySet?.Invoke(this, new TDFMAUI.Helpers.AvailabilitySetEventArgs
+                        {
+                            IsAvailable = isAvailable,
+                            Timestamp = timestamp
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error invoking AvailabilitySet event");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling availability set event");
+            }
+        }
+
+        private void HandleStatusUpdated(JsonElement element)
+        {
+            try
+            {
+                var status = element.GetProperty("status").GetString();
+                var statusMessage = element.GetProperty("statusMessage").GetString();
+                var timestamp = element.GetProperty("timestamp").GetDateTime();
+
+                MainThread.BeginInvokeOnMainThread(() => {
+                    try
+                    {
+                        StatusUpdateConfirmed?.Invoke(this, new TDFMAUI.Helpers.StatusUpdateConfirmedEventArgs
+                        {
+                            Status = status,
+                            StatusMessage = statusMessage,
+                            Timestamp = timestamp
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error invoking StatusUpdateConfirmed event");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling status updated event");
+            }
+        }
+
+        private void HandleError(JsonElement element)
+        {
+            try
+            {
+                var errorCode = element.GetProperty("errorCode").GetString();
+                var errorMessage = element.GetProperty("errorMessage").GetString();
+                var timestamp = element.GetProperty("timestamp").GetDateTime();
+                
+                ErrorReceived?.Invoke(this, new WebSocketErrorEventArgs
+                {
+                    ErrorCode = errorCode,
+                    ErrorMessage = errorMessage,
+                    Timestamp = timestamp
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error handling error event");
+            }
         }
 
         public void Dispose()

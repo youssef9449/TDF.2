@@ -50,6 +50,20 @@ public partial class AddRequestPage : ContentPage
     {
         base.OnAppearing();
         ConfigureForCurrentDevice();
+        
+        // Initialize the view model if needed
+        if (BindingContext is AddRequestViewModel viewModel)
+        {
+            // Ensure time pickers are initialized for Permission/External Assignment
+            if (viewModel.SelectedLeaveType == "Permission" || viewModel.SelectedLeaveType == "ExternalAssignment")
+            {
+                if (!viewModel.StartTime.HasValue)
+                    viewModel.StartTime = new TimeSpan(9, 0, 0); // Default to 9:00 AM
+                
+                if (!viewModel.EndTime.HasValue)
+                    viewModel.EndTime = new TimeSpan(17, 0, 0); // Default to 5:00 PM
+            }
+        }
     }
     
     private void OnPageSizeChanged(object sender, EventArgs e)

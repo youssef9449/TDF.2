@@ -2,10 +2,11 @@ using System;
 using TDFMAUI.Helpers;
 using Microsoft.Extensions.Logging;
 using TDFShared.Enums;
-#if !WINDOWS
+#if !WINDOWS && !MACCATALYST
 using Plugin.LocalNotification;
 using Plugin.LocalNotification.AndroidOption;
 using Plugin.LocalNotification.iOSOption;
+using Plugin.LocalNotification.EventArgs;
 #endif
 #if MACCATALYST
 using UIKit;
@@ -20,27 +21,38 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using TDFShared.DTOs.Messages;
+using TDFShared.Services;
 
 namespace TDFMAUI.Services
 {
-    public class PlatformNotificationService : IPlatformNotificationService, IDisposable
+    public class PlatformNotificationService : IPlatformNotificationService
     {
-        private readonly ILogger<PlatformNotificationService> _logger;
-        private readonly ILocalStorageService _localStorage;
-        private NotificationPermissionStatus _currentPermissionStatus = NotificationPermissionStatus.NotDetermined;
+        private class ScheduledNotification
+        {
+            public string Id { get; set; } = string.Empty;
+            public string Title { get; set; } = string.Empty;
+            public string Message { get; set; } = string.Empty;
+            public DateTime DeliveryTime { get; set; }
+            public string? Data { get; set; }
+        }
+
+        private const string SCHEDULED_NOTIFICATIONS_KEY = "scheduled_notifications";
+        private const int MAX_SCHEDULED_NOTIFICATIONS = 50;
         private const int MAX_NOTIFICATION_LENGTH = 2000;
         private const int MAX_TITLE_LENGTH = 100;
-        private const int MAX_SCHEDULED_NOTIFICATIONS = 100;
-        private readonly SemaphoreSlim _permissionSemaphore = new SemaphoreSlim(1, 1);
-        private readonly SemaphoreSlim _scheduleSemaphore = new SemaphoreSlim(1, 1);
         private const int MAX_RETRY_ATTEMPTS = 3;
         private const int RETRY_DELAY_MS = 1000;
         private const int CLEANUP_INTERVAL_MS = 3600000; // 1 hour
         private System.Threading.Timer _cleanupTimer;
+        private readonly SemaphoreSlim _permissionSemaphore = new(1, 1);
+        private readonly SemaphoreSlim _scheduleSemaphore = new(1, 1);
+        private NotificationPermissionStatus _currentPermissionStatus = NotificationPermissionStatus.NotDetermined;
+
+        public event EventHandler<TDFShared.DTOs.Messages.NotificationEventArgs> LocalNotificationRequested = delegate { };
         public NotificationPermissionStatus CurrentPermissionStatus => _currentPermissionStatus;
 
-        // Initialize event with empty handler to avoid null reference
-        public event EventHandler<TDFShared.DTOs.Messages.NotificationEventArgs> LocalNotificationRequested = delegate { };
+        private readonly ILogger<PlatformNotificationService> _logger;
+        private readonly ILocalStorageService _localStorage;
 
         public PlatformNotificationService(
             ILogger<PlatformNotificationService> logger,
@@ -81,7 +93,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-#if !WINDOWS
+#if !WINDOWS && !MACCATALYST
                 // Register for notification delivery events
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived += OnNotificationReceived;
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped += OnNotificationTapped;
@@ -101,6 +113,16 @@ namespace TDFMAUI.Services
             {
                 _logger.LogInformation("Notification received: ID={NotificationId}, Title={Title}", 
                     e.Request.NotificationId, e.Request.Title);
+                
+                // Convert to our shared DTO type and raise our event
+                var notificationArgs = new TDFShared.DTOs.Messages.NotificationEventArgs
+                {
+                    NotificationId = e.Request.NotificationId,
+                    Title = e.Request.Title,
+                    Message = e.Request.Description,
+                    Data = e.Request.ReturningData
+                };
+                LocalNotificationRequested?.Invoke(this, notificationArgs);
                 
                 // Use Task.Run to avoid blocking the UI thread with async operations
                 Task.Run(async () => 
@@ -160,6 +182,16 @@ namespace TDFMAUI.Services
                 _logger.LogInformation("Notification tapped: ID={NotificationId}, Title={Title}", 
                     e.Request.NotificationId, e.Request.Title);
                 
+                // Convert to our shared DTO type and raise our event
+                var notificationArgs = new TDFShared.DTOs.Messages.NotificationEventArgs
+                {
+                    NotificationId = e.Request.NotificationId,
+                    Title = e.Request.Title,
+                    Message = e.Request.Description,
+                    Data = e.Request.ReturningData
+                };
+                LocalNotificationRequested?.Invoke(this, notificationArgs);
+                
                 // Use Task.Run to avoid blocking the UI thread with async operations
                 Task.Run(async () => 
                 {
@@ -186,14 +218,11 @@ namespace TDFMAUI.Services
                             
                             if (success)
                             {
-                                _logger.LogInformation("Updated delivery status for tapped notification {TrackingId}", trackingId);
-                                
-                                // Then handle any additional logic for notification taps
-                                // This could include navigation, data processing, etc.
+                                _logger.LogInformation("Updated delivery status for notification {TrackingId}", trackingId);
                             }
                             else
                             {
-                                _logger.LogWarning("Failed to update delivery status for tapped notification {TrackingId}", trackingId);
+                                _logger.LogWarning("Failed to update delivery status for notification {TrackingId}", trackingId);
                             }
                         }
                         else
@@ -204,7 +233,7 @@ namespace TDFMAUI.Services
                     }
                     catch (Exception innerEx)
                     {
-                        _logger.LogError(innerEx, "Error handling notification tap");
+                        _logger.LogError(innerEx, "Error updating notification delivery status");
                     }
                 });
             }
@@ -441,6 +470,11 @@ namespace TDFMAUI.Services
             }
         }
 
+        private int GenerateNotificationId()
+        {
+            return new Random().Next(10000, 99999);
+        }
+
         private async Task<bool> ShowMobileNotificationAsync(string title, string message, NotificationType notificationType, string? data = null, DateTime? fireAt = null)
         {
             try
@@ -455,11 +489,11 @@ namespace TDFMAUI.Services
                     return false;
                 }
 
-                // Use Plugin.LocalNotification for Android/iOS
-                var notificationId = new Random().Next(10000, 99999);
+#if !WINDOWS
+                // Generate a unique notification ID
+                var notificationId = GenerateNotificationId();
                 
-                // Use the tracking ID passed from the parent method
-                // If we need to create a new one, we'll use the title and message to create a consistent ID
+                // Log the notification for tracking
                 string trackingId = await LogNotificationAsync(title, message, notificationType, data, false);
                 
                 // Store the mapping between system notification ID and our tracking ID
@@ -468,36 +502,40 @@ namespace TDFMAUI.Services
                 
                 notificationMap[notificationId] = trackingId;
                 await _localStorage.SetItemAsync("notification_id_map", notificationMap);
-                
+
                 var request = new NotificationRequest
                 {
                     NotificationId = notificationId,
                     Title = title,
                     Description = message,
-                    // Store the tracking ID in the ReturningData field for delivery tracking
                     ReturningData = trackingId,
-                    // Include any additional data as part of the Category
                     CategoryType = NotificationCategoryType.Status,
                     Android = new AndroidOptions
                     {
                         Priority = AndroidPriority.High,
                         VisibilityType = AndroidVisibilityType.Public
                     },
-                    iOS = new iOSOptions(),
-                    Schedule = fireAt.HasValue ? new NotificationRequestSchedule { NotifyTime = fireAt.Value } : null
+                    iOS = new iOSOptions()
                 };
-                
-                // Send the notification
+                request.Schedule = fireAt.HasValue ? new NotificationRequestSchedule
+                {
+                    NotifyTime = fireAt.Value
+                } : null;
+
                 await LocalNotificationCenter.Current.Show(request);
-                
-                // If this is an immediate notification (not scheduled), we'll mark it as delivered
-                // For scheduled notifications, the delivery status will be updated when received
+
+                // If this is an immediate notification (not scheduled), mark it as delivered
                 if (!fireAt.HasValue)
                 {
                     await UpdateNotificationDeliveryStatusAsync(trackingId, true);
                 }
-                
+
                 return true;
+#else
+                // For Windows, use in-app notification
+                await ShowLocalNotificationAsync(title, message, notificationType, data);
+                return false;
+#endif
             }
             catch (Exception ex)
             {
@@ -622,109 +660,91 @@ namespace TDFMAUI.Services
 
         public async Task<bool> ScheduleNotificationAsync(string title, string message, DateTime deliveryTime, string? data = null)
         {
-#if ANDROID || IOS
             try
             {
-                // Validate and sanitize content
+                // Validate the notification content
                 ValidateNotificationContent(title, message);
-                title = SanitizeNotificationContent(title);
-                message = SanitizeNotificationContent(message);
 
-                // Log notification for history and get tracking ID
-                string trackingId = await LogNotificationAsync(title, message, NotificationType.Info, data, false);
-                
-                // Generate a unique notification ID
-                var notificationId = new Random().Next(10000, 99999);
-                
-                // Store the mapping between notification ID and tracking ID
-                var notificationMap = await _localStorage.GetItemAsync<Dictionary<int, string>>("notification_id_map") 
-                    ?? new Dictionary<int, string>();
-                
-                notificationMap[notificationId] = trackingId;
-                await _localStorage.SetItemAsync("notification_id_map", notificationMap);
-                
-                var request = new NotificationRequest
+                // Get current scheduled notifications
+                var notifications = await GetScheduledNotificationsAsync();
+
+                // Check if we've reached the maximum limit
+                if (notifications.Count >= MAX_SCHEDULED_NOTIFICATIONS)
                 {
-                    NotificationId = notificationId,
+                    _logger.LogWarning("Maximum number of scheduled notifications reached");
+                    return false;
+                }
+
+                // Create a new scheduled notification
+                var notification = new ScheduledNotification
+                {
+                    Id = Guid.NewGuid().ToString(),
                     Title = title,
-                    Description = message,
-                    // Store the tracking ID in the ReturningData field for delivery tracking
-                    ReturningData = trackingId,
-                    // Include any additional data as part of the Category
-                    CategoryType = NotificationCategoryType.Status,
-                    Android = new AndroidOptions
-                    {
-                        Priority = AndroidPriority.High,
-                        VisibilityType = AndroidVisibilityType.Public
-                    },
-                    iOS = new iOSOptions(),
-                    Schedule = new NotificationRequestSchedule { NotifyTime = deliveryTime }
+                    Message = message,
+                    DeliveryTime = deliveryTime,
+                    Data = data
                 };
-                
-                await LocalNotificationCenter.Current.Show(request);
-                
-                // Store the scheduled notification ID for later cancellation/retrieval
-                var ids = await _localStorage.GetItemAsync<List<int>>("scheduled_notification_ids") ?? new List<int>();
-                ids.Add(notificationId);
-                await _localStorage.SetItemAsync("scheduled_notification_ids", ids);
-                
-                _logger.LogInformation("Scheduled notification with ID {NotificationId} and tracking ID {TrackingId} for {DeliveryTime}", 
-                    notificationId, trackingId, deliveryTime);
-                return true;
+
+                // Add to the list
+                notifications.Add(notification);
+
+                // Save the updated list
+                await SaveScheduledNotificationsAsync(notifications);
+
+                // Schedule the actual notification
+                return await ShowNotificationAsync(title, message, NotificationType.Info, data, deliveryTime);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error scheduling notification");
                 return false;
             }
-#else
-            _logger.LogInformation("Scheduling notifications is not implemented for this platform.");
-            return false;
-#endif
         }
 
         public async Task<bool> CancelScheduledNotificationAsync(string id)
         {
-#if ANDROID || IOS
-            if (!int.TryParse(id, out var notificationId))
-                return false;
             try
             {
-                LocalNotificationCenter.Current.Cancel(notificationId);
-                // Remove from stored scheduled IDs
-                var ids = await _localStorage.GetItemAsync<List<int>>("scheduled_notification_ids") ?? new List<int>();
-                ids.Remove(notificationId);
-                await _localStorage.SetItemAsync("scheduled_notification_ids", ids);
-                return true;
+                // Get current scheduled notifications
+                var notifications = await GetScheduledNotificationsAsync();
+
+                // Find and remove the notification
+                var notification = notifications.FirstOrDefault(n => n.Id == id);
+                if (notification != null)
+                {
+                    notifications.Remove(notification);
+                    await SaveScheduledNotificationsAsync(notifications);
+                    return true;
+                }
+
+                return false;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error canceling scheduled notification {id}");
+                _logger.LogError(ex, "Error canceling scheduled notification");
                 return false;
             }
-#else
-            _logger.LogInformation("Canceling scheduled notifications is not implemented for this platform.");
-            return false;
-#endif
         }
 
         public async Task<IEnumerable<string>> GetScheduledNotificationIdsAsync()
         {
-#if ANDROID || IOS
-            var ids = await _localStorage.GetItemAsync<List<int>>("scheduled_notification_ids") ?? new List<int>();
-            return ids.Select(i => i.ToString()).ToList();
-#else
-            return new List<string>();
-#endif
+            try
+            {
+                var notifications = await GetScheduledNotificationsAsync();
+                return notifications.Select(n => n.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting scheduled notification IDs");
+                return Enumerable.Empty<string>();
+            }
         }
 
         public async Task<bool> ClearAllScheduledNotificationsAsync()
         {
-#if ANDROID || IOS
             try
             {
-                LocalNotificationCenter.Current.CancelAll();
-                await _localStorage.SetItemAsync("scheduled_notification_ids", new List<int>());
+                await SaveScheduledNotificationsAsync(new List<ScheduledNotification>());
                 return true;
             }
             catch (Exception ex)
@@ -732,10 +752,6 @@ namespace TDFMAUI.Services
                 _logger.LogError(ex, "Error clearing all scheduled notifications");
                 return false;
             }
-#else
-            _logger.LogInformation("Clearing scheduled notifications is not implemented for this platform.");
-            return false;
-#endif
         }
 
         /// <summary>
@@ -796,7 +812,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var notifications = await _localStorage.GetItemAsync<List<ScheduledNotification>>("scheduled_notifications");
+                var notifications = await _localStorage.GetItemAsync<List<ScheduledNotification>>(SCHEDULED_NOTIFICATIONS_KEY);
                 return notifications ?? new List<ScheduledNotification>();
             }
             catch (Exception ex)
@@ -810,15 +826,16 @@ namespace TDFMAUI.Services
         {
             try
             {
-                await _localStorage.SetItemAsync("scheduled_notifications", notifications);
+                await _localStorage.SetItemAsync(SCHEDULED_NOTIFICATIONS_KEY, notifications);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error saving scheduled notifications");
+                throw;
             }
         }
 
-        public async Task<bool> UpdateScheduledNotificationAsync(string notificationId, string title, string message, DateTime deliveryTime, string? data = null)
+        public async Task<bool> UpdateScheduledNotificationAsync(string id, string title, string message, DateTime newDeliveryTime, string? data = null)
         {
             try
             {
@@ -826,11 +843,11 @@ namespace TDFMAUI.Services
                 try
                 {
                     var notifications = await GetScheduledNotificationsAsync();
-                    var notification = notifications.FirstOrDefault(n => n.Id == notificationId);
+                    var notification = notifications.FirstOrDefault(n => n.Id == id);
                     
                     if (notification == null)
                     {
-                        _logger.LogWarning("Attempted to update non-existent notification: {NotificationId}", notificationId);
+                        _logger.LogWarning("Attempted to update non-existent notification: {NotificationId}", id);
                         return false;
                     }
 
@@ -841,7 +858,7 @@ namespace TDFMAUI.Services
                         return false;
                     }
 
-                    if (deliveryTime <= DateTime.Now)
+                    if (newDeliveryTime <= DateTime.Now)
                     {
                         _logger.LogWarning("Attempted to schedule notification in the past");
                         return false;
@@ -850,11 +867,11 @@ namespace TDFMAUI.Services
                     // Update notification
                     notification.Title = title;
                     notification.Message = message;
-                    notification.DeliveryTime = deliveryTime;
+                    notification.DeliveryTime = newDeliveryTime;
                     notification.Data = data;
 
                     await SaveScheduledNotificationsAsync(notifications);
-                    _logger.LogInformation("Successfully updated scheduled notification: {NotificationId}", notificationId);
+                    _logger.LogInformation("Successfully updated scheduled notification: {NotificationId}", id);
                     return true;
                 }
                 finally
@@ -864,7 +881,7 @@ namespace TDFMAUI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating scheduled notification: {NotificationId}", notificationId);
+                _logger.LogError(ex, "Error updating scheduled notification: {NotificationId}", id);
                 return false;
             }
         }
@@ -989,15 +1006,6 @@ namespace TDFMAUI.Services
             }
         }
 
-        private class ScheduledNotification
-        {
-            public string Id { get; set; } = string.Empty;
-            public string Title { get; set; } = string.Empty;
-            public string Message { get; set; } = string.Empty;
-            public DateTime DeliveryTime { get; set; }
-            public string? Data { get; set; }
-        }
-        
         public void Dispose()
         {
             try

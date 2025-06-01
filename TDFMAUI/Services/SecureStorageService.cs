@@ -9,6 +9,8 @@ namespace TDFMAUI.Services
     {
         private const string TokenKey = "auth_token";
         private const string TokenExpirationKey = "token_expiration";
+        private const string RefreshTokenKey = "refresh_token";
+        private const string RefreshTokenExpirationKey = "refresh_token_expiration";
         private readonly ILogger<SecureStorageService> _logger;
 
         public SecureStorageService(ILogger<SecureStorageService> logger = null)
@@ -16,13 +18,18 @@ namespace TDFMAUI.Services
             _logger = logger;
         }
 
-        public async Task SaveTokenAsync(string token, DateTime expiration)
+        public async Task SaveTokenAsync(string token, DateTime expiration, string refreshToken = null, DateTime? refreshTokenExpiration = null)
         {
             try
             {
                 // Always update in-memory values regardless of platform
                 ApiConfig.CurrentToken = token;
                 ApiConfig.TokenExpiration = expiration;
+                if (refreshToken != null)
+                {
+                    ApiConfig.CurrentRefreshToken = refreshToken;
+                    ApiConfig.RefreshTokenExpiration = refreshTokenExpiration ?? DateTime.MinValue;
+                }
 
                 // Only persist token to secure storage if platform allows it
                 if (ShouldPersistToken())
@@ -30,6 +37,11 @@ namespace TDFMAUI.Services
                     _logger?.LogInformation("Saving token to secure storage (mobile platform)");
                     await SecureStorage.SetAsync(TokenKey, token);
                     await SecureStorage.SetAsync(TokenExpirationKey, expiration.ToString("o"));
+                    if (refreshToken != null)
+                    {
+                        await SecureStorage.SetAsync(RefreshTokenKey, refreshToken);
+                        await SecureStorage.SetAsync(RefreshTokenExpirationKey, refreshTokenExpiration?.ToString("o") ?? DateTime.MinValue.ToString("o"));
+                    }
                 }
                 else
                 {
@@ -81,16 +93,56 @@ namespace TDFMAUI.Services
             return (null, DateTime.MinValue);
         }
 
+        public async Task<(string Token, DateTime Expiration)> GetRefreshTokenAsync()
+        {
+            // On desktop, check in-memory token first
+            if (DeviceHelper.IsDesktop)
+            {
+                if (!string.IsNullOrEmpty(ApiConfig.CurrentRefreshToken) && ApiConfig.RefreshTokenExpiration > DateTime.UtcNow)
+                {
+                    return (ApiConfig.CurrentRefreshToken, ApiConfig.RefreshTokenExpiration);
+                }
+                // If not set, fall through to try SecureStorage (should be empty)
+            }
+
+            try
+            {
+                string token = await SecureStorage.GetAsync(RefreshTokenKey);
+                string expirationString = await SecureStorage.GetAsync(RefreshTokenExpirationKey);
+
+                if (!string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(expirationString))
+                {
+                    DateTime expiration = DateTime.Parse(expirationString);
+
+                    // Update in-memory values
+                    ApiConfig.CurrentRefreshToken = token;
+                    ApiConfig.RefreshTokenExpiration = expiration;
+
+                    return (token, expiration);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting refresh token: {ex.Message}");
+            }
+
+            return (null, DateTime.MinValue);
+        }
+
         public async Task ClearTokenAsync()
         {
             try
             {
                 SecureStorage.Remove(TokenKey);
                 SecureStorage.Remove(TokenExpirationKey);
+                SecureStorage.Remove(RefreshTokenKey);
+                SecureStorage.Remove(RefreshTokenExpirationKey);
 
                 // Also clear in-memory values
                 ApiConfig.CurrentToken = null;
                 ApiConfig.TokenExpiration = DateTime.MinValue;
+                ApiConfig.CurrentRefreshToken = null;
+                ApiConfig.RefreshTokenExpiration = DateTime.MinValue;
             }
             catch (Exception ex)
             {

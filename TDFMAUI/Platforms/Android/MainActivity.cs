@@ -30,7 +30,6 @@ namespace TDFMAUI
                 base.OnCreate(savedInstanceState);
 
                 // Initialize LocalNotification
-                LocalNotificationCenter.CreateNotificationChannel();
                 CreateNotificationChannel();
 
                 LogToFile("MainActivity", "OnCreate completed successfully");

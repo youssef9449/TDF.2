@@ -16,6 +16,7 @@
             <converters:ValidationStateToColorConverter x:Key="ValidationColorConverter" />
             <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
             <converters:LeaveTypeToTimePickersVisibilityConverter x:Key="LeaveTypeToTimePickersVisibilityConverter" />
+            <converters:LeaveTypeToEndDateVisibilityConverter x:Key="LeaveTypeToEndDateVisibilityConverter" />
 
             <Style x:Key="FormFieldTitleLabelStyle" TargetType="Label">
                 <Setter Property="FontAttributes" Value="Bold" />
@@ -102,10 +103,12 @@
                                 <DatePicker Date="{Binding StartDate}" Format="D"/>
                             </Border>
 
-                            <Label Grid.Row="3" Grid.Column="0" Text="End Date" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                            <Label Grid.Row="3" Grid.Column="0" Text="End Date" Style="{StaticResource FormFieldTitleLabelStyle}"
+                                   IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}"/>
                             <Border Grid.Row="3" Grid.Column="1" StrokeThickness="1"
                                      Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndDate'}"
-                                     Padding="0">
+                                     Padding="0"
+                                     IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}">
                                  <DatePicker Date="{Binding EndDate}" Format="D"/>
                              </Border>
 
@@ -176,10 +179,12 @@
                                 <DatePicker Date="{Binding StartDate}" Format="D"/>
                             </Border>
 
-                            <Label Text="End Date" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                            <Label Text="End Date" Style="{StaticResource FormFieldTitleLabelStyle}"
+                                   IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}"/>
                             <Border StrokeThickness="1"
                                      Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndDate'}"
-                                     Padding="0">
+                                     Padding="0"
+                                     IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}">
                                  <DatePicker Date="{Binding EndDate}" Format="D"/>
                              </Border>
 

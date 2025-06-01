@@ -54,10 +54,16 @@ namespace TDFMAUI.Config
         // Token storage
         public static string CurrentToken { get; set; }
         public static DateTime TokenExpiration { get; set; }
+        public static string CurrentRefreshToken { get; set; }
+        public static DateTime RefreshTokenExpiration { get; set; }
 
         public static bool IsTokenValid =>
             !string.IsNullOrEmpty(CurrentToken) &&
             TokenExpiration > DateTime.UtcNow.AddMinutes(5); // 5 min buffer
+
+        public static bool IsRefreshTokenValid =>
+            !string.IsNullOrEmpty(CurrentRefreshToken) &&
+            RefreshTokenExpiration > DateTime.UtcNow.AddMinutes(5); // 5 min buffer
 
         // Flag to track if initialization was attempted
         private static bool _initialized = false;

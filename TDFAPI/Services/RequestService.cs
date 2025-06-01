@@ -147,7 +147,7 @@ namespace TDFAPI.Services
                 // Calculate business days (still needed for entity creation)
                 int numberOfDays = CalculateBusinessDays(
                     createDto.RequestStartDate,
-                    createDto.RequestEndDate ?? createDto.RequestStartDate);
+                    createDto.RequestEndDate.HasValue ? createDto.RequestEndDate.Value : createDto.RequestStartDate);
 
                 var request = new RequestEntity
                 {
@@ -238,7 +238,7 @@ namespace TDFAPI.Services
 
                 int numberOfDays = CalculateBusinessDays(
                     updateDto.RequestStartDate,
-                    updateDto.RequestEndDate ?? updateDto.RequestStartDate);
+                    updateDto.RequestEndDate.HasValue ? updateDto.RequestEndDate.Value : updateDto.RequestStartDate);
 
                 // Update the request
                 existingRequest.RequestType = updateDto.LeaveType;
@@ -541,8 +541,8 @@ namespace TDFAPI.Services
                 RequestEndDate = request.RequestToDay,
                 RequestBeginningTime = request.RequestBeginningTime,
                 RequestEndingTime = request.RequestEndingTime,
-                CreatedDate = request.CreatedAt.GetValueOrDefault(),
-                LastModifiedDate = request.UpdatedAt.GetValueOrDefault(),
+                CreatedDate = request.CreatedAt.GetValueOrDefault(DateTime.MinValue),
+                LastModifiedDate = request.UpdatedAt,
                 RequestNumberOfDays = request.RequestNumberOfDays,
                 RemainingBalance = remainingBalance,
                 RowVersion = request.RowVersion

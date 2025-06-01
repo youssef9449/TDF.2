@@ -359,7 +359,7 @@ namespace TDFAPI.Services
                         bool balanceUpdated = await _requestRepository.UpdateLeaveBalanceAsync(
                             request.RequestUserID,
                             Enum.Parse<LeaveType>(balanceType, true),
-                            request.RequestNumberOfDays,
+                            request.RequestNumberOfDays.GetValueOrDefault(),
                             false);
                         if (!balanceUpdated)
                         {
@@ -541,8 +541,8 @@ namespace TDFAPI.Services
                 RequestEndDate = request.RequestToDay,
                 RequestBeginningTime = request.RequestBeginningTime,
                 RequestEndingTime = request.RequestEndingTime,
-                CreatedDate = request.CreatedAt,
-                LastModifiedDate = request.UpdatedAt,
+                CreatedDate = request.CreatedAt.GetValueOrDefault(),
+                LastModifiedDate = request.UpdatedAt.GetValueOrDefault(),
                 RequestNumberOfDays = request.RequestNumberOfDays,
                 RemainingBalance = remainingBalance,
                 RowVersion = request.RowVersion

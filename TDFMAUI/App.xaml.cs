@@ -812,33 +812,12 @@ namespace TDFMAUI
             // When app goes to background, reconnect socket when it comes back
             DebugService.LogInfo("App", "Application going to sleep");
 
-            // For desktop platforms, clear token and update user status to Offline
+            // For desktop platforms, we should NOT clear token when app is just minimized
+            // Only update user status to Offline
             if (DeviceHelper.IsDesktop)
             {
-                DebugService.LogInfo("App", "Desktop platform detected, clearing token and setting user offline");
-
-                // Clear token on desktop platforms when app is closed
-                if (Services != null)
-                {
-                    var secureStorage = Services.GetService<SecureStorageService>();
-                    if (secureStorage != null)
-                    {
-                        // Fire and forget - don't block the UI thread
-                        Task.Run(async () =>
-                        {
-                            try
-                            {
-                                await secureStorage.ClearTokenAsync();
-                                DebugService.LogInfo("App", "Token cleared on desktop platform during sleep");
-                            }
-                            catch (Exception ex)
-                            {
-                                DebugService.LogError("App", $"Error clearing token: {ex.Message}");
-                            }
-                        });
-                    }
-                }
-
+                DebugService.LogInfo("App", "Desktop platform detected, setting user offline without clearing token");
+            
                 // Update user status to Offline
                 UpdateUserStatusToOffline();
             }
@@ -977,7 +956,9 @@ namespace TDFMAUI
                 if (Services != null)
                 {
                     var webSocketService = Services.GetService<IWebSocketService>();
-                    if (webSocketService != null && !webSocketService.IsConnected)
+                    var secureStorage = Services.GetService<SecureStorageService>();
+                    
+                    if (webSocketService != null && !webSocketService.IsConnected && secureStorage != null)
                     {
                         DebugService.LogInfo("App", "WebSocket not connected, attempting to reconnect");
 
@@ -986,17 +967,18 @@ namespace TDFMAUI
                         {
                             try
                             {
-                                var secureStorage = Services.GetService<SecureStorageService>();
-                                if (secureStorage != null)
+                                var (token, expiration) = await secureStorage.GetTokenAsync();
+                                if (!string.IsNullOrEmpty(token) && expiration > DateTime.UtcNow)
                                 {
-                                    var (token, expiration) = await secureStorage.GetTokenAsync();
-                                    if (!string.IsNullOrEmpty(token) && expiration > DateTime.UtcNow)
+                                    await webSocketService.ConnectAsync(token);
+                                    DebugService.LogInfo("App", "WebSocket reconnected successfully");
+                                }
+                                else
+                                {
+                                    DebugService.LogWarning("App", "WebSocket reconnect skipped: token missing or expired.");
+                                    // Only redirect to login if token is actually expired, not just because we're resuming
+                                    if (expiration <= DateTime.UtcNow)
                                     {
-                                        await webSocketService.ConnectAsync(token);
-                                    }
-                                    else
-                                    {
-                                        DebugService.LogWarning("App", "WebSocket reconnect skipped: token missing or expired.");
                                         // Handle token expiration by redirecting to login
                                         await MainThread.InvokeOnMainThreadAsync(async () =>
                                         {

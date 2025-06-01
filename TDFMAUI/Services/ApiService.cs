@@ -312,7 +312,7 @@ namespace TDFMAUI.Services
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "ApiService: Error in GetRawResponseAsync for {Endpoint}: {Message}", endpoint, ex.Message);
-                throw new ApiException($"Error fetching raw data from {endpoint}", ex);
+                throw new ApiException(ex.Message, ex);
             }
         }
 
@@ -341,7 +341,7 @@ namespace TDFMAUI.Services
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "ApiService: Error in GetAsync for {Endpoint}: {Message}", endpoint, ex.Message);
-                throw new ApiException($"Error fetching data from {endpoint}: {ex.Message}", ex);
+                throw new ApiException(ex.Message, ex);
             }
         }
 
@@ -370,7 +370,7 @@ namespace TDFMAUI.Services
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "ApiService: Error in PostAsync for {Endpoint}: {Message}", endpoint, ex.Message);
-                throw new ApiException($"Error posting data to {endpoint}: {ex.Message}", ex);
+                throw new ApiException(ex.Message, ex);
             }
         }
 
@@ -400,7 +400,7 @@ namespace TDFMAUI.Services
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "ApiService: Error in PutAsync for {Endpoint}: {Message}", endpoint, ex.Message);
-                throw new ApiException($"Error putting data to {endpoint}: {ex.Message}", ex);
+                throw new ApiException(ex.Message, ex);
             }
         }
 
@@ -449,7 +449,7 @@ namespace TDFMAUI.Services
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "ApiService: Error in DeleteAsync for {Endpoint}: {Message}", endpoint, ex.Message);
-                throw new ApiException($"Error deleting data from {endpoint}: {ex.Message}", ex);
+                throw new ApiException(ex.Message, ex);
             }
         }
         #endregion

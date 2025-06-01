@@ -175,7 +175,7 @@ namespace TDFAPI.Repositories
             catch (DbUpdateConcurrencyException)
             {
                 // Request not found or modified by another user
-                var exists = await _context.Requests.AnyAsync(r => r.Id == request.Id);
+                var exists = await _context.Requests.AnyAsync(r => r.RequestID == request.RequestID);
                 if (!exists)
                 {
                     return false;
@@ -185,12 +185,12 @@ namespace TDFAPI.Repositories
             catch (DbUpdateException ex)
             {
                 _logger.LogError(ex, "DB error updating request {RequestId} for user {UserId}",
-                    request.Id, request.RequestUserID);
+                    request.RequestID, request.RequestUserID);
                 throw;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating request {RequestId}", request.Id);
+                _logger.LogError(ex, "Error updating request {RequestId}", request.RequestID);
                 throw;
             }
         }
@@ -384,7 +384,7 @@ namespace TDFAPI.Repositories
                         r.RequestHRStatus == RequestStatus.Pending)
                     .ToListAsync();
 
-                int totalDays = pendingRequests.Sum(r => r.RequestNumberOfDays);
+                int totalDays = pendingRequests.Sum(r => r.RequestNumberOfDays ?? 0);
                 return totalDays;
             }
             catch (Exception ex)
@@ -581,7 +581,7 @@ namespace TDFAPI.Repositories
                     r.RequestHRStatus == RequestStatus.ManagerApproved)
                 .ToListAsync();
 
-            int totalDays = approvedRequests.Sum(r => r.RequestNumberOfDays);
+            int totalDays = approvedRequests.Sum(r => r.RequestNumberOfDays ?? 0);
             return totalDays;
         }
 

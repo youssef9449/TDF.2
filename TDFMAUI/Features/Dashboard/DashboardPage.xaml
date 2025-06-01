@@ -96,14 +96,16 @@
                                 <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,10" />
                                 <CollectionView ItemsSource="{Binding RecentRequests}" HeightRequest="300" EmptyView="No recent requests">
                                     <CollectionView.ItemTemplate>
-                                        <DataTemplate x:DataType="dto:LeaveRequestDto">
+                                        <DataTemplate x:DataType="dto:RequestResponseDto">
                                             <Grid Padding="5" ColumnDefinitions="*,Auto">
                                                 <VerticalStackLayout Spacing="4">
-                                                    <Label Text="{Binding Type}" FontAttributes="Bold" />
-                                                    <Label Text="{Binding DateRange}" FontSize="12" />
+                                                    <Label Text="{Binding LeaveType}" FontAttributes="Bold" />
+                                                    <!-- DateRange does not exist on RequestResponseDto. Use RequestStartDate and RequestEndDate instead. -->
+                                                    <Label Text="{Binding RequestStartDate, StringFormat='From: {0:yyyy-MM-dd}'}" FontSize="12" />
+                                                    <Label Text="{Binding RequestEndDate, StringFormat='To: {0:yyyy-MM-dd}'}" FontSize="12" IsVisible="{Binding RequestEndDate, Converter={StaticResource NullToVisibilityConverter}}" />
                                                     <Label Text="{Binding Status}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}" FontSize="12" />
                                                 </VerticalStackLayout>
-                                                <Button Grid.Column="1" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DashboardViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding Id}" FontSize="12" HeightRequest="30" WidthRequest="60" VerticalOptions="Center" Padding="0" />
+                                                <Button Grid.Column="1" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DashboardViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding RequestID}" FontSize="12" HeightRequest="30" WidthRequest="60" VerticalOptions="Center" Padding="0" />
                                             </Grid>
                                         </DataTemplate>
                                     </CollectionView.ItemTemplate>
@@ -176,14 +178,15 @@
                             <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,8" />
                             <CollectionView ItemsSource="{Binding RecentRequests}" HeightRequest="200" EmptyView="No recent requests">
                                 <CollectionView.ItemTemplate>
-                                    <DataTemplate x:DataType="dto:LeaveRequestDto">
+                                    <DataTemplate x:DataType="dto:RequestResponseDto">
                                         <Grid Padding="5" ColumnDefinitions="*,Auto">
                                             <VerticalStackLayout Spacing="2">
-                                                <Label Text="{Binding Type}" FontAttributes="Bold" FontSize="14"/>
-                                                <Label Text="{Binding DateRange}" FontSize="11" />
+                                                <Label Text="{Binding LeaveType}" FontAttributes="Bold" FontSize="14"/>
+                                                <Label Text="{Binding RequestStartDate, StringFormat='From: {0:yyyy-MM-dd}'}" FontSize="11" />
+                                                <Label Text="{Binding RequestEndDate, StringFormat='To: {0:yyyy-MM-dd}'}" FontSize="11" IsVisible="{Binding RequestEndDate, Converter={StaticResource NullToVisibilityConverter}}" />
                                                 <Label Text="{Binding Status}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}" FontSize="11" />
                                             </VerticalStackLayout>
-                                            <Button Grid.Column="1" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DashboardViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding Id}" FontSize="12" HeightRequest="30" WidthRequest="60" VerticalOptions="Center" Padding="0" />
+                                            <Button Grid.Column="1" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:DashboardViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding RequestID}" FontSize="12" HeightRequest="30" WidthRequest="60" VerticalOptions="Center" Padding="0" />
                                         </Grid>
                                     </DataTemplate>
                                 </CollectionView.ItemTemplate>

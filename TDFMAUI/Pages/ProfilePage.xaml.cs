@@ -73,8 +73,8 @@ public partial class ProfilePage : ContentPage, INotifyPropertyChanged
 
                 Department = App.CurrentUser.Department,
                 Title = App.CurrentUser.Title,
-                IsAdmin = App.CurrentUser.IsAdmin,
-                IsActive = App.CurrentUser.IsActive,
+                IsAdmin = App.CurrentUser.IsAdmin ?? false,
+                IsActive = App.CurrentUser.IsActive ?? false,
                 // Map other relevant properties if needed
             };
 

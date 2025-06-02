@@ -106,13 +106,13 @@ namespace TDFShared.Services
             if (request == null || currentUser == null) return false;
 
             // Admin and HR can view all requests
-            if (currentUser.IsAdmin || currentUser.IsHR) return true;
+            if ((currentUser.IsAdmin ?? false) || (currentUser.IsHR ?? false)) return true;
 
             // Users can view their own requests
             if (request.RequestUserID == currentUser.UserID) return true;
 
             // Managers can view requests from their department (including constituent departments for hyphenated departments)
-            if (currentUser.IsManager &&
+            if ((currentUser.IsManager ?? false) &&
                 !string.IsNullOrEmpty(currentUser.Department) &&
                 CanAccessDepartment(currentUser.Department, request.RequestDepartment))
             {
@@ -139,10 +139,10 @@ namespace TDFShared.Services
             if (request.RequestUserID == currentUser.UserID) return false;
 
             // Admin and HR can approve/reject all requests
-            if (currentUser.IsAdmin || currentUser.IsHR) return true;
+            if ((currentUser.IsAdmin ?? false) || (currentUser.IsHR ?? false)) return true;
 
             // Managers can approve/reject requests from their department (including constituent departments for hyphenated departments)
-            if (currentUser.IsManager &&
+            if ((currentUser.IsManager ?? false) &&
                 !string.IsNullOrEmpty(currentUser.Department) &&
                 CanAccessDepartment(currentUser.Department, request.RequestDepartment))
             {
@@ -159,7 +159,7 @@ namespace TDFShared.Services
         /// <returns>True if the user can manage requests</returns>
         public static bool CanManageRequests(UserDto user)
         {
-            return user != null && (user.IsAdmin || user.IsManager || user.IsHR);
+            return user != null && ((user.IsAdmin ?? false) || (user.IsManager ?? false) || (user.IsHR ?? false));
         }
 
         /// <summary>
@@ -173,10 +173,10 @@ namespace TDFShared.Services
             if (user == null || string.IsNullOrEmpty(department)) return false;
 
             // Admin and HR can manage all departments
-            if (user.IsAdmin || user.IsHR) return true;
+            if ((user.IsAdmin ?? false) || (user.IsHR ?? false)) return true;
 
             // Managers can manage their own department (including constituent departments for hyphenated departments)
-            return user.IsManager &&
+            return (user.IsManager ?? false) &&
                    !string.IsNullOrEmpty(user.Department) &&
                    CanAccessDepartment(user.Department, department);
         }

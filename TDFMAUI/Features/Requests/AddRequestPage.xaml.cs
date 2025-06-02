@@ -55,7 +55,7 @@ public partial class AddRequestPage : ContentPage
         if (BindingContext is AddRequestViewModel viewModel)
         {
             // Ensure time pickers are initialized for Permission/External Assignment
-            if (viewModel.SelectedLeaveType == "Permission" || viewModel.SelectedLeaveType == "ExternalAssignment")
+            if (viewModel.SelectedLeaveType == "Permission" || viewModel.SelectedLeaveType == "External Assignment")
             {
                 if (!viewModel.StartTime.HasValue)
                     viewModel.StartTime = new TimeSpan(9, 0, 0); // Default to 9:00 AM

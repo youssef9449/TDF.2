@@ -68,7 +68,7 @@ namespace TDFShared.Models.User
         /// <summary>
         /// Gets or sets a value indicating whether the user is currently connected.
         /// </summary>
-        public bool IsConnected { get; set; }
+        public bool? IsConnected { get; set; }
 
         /// <summary>
         /// Gets or sets the name of the machine the user is connected from.
@@ -100,22 +100,22 @@ namespace TDFShared.Models.User
         /// <summary>
         /// Gets or sets a value indicating whether the user is available for chat.
         /// </summary>
-        public bool IsAvailableForChat { get; set; } = true;
+        public bool? IsAvailableForChat { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the user has administrator privileges.
         /// </summary>
-        public bool IsAdmin { get; set; }
+        public bool? IsAdmin { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the user has manager privileges.
         /// </summary>
-        public bool IsManager { get; set; }
+        public bool? IsManager { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the user has HR privileges.
         /// </summary>
-        public bool IsHR { get; set; }
+        public bool? IsHR { get; set; }
 
         /// <summary>
         /// Gets or sets the refresh token used for authentication.
@@ -147,7 +147,7 @@ namespace TDFShared.Models.User
         /// <summary>
         /// Gets or sets a value indicating whether the user account is locked.
         /// </summary>
-        public bool IsLocked { get; set; }
+        public bool? IsLocked { get; set; }
 
         /// <summary>
         /// Gets or sets the date and time when the account lockout ends.
@@ -163,7 +163,7 @@ namespace TDFShared.Models.User
         /// <summary>
         /// Gets or sets a value indicating whether the user account is active.
         /// </summary>
-        public bool IsActive { get; set; } = true;
+        public bool? IsActive { get; set; }
         
         /// <summary>
         /// Gets or sets the date and time when the user was last updated.

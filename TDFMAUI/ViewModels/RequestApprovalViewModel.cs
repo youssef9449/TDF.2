@@ -140,9 +140,9 @@ namespace TDFMAUI.ViewModels
 
         // Authorization properties using cached user and RequestStateManager
         public bool CanManageRequests => GetCachedCurrentUser() is UserDto user && RequestStateManager.CanManageRequests(user);
-        public bool CanEditDeleteAny => GetCachedCurrentUser() is UserDto user && user.IsAdmin;
+        public bool CanEditDeleteAny => GetCachedCurrentUser() is UserDto user && (user.IsAdmin ?? false);
         public bool CanFilterByDepartment => GetCachedCurrentUser() is UserDto user &&
-            (user.IsAdmin || user.IsHR || user.IsManager);
+            ((user.IsAdmin ?? false) || (user.IsHR ?? false) || (user.IsManager ?? false));
 
         // UI: Populate Departments based on user role
         private async Task LoadDepartmentsAsync()
@@ -156,11 +156,11 @@ namespace TDFMAUI.ViewModels
                 {
                     filteredDepartments = allDepartments.ToList();
                 }
-                else if (user.IsAdmin || user.IsHR)
+                else if ((user.IsAdmin ?? false) || (user.IsHR ?? false))
                 {
                     filteredDepartments = allDepartments.ToList();
                 }
-                else if (user.IsManager)
+                else if (user.IsManager ?? false)
                 {
                     // Only show departments the manager can manage
                     var accessible = TDFShared.Utilities.AuthorizationUtilities.GetAccessibleDepartments(

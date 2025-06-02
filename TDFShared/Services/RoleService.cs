@@ -21,9 +21,9 @@ namespace TDFShared.Services
             user.Roles.Clear();
 
             // Add roles based on role flags
-            if (user.IsAdmin) user.Roles.Add("Admin");
-            if (user.IsManager) user.Roles.Add("Manager");
-            if (user.IsHR) user.Roles.Add("HR");
+            if (user.IsAdmin ?? false) user.Roles.Add("Admin");
+            if (user.IsManager ?? false) user.Roles.Add("Manager");
+            if (user.IsHR ?? false) user.Roles.Add("HR");
 
             // Add default "User" role if no other roles are assigned
             if (!user.Roles.Any())
@@ -80,7 +80,7 @@ namespace TDFShared.Services
         public bool IsAdministrative(UserDto user)
         {
             if (user == null) throw new ArgumentNullException(nameof(user));
-            return user.IsAdmin || user.IsHR;
+            return (user.IsAdmin ?? false) || (user.IsHR ?? false);
         }
 
         /// <summary>
@@ -89,7 +89,7 @@ namespace TDFShared.Services
         public bool IsManagement(UserDto user)
         {
             if (user == null) throw new ArgumentNullException(nameof(user));
-            return user.IsAdmin || user.IsHR || user.IsManager;
+            return (user.IsAdmin ?? false) || (user.IsHR ?? false) || (user.IsManager ?? false);
         }
     }
 } 

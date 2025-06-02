@@ -85,33 +85,39 @@ namespace TDFAPI.Data
                 entity.Property(e => e.RequestToDay).HasColumnType("date");
                 entity.Property(e => e.RequestBeginningTime).HasColumnType("time(7)");
                 entity.Property(e => e.RequestEndingTime).HasColumnType("time(7)");
-                entity.Property(e => e.RequestReason).HasMaxLength(255);
+                entity.Property(e => e.RequestReason).HasMaxLength(255).IsUnicode();
+                entity.Property(e => e.ManagerApproverId);
+                entity.Property(e => e.ManagerRemarks).HasMaxLength(255).IsUnicode();
                 entity.Property(e => e.RequestManagerStatus)
                     .IsRequired()
                     .HasMaxLength(50)
                     .HasConversion<string>() // Convert enum to string for DB
-                    .HasDefaultValue(RequestStatus.Pending); // Set default using enum
+                    .HasDefaultValue(RequestStatus.Pending) // Set default using enum
+                    .IsUnicode(false);
+                entity.Property(e => e.HRApproverId);
+                entity.Property(e => e.HRRemarks).HasMaxLength(255).IsUnicode();
                 entity.Property(e => e.RequestType)
                     .IsRequired()
                     .HasMaxLength(255)
                     .HasConversion<string>() // Convert enum to string for DB
                     .IsUnicode(false);
                 entity.Property(e => e.RequestDepartment).IsRequired().HasMaxLength(255).IsUnicode(false);
-                entity.Property(e => e.RequestNumberOfDays);
+                entity.Property(e => e.RequestNumberOfDays).HasColumnName("RequestNumberOfDays");
                 entity.Property(e => e.RequestHRStatus)
                     .IsRequired()
                     .HasMaxLength(50)
                     .HasConversion<string>() // Convert enum to string for DB
-                    .HasDefaultValue(RequestStatus.Pending); // Set default using enum
-                entity.Property(e => e.CreatedAt);
-                entity.Property(e => e.UpdatedAt);
-                entity.Property(e => e.RowVersion);
+                    .HasDefaultValue(RequestStatus.Pending) // Set default using enum
+                    .IsUnicode(false);
+                entity.Property(e => e.CreatedAt).HasColumnType("datetime");
+                entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
+                entity.Property(e => e.RowVersion).IsRowVersion();
 
                 // Configure the relationship with UserEntity
                 entity.HasOne(r => r.User)
                     .WithMany(u => u.Requests)
                     .HasForeignKey(r => r.RequestUserID)
-                    .OnDelete(DeleteBehavior.Restrict);
+                    .OnDelete(DeleteBehavior.NoAction);
             });
 
              builder.Entity<NotificationEntity>(entity =>

@@ -116,7 +116,7 @@ namespace TDFMAUI.Services
                             Department = userDto.Department ?? string.Empty,
                             Status = userDto.PresenceStatus,
                             StatusMessage = userDto.StatusMessage ?? string.Empty,
-                            IsAvailableForChat = userDto.IsAvailableForChat,
+                            IsAvailableForChat = userDto.IsAvailableForChat ?? false,
                             LastActivityTime = userDto.LastActivityTime ?? DateTime.UtcNow,
                             ProfilePictureData = userDto.Picture
                         };

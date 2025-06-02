@@ -202,7 +202,7 @@ namespace TDFAPI.Controllers
                 }
 
                 // For managers, ensure they can only access their department (including constituent departments for hyphenated departments)
-                if (currentUser.IsManager && !currentUser.IsAdmin && !currentUser.IsHR)
+                if ((currentUser.IsManager ?? false) && !(currentUser.IsAdmin ?? false) && !(currentUser.IsHR ?? false))
                 {
                     bool canAccessDepartment = RequestStateManager.CanManageDepartment(currentUser, targetUser.Department);
                     if (!canAccessDepartment)
@@ -351,7 +351,7 @@ namespace TDFAPI.Controllers
 
                 // Use RequestStateManager to check edit rights
                 bool isOwner = existingRequest.RequestUserID == userId;
-                bool canEdit = RequestStateManager.CanEdit(existingRequest, currentUser.IsAdmin, isOwner);
+                bool canEdit = RequestStateManager.CanEdit(existingRequest, currentUser.IsAdmin ?? false, isOwner);
                 if (!canEdit)
                 {
                     _logger.LogWarning("User {UserId} tried to update request {RequestId} belonging to {OwnerId} but lacks permission",
@@ -428,7 +428,7 @@ namespace TDFAPI.Controllers
 
                 // Use RequestStateManager to check delete rights
                 bool isOwner = requestDto.RequestUserID == currentUserId;
-                bool canDelete = RequestStateManager.CanDelete(requestDto, currentUser.IsAdmin, isOwner);
+                bool canDelete = RequestStateManager.CanDelete(requestDto, currentUser.IsAdmin ?? false, isOwner);
                 if (!canDelete)
                 {
                     _logger.LogWarning("User {UserId} tried to delete request {RequestId} belonging to {OwnerId} but lacks permission",

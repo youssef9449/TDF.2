@@ -60,11 +60,11 @@ namespace TDFAPI.Services
                 _userPresence[userId] = new UserPresenceInfo
                 {
                     UserId = userId,
-                    Username = user.UserName,
-                    FullName = user.FullName,
+                    Username = user.UserName ?? string.Empty,
+                    FullName = user.FullName ?? string.Empty,
                     Status = user.PresenceStatus,
-                    StatusMessage = user.StatusMessage,
-                    IsAvailableForChat = user.IsAvailableForChat,
+                    StatusMessage = user.StatusMessage ?? string.Empty,
+                    IsAvailableForChat = user.IsAvailableForChat ?? false,
                     LastActivity = DateTime.UtcNow
                 };
 
@@ -116,11 +116,11 @@ namespace TDFAPI.Services
                     id => new UserPresenceInfo
                     {
                         UserId = id,
-                        Username = user.UserName,
-                        FullName = user.FullName,
+                        Username = user.UserName ?? string.Empty,
+                        FullName = user.FullName ?? string.Empty,
                         Status = status,
-                        StatusMessage = statusMessage ?? user.StatusMessage,
-                        IsAvailableForChat = user.IsAvailableForChat,
+                        StatusMessage = statusMessage ?? user.StatusMessage ?? string.Empty,
+                        IsAvailableForChat = user.IsAvailableForChat ?? false,
                         LastActivity = DateTime.UtcNow
                     },
                     (id, existing) =>
@@ -137,10 +137,10 @@ namespace TDFAPI.Services
                 // Publish status changed event via the event mediator
                 _eventMediator.Publish(new Messaging.UserStatusChangedEvent(
                     userId, 
-                    user.UserName, 
-                    user.FullName, 
+                    user.UserName ?? string.Empty, 
+                    user.FullName ?? string.Empty, 
                     status, 
-                    statusMessage ?? user.StatusMessage
+                    statusMessage ?? user.StatusMessage ?? string.Empty
                 ));
 
                 _logger.LogInformation("User {UserId} status updated to {Status}", userId, status);
@@ -254,10 +254,10 @@ namespace TDFAPI.Services
                     id => new UserPresenceInfo
                     {
                         UserId = id,
-                        Username = user.UserName,
-                        FullName = user.FullName,
+                        Username = user.UserName ?? string.Empty,
+                        FullName = user.FullName ?? string.Empty,
                         Status = user.PresenceStatus,
-                        StatusMessage = user.StatusMessage,
+                        StatusMessage = user.StatusMessage ?? string.Empty,
                         IsAvailableForChat = isAvailable,
                         LastActivity = DateTime.UtcNow
                     },
@@ -271,8 +271,8 @@ namespace TDFAPI.Services
                 // Publish availability changed event using the event mediator
                 _eventMediator.Publish(new Messaging.UserAvailabilityChangedEvent(
                     userId,
-                    user.UserName,
-                    user.FullName,
+                    user.UserName ?? string.Empty,
+                    user.FullName ?? string.Empty,
                     isAvailable
                 ));
 
@@ -311,10 +311,10 @@ namespace TDFAPI.Services
     public class UserPresenceInfo
     {
         public int UserId { get; set; }
-        public string Username { get; set; }
-        public string FullName { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
         public UserPresenceStatus Status { get; set; }
-        public string StatusMessage { get; set; }
+        public string StatusMessage { get; set; } = string.Empty;
         public bool IsAvailableForChat { get; set; }
         public DateTime LastActivity { get; set; }
     }

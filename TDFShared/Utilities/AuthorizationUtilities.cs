@@ -52,7 +52,7 @@ namespace TDFShared.Utilities
         /// <returns>True if the user is an admin or HR</returns>
         public static bool IsAdministrative(UserDto user)
         {
-            return user != null && (user.IsAdmin || user.IsHR);
+            return user != null && ((user.IsAdmin ?? false) || (user.IsHR ?? false));
         }
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace TDFShared.Utilities
         /// <returns>True if the user is in a management role</returns>
         public static bool IsManagement(UserDto user)
         {
-            return user != null && (user.IsAdmin || user.IsHR || user.IsManager);
+            return user != null && ((user.IsAdmin ?? false) || (user.IsHR ?? false) || (user.IsManager ?? false));
         }
 
         #endregion
@@ -81,11 +81,11 @@ namespace TDFShared.Utilities
                 return false;
 
             // Admin and HR can access all departments
-            if (user.IsAdmin || user.IsHR)
+            if ((user.IsAdmin ?? false) || (user.IsHR ?? false))
                 return true;
 
             // Managers can access their own department (including constituent departments for hyphenated departments)
-            if (user.IsManager && !string.IsNullOrEmpty(user.Department))
+            if ((user.IsManager ?? false) && !string.IsNullOrEmpty(user.Department))
                 return RequestStateManager.CanManageDepartment(user, targetDepartment);
 
             // Regular users can only access their own department for limited operations
@@ -105,7 +105,7 @@ namespace TDFShared.Utilities
                 return Enumerable.Empty<string>();
 
             // Admin and HR can access all departments
-            if (user.IsAdmin || user.IsHR)
+            if ((user.IsAdmin ?? false) || (user.IsHR ?? false))
                 return allDepartments;
 
             // Managers and regular users can access departments based on their department (including constituent departments for hyphenated departments)
@@ -129,10 +129,10 @@ namespace TDFShared.Utilities
             if (user == null)
                 return RequestAccessLevel.None;
 
-            if (user.IsAdmin || user.IsHR)
+            if ((user.IsAdmin ?? false) || (user.IsHR ?? false))
                 return RequestAccessLevel.All;
 
-            if (user.IsManager)
+            if (user.IsManager ?? false)
                 return RequestAccessLevel.Department;
 
             return RequestAccessLevel.Own;
@@ -168,13 +168,13 @@ namespace TDFShared.Utilities
         private static bool CanViewRequest(UserDto user, RequestResponseDto request)
         {
             // Admin and HR can view all requests
-            if (user.IsAdmin || user.IsHR) return true;
+            if ((user.IsAdmin ?? false) || (user.IsHR ?? false)) return true;
 
             // Users can view their own requests
             if (request.RequestUserID == user.UserID) return true;
 
             // Managers can view requests from their department
-            return user.IsManager && CanAccessDepartment(user, request.RequestDepartment);
+            return (user.IsManager ?? false) && CanAccessDepartment(user, request.RequestDepartment);
         }
 
         private static bool CanEditRequest(UserDto user, RequestResponseDto request)
@@ -183,7 +183,7 @@ namespace TDFShared.Utilities
             if (request.Status != RequestStatus.Pending) return false;
 
             // Admin can edit any pending request
-            if (user.IsAdmin) return true;
+            if (user.IsAdmin ?? false) return true;
 
             // Users can edit their own pending requests
             return request.RequestUserID == user.UserID;
@@ -195,7 +195,7 @@ namespace TDFShared.Utilities
             if (request.Status != RequestStatus.Pending) return false;
 
             // Admin can delete any pending request
-            if (user.IsAdmin) return true;
+            if (user.IsAdmin ?? false) return true;
 
             // Users can delete their own pending requests
             return request.RequestUserID == user.UserID;
@@ -210,10 +210,10 @@ namespace TDFShared.Utilities
             if (request.RequestUserID == user.UserID) return false;
 
             // Admin and HR can approve all requests
-            if (user.IsAdmin || user.IsHR) return true;
+            if ((user.IsAdmin ?? false) || (user.IsHR ?? false)) return true;
 
             // Managers can approve requests from their department
-            return user.IsManager && CanAccessDepartment(user, request.RequestDepartment);
+            return (user.IsManager ?? false) && CanAccessDepartment(user, request.RequestDepartment);
         }
 
         private static bool CanRejectRequest(UserDto user, RequestResponseDto request)
@@ -253,10 +253,25 @@ namespace TDFShared.Utilities
     /// </summary>
     public enum RequestAccessLevel
     {
-        None,       // No access
-        Own,        // Can only access own requests
-        Department, // Can access own + department requests
-        All         // Can access all requests
+        /// <summary>
+        /// No access to any requests
+        /// </summary>
+        None,
+        
+        /// <summary>
+        /// Can only access own requests
+        /// </summary>
+        Own,
+        
+        /// <summary>
+        /// Can access own requests and requests from the user's department
+        /// </summary>
+        Department,
+        
+        /// <summary>
+        /// Can access all requests in the system
+        /// </summary>
+        All
     }
 
     /// <summary>
@@ -264,10 +279,29 @@ namespace TDFShared.Utilities
     /// </summary>
     public enum RequestAction
     {
+        /// <summary>
+        /// View a request's details
+        /// </summary>
         View,
+        
+        /// <summary>
+        /// Edit or modify a request
+        /// </summary>
         Edit,
+        
+        /// <summary>
+        /// Delete a request
+        /// </summary>
         Delete,
+        
+        /// <summary>
+        /// Approve a request
+        /// </summary>
         Approve,
+        
+        /// <summary>
+        /// Reject a request
+        /// </summary>
         Reject
     }
 

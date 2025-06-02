@@ -39,7 +39,7 @@ public partial class MainPage : ContentPage
 
             if (adminFrame != null)
             {
-                adminFrame.IsVisible = App.CurrentUser.IsAdmin;
+                adminFrame.IsVisible = App.CurrentUser.IsAdmin ?? false;
             }
         }
         else

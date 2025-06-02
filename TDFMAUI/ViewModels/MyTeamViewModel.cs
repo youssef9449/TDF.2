@@ -104,7 +104,7 @@ namespace TDFMAUI.ViewModels
                             if (member.UserID != currentUser.UserID)
                             {
                                 // For managers, validate they can manage this user's department
-                                if (userDto.IsManager && !userDto.IsAdmin && !userDto.IsHR)
+                                if ((userDto.IsManager ?? false) && !(userDto.IsAdmin ?? false) && !(userDto.IsHR ?? false))
                                 {
                                     if (AuthorizationUtilities.CanAccessDepartment(userDto, member.Department))
                                     {

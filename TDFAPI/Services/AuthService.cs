@@ -174,10 +174,10 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 Expiration = DateTime.UtcNow.AddMinutes(_jwtTokenExpirationMinutes),
                 UserId = user.UserID,
                 Username = user.UserName,
-                FullName = user.FullName,
-                IsAdmin = user.IsAdmin,
-                IsManager = user.IsManager,
-                IsHR = user.IsHR,
+                FullName = user.FullName ?? string.Empty,
+                IsAdmin = user.IsAdmin ?? false,
+                IsManager = user.IsManager ?? false,
+                IsHR = user.IsHR ?? false,
                 RefreshTokenExpiration = refreshTokenExpiry,
                 User = user,
                 Roles = user.Roles?.ToArray() ?? Array.Empty<string>()
@@ -297,9 +297,9 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             }
 
             // Add roles based on user properties
-            if (user.IsAdmin) roles.Add("Admin");
-            if (user.IsManager) roles.Add("Manager");
-            if (user.IsHR) roles.Add("HR");
+            if (user.IsAdmin ?? false) roles.Add("Admin");
+            if (user.IsManager ?? false) roles.Add("Manager");
+            if (user.IsHR ?? false) roles.Add("HR");
 
             _logger.LogDebug("Found {RoleCount} roles for user {UserId}", roles.Count, userId);
             return roles.AsReadOnly();
@@ -530,10 +530,10 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 Expiration = DateTime.UtcNow.AddMinutes(_jwtTokenExpirationMinutes),
                 UserId = user.UserID,
                 Username = user.UserName,
-                FullName = user.FullName,
-                IsAdmin = user.IsAdmin,
-                IsManager = user.IsManager,
-                IsHR = user.IsHR,
+                FullName = user.FullName ?? string.Empty,
+                IsAdmin = user.IsAdmin ?? false,
+                IsManager = user.IsManager ?? false,
+                IsHR = user.IsHR ?? false,
                 RefreshTokenExpiration = refreshTokenExpiryUtc,
                 User = user,
                 Roles = user.Roles?.ToArray() ?? Array.Empty<string>()

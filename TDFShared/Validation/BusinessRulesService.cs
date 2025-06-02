@@ -179,7 +179,7 @@ namespace TDFShared.Validation
             else
             {
                 // Check if approver has permission (manager or admin)
-                if (!approver.IsManager && !approver.IsAdmin)
+                if (!(approver.IsManager ?? false) && !(approver.IsAdmin ?? false))
                 {
                     errors.Add("Only managers and administrators can approve requests.");
                 }

@@ -209,9 +209,9 @@ namespace TDFAPI.Controllers
                         UserName = newUser.UserName,
                         FullName = newUser.FullName,
                         Department = newUser.Department,
-                        IsAdmin = newUser.IsAdmin,
-                        IsManager = newUser.IsManager,
-                        IsHR = newUser.IsHR,
+                        IsAdmin = newUser.IsAdmin ?? false,
+                        IsManager = newUser.IsManager ?? false,
+                        IsHR = newUser.IsHR ?? false,
                         Roles = new List<string>()
                     }
                 };

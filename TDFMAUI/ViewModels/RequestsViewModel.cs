@@ -183,7 +183,7 @@ namespace TDFMAUI.ViewModels
                 bool isOwner = req.RequestUserID == user?.UserID;
                 // Use RequestStateManager for state-based checks
                 _canEditDeleteCache[req.RequestID] = user != null && 
-                    RequestStateManager.CanEdit(req, user.IsAdmin, isOwner);
+                    RequestStateManager.CanEdit(req, user.IsAdmin ?? false, isOwner);
 
                 // Use AuthorizationUtilities for action-specific checks
                 _canApproveRejectCache[req.RequestID] = user != null && 
@@ -300,7 +300,7 @@ namespace TDFMAUI.ViewModels
             if (currentUser == null) return false;
 
             bool isOwner = request.RequestUserID == _currentUserId;
-            return RequestStateManager.CanEdit(request, currentUser.IsAdmin, isOwner);
+            return RequestStateManager.CanEdit(request, currentUser.IsAdmin ?? false, isOwner);
         }
 
         /// <summary>

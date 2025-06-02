@@ -11,7 +11,7 @@ namespace TDFMAUI.Converters
             if (value is string leaveType)
             {
                 // Hide end date for Permission and External Assignment
-                return !(leaveType == "Permission" || leaveType == "ExternalAssignment");
+                return !(leaveType == "Permission" || leaveType == "External Assignment");
             }
             return true; // Default to showing end date
         }

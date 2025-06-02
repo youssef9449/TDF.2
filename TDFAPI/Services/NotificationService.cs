@@ -608,7 +608,7 @@ namespace TDFAPI.Services
             {
                 // Get all users in the department
                 var userIds = await _context.Users
-                    .Where(u => u.Department == department && u.IsActive)
+                    .Where(u => u.Department == department && (u.IsActive ?? false))
                     .Select(u => u.UserID)
                     .ToListAsync();
 

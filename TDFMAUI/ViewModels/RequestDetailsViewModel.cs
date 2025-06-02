@@ -142,8 +142,8 @@ namespace TDFMAUI.ViewModels
             bool isOwner = Request.RequestUserID == currentUser.UserID;
 
             // Use RequestStateManager for state-based checks
-            CanEdit = RequestStateManager.CanEdit(Request, userDto.IsAdmin, isOwner);
-            CanDelete = RequestStateManager.CanDelete(Request, userDto.IsAdmin, isOwner);
+            CanEdit = RequestStateManager.CanEdit(Request, userDto.IsAdmin ?? false, isOwner);
+            CanDelete = RequestStateManager.CanDelete(Request, userDto.IsAdmin ?? false, isOwner);
             
             // Use AuthorizationUtilities for action-specific checks
             CanApprove = AuthorizationUtilities.CanPerformRequestAction(userDto, Request, TDFShared.Utilities.RequestAction.Approve);

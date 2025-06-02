@@ -61,7 +61,7 @@ namespace TDFMAUI.ViewModels
                 _requestType = value;
                 
                 // Initialize time values for Permission and External Assignment
-                if (value == "Permission" || value == "ExternalAssignment")
+                if (value == "Permission" || value == "External Assignment")
                 {
                     if (!StartTime.HasValue)
                         StartTime = new TimeSpan(9, 0, 0); // Default to 9:00 AM
@@ -102,7 +102,7 @@ namespace TDFMAUI.ViewModels
                 }
                 
                 // For Permission and External Assignment, EndDate should always equal StartDate
-                if (SelectedLeaveType == "Permission" || SelectedLeaveType == "ExternalAssignment")
+                if (SelectedLeaveType == "Permission" || SelectedLeaveType == "External Assignment")
                 {
                     EndDate = value;
                 }
@@ -160,9 +160,21 @@ namespace TDFMAUI.ViewModels
 
         public bool IsNotBusy => !IsBusy;
 
-        public RequestCreateDto RequestCreateDto =>
-            Enum.TryParse(SelectedLeaveType, true, out LeaveType leaveType)
-                ? new RequestCreateDto {
+        public RequestCreateDto RequestCreateDto
+        {
+            get
+            {
+                // Convert display name to enum value
+                LeaveType leaveType;
+                if (SelectedLeaveType == "Work From Home")
+                    leaveType = LeaveType.WorkFromHome;
+                else if (SelectedLeaveType == "External Assignment")
+                    leaveType = LeaveType.ExternalAssignment;
+                else if (!Enum.TryParse(SelectedLeaveType, true, out leaveType))
+                    return new RequestCreateDto();
+
+                return new RequestCreateDto
+                {
                     LeaveType = leaveType,
                     RequestStartDate = StartDate,
                     RequestEndDate = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartDate : EndDate ?? StartDate,
@@ -170,20 +182,34 @@ namespace TDFMAUI.ViewModels
                     RequestEndingTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? EndTime : null,
                     RequestReason = RequestReason ?? string.Empty,
                     UserId = _currentUserId // Use backing field
-                }
-                : new RequestCreateDto();
+                };
+            }
+        }
 
-        public RequestUpdateDto RequestUpdateDto =>
-            Enum.TryParse(SelectedLeaveType, true, out LeaveType leaveType)
-                ? new RequestUpdateDto {
+        public RequestUpdateDto RequestUpdateDto
+        {
+            get
+            {
+                // Convert display name to enum value
+                LeaveType leaveType;
+                if (SelectedLeaveType == "Work From Home")
+                    leaveType = LeaveType.WorkFromHome;
+                else if (SelectedLeaveType == "External Assignment")
+                    leaveType = LeaveType.ExternalAssignment;
+                else if (!Enum.TryParse(SelectedLeaveType, true, out leaveType))
+                    return new RequestUpdateDto();
+
+                return new RequestUpdateDto
+                {
                     LeaveType = leaveType,
                     RequestStartDate = StartDate,
                     RequestEndDate = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartDate : EndDate ?? StartDate,
                     RequestBeginningTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartTime : null,
                     RequestEndingTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? EndTime : null,
                     RequestReason = RequestReason ?? string.Empty
-                }
-                : new RequestUpdateDto();
+                };
+            }
+        }
 
         public ICommand SubmitRequestCommand { get; }
         public ICommand CancelCommand { get; }
@@ -245,7 +271,15 @@ namespace TDFMAUI.ViewModels
             LeaveTypes.Clear();
             foreach (LeaveType type in Enum.GetValues(typeof(LeaveType)))
             {
-                LeaveTypes.Add(type.ToString());
+                string displayName = type.ToString();
+                
+                // Format specific leave types with spaces
+                if (type == LeaveType.WorkFromHome)
+                    displayName = "Work From Home";
+                else if (type == LeaveType.ExternalAssignment)
+                    displayName = "External Assignment";
+                
+                LeaveTypes.Add(displayName);
             }
             SelectedLeaveType = LeaveTypes.FirstOrDefault() ?? string.Empty;
         }
@@ -367,7 +401,7 @@ namespace TDFMAUI.ViewModels
                 bool isOwner = request.RequestUserID == currentUser.UserID;
 
                 // Use RequestStateManager for state-based checks
-                if (!RequestStateManager.CanEdit(request, userDto.IsAdmin, isOwner))
+                if (!RequestStateManager.CanEdit(request, userDto.IsAdmin ?? false, isOwner))
                 {
                     _logger.LogWarning("User {UserId} attempted to edit request {RequestId} without proper state permissions", 
                         currentUser.UserID, request.RequestID);

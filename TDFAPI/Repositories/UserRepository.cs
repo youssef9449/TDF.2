@@ -200,7 +200,7 @@ namespace TDFAPI.Repositories
                         UserId = u.UserID,
                         PasswordHash = u.PasswordHash,
                         PasswordSalt = u.Salt,
-                        IsLocked = u.IsLocked,
+                        IsLocked = u.IsLocked ?? false,
                         LockoutEnd = u.LockoutEndTime,
                         RefreshToken = u.RefreshToken ?? string.Empty,
                         RefreshTokenExpiryTime = u.RefreshTokenExpiryTime

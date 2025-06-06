@@ -95,7 +95,19 @@
                                     <Button Grid.Column="1" Text="View All" Command="{Binding ViewAllRequestsCommand}" FontSize="12" HeightRequest="30" WidthRequest="80" Padding="0" />
                                 </Grid>
                                 <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,10" />
-                                <dashboard:DashboardRecentRequestsCard />
+                                <CollectionView ItemsSource="{Binding RecentRequests}" HeightRequest="300" EmptyView="No recent requests">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate x:DataType="dto:RequestResponseDto">
+                                            <Grid Padding="5" RowDefinitions="Auto,Auto" RowSpacing="4">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <Label Text="{Binding LeaveType}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                                    <Label Grid.Column="1" Text="{Binding CreatedDate, StringFormat='{0:g}'}" FontSize="10" />
+                                                </Grid>
+                                                <Label Grid.Row="1" Text="{Binding RequestReason}" FontSize="12" LineBreakMode="TailTruncation" MaxLines="2" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
                             </VerticalStackLayout>
                         </Border>
                         <!-- Recent Notifications -->
@@ -162,7 +174,19 @@
                                 <Button Grid.Column="1" Text="View All" Command="{Binding ViewAllRequestsCommand}" FontSize="12" HeightRequest="30" WidthRequest="80" Padding="0" />
                             </Grid>
                             <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,8" />
-                            <dashboard:DashboardRecentRequestsCard />
+                            <CollectionView ItemsSource="{Binding RecentRequests}" HeightRequest="200" EmptyView="No recent requests">
+                                <CollectionView.ItemTemplate>
+                                    <DataTemplate x:DataType="dto:RequestResponseDto">
+                                        <Grid Padding="5" RowDefinitions="Auto,Auto" RowSpacing="4">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <Label Text="{Binding LeaveType}" FontAttributes="Bold" LineBreakMode="TailTruncation" FontSize="14" />
+                                                <Label Grid.Column="1" Text="{Binding CreatedDate, StringFormat='{0:g}'}" FontSize="10" />
+                                            </Grid>
+                                            <Label Grid.Row="1" Text="{Binding RequestReason}" FontSize="11" LineBreakMode="TailTruncation" MaxLines="2" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </CollectionView.ItemTemplate>
+                            </CollectionView>
                         </VerticalStackLayout>
                     </Border>
                     <!-- Recent Notifications -->

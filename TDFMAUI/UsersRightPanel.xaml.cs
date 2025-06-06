@@ -108,22 +108,48 @@ namespace TDFMAUI
         protected override async void OnAppearing()
         {
             base.OnAppearing();
-            await RefreshUsersAsync();
+            
+            try
+            {
+                // Subscribe to presence events
+                if (_userPresenceService != null)
+                {
+                    _userPresenceService.UserStatusChanged += OnUserPresenceServiceStatusChanged;
+                    _userPresenceService.UserAvailabilityChanged += OnUserAvailabilityChanged;
+                    _logger?.LogInformation("Subscribed to user presence events");
+                }
+                else
+                {
+                    _logger?.LogWarning("UserPresenceService is null, cannot subscribe to events");
+                }
 
-            // Subscribe to presence events
-            _userPresenceService.UserStatusChanged += OnUserPresenceServiceStatusChanged;
-            _userPresenceService.UserAvailabilityChanged += OnUserAvailabilityChanged;
-
-            // Device-specific behavior
-            ConfigureDeviceSpecificBehavior();
+                // Initial load of users
+                await RefreshUsersAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error in OnAppearing: {Message}", ex.Message);
+            }
         }
 
         protected override void OnDisappearing()
         {
             base.OnDisappearing();
-            // Unsubscribe from events
-            _userPresenceService.UserStatusChanged -= OnUserPresenceServiceStatusChanged;
-            _userPresenceService.UserAvailabilityChanged -= OnUserAvailabilityChanged;
+            
+            try
+            {
+                // Unsubscribe from events
+                if (_userPresenceService != null)
+                {
+                    _userPresenceService.UserStatusChanged -= OnUserPresenceServiceStatusChanged;
+                    _userPresenceService.UserAvailabilityChanged -= OnUserAvailabilityChanged;
+                    _logger?.LogInformation("Unsubscribed from user presence events");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error in OnDisappearing: {Message}", ex.Message);
+            }
         }
 
         private void ConfigureDeviceSpecificBehavior()
@@ -146,11 +172,11 @@ namespace TDFMAUI
             // Skip updates for the current user - they should not be displayed in the panel
             if (App.CurrentUser != null && e.UserId == App.CurrentUser.UserID)
             {
-                _logger.LogInformation("Ignoring status change for current user (ID: {UserId})", e.UserId);
+                _logger?.LogInformation("Ignoring status change for current user (ID: {UserId})", e.UserId);
                 return;
             }
 
-            _logger.LogInformation("User status changed: UserID {UserId}, Status {Status}. Updating panel.", e.UserId, e.Status);
+            _logger?.LogInformation("User status changed: UserID {UserId}, Status {Status}. Updating panel.", e.UserId, e.Status);
 
             MainThread.BeginInvokeOnMainThread(async () =>
             {
@@ -162,40 +188,32 @@ namespace TDFMAUI
                     {
                         // Update the user's status
                         existingUser.Status = e.Status;
-                        _logger.LogInformation("Updated user {Username} (ID: {UserId}) status to {Status} in UsersRightPanel", e.Username, e.UserId, e.Status);
+                        _logger?.LogInformation("Updated user {Username} (ID: {UserId}) status to {Status} in UsersRightPanel", e.Username, e.UserId, e.Status);
                     }
-                    else
+                    else if (e.Status != UserPresenceStatus.Offline)
                     {
                         // If user not in collection and they're not offline, refresh the full list
-                        // This handles cases where a user comes online that wasn't in our list before
-                        if (e.Status != UserPresenceStatus.Offline)
-                        {
-                            _logger.LogInformation("User {Username} (ID: {UserId}) not found in collection, refreshing panel", e.Username, e.UserId);
-                            await RefreshUsersAsync();
-                        }
-                        else
-                        {
-                            _logger.LogInformation("Ignoring offline status for user not in collection: {Username} (ID: {UserId})", e.Username, e.UserId);
-                        }
+                        _logger?.LogInformation("User {Username} (ID: {UserId}) not found in collection, refreshing panel", e.Username, e.UserId);
+                        await RefreshUsersAsync();
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error updating user status in UsersRightPanel: {Message}", ex.Message);
+                    _logger?.LogError(ex, "Error updating user status in UsersRightPanel: {Message}", ex.Message);
                 }
             });
         }
 
         private void OnUserAvailabilityChanged(object? sender, UserAvailabilityChangedEventArgs e)
         {
-            // Skip updates for the current user - they should not be displayed in the panel
+            // Skip updates for the current user
             if (App.CurrentUser != null && e.UserId == App.CurrentUser.UserID)
             {
-                _logger.LogInformation("Ignoring availability change for current user (ID: {UserId})", e.UserId);
+                _logger?.LogInformation("Ignoring availability change for current user (ID: {UserId})", e.UserId);
                 return;
             }
 
-            _logger.LogInformation("User availability changed: UserID {UserId}, Available: {IsAvailableForChat}", e.UserId, e.IsAvailableForChat);
+            _logger?.LogInformation("User availability changed: UserID {UserId}, Available: {IsAvailableForChat}", e.UserId, e.IsAvailableForChat);
 
             MainThread.BeginInvokeOnMainThread(() =>
             {
@@ -205,13 +223,12 @@ namespace TDFMAUI
                     if (existingUser != null)
                     {
                         existingUser.IsAvailableForChat = e.IsAvailableForChat;
-                        _logger.LogInformation("Updated user {Username} (ID: {UserId}) availability to {IsAvailableForChat} in UsersRightPanel", e.Username, e.UserId, e.IsAvailableForChat);
+                        _logger?.LogInformation("Updated user {Username} (ID: {UserId}) availability to {IsAvailableForChat} in UsersRightPanel", e.Username, e.UserId, e.IsAvailableForChat);
                     }
-                    // No need to refresh the full list for availability changes
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error updating user availability in UsersRightPanel: {Message}", ex.Message);
+                    _logger?.LogError(ex, "Error updating user availability in UsersRightPanel: {Message}", ex.Message);
                 }
             });
         }

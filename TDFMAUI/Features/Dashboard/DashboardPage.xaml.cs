@@ -5,6 +5,7 @@ using TDFMAUI.Features.Dashboard;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
 using System;
+using TDFShared.Services;
 
 namespace TDFMAUI.Features.Dashboard
 {
@@ -29,15 +30,17 @@ namespace TDFMAUI.Features.Dashboard
                 if (_viewModel == null)
                 {
                     var requestService = IPlatformApplication.Current?.Services.GetService<IRequestService>();
-                    var notificationService = IPlatformApplication.Current?.Services.GetService<INotificationService>();
+                    var notificationService = IPlatformApplication.Current?.Services.GetService<TDFMAUI.Services.INotificationService>();
                     var logger = IPlatformApplication.Current?.Services.GetService<Microsoft.Extensions.Logging.ILogger<DashboardViewModel>>();
+                    var authService = IPlatformApplication.Current?.Services.GetService<IAuthService>();
                     
-                    if (requestService != null && notificationService != null)
+                    if (requestService != null && notificationService != null && authService != null)
                     {
                         _viewModel = new DashboardViewModel(
                             requestService, 
                             notificationService, 
-                            logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<DashboardViewModel>.Instance);
+                            logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<DashboardViewModel>.Instance,
+                            authService);
                     }
                     else
                     {

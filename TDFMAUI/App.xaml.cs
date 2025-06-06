@@ -270,6 +270,10 @@ namespace TDFMAUI
                     var mainWindow = Application.Current.Windows[0];
                     WindowManager.ConfigureMainWindow(mainWindow);
                     DebugService.LogInfo("App", "Window configured.");
+
+                    // Subscribe to the Destroying event for desktop platforms
+                    mainWindow.Destroying += OnWindowDestroying;
+                    DebugService.LogInfo("App", "Subscribed to Window.Destroying event.");
                 }
 
                 // MainPage is now set here instead of the constructor
@@ -813,25 +817,17 @@ namespace TDFMAUI
         {
             base.OnSleep();
 
-            // When app goes to background, reconnect socket when it comes back
-            DebugService.LogInfo("App", "Application going to sleep");
+            DebugService.LogInfo("App", "Application going to sleep (minimized/backgrounded)");
 
-            // For desktop platforms, we should NOT clear token when app is just minimized
-            // Only update user status to Offline
-            if (DeviceHelper.IsDesktop)
-            {
-                DebugService.LogInfo("App", "Desktop platform detected, setting user offline without clearing token");
-            
-                // Update user status to Offline
-                UpdateUserStatusToOffline();
-            }
-            // For non-mobile large screen devices, just update status to Offline
-            else if (!DeviceHelper.IsMobile && DeviceHelper.IsLargeScreen)
-            {
-                UpdateUserStatusToOffline();
-            }
+            // For mobile platforms, we might want to keep the user online for a short period
+            // or handle push notifications. This is handled by the platform-specific services.
+            // On desktop, we do nothing here as the app is still running.
+        }
 
-            // Unregister WebSocketService event handlers to prevent memory leaks
+        private void OnWindowDestroying(object? sender, EventArgs e)
+        {
+            DebugService.LogInfo("App", "Window is destroying, setting user offline and unregistering WebSocket handlers.");
+            UpdateUserStatusToOffline();
             UnregisterWebSocketEventHandlers();
         }
 
@@ -856,7 +852,7 @@ namespace TDFMAUI
 
                                 // Use the cancellation token to prevent hanging
                                 await userPresenceService.UpdateStatusAsync(
-                                    TDFShared.Enums.UserPresenceStatus.Offline,
+                                    UserPresenceStatus.Offline,
                                     "",
                                     cts.Token);
                             }
@@ -971,43 +967,64 @@ namespace TDFMAUI
                         {
                             try
                             {
-                                var (token, expiration) = await secureStorage.GetTokenAsync();
-                                if (!string.IsNullOrEmpty(token) && expiration > DateTime.UtcNow)
+                                // Handle differently based on platform
+                                if (DeviceHelper.IsDesktop)
                                 {
-                                    await webSocketService.ConnectAsync(token);
-                                    DebugService.LogInfo("App", "WebSocket reconnected successfully");
+                                    // For desktop, use the in-memory token from ApiConfig
+                                    if (!string.IsNullOrEmpty(ApiConfig.CurrentToken) && ApiConfig.TokenExpiration > DateTime.UtcNow)
+                                    {
+                                        DebugService.LogInfo("App", "Using in-memory token for desktop WebSocket reconnection");
+                                        await webSocketService.ConnectAsync(ApiConfig.CurrentToken);
+                                        DebugService.LogInfo("App", "WebSocket reconnected successfully");
+                                    }
+                                    else
+                                    {
+                                        DebugService.LogWarning("App", "Desktop WebSocket reconnect skipped: no valid in-memory token");
+                                        // Don't automatically redirect to login on desktop platforms
+                                        // The user will need to manually log in again
+                                    }
                                 }
                                 else
                                 {
-                                    DebugService.LogWarning("App", "WebSocket reconnect skipped: token missing or expired.");
-                                    // Only redirect to login if token is actually expired, not just because we're resuming
-                                    if (expiration <= DateTime.UtcNow)
+                                    // For mobile platforms, use the stored token
+                                    var (token, expiration) = await secureStorage.GetTokenAsync();
+                                    if (!string.IsNullOrEmpty(token) && expiration > DateTime.UtcNow)
                                     {
-                                        // Handle token expiration by redirecting to login
-                                        await MainThread.InvokeOnMainThreadAsync(async () =>
+                                        await webSocketService.ConnectAsync(token);
+                                        DebugService.LogInfo("App", "WebSocket reconnected successfully");
+                                    }
+                                    else
+                                    {
+                                        DebugService.LogWarning("App", "WebSocket reconnect skipped: token missing or expired.");
+                                        // Only redirect to login if token is actually expired, not just because we're resuming
+                                        if (expiration <= DateTime.UtcNow)
                                         {
-                                            try
+                                            // Handle token expiration by redirecting to login
+                                            await MainThread.InvokeOnMainThreadAsync(async () =>
                                             {
-                                                // Clear current user and token
-                                                CurrentUser = null;
-                                                await secureStorage.RemoveTokenAsync();
+                                                try
+                                                {
+                                                    // Clear current user and token
+                                                    CurrentUser = null;
+                                                    await secureStorage.RemoveTokenAsync();
 
-                                                // Navigate to login page
-                                                var loginPage = Services?.GetService<LoginPage>();
-                                                if (loginPage != null)
-                                                {
-                                                    MainPage = loginPage;
+                                                    // Navigate to login page
+                                                    var loginPage = Services?.GetService<LoginPage>();
+                                                    if (loginPage != null)
+                                                    {
+                                                        MainPage = loginPage;
+                                                    }
+                                                    else
+                                                    {
+                                                        await Shell.Current.GoToAsync("LoginPage");
+                                                    }
                                                 }
-                                                else
+                                                catch (Exception ex)
                                                 {
-                                                    await Shell.Current.GoToAsync("LoginPage");
+                                                    DebugService.LogError("App", $"Error handling token expiration: {ex.Message}");
                                                 }
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                DebugService.LogError("App", $"Error handling token expiration: {ex.Message}");
-                                            }
-                                        });
+                                            });
+                                        }
                                     }
                                 }
                             }

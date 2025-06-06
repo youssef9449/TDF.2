@@ -69,10 +69,17 @@ namespace TDFMAUI.Services
                 if (DeviceHelper.IsDesktop)
                 {
                     var desktopToken = ApiConfig.CurrentToken;
-                    if (!string.IsNullOrEmpty(desktopToken))
+                    if (!string.IsNullOrEmpty(desktopToken) && ApiConfig.TokenExpiration > DateTime.UtcNow)
                     {
                         _logger.LogDebug("Using in-memory token for desktop platform");
                         return desktopToken;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Desktop platform has no valid in-memory token");
+                        // On desktop, we don't try to refresh from secure storage
+                        // since tokens aren't persisted there
+                        return null;
                     }
                 }
 
@@ -196,21 +203,49 @@ namespace TDFMAUI.Services
                 {
                     _logger.LogError(wsEx, "Authentication failed (401 Unauthorized) when connecting to WebSocket server");
                     
-                    // Try to refresh the token
-                    var (currentToken, _) = await _secureStorage.GetTokenAsync();
-                    var (currentRefreshToken, _) = await _secureStorage.GetRefreshTokenAsync();
-                    if (!string.IsNullOrEmpty(currentToken) && !string.IsNullOrEmpty(currentRefreshToken))
+                    // Handle differently based on platform
+                    if (DeviceHelper.IsDesktop)
                     {
-                        var refreshResult = await _authService.RefreshTokenAsync(currentToken, currentRefreshToken);
-                        if (refreshResult != null)
-                        {
-                            _logger.LogInformation("Token refreshed successfully, attempting to reconnect");
-                            return await ConnectAsync(); // Retry connection with new token
-                        }
+                        _logger.LogWarning("Desktop platform authentication failed - user may need to log in again");
+                        
+                        // For desktop, we should notify the app that authentication has failed
+                        // This will allow the app to redirect to the login page if needed
+                        MainThread.BeginInvokeOnMainThread(() => {
+                            try
+                            {
+                                ErrorReceived?.Invoke(this, new WebSocketErrorEventArgs
+                                {
+                                    ErrorCode = "401",
+                                    ErrorMessage = "Authentication failed. Please log in again.",
+                                    Timestamp = DateTime.UtcNow
+                                });
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Error invoking ErrorReceived event");
+                            }
+                        });
+                        
+                        return false;
                     }
-                    
-                    _logger.LogWarning("Token refresh failed, cannot establish WebSocket connection");
-                    return false;
+                    else
+                    {
+                        // For mobile platforms, try to refresh the token
+                        var (currentToken, _) = await _secureStorage.GetTokenAsync();
+                        var (currentRefreshToken, _) = await _secureStorage.GetRefreshTokenAsync();
+                        if (!string.IsNullOrEmpty(currentToken) && !string.IsNullOrEmpty(currentRefreshToken))
+                        {
+                            var refreshResult = await _authService.RefreshTokenAsync(currentToken, currentRefreshToken);
+                            if (refreshResult != null)
+                            {
+                                _logger.LogInformation("Token refreshed successfully, attempting to reconnect");
+                                return await ConnectAsync(); // Retry connection with new token
+                            }
+                        }
+                        
+                        _logger.LogWarning("Token refresh failed, cannot establish WebSocket connection");
+                        return false;
+                    }
                 }
                 catch (OperationCanceledException)
                 {

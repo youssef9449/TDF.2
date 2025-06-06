@@ -710,5 +710,60 @@ namespace TDFAPI.Services
         {
             return await _requestRepository.HasConflictingRequestsAsync(userId, startDate, endDate, requestId);
         }
+
+        public async Task<List<RequestResponseDto>> GetPendingRequestsByUserIdAsync(int userId)
+        {
+            _logger.LogInformation("Getting pending requests for user {UserId}", userId);
+            
+            // Create a pagination DTO with a large page size to get all pending requests
+            var pagination = new RequestPaginationDto 
+            { 
+                Page = 1, 
+                PageSize = 100, 
+                SortBy = "CreatedDate", 
+                Ascending = false,
+                FilterStatus = RequestStatus.Pending
+            };
+            
+            var result = await GetByUserIdAsync(userId, pagination);
+            return result?.Items?.ToList() ?? new List<RequestResponseDto>();
+        }
+
+        public async Task<List<RequestResponseDto>> GetPendingRequestsByDepartmentAsync(string department)
+        {
+            _logger.LogInformation("Getting pending requests for department {Department}", department);
+            
+            // Create a pagination DTO with a large page size to get all pending requests
+            var pagination = new RequestPaginationDto 
+            { 
+                Page = 1, 
+                PageSize = 100, 
+                SortBy = "CreatedDate", 
+                Ascending = false,
+                FilterStatus = RequestStatus.Pending,
+                Department = department
+            };
+            
+            var result = await GetByDepartmentAsync(department, pagination);
+            return result?.Items?.ToList() ?? new List<RequestResponseDto>();
+        }
+
+        public async Task<List<RequestResponseDto>> GetAllPendingRequestsAsync()
+        {
+            _logger.LogInformation("Getting all pending requests");
+            
+            // Create a pagination DTO with a large page size to get all pending requests
+            var pagination = new RequestPaginationDto 
+            { 
+                Page = 1, 
+                PageSize = 100, 
+                SortBy = "CreatedDate", 
+                Ascending = false,
+                FilterStatus = RequestStatus.Pending
+            };
+            
+            var result = await GetAllAsync(pagination);
+            return result?.Items?.ToList() ?? new List<RequestResponseDto>();
+        }
     }
 }

@@ -7,7 +7,7 @@ using TDFShared.DTOs;
 using TDFShared.DTOs.Users;
 using TDFShared.DTOs.Common;
 using TDFShared.Exceptions;
-
+using TDFShared.Constants;
 
 namespace TDFMAUI.Services
 {
@@ -81,94 +81,47 @@ namespace TDFMAUI.Services
         {
             try
             {
-                _logger.LogInformation("Attempting to fetch users from API endpoint: users/all");
+                _logger.LogInformation("Attempting to fetch all users with status from API endpoint: users/all");
                 
-                // Get all users from the API
-                var allUsersData = await _apiService.GetAsync<IEnumerable<UserDto>>("users/all");
-
-                // Check if data was successfully retrieved
+                // Get all users with their status from the API
+                var allUsersData = await _apiService.GetAsync<IEnumerable<UserDto>>(ApiRoutes.Users.GetAllWithStatus);
+                
                 if (allUsersData == null)
                 {
-                    _logger.LogWarning("GetOnlineUsersAsync: Received null data from API for users/all");
-                    return GetCachedUsers();
+                    _logger.LogWarning("API returned null for users");
+                    return new Dictionary<int, UserPresenceInfo>();
                 }
 
-                var allUsersDictionary = new Dictionary<int, UserPresenceInfo>();
-                int processedCount = 0;
-                int skippedCount = 0;
-
-                // Map UserDto to UserPresenceInfo
-                foreach (var userDto in allUsersData)
+                var result = new Dictionary<int, UserPresenceInfo>();
+                foreach (var user in allUsersData)
                 {
-                    if (userDto == null)
+                    result[user.UserID] = new UserPresenceInfo
                     {
-                        skippedCount++;
-                        continue;
-                    }
-
-                    try
-                    {
-                        var userInfo = new UserPresenceInfo
-                        {
-                            UserId = userDto.UserID,
-                            Username = userDto.UserName ?? string.Empty,
-                            FullName = userDto.FullName ?? string.Empty,
-                            Department = userDto.Department ?? string.Empty,
-                            Status = userDto.PresenceStatus,
-                            StatusMessage = userDto.StatusMessage ?? string.Empty,
-                            IsAvailableForChat = userDto.IsAvailableForChat ?? false,
-                            LastActivityTime = userDto.LastActivityTime ?? DateTime.UtcNow,
-                            ProfilePictureData = userDto.Picture
-                        };
-
-                        allUsersDictionary[userInfo.UserId] = userInfo;
-                        _userStatuses[userInfo.UserId] = userInfo; // Update cache
-                        processedCount++;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error processing user data for user ID: {UserId}", userDto.UserID);
-                        skippedCount++;
-                    }
+                        UserId = user.UserID,
+                        Username = user.UserName,
+                        FullName = user.FullName,
+                        Department = user.Department,
+                        Status = user.PresenceStatus,
+                        StatusMessage = user.StatusMessage,
+                        IsAvailableForChat = user.IsAvailableForChat ?? false,
+                        ProfilePictureData = user.Picture
+                    };
                 }
 
-                _logger.LogInformation("Successfully processed {ProcessedCount} users, skipped {SkippedCount} users", 
-                    processedCount, skippedCount);
-
-                if (allUsersDictionary.Count == 0)
+                // Update the cache
+                _userStatuses.Clear();
+                foreach (var kvp in result)
                 {
-                    _logger.LogWarning("No users were successfully processed from the API response");
-                    return GetCachedUsers();
+                    _userStatuses[kvp.Key] = kvp.Value;
                 }
 
-                return allUsersDictionary;
-            }
-            catch (ApiException apiEx)
-            {
-                _logger.LogError(apiEx, "API Error fetching online users: {StatusCode} - {Message}", 
-                    apiEx.StatusCode, apiEx.Message);
-                
-                // Check if this is a server error (500)
-                if (apiEx.StatusCode == System.Net.HttpStatusCode.InternalServerError)
-                {
-                    _logger.LogWarning("Server error occurred, checking server health...");
-                    try
-                    {
-                        var isHealthy = await _apiService.TestConnectivityAsync();
-                        _logger.LogInformation("Server health check result: {IsHealthy}", isHealthy);
-                    }
-                    catch (Exception healthEx)
-                    {
-                        _logger.LogError(healthEx, "Error checking server health");
-                    }
-                }
-                
-                return GetCachedUsers();
+                _logger.LogInformation("Successfully fetched {Count} users with status", result.Count);
+                return result;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error fetching online users: {Message}", ex.Message);
-                return GetCachedUsers();
+                _logger.LogError(ex, "Error fetching users from API");
+                throw;
             }
         }
 
@@ -202,8 +155,15 @@ namespace TDFMAUI.Services
                 // Use the provided token or the timeout token
                 var effectiveToken = cancellationToken != CancellationToken.None ? cancellationToken : timeoutToken;
 
-                // Send the status update via WebSocket
-                await _webSocketService.UpdatePresenceStatusAsync(status.ToString(), statusMessage);
+                // Send the status update via WebSocket, only if connected
+                if (_webSocketService.IsConnected)
+                {
+                    await _webSocketService.UpdatePresenceStatusAsync(status.ToString(), statusMessage);
+                }
+                else
+                {
+                    _logger.LogWarning("WebSocket is not connected, skipping status update via WebSocket.");
+                }
 
                 // Update local cache
                 int userId = App.CurrentUser.UserID;

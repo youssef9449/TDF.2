@@ -37,5 +37,10 @@ namespace TDFAPI.Services
         Task<int> GetPermissionUsedAsync(int userId);
         Task<int> GetPendingDaysCountAsync(int userId, string requestType);
         Task<bool> HasConflictingRequestsAsync(int userId, DateTime startDate, DateTime endDate, int requestId = 0);
+        
+        // Dashboard methods
+        Task<List<RequestResponseDto>> GetPendingRequestsByUserIdAsync(int userId);
+        Task<List<RequestResponseDto>> GetPendingRequestsByDepartmentAsync(string department);
+        Task<List<RequestResponseDto>> GetAllPendingRequestsAsync();
     }
 }

@@ -13,6 +13,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Maui.ApplicationModel;
 using TDFMAUI.Config;
 using TDFMAUI.Helpers;
+using TDFShared.Constants; // Added
 using TDFShared.DTOs.Auth;
 using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Users;
@@ -164,6 +165,7 @@ public class AuthService : IAuthService
                     // Store the token and user details
                     await _secureStorageService.SaveTokenAsync(apiResponse.Data.Token, apiResponse.Data.Expiration);
                     _userProfileService.SetUserDetails(userDetails);
+                    await _httpClientService.SetAuthenticationTokenAsync(apiResponse.Data.Token);
 
                     // Create and set App.CurrentUser from UserDetailsDto
                     var currentUser = new TDFShared.DTOs.Users.UserDto
@@ -951,20 +953,42 @@ public class AuthService : IAuthService
 
     private async Task<string?> RefreshTokenFromServerAsync(string refreshToken)
     {
-        // Implement your token refresh logic here
-        // This is a placeholder - replace with your actual implementation
         try
         {
-            // Example implementation:
-            // var response = await _apiService.PostAsync<TokenRefreshRequest, TokenResponse>("auth/refresh", new TokenRefreshRequest { RefreshToken = refreshToken });
-            // return response?.Token;
-            
-            _logger.LogWarning("Token refresh not implemented");
-            return null;
+            var response = await _httpClientService.PostAsync<RefreshTokenRequest, ApiResponse<TokenResponse>>(
+                ApiRoutes.Auth.RefreshToken,
+                new RefreshTokenRequest { RefreshToken = refreshToken });
+
+            if (response?.Success == true && response.Data != null)
+            {
+                _logger.LogInformation("Token refreshed successfully. New token length: {Length}", response.Data.Token.Length);
+                // Update the in-memory token and expiration in ApiConfig
+                ApiConfig.CurrentToken = response.Data.Token;
+                ApiConfig.TokenExpiration = response.Data.Expiration;
+                // Also save the new refresh token if provided
+                if (!string.IsNullOrEmpty(response.Data.RefreshToken))
+                {
+                    await _secureStorageService.SaveTokenAsync(response.Data.Token, response.Data.Expiration, response.Data.RefreshToken, response.Data.RefreshTokenExpiration);
+                }
+                else
+                {
+                    await _secureStorageService.SaveTokenAsync(response.Data.Token, response.Data.Expiration);
+                }
+                
+                // Set the new token in HttpClientService
+                await _httpClientService.SetAuthenticationTokenAsync(response.Data.Token);
+
+                return response.Data.Token;
+            }
+            else
+            {
+                _logger.LogWarning("Failed to refresh token from server. API response: {Message}", response?.Message ?? "No response message");
+                return null;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error refreshing token from server");
+            _logger.LogError(ex, "Error calling RefreshTokenFromServerAsync");
             return null;
         }
     }

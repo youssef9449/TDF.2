@@ -481,29 +481,56 @@ namespace TDFAPI.Controllers
                 var currentUser = await GetCachedUserAsync(currentUserId);
                 if (currentUser == null) return Unauthorized("User not found.");
 
-                _logger.LogInformation("User {UserId} getting recent dashboard requests (Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Dept: {Department})", currentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department);
+                _logger.LogInformation("User {UserId} getting recent dashboard requests (Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Dept: {Department})", 
+                    currentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department);
 
-                var pagination = new RequestPaginationDto { Page = 1, PageSize = 5, SortBy = "CreatedAt", Ascending = false };
+                var pagination = new RequestPaginationDto { Page = 1, PageSize = 20, SortBy = "CreatedDate", Ascending = false };
                 PaginatedResult<RequestResponseDto> result;
+                List<RequestResponseDto> filteredRequests;
 
-                var accessLevel = AuthorizationUtilities.GetRequestAccessLevel(currentUser);
-                switch (accessLevel)
+                // Apply role-specific filtering logic
+                if (currentUser.IsHR ?? false)
                 {
-                    case RequestAccessLevel.All:
-                        result = await _requestService.GetAllAsync(pagination);
-                        break;
-                    case RequestAccessLevel.Department:
-                        result = await _requestService.GetRequestsForManagerAsync(currentUserId, currentUser.Department, pagination);
-                        break;
-                    case RequestAccessLevel.Own:
-                        result = await _requestService.GetByUserIdAsync(currentUserId, pagination);
-                        break;
-                    default:
-                        return Forbid("You do not have permission to view requests.");
+                    // HR: Show requests with RequestHRStatus = "Pending"
+                    result = await _requestService.GetAllAsync(pagination);
+                    filteredRequests = result?.Items?
+                        .Where(r => r.HRStatus == RequestStatus.Pending)
+                        .OrderByDescending(r => r.CreatedDate)
+                        .Take(5)
+                        .ToList() ?? new List<RequestResponseDto>();
+                }
+                else if (currentUser.IsAdmin ?? false)
+                {
+                    // Admin: Show all requests where both RequestManagerStatus and RequestHRStatus are "Pending"
+                    result = await _requestService.GetAllAsync(pagination);
+                    filteredRequests = result?.Items?
+                        .Where(r => r.Status == RequestStatus.Pending && r.HRStatus == RequestStatus.Pending)
+                        .OrderByDescending(r => r.CreatedDate)
+                        .Take(5)
+                        .ToList() ?? new List<RequestResponseDto>();
+                }
+                else if (currentUser.IsManager ?? false)
+                {
+                    // Manager: Show requests with RequestManagerStatus = "Pending" from departments they manage
+                    result = await _requestService.GetRequestsForManagerAsync(currentUserId, currentUser.Department, pagination);
+                    filteredRequests = result?.Items?
+                        .Where(r => r.Status == RequestStatus.Pending)
+                        .OrderByDescending(r => r.CreatedDate)
+                        .Take(5)
+                        .ToList() ?? new List<RequestResponseDto>();
+                }
+                else
+                {
+                    // Regular user: Show their own requests where RequestManagerStatus or RequestHRStatus is "Pending"
+                    result = await _requestService.GetByUserIdAsync(currentUserId, pagination);
+                    filteredRequests = result?.Items?
+                        .Where(r => r.Status == RequestStatus.Pending || r.HRStatus == RequestStatus.Pending)
+                        .OrderByDescending(r => r.CreatedDate)
+                        .Take(5)
+                        .ToList() ?? new List<RequestResponseDto>();
                 }
 
-                var recent = result?.Items?.OrderByDescending(r => r.CreatedDate).Take(5).ToList() ?? new List<RequestResponseDto>();
-                return Ok(recent);
+                return Ok(filteredRequests);
             }
             catch (Exception ex)
             {
@@ -522,29 +549,39 @@ namespace TDFAPI.Controllers
                 var currentUser = await GetCachedUserAsync(currentUserId);
                 if (currentUser == null) return Unauthorized("User not found.");
 
-                _logger.LogInformation("User {UserId} getting pending dashboard requests count (Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Dept: {Department})", currentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department);
+                _logger.LogInformation("User {UserId} getting pending dashboard requests count (Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Dept: {Department})", 
+                    currentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department);
 
-                var pagination = new RequestPaginationDto { Page = 1, PageSize = 100, SortBy = "CreatedAt", Ascending = false };
+                var pagination = new RequestPaginationDto { Page = 1, PageSize = 1000, SortBy = "CreatedDate", Ascending = false, CountOnly = true };
                 PaginatedResult<RequestResponseDto> result;
+                int pendingCount = 0;
 
-                var accessLevel = AuthorizationUtilities.GetRequestAccessLevel(currentUser);
-                switch (accessLevel)
+                // Apply role-specific filtering logic
+                if (currentUser.IsHR ?? false)
                 {
-                    case RequestAccessLevel.All:
-                        result = await _requestService.GetAllAsync(pagination);
-                        break;
-                    case RequestAccessLevel.Department:
-                        result = await _requestService.GetRequestsForManagerAsync(currentUserId, currentUser.Department, pagination);
-                        break;
-                    case RequestAccessLevel.Own:
-                        result = await _requestService.GetByUserIdAsync(currentUserId, pagination);
-                        break;
-                    default:
-                        return Forbid("You do not have permission to view requests.");
+                    // HR: Count requests with RequestHRStatus = "Pending"
+                    result = await _requestService.GetAllAsync(pagination);
+                    pendingCount = result?.Items?.Count(r => r.HRStatus == RequestStatus.Pending) ?? 0;
+                }
+                else if (currentUser.IsAdmin ?? false)
+                {
+                    // Admin: Count all requests where both RequestManagerStatus and RequestHRStatus are "Pending"
+                    result = await _requestService.GetAllAsync(pagination);
+                    pendingCount = result?.Items?.Count(r => r.Status == RequestStatus.Pending && r.HRStatus == RequestStatus.Pending) ?? 0;
+                }
+                else if (currentUser.IsManager ?? false)
+                {
+                    // Manager: Count requests with RequestManagerStatus = "Pending" from departments they manage
+                    result = await _requestService.GetRequestsForManagerAsync(currentUserId, currentUser.Department, pagination);
+                    pendingCount = result?.Items?.Count(r => r.Status == RequestStatus.Pending) ?? 0;
+                }
+                else
+                {
+                    // Regular user: Count their own requests where RequestManagerStatus or RequestHRStatus is "Pending"
+                    result = await _requestService.GetByUserIdAsync(currentUserId, pagination);
+                    pendingCount = result?.Items?.Count(r => r.Status == RequestStatus.Pending || r.HRStatus == RequestStatus.Pending) ?? 0;
                 }
 
-                // Only count requests that are pending (Manager or HR status)
-                int pendingCount = result?.Items?.Count(r => r.Status == RequestStatus.Pending || r.HRStatus == RequestStatus.Pending) ?? 0;
                 return Ok(pendingCount);
             }
             catch (Exception ex)
@@ -587,6 +624,126 @@ namespace TDFAPI.Controllers
             return AuthorizationUtilities.CreateAuthorizationContext(
                 async (requestId) => await _requestService.GetByIdAsync(requestId),
                 async (userId) => await GetCachedUserAsync(userId));
+        }
+
+        #endregion
+
+        #region Dashboard Endpoints
+
+        // GET: api/requests/recent
+        [HttpGet("recent")]
+        public async Task<ActionResult<List<RequestResponseDto>>> GetRecentRequests()
+        {
+            try
+            {
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                _logger.LogInformation("User {UserId} getting recent requests (Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Dept: {Department})", 
+                    currentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department);
+
+                List<RequestResponseDto> filteredRequests;
+
+                // Apply role-specific filtering logic on the server side
+                if (currentUser.IsHR ?? false)
+                {
+                    // HR: Show requests with HRStatus = "Pending"
+                    var allRequests = await _requestService.GetAllPendingRequestsAsync();
+                    filteredRequests = allRequests
+                        .Where(r => r.HRStatus == RequestStatus.Pending)
+                        .OrderByDescending(r => r.CreatedDate)
+                        .Take(5)
+                        .ToList();
+                }
+                else if (currentUser.IsAdmin ?? false)
+                {
+                    // Admin: Show all requests where both Status and HRStatus are "Pending"
+                    var allRequests = await _requestService.GetAllPendingRequestsAsync();
+                    filteredRequests = allRequests
+                        .Where(r => r.Status == RequestStatus.Pending && r.HRStatus == RequestStatus.Pending)
+                        .OrderByDescending(r => r.CreatedDate)
+                        .Take(5)
+                        .ToList();
+                }
+                else if (currentUser.IsManager ?? false)
+                {
+                    // Manager: Show requests with Status = "Pending" from departments they manage
+                    var departmentRequests = await _requestService.GetPendingRequestsByDepartmentAsync(currentUser.Department);
+                    filteredRequests = departmentRequests
+                        .Where(r => r.Status == RequestStatus.Pending)
+                        .OrderByDescending(r => r.CreatedDate)
+                        .Take(5)
+                        .ToList();
+                }
+                else
+                {
+                    // Regular user: Show their own requests where Status or HRStatus is "Pending"
+                    var userRequests = await _requestService.GetPendingRequestsByUserIdAsync(currentUserId);
+                    filteredRequests = userRequests
+                        .Where(r => r.Status == RequestStatus.Pending || r.HRStatus == RequestStatus.Pending)
+                        .OrderByDescending(r => r.CreatedDate)
+                        .Take(5)
+                        .ToList();
+                }
+
+                return Ok(filteredRequests);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving recent requests");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        // GET: api/requests/pending/count
+        [HttpGet("pending/count")]
+        public async Task<ActionResult<int>> GetPendingRequestsCount()
+        {
+            try
+            {
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                _logger.LogInformation("User {UserId} getting pending requests count (Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Dept: {Department})", 
+                    currentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department);
+
+                int pendingCount = 0;
+
+                // Apply role-specific filtering logic on the server side
+                if (currentUser.IsHR ?? false)
+                {
+                    // HR: Count requests with HRStatus = "Pending"
+                    var allRequests = await _requestService.GetAllPendingRequestsAsync();
+                    pendingCount = allRequests.Count(r => r.HRStatus == RequestStatus.Pending);
+                }
+                else if (currentUser.IsAdmin ?? false)
+                {
+                    // Admin: Count all requests where both Status and HRStatus are "Pending"
+                    var allRequests = await _requestService.GetAllPendingRequestsAsync();
+                    pendingCount = allRequests.Count(r => r.Status == RequestStatus.Pending && r.HRStatus == RequestStatus.Pending);
+                }
+                else if (currentUser.IsManager ?? false)
+                {
+                    // Manager: Count requests with Status = "Pending" from departments they manage
+                    var departmentRequests = await _requestService.GetPendingRequestsByDepartmentAsync(currentUser.Department);
+                    pendingCount = departmentRequests.Count(r => r.Status == RequestStatus.Pending);
+                }
+                else
+                {
+                    // Regular user: Count their own requests where Status or HRStatus is "Pending"
+                    var userRequests = await _requestService.GetPendingRequestsByUserIdAsync(currentUserId);
+                    pendingCount = userRequests.Count(r => r.Status == RequestStatus.Pending || r.HRStatus == RequestStatus.Pending);
+                }
+
+                return Ok(pendingCount);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving pending requests count");
+                return StatusCode(500, "Internal server error");
+            }
         }
 
         #endregion

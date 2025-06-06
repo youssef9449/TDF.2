@@ -29,4 +29,6 @@ public interface IRequestService
     Task<ApiResponse<RequestResponseDto>> HRApproveRequestAsync(int requestId, HRApprovalDto approvalDto);
     Task<ApiResponse<RequestResponseDto>> ManagerRejectRequestAsync(int requestId, ManagerRejectDto rejectDto);
     Task<ApiResponse<RequestResponseDto>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto);
+    Task<List<RequestResponseDto>> GetRecentDashboardRequestsAsync();
+    Task<int> GetPendingDashboardRequestCountAsync();
 }

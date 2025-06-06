@@ -164,15 +164,15 @@ namespace TDFShared.Utilities
         #endregion
 
         #region Private Helper Methods
-
-        private static bool CanViewRequest(UserDto user, RequestResponseDto request)
+ 
+        public static bool CanViewRequest(UserDto user, RequestResponseDto request)
         {
             // Admin and HR can view all requests
             if ((user.IsAdmin ?? false) || (user.IsHR ?? false)) return true;
-
+ 
             // Users can view their own requests
             if (request.RequestUserID == user.UserID) return true;
-
+ 
             // Managers can view requests from their department
             return (user.IsManager ?? false) && CanAccessDepartment(user, request.RequestDepartment);
         }

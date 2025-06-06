@@ -12,6 +12,8 @@ using System.Linq;
 using TDFAPI.Exceptions;
 using TDFShared.Services;
 using TDFShared.Utilities;
+using Microsoft.EntityFrameworkCore;
+using TDFShared.Enums;
 
 namespace TDFAPI.Controllers
 {
@@ -465,6 +467,89 @@ namespace TDFAPI.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting request with ID {RequestId}", id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        // GET: api/requests/recent-dashboard
+        [HttpGet(ApiRoutes.Requests.GetRecentDashboard)]
+        public async Task<ActionResult<List<RequestResponseDto>>> GetRecentRequestsForDashboard()
+        {
+            try
+            {
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                _logger.LogInformation("User {UserId} getting recent dashboard requests (Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Dept: {Department})", currentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department);
+
+                var pagination = new RequestPaginationDto { Page = 1, PageSize = 5, SortBy = "CreatedAt", Ascending = false };
+                PaginatedResult<RequestResponseDto> result;
+
+                var accessLevel = AuthorizationUtilities.GetRequestAccessLevel(currentUser);
+                switch (accessLevel)
+                {
+                    case RequestAccessLevel.All:
+                        result = await _requestService.GetAllAsync(pagination);
+                        break;
+                    case RequestAccessLevel.Department:
+                        result = await _requestService.GetRequestsForManagerAsync(currentUserId, currentUser.Department, pagination);
+                        break;
+                    case RequestAccessLevel.Own:
+                        result = await _requestService.GetByUserIdAsync(currentUserId, pagination);
+                        break;
+                    default:
+                        return Forbid("You do not have permission to view requests.");
+                }
+
+                var recent = result?.Items?.OrderByDescending(r => r.CreatedDate).Take(5).ToList() ?? new List<RequestResponseDto>();
+                return Ok(recent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving recent dashboard requests");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        // GET: api/requests/pending-dashboard-count
+        [HttpGet(ApiRoutes.Requests.GetPendingDashboardCount)]
+        public async Task<ActionResult<int>> GetPendingRequestsCountForDashboard()
+        {
+            try
+            {
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                _logger.LogInformation("User {UserId} getting pending dashboard requests count (Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Dept: {Department})", currentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department);
+
+                var pagination = new RequestPaginationDto { Page = 1, PageSize = 100, SortBy = "CreatedAt", Ascending = false };
+                PaginatedResult<RequestResponseDto> result;
+
+                var accessLevel = AuthorizationUtilities.GetRequestAccessLevel(currentUser);
+                switch (accessLevel)
+                {
+                    case RequestAccessLevel.All:
+                        result = await _requestService.GetAllAsync(pagination);
+                        break;
+                    case RequestAccessLevel.Department:
+                        result = await _requestService.GetRequestsForManagerAsync(currentUserId, currentUser.Department, pagination);
+                        break;
+                    case RequestAccessLevel.Own:
+                        result = await _requestService.GetByUserIdAsync(currentUserId, pagination);
+                        break;
+                    default:
+                        return Forbid("You do not have permission to view requests.");
+                }
+
+                // Only count requests that are pending (Manager or HR status)
+                int pendingCount = result?.Items?.Count(r => r.Status == RequestStatus.Pending || r.HRStatus == RequestStatus.Pending) ?? 0;
+                return Ok(pendingCount);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving pending dashboard requests count");
                 return StatusCode(500, "Internal server error");
             }
         }

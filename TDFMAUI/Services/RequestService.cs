@@ -6,6 +6,8 @@ using TDFShared.DTOs.Common;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Json;
 using TDFShared.Services;
+using Microsoft.Maui.Controls;
+using TDFMAUI.Helpers;
 
 namespace TDFMAUI.Services 
 {
@@ -15,13 +17,20 @@ namespace TDFMAUI.Services
         private readonly ILogger<RequestService> _logger;
         private readonly HttpClient _httpClient;
         private readonly IAuthService _authService;
+        private readonly SecureStorageService _secureStorageService;
 
-        public RequestService(IApiService apiService, ILogger<RequestService> logger, HttpClient httpClient, IAuthService authService)
+        public RequestService(
+            IApiService apiService, 
+            ILogger<RequestService> logger, 
+            HttpClient httpClient, 
+            IAuthService authService, 
+            SecureStorageService secureStorageService)
         {
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClient = httpClient;
             _authService = authService;
+            _secureStorageService = secureStorageService ?? throw new ArgumentNullException(nameof(secureStorageService));
             _logger.LogInformation("RequestService initialized, using IApiService.");
         }
 
@@ -267,6 +276,60 @@ namespace TDFMAUI.Services
                     Success = false,
                     Message = $"Error: {ex.Message}"
                 };
+            }
+        }
+
+        public async Task<List<RequestResponseDto>> GetRecentDashboardRequestsAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync(TDFShared.Constants.ApiRoutes.Requests.GetRecentDashboard);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    {
+                        _logger.LogWarning("Authentication failed for recent dashboard requests");
+                        return new List<RequestResponseDto>();
+                    }
+                    _logger.LogError("Failed to get recent dashboard requests. Status code: {StatusCode}", response.StatusCode);
+                    return new List<RequestResponseDto>();
+                }
+
+                var result = await response.Content.ReadFromJsonAsync<List<RequestResponseDto>>();
+                return result ?? new List<RequestResponseDto>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting recent dashboard requests");
+                return new List<RequestResponseDto>();
+            }
+        }
+
+        public async Task<int> GetPendingDashboardRequestCountAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync(TDFShared.Constants.ApiRoutes.Requests.GetPendingDashboardCount);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                    {
+                        _logger.LogWarning("Authentication failed for pending dashboard count");
+                        return 0;
+                    }
+                    _logger.LogError("Failed to get pending dashboard request count. Status code: {StatusCode}", response.StatusCode);
+                    return 0;
+                }
+
+                var result = await response.Content.ReadFromJsonAsync<int>();
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting pending dashboard request count");
+                return 0;
             }
         }
     }

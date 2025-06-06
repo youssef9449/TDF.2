@@ -8,6 +8,12 @@ using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Messages;
 using Microsoft.Extensions.Logging;
 using TDFShared.Enums;
+using TDFShared.DTOs.Common;
+using TDFShared.DTOs.Users;
+using TDFShared.Services;
+using INotificationService = TDFMAUI.Services.INotificationService;
+using System.Threading;
+using System.Linq;
 
 namespace TDFMAUI.Features.Dashboard
 {
@@ -16,7 +22,8 @@ namespace TDFMAUI.Features.Dashboard
         private readonly IRequestService _requestService;
         private readonly INotificationService _notificationService;
         private readonly ILogger<DashboardViewModel> _logger;
-
+        private readonly IAuthService _authService;
+        private CancellationTokenSource? _refreshCts;
 
         [ObservableProperty]
         private string welcomeMessage = "Welcome back!";
@@ -25,10 +32,10 @@ namespace TDFMAUI.Features.Dashboard
         private DateTime currentDate = DateTime.Now;
 
         [ObservableProperty]
-        private ObservableCollection<RequestResponseDto> recentRequests = new();
+        private ObservableCollection<NotificationDto> recentNotifications = new();
 
         [ObservableProperty]
-        private ObservableCollection<NotificationDto> recentNotifications = new();
+        private ObservableCollection<RequestResponseDto> recentRequests = new();
 
         [ObservableProperty]
         private int unreadNotificationsCount;
@@ -41,9 +48,6 @@ namespace TDFMAUI.Features.Dashboard
         private bool hasRecentNotifications;
 
         [ObservableProperty]
-        private bool hasRecentRequests;
-
-        [ObservableProperty]
         private bool _isDataLoaded;
 
         [ObservableProperty]
@@ -52,11 +56,13 @@ namespace TDFMAUI.Features.Dashboard
         public DashboardViewModel(
             IRequestService requestService,
             INotificationService notificationService,
-            ILogger<DashboardViewModel> logger)
+            ILogger<DashboardViewModel> logger,
+            IAuthService authService)
         {
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _notificationService = notificationService ?? throw new ArgumentNullException(nameof(notificationService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
 
             Title = "Dashboard";
 
@@ -70,8 +76,6 @@ namespace TDFMAUI.Features.Dashboard
 
             // Subscribe to user changed event to update welcome message
             App.UserChanged += OnUserChanged;
-
-            // Initialize with a refresh
         }
 
         // Default parameterless constructor for design-time support ONLY
@@ -87,30 +91,27 @@ namespace TDFMAUI.Features.Dashboard
                 WelcomeMessage = "Welcome to TDF!";
 
                 // Initialize collections with sample data for design-time
-                RecentRequests = new ObservableCollection<RequestResponseDto>();
                 RecentNotifications = new ObservableCollection<NotificationDto>();
+                RecentRequests = new ObservableCollection<RequestResponseDto>();
 
                 // Add sample data for design-time preview
-                RecentRequests.Add(new RequestResponseDto
-                {
-                    RequestID = 1,
-                    LeaveType = TDFShared.Enums.LeaveType.Annual,
-                    RequestStartDate = DateTime.Today.AddDays(7),
-                    Status = TDFShared.Enums.RequestStatus.Pending
-                });
-
                 RecentNotifications.Add(new NotificationDto
                 {
                     NotificationId = 1,
                     Message = "Sample notification",
                     Timestamp = DateTime.Now
                 });
+                RecentRequests.Add(new RequestResponseDto
+                {
+                    RequestID = 1,
+                    Status = RequestStatus.Pending,
+                    CreatedDate = DateTime.Now
+                });
 
                 // Set sample stats for design-time
                 PendingRequestsCount = 3;
                 UnreadNotificationsCount = 2;
                 UnreadMessagesCount = 1;
-                HasRecentRequests = true;
                 HasRecentNotifications = true;
                 IsDataLoaded = true;
             }
@@ -124,7 +125,6 @@ namespace TDFMAUI.Features.Dashboard
                     "INotificationService, and ILogger parameters. Check your service registration in MauiProgram.cs.");
             }
         }
-
 
         private void OnUserChanged(object sender, EventArgs e)
         {
@@ -142,6 +142,11 @@ namespace TDFMAUI.Features.Dashboard
         {
             if (IsBusy) return;
 
+            // Cancel any existing refresh operation
+            _refreshCts?.Cancel();
+            _refreshCts = new CancellationTokenSource();
+            var ct = _refreshCts.Token;
+
             await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
                 IsBusy = true;
                 IsRefreshing = true;
@@ -155,18 +160,21 @@ namespace TDFMAUI.Features.Dashboard
                 CurrentDate = DateTime.Now;
 
                 // Fetch all data in parallel for better performance
-                var statsTask = LoadStatsAsync();
-                var requestsTask = LoadRecentRequestsAsync();
-                var notificationsTask = LoadRecentNotificationsAsync();
+                var statsTask = LoadStatsAsync(ct);
+                var notificationsTask = LoadRecentNotificationsAsync(ct);
+                var requestsTask = LoadRecentRequestsAsync(ct);
 
-                await Task.WhenAll(statsTask, requestsTask, notificationsTask);
+                await Task.WhenAll(statsTask, notificationsTask, requestsTask);
 
                 // Update UI state flags
-                HasRecentRequests = RecentRequests.Count > 0;
                 HasRecentNotifications = RecentNotifications.Count > 0;
                 IsDataLoaded = true;
 
                 _logger.LogInformation("Dashboard refresh completed successfully");
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Dashboard refresh was cancelled");
             }
             catch (Exception ex)
             {
@@ -182,31 +190,12 @@ namespace TDFMAUI.Features.Dashboard
             }
         }
 
-        private async Task LoadStatsAsync()
+        private async Task LoadStatsAsync(CancellationToken ct)
         {
             try
             {
-                if (App.CurrentUser == null)
-                {
-                    _logger.LogWarning("Cannot load stats: Current user is null");
-                    PendingRequestsCount = 0;
-                    UnreadNotificationsCount = 0;
-                    UnreadMessagesCount = 0;
-                    return;
-                }
-
-                // Get pending requests count
-                var pendingPagination = new RequestPaginationDto
-                {
-                    PageSize = 1,
-                    FilterStatus = RequestStatus.Pending, // Corrected property name
-                    CountOnly = true
-                };
-                if (App.CurrentUser != null) { // Add safety check, though outer method already has one
-                    pendingPagination.UserId = App.CurrentUser.UserID;
-                }
-                var pendingResult = await _requestService.GetAllRequestsAsync(pendingPagination);
-                PendingRequestsCount = pendingResult?.Data?.TotalCount ?? 0;
+                ct.ThrowIfCancellationRequested();
+                PendingRequestsCount = await _requestService.GetPendingDashboardRequestCountAsync();
 
                 // Get unread notifications count
                 var notifications = await _notificationService.GetUnreadNotificationsAsync();
@@ -227,6 +216,10 @@ namespace TDFMAUI.Features.Dashboard
                 _logger.LogInformation("Stats loaded: {PendingRequests} pending requests, {UnreadNotifications} unread notifications, {UnreadMessages} unread messages",
                     PendingRequestsCount, UnreadNotificationsCount, UnreadMessagesCount);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading dashboard stats");
@@ -237,97 +230,90 @@ namespace TDFMAUI.Features.Dashboard
             }
         }
 
-        private async Task LoadRecentRequestsAsync()
+        private async Task LoadRecentRequestsAsync(CancellationToken ct)
         {
             try
             {
-                if (App.CurrentUser == null)
-                {
-                    _logger.LogWarning("Cannot load recent requests: Current user is null");
+                ct.ThrowIfCancellationRequested();
+                var recent = await _requestService.GetRecentDashboardRequestsAsync();
+                
+                await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
                     RecentRequests.Clear();
-                    return;
-                }
-
-                var pagination = new RequestPaginationDto
-                {
-                    PageSize = 5,
-                    SortBy = "CreatedDate",
-                    Ascending = false // Corrected property name and value type
-                };
-
-                if (App.CurrentUser != null) { // Add safety check
-                    pagination.UserId = App.CurrentUser.UserID;
-                }
-                var recentResult = await _requestService.GetAllRequestsAsync(pagination);
-
-                RecentRequests.Clear();
-                if (recentResult?.Data?.Items != null)
-                {
-                    foreach (var req in recentResult.Data.Items)
+                    foreach (var request in recent)
                     {
-                        RecentRequests.Add(req);
+                        RecentRequests.Add(request);
                     }
-                    _logger.LogInformation("Loaded {Count} recent requests", RecentRequests.Count);
-                }
-                else
-                {
-                    _logger.LogWarning("No recent requests found or API returned null");
-                }
+                });
+                
+                _logger.LogInformation("Loaded {Count} recent requests", RecentRequests.Count);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading recent requests");
-                RecentRequests.Clear();
+                await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
+                    RecentRequests.Clear();
+                });
             }
         }
 
-        private async Task LoadRecentNotificationsAsync()
+        private async Task LoadRecentNotificationsAsync(CancellationToken ct)
         {
             try
             {
+                ct.ThrowIfCancellationRequested();
                 if (App.CurrentUser == null)
                 {
                     _logger.LogWarning("Cannot load recent notifications: Current user is null");
-                    RecentNotifications.Clear();
+                    await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
+                        RecentNotifications.Clear();
+                    });
                     return;
                 }
 
                 var notificationEntities = await _notificationService.GetUnreadNotificationsAsync();
 
-                RecentNotifications.Clear();
-                if (notificationEntities != null)
-                {
-                    // Convert entities to DTOs and take the 5 most recent
-                    var recentNotifications = notificationEntities
-                        .OrderByDescending(n => n.Timestamp)
-                        .Take(5)
-                        .Select(entity => new NotificationDto
-                        {
-                            NotificationId = entity.NotificationID,
-                            UserId = entity.ReceiverID,
-                            Message = entity.Message,
-                            IsSeen = entity.IsSeen,
-                            Timestamp = entity.Timestamp,
-                            Title = "Notification", // Default title
-                            Level = NotificationLevel.Medium // Default level
-                        });
-
-                    foreach (var notification in recentNotifications)
+                await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
+                    RecentNotifications.Clear();
+                    if (notificationEntities != null)
                     {
-                        RecentNotifications.Add(notification);
-                    }
+                        // Convert entities to DTOs and take the 5 most recent
+                        var recentNotifications = notificationEntities
+                            .OrderByDescending(n => n.Timestamp)
+                            .Take(5)
+                            .Select(entity => new NotificationDto
+                            {
+                                NotificationId = entity.NotificationID,
+                                UserId = entity.ReceiverID,
+                                Message = entity.Message,
+                                IsSeen = entity.IsSeen,
+                                Timestamp = entity.Timestamp,
+                                Title = "Notification", // Default title
+                                Level = NotificationLevel.Medium // Default level
+                            });
 
-                    _logger.LogInformation("Loaded {Count} recent notifications", RecentNotifications.Count);
-                }
-                else
-                {
-                    _logger.LogWarning("No recent notifications found or API returned null");
-                }
+                        foreach (var notification in recentNotifications)
+                        {
+                            RecentNotifications.Add(notification);
+                        }
+                    }
+                });
+
+                _logger.LogInformation("Loaded {Count} recent notifications", RecentNotifications.Count);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading recent notifications");
-                RecentNotifications.Clear();
+                await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
+                    RecentNotifications.Clear();
+                });
             }
         }
 
@@ -362,11 +348,11 @@ namespace TDFMAUI.Features.Dashboard
         }
 
         [RelayCommand]
-        private async Task ViewRequestAsync(Guid requestId)
+        private async Task ViewRequestAsync(int requestId)
         {
             try
             {
-                if (requestId == Guid.Empty)
+                if (requestId <= 0)
                 {
                     _logger.LogWarning("Cannot view request: Invalid request ID");
                     return;
@@ -394,39 +380,22 @@ namespace TDFMAUI.Features.Dashboard
                 }
 
                 _logger.LogInformation("Marking notification {NotificationId} as read", notificationId);
-                bool success = await _notificationService.MarkAsSeenAsync(notificationId);
-
-                if (success)
-                {
-                    // Remove from the collection or update its status
-                    var notification = RecentNotifications.FirstOrDefault(n => n.NotificationId == notificationId);
-                    if (notification != null)
-                    {
-                        RecentNotifications.Remove(notification);
-
-                        // Update the unread count
-                        UnreadNotificationsCount = Math.Max(0, UnreadNotificationsCount - 1);
-
-                        // Update UI state
-                        HasRecentNotifications = RecentNotifications.Count > 0;
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning("Failed to mark notification {NotificationId} as read", notificationId);
-                }
+                await _notificationService.MarkAsSeenAsync(notificationId);
+                await Refresh();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error marking notification as read");
-                await _notificationService.ShowErrorAsync("Failed to update notification. Please try again.");
+                await _notificationService.ShowErrorAsync("Failed to mark notification as read. Please try again.");
             }
         }
 
-        // Clean up event subscriptions
+        // Clean up event subscriptions and cancellation token
         public void Cleanup()
         {
             App.UserChanged -= OnUserChanged;
+            _refreshCts?.Cancel();
+            _refreshCts?.Dispose();
         }
     }
 }

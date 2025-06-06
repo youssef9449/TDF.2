@@ -34,8 +34,8 @@
     <!-- Main grid with responsive layout -->
     <ScrollView>
         <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
-            <Label Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}" HorizontalOptions="End" Margin="0,5,10,0" FontSize="10" TextColor="{StaticResource Gray600}"/>
-            <Label Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}" HorizontalOptions="End" Margin="0,5,10,0" FontSize="10" TextColor="{StaticResource Gray600}"/>
+            <Label Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}" HorizontalOptions="End" Margin="0,5,10,0" FontSize="10" TextColor="{StaticResource TextSecondaryColor}"/>
+            <Label Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}" HorizontalOptions="End" Margin="0,5,10,0" FontSize="10" TextColor="{StaticResource TextSecondaryColor}"/>
             <!-- Top safe area padding - minimal -->
             <BoxView Grid.Row="0" BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource DarkBackground}}" HeightRequest="0" />
 

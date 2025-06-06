@@ -220,6 +220,16 @@ namespace TDFShared.Constants
             /// </summary>
             public const string Verify = Base + "/verify";
 
+            /// <summary>
+            /// Get pending requests count route
+            /// </summary>
+            public const string GetPendingCount = Base + "/pending/count";
+
+            /// <summary>
+            /// Get recent requests route
+            /// </summary>
+            public const string GetRecentRequests = Base + "/recent";
+
             public static string UsersBase => $"{Base}/users";
         }
 
@@ -297,6 +307,16 @@ namespace TDFShared.Constants
             /// Get requests for approval route
             /// </summary>
             public const string GetForApproval = Base + "/approval";
+
+            /// <summary>
+            /// Get recent requests for dashboard route
+            /// </summary>
+            public const string GetRecentDashboard = Base + "/recent-dashboard";
+
+            /// <summary>
+            /// Get pending requests count for dashboard route
+            /// </summary>
+            public const string GetPendingDashboardCount = Base + "/pending-dashboard-count";
         }
 
         /// <summary>

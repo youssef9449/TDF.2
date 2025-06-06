@@ -222,11 +222,54 @@ namespace TDFMAUI.ViewModels
                     PageSize = 50,
                     FilterStatus = ShowPendingOnly ? RequestStatus.Pending : RequestStatus.All
                 };
-                var response = await _requestService.GetAllRequestsAsync(pagination);
+
+                ApiResponse<PaginatedResult<RequestResponseDto>>? response = null;
+                var accessLevel = AuthorizationUtilities.GetRequestAccessLevel(await GetCurrentUserDtoAsync());
+
+                switch (accessLevel)
+                {
+                    case RequestAccessLevel.All:
+                        response = await _requestService.GetAllRequestsAsync(pagination);
+                        break;
+                    case RequestAccessLevel.Department:
+                        if (SelectedDepartment != null && SelectedDepartment.Id != "0")
+                        {
+                            response = await _requestService.GetRequestsByDepartmentAsync(SelectedDepartment.Name, pagination);
+                        }
+                        else
+                        {
+                            // If no specific department is selected, managers should see their own and all managed departments
+                            // For now, default to all requests for simplicity if "All" is selected for managers
+                            response = await _requestService.GetAllRequestsAsync(pagination);
+                        }
+                        break;
+                    case RequestAccessLevel.Own:
+                    case RequestAccessLevel.None: // If no access, only show own requests (if any)
+                    default:
+                        response = await _requestService.GetMyRequestsAsync(pagination);
+                        break;
+                }
+
                 if (response?.Success == true && response.Data?.Items != null)
                 {
                     foreach (var request in response.Data.Items)
-                        Requests.Add(request);
+                    {
+                        // Apply client-side filtering for managers if "All" departments is selected
+                        // This is a fallback if the API doesn't handle department filtering for managers
+                        // when "All" is selected. Ideally, the API would return only accessible requests.
+                        if (accessLevel == RequestAccessLevel.Department && SelectedDepartment?.Id == "0")
+                        {
+                            var currentUser = await GetCurrentUserDtoAsync();
+                            if (currentUser != null && AuthorizationUtilities.CanViewRequest(currentUser, request))
+                            {
+                                Requests.Add(request);
+                            }
+                        }
+                        else
+                        {
+                            Requests.Add(request);
+                        }
+                    }
                     _logger.LogInformation("Loaded {Count} requests.", Requests.Count);
                 }
                 else

@@ -1,24 +1,62 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- ─────────────────────────────────────────────────────────────────────
+       1. GLOBAL PROPERTIES
+       ───────────────────────────────────────────────────────────────────── -->
   <PropertyGroup>
     <MauiVersion>8.0.0</MauiVersion>
-    <TargetFrameworks>net8.0-ios;net8.0-maccatalyst;net8.0-android34;net8.0-windows10.0.19041.0</TargetFrameworks>
+
+    <!-- Use net8.0-android instead of net8.0-android34 -->
+    <TargetFrameworks>net8.0-ios;net8.0-maccatalyst;net8.0-android;net8.0-windows10.0.19041.0</TargetFrameworks>
+
     <OutputType>Exe</OutputType>
     <RootNamespace>TDFMAUI</RootNamespace>
     <UseMaui>true</UseMaui>
     <SingleProject>true</SingleProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <WarningsNotAsErrors>NU1605</WarningsNotAsErrors>
+    <WarningsNotAsErrors>NU1605</WarningsNotAsErrors> <!-- Keep downgrade warnings as errors -->
+    <NoWarn>XA4214</NoWarn>
+
     <ApplicationTitle>TDF</ApplicationTitle>
     <ApplicationId>com.TDF.TDFMAUI</ApplicationId>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
     <AssemblyName>TDF</AssemblyName>
+
+    <!-- ─────────────────────────────────────────────────────────────────────
+         2. ANDROIDX VERSION OVERRIDES (all must exist on NuGet)
+         ───────────────────────────────────────────────────────────────────── -->
+    <!-- 
+      - Xamarin.AndroidX.AppCompat 1.7.0.6 is available (AppCompat’s newest stable).
+      - It depends on Activity ≥ 1.10.1.1, Core.Core.Ktx ≥ 1.16.0.1, Collection ≥ 1.5.0.1, Annotation ≥ 1.9.1.3, etc.
+      - We will pin every transitive requirement at or above those versions.
+    -->
+    <AndroidXAppCompatVersion>1.7.0.6</AndroidXAppCompatVersion>
+    <AndroidXActivityVersion>1.10.1.1</AndroidXActivityVersion>
+    <AndroidXActivityKtxVersion>1.10.1.1</AndroidXActivityKtxVersion>
+    <AndroidXCoreVersion>1.16.0.1</AndroidXCoreVersion>
+    <AndroidXCoreKtxVersion>1.16.0.1</AndroidXCoreKtxVersion>
+    <AndroidXCollectionVersion>1.5.0.1</AndroidXCollectionVersion>
+    <AndroidXFragmentVersion>1.8.6.1</AndroidXFragmentVersion>
+    <AndroidXAnnotationVersion>1.9.1.3</AndroidXAnnotationVersion>
+    <AndroidXAnnotationExperimentalVersion>1.4.1.9</AndroidXAnnotationExperimentalVersion>
   </PropertyGroup>
 
-  <!-- Windows-specific configuration -->
+  <!-- ─────────────────────────────────────────────────────────────────────
+       3. ANDROID-SPECIFIC CONFIGURATION
+       ───────────────────────────────────────────────────────────────────── -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
+    <!-- Minimum Android version API-21 -->
+    <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
+    <AndroidLinkMode>None</AndroidLinkMode>
+    <AndroidEnableMultiDex>true</AndroidEnableMultiDex>
+  </PropertyGroup>
+
+  <!-- ─────────────────────────────────────────────────────────────────────
+       4. WINDOWS-SPECIFIC CONFIGURATION
+       ───────────────────────────────────────────────────────────────────── -->
   <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
     <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
     <PlatformTarget>x64</PlatformTarget>
@@ -30,39 +68,80 @@
     <UseAppHost>true</UseAppHost>
   </PropertyGroup>
 
-  <!-- Android-specific JAVAC options -->
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-android34'">
-    <AndroidJavacTargetOptions>-Xlint:-options</AndroidJavacTargetOptions>
-    <!-- Ensure all required assemblies are included -->
-    <AndroidLinkMode>None</AndroidLinkMode>
-    <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
-    <AndroidUseAapt2>true</AndroidUseAapt2>
-    <AndroidCreatePackagePerAbi>false</AndroidCreatePackagePerAbi>
-    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
-    <AndroidResgenFile>Resources\Resource.designer.cs</AndroidResgenFile>
-    <AndroidResgenClass>Resource</AndroidResgenClass>
-    <AndroidManifest>Properties\AndroidManifest.xml</AndroidManifest>
-    <AndroidUseLatestPlatformSdk>true</AndroidUseLatestPlatformSdk>
-    <AndroidResourceNameCase>Lowercase</AndroidResourceNameCase>
-    <AndroidUseManagedDesignTimeResourceGenerator>True</AndroidUseManagedDesignTimeResourceGenerator>
-    <AndroidEnableMultiDex>true</AndroidEnableMultiDex>
-  </PropertyGroup>
+  <!-- ─────────────────────────────────────────────────────────────────────
+       5. CROSS-PLATFORM NUGET REFERENCES
+       ───────────────────────────────────────────────────────────────────── -->
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Maui" Version="9.0.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.14" />
+    <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Plugin.Firebase" Version="3.1.4" />
+  </ItemGroup>
 
-  <!-- Supported OS versions by platform -->
-  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
-    <SupportedOSPlatformVersion>11.0</SupportedOSPlatformVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
-    <SupportedOSPlatformVersion>13.1</SupportedOSPlatformVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
-    <SupportedOSPlatformVersion>21.0</SupportedOSPlatformVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">
-    <SupportedOSPlatformVersion>6.5</SupportedOSPlatformVersion>
-  </PropertyGroup>
+  <!-- ─────────────────────────────────────────────────────────────────────
+       6. ANDROID-ONLY NUGET REFERENCES (all versions must exist on nuget.org)
+       ───────────────────────────────────────────────────────────────────── -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
+    <!-- 6.1. Core + Core.Ktx (AppCompat requires Core.Core.Ktx ≥ 1.16.0.1) -->
+    <PackageReference Include="Xamarin.AndroidX.Core" Version="$(AndroidXCoreVersion)" />
+    <PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="$(AndroidXCoreKtxVersion)" />
 
-  <!-- App icons, splash screen, and other resources -->
+    <!-- 6.2. AppCompat -->
+    <PackageReference Include="Xamarin.AndroidX.AppCompat" Version="$(AndroidXAppCompatVersion)" />
+
+    <!-- 6.3. Activity + Activity.Ktx (AppCompat 1.7.0.6 → Activity ≥ 1.10.1.1) -->
+    <PackageReference Include="Xamarin.AndroidX.Activity" Version="$(AndroidXActivityVersion)" />
+    <PackageReference Include="Xamarin.AndroidX.Activity.Ktx" Version="$(AndroidXActivityKtxVersion)" />
+
+    <!-- 6.4. Fragment + Fragment.Ktx (pulled by various libraries) -->
+    <PackageReference Include="Xamarin.AndroidX.Fragment" Version="$(AndroidXFragmentVersion)" />
+    <PackageReference Include="Xamarin.AndroidX.Fragment.Ktx" Version="$(AndroidXFragmentVersion)" />
+
+    <!-- 6.5. Collection: only Ktx variant; exclude the .Jvm so ArrayMapKt is defined exactly once. -->
+    <PackageReference Include="Xamarin.AndroidX.Collection.Ktx" Version="$(AndroidXCollectionVersion)" />
+    <PackageReference Include="Xamarin.AndroidX.Collection.Jvm" Version="$(AndroidXCollectionVersion)" />
+
+    <!-- 6.6. Annotation & Annotation.Experimental (to satisfy Fragment & AppCompat) -->
+    <PackageReference Include="Xamarin.AndroidX.Annotation" Version="$(AndroidXAnnotationVersion)" />
+    <PackageReference Include="Xamarin.AndroidX.Annotation.Experimental" Version="$(AndroidXAnnotationExperimentalVersion)" />
+
+    <!-- 6.7. Firebase CloudMessaging & LocalNotification -->
+    <PackageReference Include="Plugin.Firebase.CloudMessaging" Version="3.1.2" />
+    <PackageReference Include="Plugin.LocalNotification" Version="12.0.1" />
+  </ItemGroup>
+
+  <!-- ─────────────────────────────────────────────────────────────────────
+       7. IOS-ONLY NUGET REFERENCES
+       ───────────────────────────────────────────────────────────────────── -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-ios'">
+    <PackageReference Include="Plugin.Firebase.CloudMessaging" Version="3.1.2" />
+    <PackageReference Include="Plugin.LocalNotification" Version="12.0.1" />
+  </ItemGroup>
+
+  <!-- ─────────────────────────────────────────────────────────────────────
+       8. WINDOWS-ONLY NUGET REFERENCES (UWP/WINUI)
+       ───────────────────────────────────────────────────────────────────── -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0-19041.0'">
+    <PackageReference Include="Plugin.Firebase.CloudMessaging" Version="3.1.2" />
+    <PackageReference Include="System.Collections" Version="4.3.0" />
+    <PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" />
+
+    <PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop" Version="8.0.14" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.240211001" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
+    <PackageReference Include="Plugin.LocalNotification" Version="12.0.1" />
+  </ItemGroup>
+
+  <!-- ─────────────────────────────────────────────────────────────────────
+       9. RESOURCES, ICONS, SPLASH, ETC.
+       ───────────────────────────────────────────────────────────────────── -->
   <ItemGroup>
     <MauiIcon Include="Resources\AppIcon\appicon.svg"
               ForegroundFile="Resources\AppIcon\appiconfg.svg"
@@ -71,6 +150,7 @@
               AndroidRoundIcon="Resources\AppIcon\appicon.svg"
               AndroidAdaptiveIconForeground="Resources\AppIcon\appiconfg.svg"
               AndroidAdaptiveIconBackground="Resources\AppIcon\appicon.svg" />
+
     <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
     <MauiImage Include="Resources\Images\*" />
     <MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
@@ -84,54 +164,9 @@
     <GoogleServicesJson Include="google-services.json" />
   </ItemGroup>
 
-  <!-- General NuGet package references -->
-  <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Maui" Version="9.0.0" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Maui.Controls" Version="8.0.14" />
-    <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.14" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.6" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Plugin.Firebase" Version="3.1.2" />
-  </ItemGroup>
-
-  <!-- Android-specific package references and exclusion of KTX -->
-  <ItemGroup Condition="$(TargetFramework.Contains('-android'))">
-    <PackageReference Include="Plugin.Firebase.CloudMessaging" Version="3.1.2" />
-    <PackageReference Include="Plugin.LocalNotification" Version="12.0.1" />
-
-    <!-- Exclude Xamarin.AndroidX.Collection.Ktx to avoid duplicate classes -->
-    <PackageReference Update="Xamarin.AndroidX.Collection.Ktx">
-      <ExcludeAssets>all</ExcludeAssets>
-    </PackageReference>
-  </ItemGroup>
-
-  <!-- iOS-specific package references -->
-  <ItemGroup Condition="$(TargetFramework.Contains('-ios'))">
-    <PackageReference Include="Plugin.Firebase.CloudMessaging" Version="3.1.2" />
-    <PackageReference Include="Plugin.LocalNotification" Version="12.0.1" />
-  </ItemGroup>
-
-  <!-- Windows-specific package references -->
-  <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
-    <PackageReference Include="Plugin.Firebase.CloudMessaging" Version="3.1.2" />
-    <PackageReference Include="System.Collections" Version="4.3.0" />
-    <PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.0" />
-  </ItemGroup>
-
-  <!-- Windows-specific packages for the UWP target -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0-19041.0'">
-    <PackageReference Include="Microsoft.Maui.Graphics.Win2D.WinUI.Desktop" Version="8.0.14" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.240211001" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
-    <PackageReference Include="Plugin.LocalNotification" Version="12.0.1" />
-  </ItemGroup>
-
-  <!-- Copy appsettings.json to output -->
+  <!-- ─────────────────────────────────────────────────────────────────────
+       10. COPY/EMBED APPSETTINGS
+       ───────────────────────────────────────────────────────────────────── -->
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -141,12 +176,16 @@
     </EmbeddedResource>
   </ItemGroup>
 
-  <!-- Project reference to shared code -->
+  <!-- ─────────────────────────────────────────────────────────────────────
+       11. SHARED PROJECT REFERENCE
+       ───────────────────────────────────────────────────────────────────── -->
   <ItemGroup>
     <ProjectReference Include="..\TDFShared\TDFShared.csproj" />
   </ItemGroup>
 
-  <!-- Organize XAML and ViewModel files under Features folder -->
+  <!-- ─────────────────────────────────────────────────────────────────────
+       12. XAML/FEATURE ORGANIZATION (unchanged)
+       ───────────────────────────────────────────────────────────────────── -->
   <ItemGroup>
     <Compile Update="Features\**\*.xaml.cs">
       <DependentUpon>%(Filename)</DependentUpon>

@@ -153,6 +153,10 @@ namespace TDFMAUI
                     InitializeComponent();
                     System.Diagnostics.Debug.WriteLine("InitializeComponent completed successfully");
 
+                    // Initialize theme service for platform-aware theme adaptation
+                    var themeService = Services?.GetService<ThemeService>();
+                    themeService?.Initialize();
+                    
                     // Dynamically merge the correct theme dictionary
                     SetThemeColors();
                     // Set a temporary page to satisfy MainPage requirement
@@ -1018,25 +1022,120 @@ namespace TDFMAUI
         }
 
         /// <summary>
-        /// Dynamically applies the correct theme resource dictionary for colors by copying values from the active theme dictionary.
+        /// Dynamically applies the correct theme resource dictionary for colors by using ThemeHelper.
         /// </summary>
         private void SetThemeColors()
         {
-            var appTheme = Application.Current?.RequestedTheme ?? AppTheme.Light;
-            var merged = Application.Current.Resources.MergedDictionaries;
-
-            // Find both theme dictionaries
-            var lightDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Colors.Light.xaml"));
-            var darkDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Colors.Dark.xaml"));
-            var activeDict = appTheme == AppTheme.Dark ? darkDict : lightDict;
-
-            if (activeDict == null)
-                return;
-
-            // Copy all color keys from the active theme dictionary into Application.Current.Resources
-            foreach (var key in activeDict.Keys)
+            try
             {
-                Application.Current.Resources[key] = activeDict[key];
+                // Configure the merged dictionaries for the current theme
+                ConfigureThemeDictionaries();
+                
+                // Add adaptive theme bindings programmatically to ensure proper initialization order
+                AddAdaptiveThemeBindings();
+                
+                // Let ThemeHelper handle theme application
+                ThemeHelper.ApplyTheme();
+                
+                // Apply platform-specific theme adaptations
+                ThemeHelper.ApplyPlatformSpecificAdaptations();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error setting theme colors: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Add adaptive theme bindings programmatically to ensure proper initialization order
+        /// </summary>
+        private void AddAdaptiveThemeBindings()
+        {
+            try
+            {
+                var resources = Application.Current.Resources;
+                // Assign adaptive resources directly based on the current theme
+                resources["AdaptiveTextColor"] = resources.ContainsKey("TextColor") ? resources["TextColor"] : Colors.Black;
+                resources["AdaptiveBackgroundColor"] = resources.ContainsKey("BackgroundColor") ? resources["BackgroundColor"] : Colors.White;
+                resources["AdaptiveSurfaceColor"] = resources.ContainsKey("SurfaceColor") ? resources["SurfaceColor"] : Colors.White;
+                resources["AdaptiveBorderColor"] = resources.ContainsKey("BorderColor") ? resources["BorderColor"] : Colors.Gray;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error adding adaptive theme bindings: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Configure the merged dictionaries for the current theme
+        /// </summary>
+        private void ConfigureThemeDictionaries()
+        {
+            try
+            {
+                var appTheme = Application.Current?.RequestedTheme ?? AppTheme.Light;
+                var merged = Application.Current.Resources.MergedDictionaries;
+                
+                if (merged == null || merged.Count == 0)
+                    return;
+                
+                // Find the theme dictionaries
+                var colorsDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Colors.xaml"));
+                var lightDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Colors.Light.xaml"));
+                var darkDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Colors.Dark.xaml"));
+                var platformDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("PlatformColors.xaml"));
+                var stylesDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Styles.xaml"));
+                
+                // Create a new ordered list of dictionaries
+                var orderedDictionaries = new List<ResourceDictionary>();
+                
+                // Add the appropriate theme dictionary first
+                if (appTheme == AppTheme.Dark && darkDict != null)
+                {
+                    orderedDictionaries.Add(darkDict);
+                }
+                else if (lightDict != null)
+                {
+                    orderedDictionaries.Add(lightDict);
+                }
+                
+                // Add colors dictionary next
+                if (colorsDict != null && !orderedDictionaries.Contains(colorsDict))
+                {
+                    orderedDictionaries.Add(colorsDict);
+                }
+                
+                // Add platform colors dictionary after the theme colors
+                if (platformDict != null && !orderedDictionaries.Contains(platformDict))
+                {
+                    orderedDictionaries.Add(platformDict);
+                }
+                
+                // Add all other dictionaries except styles
+                foreach (var dict in merged)
+                {
+                    if (dict != lightDict && dict != darkDict && dict != stylesDict && dict != colorsDict && dict != platformDict)
+                    {
+                        orderedDictionaries.Add(dict);
+                    }
+                }
+                
+                // Add styles dictionary last
+                if (stylesDict != null)
+                {
+                    orderedDictionaries.Add(stylesDict);
+                }
+                
+                // Replace the merged dictionaries with our ordered list
+                merged.Clear();
+                foreach (var dict in orderedDictionaries)
+                {
+                    merged.Add(dict);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error configuring theme dictionaries: {ex.Message}");
             }
         }
 

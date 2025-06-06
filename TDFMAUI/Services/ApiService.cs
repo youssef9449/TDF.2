@@ -1251,6 +1251,10 @@ namespace TDFMAUI.Services
                     if (!string.IsNullOrEmpty(pagination.SortBy))
                         queryParams.Add($"sortBy={Uri.EscapeDataString(pagination.SortBy)}");
                     queryParams.Add($"ascending={!pagination.Ascending}");
+                    if (pagination.FilterStatus.HasValue)
+                        queryParams.Add($"status={pagination.FilterStatus.Value}");
+                    if (pagination.CountOnly)
+                        queryParams.Add($"countOnly=true");
                 }
                 if (queryParams.Count > 0)
                     endpoint += "?" + string.Join("&", queryParams);

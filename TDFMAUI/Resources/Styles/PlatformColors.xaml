@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                   xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <!-- Platform-specific colors for Windows -->
+    <Color x:Key="WindowsControlHighlightColor">#0078D7</Color>
+    
+    <!-- Platform-specific colors for macOS -->
+    <Color x:Key="MacOSControlHighlightColor">#0078D7</Color>
+    
+    <!-- Platform-specific colors for iOS -->
+    <Color x:Key="iOSGroupedBackgroundColor">#F2F2F7</Color>
+    <Color x:Key="iOSSystemGray">#8E8E93</Color>
+    
+    <!-- Platform-specific colors for Android -->
+    <Color x:Key="AndroidSurfaceColor">#FFFFFF</Color>
+    <Color x:Key="AndroidBackgroundColor">#FFFFFF</Color>
+    
+    <!-- For theme-aware colors, use AppThemeBinding at the point of use, e.g.:
+         <Button BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#2D2D2D}" />
+    -->
+</ResourceDictionary>

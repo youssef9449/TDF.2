@@ -4,13 +4,25 @@
              xmlns:local="clr-namespace:TDFMAUI"
              xmlns:converters="clr-namespace:TDFMAUI.Converters"
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:extensions="clr-namespace:TDFMAUI.Extensions"
              x:Class="TDFMAUI.App">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <!-- Base color resources -->
+                <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
+                
+                <!-- Theme-specific color resources -->
                 <ResourceDictionary Source="Resources/Styles/Colors.Light.xaml" />
                 <ResourceDictionary Source="Resources/Styles/Colors.Dark.xaml" />
+                
+                <!-- Platform-specific color resources -->
+                <ResourceDictionary Source="Resources/Styles/PlatformColors.xaml" />
+                
+                <!-- Common styles -->
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
+                
+                <!-- Platform-specific resources will be added dynamically -->
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Font Resources -->
@@ -27,6 +39,9 @@
             <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
             <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
             <converters:ThemeToBackgroundColorConverter x:Key="ThemeToBackgroundColorConverter" />
+            
+            <!-- Theme-aware adaptive colors will be added programmatically -->
+            <!-- These were moved to code-behind to ensure proper initialization order -->
         </ResourceDictionary>
     </Application.Resources>
 </Application>

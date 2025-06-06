@@ -23,7 +23,7 @@ namespace TDFShared.DTOs.Requests
 
         /// <summary>Start date of the request</summary>
         [Required(ErrorMessage = "Start date is required")]
-        [FutureDate(1, ErrorMessage = "Start date must be at least 1 day from today")]
+        [FutureDate(0, ErrorMessage = "Start date cannot be in the past")]
         public DateTime RequestStartDate { get; set; }
 
         /// <summary>End date of the request</summary>

@@ -292,6 +292,11 @@ namespace TDFShared.Constants
             /// Delete request route (format with request ID)
             /// </summary>
             public const string Delete = Base + "/{0}";
+
+            /// <summary>
+            /// Get requests for approval route
+            /// </summary>
+            public const string GetForApproval = Base + "/approval";
         }
 
         /// <summary>
@@ -471,6 +476,27 @@ namespace TDFShared.Constants
             /// Echo route for testing request/response
             /// </summary>
             public const string Echo = Base + "/echo";
+        }
+
+        /// <summary>
+        /// Push Token routes
+        /// </summary>
+        public static class PushToken
+        {
+            /// <summary>
+            /// Base push token route
+            /// </summary>
+            public const string Base = ApiRoutes.Base + "/pushtoken";
+
+            /// <summary>
+            /// Register push token route
+            /// </summary>
+            public const string Register = Base + "/register";
+
+            /// <summary>
+            /// Unregister push token route
+            /// </summary>
+            public const string Unregister = Base + "/unregister";
         }
 
         /// <summary>

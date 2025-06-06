@@ -26,10 +26,9 @@
         },
         {
             "name": "TDFMAUI: Android Emulator (Direct)",
-            "type": "xamarin",
+            "type": "maui",
             "request": "launch",
             "preLaunchTask": "maui: Build for Android",
-            "projectFile": "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
             "targetFramework": "net8.0-android"
         },
         {
@@ -38,7 +37,7 @@
             "request": "launch",
             "preLaunchTask": "maui: Build for Android",
             "appSrcRoot": "${workspaceFolder}/TDFMAUI",
-            "apkFile": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-android/com.companyname.tdfmaui-Signed.apk",
+            "apkFile": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-android/com.TDF.TDFMAUI-Signed.apk",
             "adbPort": 5037
         },
         {

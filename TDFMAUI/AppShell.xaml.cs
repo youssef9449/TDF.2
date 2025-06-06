@@ -1,11 +1,15 @@
 using TDFMAUI.Pages;
 using TDFMAUI.Features.Auth;
+using TDFMAUI.Features.Admin;
+using TDFMAUI.Features.Dashboard;
+using TDFMAUI.Features.Settings;
+using TDFMAUI.Features.Users;
+using TDFMAUI.Features.Requests;
 using TDFMAUI.Services;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using TDFMAUI.Config;
 using Microsoft.Extensions.Logging;
-using TDFMAUI.Features.Requests;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Devices;
 using TDFMAUI.Helpers;
@@ -29,7 +33,6 @@ namespace TDFMAUI
         public bool IsManager => App.CurrentUser?.IsManager ?? false;
 
         public bool IsDevelopmentMode => ApiConfig.DevelopmentMode;
-        public bool IsDesktopUser => DeviceHelper.IsDesktop;
 
         public AppShell(IAuthService authService, ILogger<AppShell> logger, IUserPresenceService userPresenceService)
         {
@@ -79,20 +82,47 @@ namespace TDFMAUI
         private void RegisterRoutes()
         {
             System.Diagnostics.Debug.WriteLine("[AppShell] Registering Shell routes...");
-            Routing.RegisterRoute(nameof(LoginPage), typeof(LoginPage));
+            // Auth pages
+            Routing.RegisterRoute(nameof(Features.Auth.LoginPage), typeof(Features.Auth.LoginPage));
             System.Diagnostics.Debug.WriteLine("[AppShell] Registered route: LoginPage");
-            Routing.RegisterRoute(nameof(SignupPage), typeof(SignupPage));
+            Routing.RegisterRoute(nameof(Features.Auth.SignupPage), typeof(Features.Auth.SignupPage));
             System.Diagnostics.Debug.WriteLine("[AppShell] Registered route: SignupPage");
+            
+            // Main pages
             Routing.RegisterRoute(nameof(MainPage), typeof(MainPage));
+            Routing.RegisterRoute(nameof(Features.Dashboard.DashboardPage), typeof(Features.Dashboard.DashboardPage));
+            
+            // User related pages
             Routing.RegisterRoute(nameof(ProfilePage), typeof(ProfilePage));
-            Routing.RegisterRoute(nameof(AddRequestPage), typeof(AddRequestPage));
-            Routing.RegisterRoute(nameof(RequestDetailsPage), typeof(RequestDetailsPage));
-            Routing.RegisterRoute(nameof(RequestsPage), typeof(RequestsPage));
-            Routing.RegisterRoute(nameof(MessagesPage), typeof(MessagesPage));
-            Routing.RegisterRoute(nameof(DiagnosticsPage), typeof(DiagnosticsPage));
+            Routing.RegisterRoute(nameof(UserProfilePage), typeof(UserProfilePage));
             Routing.RegisterRoute(nameof(UsersPage), typeof(UsersPage));
-            Routing.RegisterRoute("DashboardPage", typeof(Features.Dashboard.DashboardPage));
             Routing.RegisterRoute(nameof(UserDetailsPage), typeof(UserDetailsPage));
+            Routing.RegisterRoute(nameof(AddUserPage), typeof(AddUserPage));
+            Routing.RegisterRoute(nameof(EditUserPage), typeof(EditUserPage));
+            
+            // Request related pages
+            Routing.RegisterRoute(nameof(Features.Requests.AddRequestPage), typeof(Features.Requests.AddRequestPage));
+            Routing.RegisterRoute(nameof(Features.Requests.RequestDetailsPage), typeof(Features.Requests.RequestDetailsPage));
+            Routing.RegisterRoute(nameof(Pages.RequestsPage), typeof(Pages.RequestsPage));
+            Routing.RegisterRoute(nameof(Pages.RequestApprovalPage), typeof(Pages.RequestApprovalPage));
+            Routing.RegisterRoute(nameof(Pages.MyTeamPage), typeof(Pages.MyTeamPage));
+            
+            // Message related pages
+            Routing.RegisterRoute(nameof(Pages.MessagesPage), typeof(Pages.MessagesPage));
+            Routing.RegisterRoute(nameof(Pages.PrivateMessagesPage), typeof(Pages.PrivateMessagesPage));
+            Routing.RegisterRoute(nameof(Pages.GlobalMessagesPage), typeof(Pages.GlobalMessagesPage));
+            Routing.RegisterRoute(nameof(Pages.GlobalChatPage), typeof(Pages.GlobalChatPage));
+            Routing.RegisterRoute(nameof(Pages.NewMessagePage), typeof(Pages.NewMessagePage));
+            
+            // Other pages
+            Routing.RegisterRoute(nameof(NotificationsPage), typeof(NotificationsPage));
+            Routing.RegisterRoute(nameof(NotificationTestPage), typeof(NotificationTestPage));
+            Routing.RegisterRoute(nameof(DiagnosticsPage), typeof(DiagnosticsPage));
+            Routing.RegisterRoute(nameof(StartupDiagnosticPage), typeof(StartupDiagnosticPage));
+            Routing.RegisterRoute(nameof(ReportsPage), typeof(ReportsPage));
+            Routing.RegisterRoute(nameof(Features.Admin.AdminPage), typeof(Features.Admin.AdminPage));
+            Routing.RegisterRoute(nameof(Features.Settings.ThemeSettingsPage), typeof(Features.Settings.ThemeSettingsPage));
+            
             System.Diagnostics.Debug.WriteLine("[AppShell] All routes registered.");
         }
 

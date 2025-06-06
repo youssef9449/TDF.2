@@ -252,7 +252,7 @@ namespace TDFMAUI.Services
                     queryParams.Add($"department={Uri.EscapeDataString(department)}");
 
                 var queryString = string.Join("&", queryParams);
-                var response = await _httpClient.GetFromJsonAsync<ApiResponse<PaginatedResult<RequestResponseDto>>>($"api/requests/approval?{queryString}");
+                var response = await _httpClient.GetFromJsonAsync<ApiResponse<PaginatedResult<RequestResponseDto>>>($"{TDFShared.Constants.ApiRoutes.Requests.GetForApproval}?{queryString}");
 
                 return response ?? new ApiResponse<PaginatedResult<RequestResponseDto>>
                 {

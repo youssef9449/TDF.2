@@ -10,7 +10,7 @@ namespace TDFAPI.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route("api/[controller]")]
+    [Route(TDFShared.Constants.ApiRoutes.PushToken.Base)]
     public class PushTokenController : ControllerBase
     {
         private readonly IPushTokenService _pushTokenService;

@@ -434,8 +434,6 @@ namespace TDFMAUI.Services
                     return false;
                 }
 #elif MACCATALYST
-                using AppKit;
-                using Foundation;
                 try
                 {
                     var notification = new NSUserNotification

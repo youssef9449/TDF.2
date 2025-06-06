@@ -2,73 +2,104 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:controls="clr-namespace:TDFMAUI.Controls"
              x:Class="TDFMAUI.Features.Settings.ThemeSettingsPage"
              Title="Theme Settings"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{AppThemeBinding Light={StaticResource BackgroundColor}, Dark={StaticResource BackgroundColor}}">
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="20">
-            <Label Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/>
-            <Label Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"/>
-            <Label Text="Appearance" FontSize="24" FontAttributes="Bold" />
+            <Label Text="Appearance" Style="{StaticResource Headline}" />
             
-            <Frame Style="{StaticResource CardStyle}">
-                <VerticalStackLayout Spacing="15">
-                    <Label Text="Theme" FontSize="18" FontAttributes="Bold" />
-                    
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="15">
-                        <!-- System Default -->
-                        <Label Grid.Row="0" Grid.Column="0" 
-                               Text="Use System Setting" 
-                               VerticalOptions="Center" />
-                        <RadioButton x:Name="systemRadioButton" 
-                                    Grid.Row="0" Grid.Column="1" 
-                                    IsChecked="{Binding FollowSystemTheme}"
-                                    GroupName="ThemeGroup"
-                                    CheckedChanged="OnThemeRadioButtonCheckedChanged" />
+            <!-- Theme Selection Card -->
+            <controls:ThemedCard Title="Theme Mode">
+                <controls:ThemedCard.Content>
+                    <VerticalStackLayout Spacing="16">
+                        <RadioButton x:Name="SystemThemeRadio" 
+                                     Content="Follow System Theme" 
+                                     GroupName="ThemeGroup"
+                                     CheckedChanged="OnThemeRadioCheckedChanged" />
                         
-                        <!-- Light Mode -->
-                        <Label Grid.Row="1" Grid.Column="0" 
-                               Text="Light" 
-                               VerticalOptions="Center" />
-                        <RadioButton x:Name="lightRadioButton"
-                                    Grid.Row="1" Grid.Column="1" 
-                                    IsChecked="{Binding IsLightTheme}"
-                                    GroupName="ThemeGroup"
-                                    CheckedChanged="OnThemeRadioButtonCheckedChanged" />
+                        <RadioButton x:Name="LightThemeRadio" 
+                                     Content="Light Theme" 
+                                     GroupName="ThemeGroup"
+                                     CheckedChanged="OnThemeRadioCheckedChanged" />
                         
-                        <!-- Dark Mode -->
-                        <Label Grid.Row="2" Grid.Column="0" 
-                               Text="Dark" 
-                               VerticalOptions="Center" />
-                        <RadioButton x:Name="darkRadioButton"
-                                    Grid.Row="2" Grid.Column="1" 
-                                    IsChecked="{Binding IsDarkTheme}"
-                                    GroupName="ThemeGroup"
-                                    CheckedChanged="OnThemeRadioButtonCheckedChanged" />
-                    </Grid>
-                </VerticalStackLayout>
-            </Frame>
+                        <RadioButton x:Name="DarkThemeRadio" 
+                                     Content="Dark Theme" 
+                                     GroupName="ThemeGroup"
+                                     CheckedChanged="OnThemeRadioCheckedChanged" />
+                    </VerticalStackLayout>
+                </controls:ThemedCard.Content>
+            </controls:ThemedCard>
             
-            <Frame Style="{StaticResource CardStyle}">
-                <VerticalStackLayout Spacing="15">
-                    <Label Text="Current Theme Information" FontSize="18" FontAttributes="Bold" />
-                    
-                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="15">
-                        <Label Grid.Row="0" Grid.Column="0" Text="Current Theme:" FontAttributes="Bold" />
-                        <Label Grid.Row="0" Grid.Column="1" Text="{Binding CurrentThemeText}" />
+            <!-- Platform Adaptations Card -->
+            <controls:ThemedCard Title="Platform Adaptations">
+                <controls:ThemedCard.Content>
+                    <VerticalStackLayout Spacing="16">
+                        <HorizontalStackLayout>
+                            <CheckBox x:Name="PlatformAdaptationsCheckbox" 
+                                      CheckedChanged="OnPlatformAdaptationsCheckedChanged" />
+                            <Label Text="Use platform-specific theme adaptations" 
+                                   VerticalOptions="Center" />
+                        </HorizontalStackLayout>
                         
-                        <Label Grid.Row="1" Grid.Column="0" Text="System Theme:" FontAttributes="Bold" />
-                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding SystemThemeText}" />
+                        <Label Text="When enabled, the app will use platform-specific colors and styles for each platform (Windows, macOS, iOS, Android)." 
+                               FontSize="12" 
+                               TextColor="{AppThemeBinding Light={StaticResource TextTertiaryColor}, Dark={StaticResource TextTertiaryColor}}" />
+                    </VerticalStackLayout>
+                </controls:ThemedCard.Content>
+            </controls:ThemedCard>
+            
+            <!-- System Information Card -->
+            <controls:ThemedCard Title="Current System Information">
+                <controls:ThemedCard.Content>
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
+                        <Label Grid.Row="0" Grid.Column="0" Text="Platform:" FontAttributes="Bold" />
+                        <Label Grid.Row="0" Grid.Column="1" x:Name="PlatformLabel" />
                         
-                        <Label Grid.Row="2" Grid.Column="0" Text="Following System:" FontAttributes="Bold" />
-                        <Label Grid.Row="2" Grid.Column="1" Text="{Binding FollowingSystemText}" />
+                        <Label Grid.Row="1" Grid.Column="0" Text="Version:" FontAttributes="Bold" />
+                        <Label Grid.Row="1" Grid.Column="1" x:Name="VersionLabel" />
+                        
+                        <Label Grid.Row="2" Grid.Column="0" Text="Device Type:" FontAttributes="Bold" />
+                        <Label Grid.Row="2" Grid.Column="1" x:Name="DeviceTypeLabel" />
+                        
+                        <Label Grid.Row="3" Grid.Column="0" Text="System Theme:" FontAttributes="Bold" />
+                        <Label Grid.Row="3" Grid.Column="1" x:Name="SystemThemeLabel" />
+                        
+                        <Label Grid.Row="4" Grid.Column="0" Text="Current Theme:" FontAttributes="Bold" />
+                        <Label Grid.Row="4" Grid.Column="1" x:Name="CurrentThemeLabel" />
                     </Grid>
-                </VerticalStackLayout>
-            </Frame>
+                </controls:ThemedCard.Content>
+            </controls:ThemedCard>
+            
+            <!-- Theme Preview Card -->
+            <controls:ThemedCard Title="Theme Preview" ActionText="More" ActionCommand="{Binding ToggleThemeCommand}">
+                <controls:ThemedCard.Content>
+                    <VerticalStackLayout Spacing="16">
+                        <Label Text="This card demonstrates the current theme appearance" />
+                        
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button Grid.Column="0" Text="Primary" Style="{StaticResource ButtonPrimary}" />
+                            <Button Grid.Column="1" Text="Secondary" 
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray800}}" 
+                                    TextColor="{AppThemeBinding Light={StaticResource TextColor}, Dark={StaticResource TextColor}}" />
+                        </Grid>
+                        
+                        <Entry Placeholder="Enter text here" />
+                        
+                        <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource BorderColor}, Dark={StaticResource BorderColor}}" />
+                        
+                        <Label Text="Platform-specific styling is applied to this card and its contents" 
+                               FontSize="12" 
+                               TextColor="{AppThemeBinding Light={StaticResource TextTertiaryColor}, Dark={StaticResource TextTertiaryColor}}" />
+                    </VerticalStackLayout>
+                </controls:ThemedCard.Content>
+            </controls:ThemedCard>
             
             <Button Text="Toggle Theme" 
                     Command="{Binding ToggleThemeCommand}"
+                    Style="{StaticResource ButtonPrimary}"
                     HorizontalOptions="Center"
                     Margin="0,20,0,0" />
         </VerticalStackLayout>

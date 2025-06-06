@@ -337,6 +337,9 @@ namespace TDFMAUI
             builder.Services.AddSingleton<TDFMAUI.Services.ConnectivityService>();
             builder.Services.AddSingleton<TDFShared.Services.IConnectivityService>(sp => sp.GetRequiredService<TDFMAUI.Services.ConnectivityService>());
 
+            // Register theme service for platform-aware theme adaptation
+            builder.Services.AddSingleton<ThemeService>();
+
             // Register shared validation services
             builder.Services.AddSingleton<IValidationService, ValidationService>();
             builder.Services.AddSingleton<IBusinessRulesService, BusinessRulesService>();

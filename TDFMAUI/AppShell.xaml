@@ -70,6 +70,22 @@
             <ShellContent ContentTemplate="{DataTemplate pages:RequestsPage}" />
         </Tab>
 
+        <Tab Title="Reports" Icon="report.png" IsVisible="{Binding IsAdmin}">
+            <ShellContent ContentTemplate="{DataTemplate pages:ReportsPage}" />
+        </Tab>
+
+        <Tab Title="Admin" Icon="admin.png" IsVisible="{Binding IsAdmin}">
+            <ShellContent ContentTemplate="{DataTemplate admin:AdminPage}" />
+        </Tab>
+
+        <Tab Title="Settings" Icon="settings.png">
+            <ShellContent ContentTemplate="{DataTemplate settings:ThemeSettingsPage}" />
+        </Tab>
+
+        <Tab Title="Diagnostics" Icon="bug.png">
+            <ShellContent ContentTemplate="{DataTemplate pages:DiagnosticsPage}" />
+        </Tab>
+
         <Tab Title="Profile" Icon="profile.png">
             <ShellContent ContentTemplate="{DataTemplate pages:UserProfilePage}" />
         </Tab>
@@ -136,6 +152,27 @@
             Title="Diagnostics"
             ContentTemplate="{DataTemplate pages:DiagnosticsPage}"
             Route="DiagnosticsPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Startup Diagnostics" Icon="bug.png">
+        <ShellContent
+            Title="Startup Diagnostics"
+            ContentTemplate="{DataTemplate pages:StartupDiagnosticPage}"
+            Route="StartupDiagnosticPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Notification Test" Icon="notifications.png" IsVisible="{Binding IsDevelopmentMode}">
+        <ShellContent
+            Title="Notification Test"
+            ContentTemplate="{DataTemplate pages:NotificationTestPage}"
+            Route="NotificationTestPage" />
+    </FlyoutItem>
+
+    <FlyoutItem Title="Profile" Icon="profile.png">
+        <ShellContent
+            Title="Profile"
+            ContentTemplate="{DataTemplate pages:ProfilePage}"
+            Route="ProfilePage" />
     </FlyoutItem>
 
     <MenuItem Text="Logout"

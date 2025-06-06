@@ -317,8 +317,34 @@ namespace TDFMAUI.ViewModels
                     }
                     else
                     {
-                        _logger.LogWarning("Failed to update request {RequestId}", RequestId);
-                        await Shell.Current.DisplayAlert("Error", "Failed to update request.", "OK");
+                        string errorMessage = "Failed to update request.";
+                        
+                        // Check for specific error messages
+                        if (!string.IsNullOrEmpty(updateResponse?.Message))
+                        {
+                            // Handle specific error cases
+                            if (updateResponse.Message.Contains("conflicting request"))
+                            {
+                                errorMessage = "You already have a request for this date. Please choose a different date.";
+                            }
+                            else if (updateResponse.Message.Contains("balance"))
+                            {
+                                errorMessage = updateResponse.Message; // Use the exact leave balance error message
+                            }
+                            // We allow requests for past dates now
+                            else if (updateResponse.Message.Contains("current state"))
+                            {
+                                errorMessage = "This request cannot be edited in its current state.";
+                            }
+                            else
+                            {
+                                // Use the server's error message for other cases
+                                errorMessage = updateResponse.Message;
+                            }
+                        }
+                        
+                        _logger.LogWarning("Failed to update request {RequestId}: {ErrorMessage}", RequestId, errorMessage);
+                        await Shell.Current.DisplayAlert("Request Error", errorMessage, "OK");
                         return;
                     }
                 }
@@ -332,8 +358,30 @@ namespace TDFMAUI.ViewModels
                     }
                     else
                     {
-                        _logger.LogWarning("Failed to create request");
-                        await Shell.Current.DisplayAlert("Error", "Failed to create request.", "OK");
+                        string errorMessage = "Failed to create request.";
+                        
+                        // Check for specific error messages
+                        if (!string.IsNullOrEmpty(createResponse?.Message))
+                        {
+                            // Handle specific error cases
+                            if (createResponse.Message.Contains("conflicting request"))
+                            {
+                                errorMessage = "You already have a request for this date. Please choose a different date.";
+                            }
+                            else if (createResponse.Message.Contains("balance"))
+                            {
+                                errorMessage = createResponse.Message; // Use the exact leave balance error message
+                            }
+                            // We allow requests for past dates now
+                            else
+                            {
+                                // Use the server's error message for other cases
+                                errorMessage = createResponse.Message;
+                            }
+                        }
+                        
+                        _logger.LogWarning("Failed to create request: {ErrorMessage}", errorMessage);
+                        await Shell.Current.DisplayAlert("Request Error", errorMessage, "OK");
                         return;
                     }
                 }

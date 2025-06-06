@@ -20,9 +20,22 @@
 
             <Style x:Key="FormFieldTitleLabelStyle" TargetType="Label">
                 <Setter Property="FontAttributes" Value="Bold" />
-                <Setter Property="TextColor" Value="White" />
+                <Setter Property="TextColor" Value="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}" />
                 <Setter Property="VerticalOptions" Value="Center" />
                 <Setter Property="Margin" Value="0,0,0,5" />
+                <Setter Property="FontSize" Value="{OnPlatform WinUI=14, MacCatalyst=14, Default=14}" />
+                <Style.Triggers>
+                    <DataTrigger TargetType="Label" Binding="{Binding Source={x:Static helpers:DeviceHelper.IsDesktop}}" Value="True">
+                        <Setter Property="FontSize" Value="16" />
+                        <Setter Property="Margin" Value="0,0,10,5" />
+                    </DataTrigger>
+                    <DataTrigger TargetType="Label" Binding="{Binding Source={x:Static helpers:DeviceHelper.IsLargeScreen}}" Value="True">
+                        <Setter Property="FontSize" Value="16" />
+                    </DataTrigger>
+                    <DataTrigger TargetType="Label" Binding="{Binding Source={x:Static helpers:DeviceHelper.IsExtraLargeScreen}}" Value="True">
+                        <Setter Property="FontSize" Value="18" />
+                    </DataTrigger>
+                </Style.Triggers>
             </Style>
         </ResourceDictionary>
     </ContentPage.Resources>
@@ -35,30 +48,95 @@
                FontAttributes="Bold"
                TextColor="White"
                HorizontalOptions="Center"
-               Margin="0,0,0,20"/>
+               Margin="0,0,0,20">
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup Name="ScreenSizeStates">
+                    <VisualState Name="LargeScreen">
+                        <VisualState.StateTriggers>
+                            <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsLargeScreen}}" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Property="FontSize" Value="26" />
+                            <Setter Property="Margin" Value="0,5,0,25" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState Name="ExtraLargeScreen">
+                        <VisualState.StateTriggers>
+                            <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsExtraLargeScreen}}" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Property="FontSize" Value="30" />
+                            <Setter Property="Margin" Value="0,10,0,30" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+        </Label>
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Spacing="15" x:Name="FormContainer">
+                <!-- Use DeviceHelper properties for responsive layout with VisualStateManager -->
                 <VerticalStackLayout.MaximumWidthRequest>
                     <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="700" Desktop="600" />
                 </VerticalStackLayout.MaximumWidthRequest>
                 <VerticalStackLayout.HorizontalOptions>
-                     <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                    <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
                 </VerticalStackLayout.HorizontalOptions>
+                
+                <VisualStateManager.VisualStateGroups>
+                    <VisualStateGroup Name="ScreenSizeStates">
+                        <VisualState Name="CompactUI">
+                            <VisualState.StateTriggers>
+                                <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.UseCompactUI}}" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Property="MaximumWidthRequest" Value="10000" />
+                                <Setter Property="HorizontalOptions" Value="Fill" />
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState Name="MediumUI">
+                            <VisualState.StateTriggers>
+                                <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.UseMediumUI}}" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Property="MaximumWidthRequest" Value="700" />
+                                <Setter Property="HorizontalOptions" Value="Center" />
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState Name="ExpandedUI">
+                            <VisualState.StateTriggers>
+                                <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.UseExpandedUI}}" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Property="MaximumWidthRequest" Value="600" />
+                                <Setter Property="HorizontalOptions" Value="Center" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
 
                 <Frame x:Name="FormFrame"
                        BackgroundColor="#0d47a1"
-                       Padding="{OnIdiom Phone='12', Default='15'}"
-                       CornerRadius="15"
-                       HasShadow="True">
+                       Padding="{OnIdiom Phone='12', Default='20'}"
+                       CornerRadius="{OnPlatform WinUI=8, MacCatalyst=10, Default=15}"
+                       HasShadow="True"
+                       BorderColor="{OnPlatform WinUI={StaticResource WindowsBorderColor}, MacCatalyst={StaticResource MacOSControlBorderColor}, Default=Transparent}">
                     <VisualStateManager.VisualStateGroups>
                         <VisualStateGroup Name="DeviceStates">
                             <VisualState Name="Desktop">
+                                <VisualState.StateTriggers>
+                                    <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsDesktop}}" />
+                                </VisualState.StateTriggers>
                                 <VisualState.Setters>
-                                    <Setter Property="BackgroundColor" Value="#1976d2" />
+                                    <Setter Property="BackgroundColor" Value="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=#1976d2}" />
+                                    <Setter Property="Padding" Value="20" />
+                                    <Setter Property="Margin" Value="0,5,0,5" />
                                 </VisualState.Setters>
                             </VisualState>
                             <VisualState Name="Mobile">
+                                <VisualState.StateTriggers>
+                                    <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsMobile}}" />
+                                </VisualState.StateTriggers>
                                 <VisualState.Setters>
                                     <Setter Property="BackgroundColor" Value="#0d47a1" />
                                 </VisualState.Setters>
@@ -71,45 +149,45 @@
                         <!-- Layout for Desktop/Tablet (Grid) -->
                         <Grid x:Name="DesktopLayout" 
                               ColumnDefinitions="Auto,*" 
-                              ColumnSpacing="10" 
-                              RowSpacing="15"
-                              IsVisible="False">
-                            <VisualStateManager.VisualStateGroups>
-                                <VisualStateGroup Name="DeviceStates">
-                                    <VisualState Name="Desktop">
-                                        <VisualState.Setters>
-                                            <Setter Property="IsVisible" Value="True" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                    <VisualState Name="Mobile">
-                                        <VisualState.Setters>
-                                            <Setter Property="IsVisible" Value="False" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                </VisualStateGroup>
-                            </VisualStateManager.VisualStateGroups>
+                              ColumnSpacing="{OnPlatform WinUI=15, MacCatalyst=15, Default=10}" 
+                              RowSpacing="{OnPlatform WinUI=20, MacCatalyst=20, Default=15}"
+                              Margin="{OnPlatform WinUI='5,10,5,10', MacCatalyst='5,10,5,10', Default='0'}"
+                              IsVisible="{Binding Source={x:Static helpers:DeviceHelper.IsDesktop}}">
+                            
+                            <!-- Apply different margins based on screen size -->
+                            <Grid.Margin>
+                                <OnPlatform x:TypeArguments="Thickness">
+                                    <On Platform="WinUI" Value="10,15,10,15"/>
+                                    <On Platform="MacCatalyst" Value="10,15,10,15"/>
+                                    <On Platform="iOS,Android" Value="0,5,0,5"/>
+                                </OnPlatform>
+                            </Grid.Margin>
 
                             <Label Grid.Row="1" Grid.Column="0" Text="Leave Type" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                             <Border Grid.Row="1" Grid.Column="1" StrokeThickness="1"
                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='LeaveType'}"
-                                    Padding="0" BackgroundColor="#1565c0">
-                                <Picker ItemsSource="{Binding LeaveTypes}" SelectedItem="{Binding SelectedLeaveType}" Title="Select Leave Type" TextColor="White" BackgroundColor="Transparent"/>
+                                    Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=#1565c0}">
+                                <Picker ItemsSource="{Binding LeaveTypes}" SelectedItem="{Binding SelectedLeaveType}" 
+                                        Title="Select Leave Type" 
+                                        TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}" 
+                                        TitleColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default=#AAAAAA}"
+                                        BackgroundColor="Transparent"/>
                             </Border>
 
                             <Label Grid.Row="2" Grid.Column="0" Text="Start Date" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                             <Border Grid.Row="2" Grid.Column="1" StrokeThickness="1"
                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartDate'}"
-                                    Padding="0">
-                                <DatePicker Date="{Binding StartDate}" Format="D"/>
+                                    Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                                <DatePicker Date="{Binding StartDate}" Format="dddd, MMMM d, yyyy" TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"/>
                             </Border>
 
                             <Label Grid.Row="3" Grid.Column="0" Text="End Date" Style="{StaticResource FormFieldTitleLabelStyle}"
                                    IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}"/>
                             <Border Grid.Row="3" Grid.Column="1" StrokeThickness="1"
                                      Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndDate'}"
-                                     Padding="0"
+                                     Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}"
                                      IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}">
-                                 <DatePicker Date="{Binding EndDate}" Format="D"/>
+                                 <DatePicker Date="{Binding EndDate}" Format="dddd, MMMM d, yyyy" TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"/>
                              </Border>
 
                             <!-- Time Pickers for Permission/External Assignment - Desktop/Tablet -->
@@ -124,16 +202,16 @@
                                     <Label Text="From Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                                     <Border StrokeThickness="1"
                                             Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartTime'}"
-                                            Padding="0">
-                                         <TimePicker Time="{Binding StartTime}" />
+                                            Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                                         <TimePicker Time="{Binding StartTime}" Format="t" TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}" />
                                      </Border>
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="1">
                                     <Label Text="To Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                                     <Border StrokeThickness="1"
                                             Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndTime'}"
-                                            Padding="0">
-                                         <TimePicker Time="{Binding EndTime}" />
+                                            Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                                         <TimePicker Time="{Binding EndTime}" Format="t" TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}" />
                                      </Border>
                                 </VerticalStackLayout>
                             </Grid>
@@ -141,29 +219,28 @@
                             <Label Grid.Row="5" Grid.Column="0" Text="Reason" Style="{StaticResource FormFieldTitleLabelStyle}" VerticalOptions="Start"/>
                             <Border Grid.Row="5" Grid.Column="1" StrokeThickness="1"
                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='Reason'}"
-                                    Padding="0">
-                                <Editor Text="{Binding RequestReason}" Placeholder="Enter reason for leave (optional)" MaxLength="200" AutoSize="TextChanges" HeightRequest="80"/>
+                                    Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                                <Editor Text="{Binding RequestReason}" Placeholder="Enter reason for leave (optional)" 
+                                        TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                        PlaceholderColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default=#AAAAAA}"
+                                        MaxLength="200" AutoSize="TextChanges" HeightRequest="100"/>
                             </Border>
                         </Grid>
 
                         <!-- Layout for Phone (VerticalStackLayout) -->
                         <VerticalStackLayout x:Name="MobileLayout" 
-                                             Spacing="10"
-                                             IsVisible="True">
-                            <VisualStateManager.VisualStateGroups>
-                                <VisualStateGroup Name="DeviceStates">
-                                    <VisualState Name="Desktop">
-                                        <VisualState.Setters>
-                                            <Setter Property="IsVisible" Value="False" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                    <VisualState Name="Mobile">
-                                        <VisualState.Setters>
-                                            <Setter Property="IsVisible" Value="True" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                </VisualStateGroup>
-                            </VisualStateManager.VisualStateGroups>
+                                             Spacing="{OnIdiom Phone=10, Tablet=12, Desktop=15}"
+                                             IsVisible="{Binding Source={x:Static helpers:DeviceHelper.IsMobile}}">
+                            
+                            <!-- Apply different spacing based on screen size -->
+                            <VerticalStackLayout.Spacing>
+                                <OnPlatform x:TypeArguments="x:Double">
+                                    <On Platform="iOS,Android" Value="10"/>
+                                    <On Platform="WinUI,MacCatalyst">
+                                        <OnIdiom x:TypeArguments="x:Double" Phone="10" Tablet="12" Desktop="15"/>
+                                    </On>
+                                </OnPlatform>
+                            </VerticalStackLayout.Spacing>
 
                             <Label Text="Leave Type" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                             <Border StrokeThickness="1"
@@ -175,17 +252,17 @@
                             <Label Text="Start Date" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                             <Border StrokeThickness="1"
                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartDate'}"
-                                    Padding="0">
-                                <DatePicker Date="{Binding StartDate}" Format="D"/>
+                                    Padding="0" BackgroundColor="#1565c0">
+                                <DatePicker Date="{Binding StartDate}" Format="dddd, MMMM d, yyyy" TextColor="White"/>
                             </Border>
 
                             <Label Text="End Date" Style="{StaticResource FormFieldTitleLabelStyle}"
                                    IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}"/>
                             <Border StrokeThickness="1"
                                      Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndDate'}"
-                                     Padding="0"
+                                     Padding="0" BackgroundColor="#1565c0"
                                      IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}">
-                                 <DatePicker Date="{Binding EndDate}" Format="D"/>
+                                 <DatePicker Date="{Binding EndDate}" Format="dddd, MMMM d, yyyy" TextColor="White"/>
                              </Border>
 
                             <!-- Time Pickers for Permission/External Assignment - Phone -->
@@ -193,22 +270,24 @@
                                 <Label Text="From Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                                 <Border StrokeThickness="1"
                                         Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartTime'}"
-                                        Padding="0">
-                                     <TimePicker Time="{Binding StartTime}" />
+                                        Padding="0" BackgroundColor="#1565c0">
+                                     <TimePicker Time="{Binding StartTime}" Format="t" TextColor="White" />
                                  </Border>
                                 <Label Text="To Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
                                 <Border StrokeThickness="1"
                                         Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndTime'}"
-                                        Padding="0">
-                                     <TimePicker Time="{Binding EndTime}" />
+                                        Padding="0" BackgroundColor="#1565c0">
+                                     <TimePicker Time="{Binding EndTime}" Format="t" TextColor="White" />
                                  </Border>
                             </VerticalStackLayout>
                             
                             <Label Text="Reason" Style="{StaticResource FormFieldTitleLabelStyle}" VerticalOptions="Start"/>
                             <Border StrokeThickness="1"
                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='Reason'}"
-                                    Padding="0">
-                                <Editor Text="{Binding RequestReason}" Placeholder="Enter reason for leave (optional)" MaxLength="200" AutoSize="TextChanges" HeightRequest="80"/>
+                                    Padding="0" BackgroundColor="#1565c0">
+                                <Editor Text="{Binding RequestReason}" Placeholder="Enter reason for leave (optional)" 
+                                        TextColor="White" PlaceholderColor="#AAAAAA"
+                                        MaxLength="200" AutoSize="TextChanges" HeightRequest="80"/>
                             </Border>
                         </VerticalStackLayout>
                     </VerticalStackLayout>
@@ -225,27 +304,84 @@
                     Wrap="Wrap"
                     JustifyContent="Center"
                     Direction="Row"
-                    Margin="0,10,0,0">
-            <Button Text="Submit"
+                    Margin="{OnPlatform WinUI='0,20,0,10', MacCatalyst='0,20,0,10', Default='0,10,0,0'}">
+            <Button x:Name="SubmitButton"
+                    Text="Submit"
                     Command="{Binding SubmitRequestCommand}"
                     IsEnabled="{Binding IsNotBusy}"
-                    BackgroundColor="#64b5f6"
+                    BackgroundColor="{OnPlatform WinUI={StaticResource WindowsAccentColor}, MacCatalyst={StaticResource MacOSAccentColor}, Default=#64b5f6}"
                     TextColor="White"
-                    WidthRequest="{OnIdiom Phone=100, Default=120}"
-                    HeightRequest="{OnIdiom Phone=40, Default=45}"
-                    FontSize="{OnIdiom Phone=14, Default=16}"
-                    CornerRadius="10"
-                    Margin="5" />
-            <Button Text="Cancel"
+                    WidthRequest="{OnPlatform WinUI=140, MacCatalyst=140, Default={OnIdiom Phone=100, Default=120}}"
+                    HeightRequest="{OnPlatform WinUI=50, MacCatalyst=50, Default={OnIdiom Phone=40, Default=45}}"
+                    FontSize="{OnPlatform WinUI=16, MacCatalyst=16, Default={OnIdiom Phone=14, Default=16}}"
+                    CornerRadius="{OnPlatform WinUI=4, MacCatalyst=6, Default=10}"
+                    Margin="{OnPlatform WinUI='10,0', MacCatalyst='10,0', Default='5'}">
+                <VisualStateManager.VisualStateGroups>
+                    <VisualStateGroup Name="ScreenSizeStates">
+                        <VisualState Name="LargeScreen">
+                            <VisualState.StateTriggers>
+                                <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsLargeScreen}}" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Property="WidthRequest" Value="160" />
+                                <Setter Property="HeightRequest" Value="50" />
+                                <Setter Property="FontSize" Value="16" />
+                                <Setter Property="Margin" Value="15,0" />
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState Name="ExtraLargeScreen">
+                            <VisualState.StateTriggers>
+                                <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsExtraLargeScreen}}" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Property="WidthRequest" Value="180" />
+                                <Setter Property="HeightRequest" Value="55" />
+                                <Setter Property="FontSize" Value="18" />
+                                <Setter Property="Margin" Value="20,0" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+            </Button>
+            
+            <Button x:Name="CancelButton"
+                    Text="Cancel"
                     Command="{Binding CancelCommand}"
                     IsEnabled="{Binding IsNotBusy}"
-                    BackgroundColor="#9e9e9e"
+                    BackgroundColor="{OnPlatform WinUI=#555555, MacCatalyst=#666666, Default=#9e9e9e}"
                     TextColor="White"
-                    WidthRequest="{OnIdiom Phone=100, Default=120}"
-                    HeightRequest="{OnIdiom Phone=40, Default=45}"
-                    FontSize="{OnIdiom Phone=14, Default=16}"
-                    CornerRadius="10"
-                    Margin="5" />
+                    WidthRequest="{OnPlatform WinUI=140, MacCatalyst=140, Default={OnIdiom Phone=100, Default=120}}"
+                    HeightRequest="{OnPlatform WinUI=50, MacCatalyst=50, Default={OnIdiom Phone=40, Default=45}}"
+                    FontSize="{OnPlatform WinUI=16, MacCatalyst=16, Default={OnIdiom Phone=14, Default=16}}"
+                    CornerRadius="{OnPlatform WinUI=4, MacCatalyst=6, Default=10}"
+                    Margin="{OnPlatform WinUI='10,0', MacCatalyst='10,0', Default='5'}">
+                <VisualStateManager.VisualStateGroups>
+                    <VisualStateGroup Name="ScreenSizeStates">
+                        <VisualState Name="LargeScreen">
+                            <VisualState.StateTriggers>
+                                <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsLargeScreen}}" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Property="WidthRequest" Value="160" />
+                                <Setter Property="HeightRequest" Value="50" />
+                                <Setter Property="FontSize" Value="16" />
+                                <Setter Property="Margin" Value="15,0" />
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState Name="ExtraLargeScreen">
+                            <VisualState.StateTriggers>
+                                <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsExtraLargeScreen}}" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Property="WidthRequest" Value="180" />
+                                <Setter Property="HeightRequest" Value="55" />
+                                <Setter Property="FontSize" Value="18" />
+                                <Setter Property="Margin" Value="20,0" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+            </Button>
         </FlexLayout>
     </Grid>
 </ContentPage>

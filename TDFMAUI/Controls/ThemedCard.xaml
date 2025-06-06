@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             x:Class="TDFMAUI.Controls.ThemedCard">
+    <ContentView.Resources>
+        <ResourceDictionary>
+            <!-- Card styles that adapt to the current theme -->
+            <Style x:Key="CardBorderStyle" TargetType="Border">
+                <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource BorderColor}, Dark={StaticResource BorderColor}}" />
+                <Setter Property="StrokeThickness" Value="1" />
+                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource SurfaceColor}, Dark={StaticResource SurfaceColor}}" />
+                <Setter Property="Padding" Value="16" />
+                <Setter Property="Margin" Value="0,0,0,16" />
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="{AppThemeBinding Light=Black, Dark=Transparent}" 
+                                Offset="0,2" 
+                                Radius="4" 
+                                Opacity="{AppThemeBinding Light=0.1, Dark=0}" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            
+            <!-- Platform-specific card styles -->
+            <Style x:Key="WindowsCardStyle" TargetType="Border" BasedOn="{StaticResource CardBorderStyle}">
+                <Setter Property="StrokeShape" Value="RoundRectangle 4" />
+                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource WindowsControlBorderColor}, Dark={StaticResource WindowsControlBorderColor}}" />
+                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource WindowsControlBackgroundColor}, Dark={StaticResource WindowsControlBackgroundColor}}" />
+            </Style>
+            
+            <Style x:Key="MacOSCardStyle" TargetType="Border" BasedOn="{StaticResource CardBorderStyle}">
+                <Setter Property="StrokeShape" Value="RoundRectangle 6" />
+                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource MacOSControlBorderColor}, Dark={StaticResource MacOSControlBorderColor}}" />
+                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource MacOSControlBackgroundColor}, Dark={StaticResource MacOSControlBackgroundColor}}" />
+            </Style>
+            
+            <Style x:Key="iOSCardStyle" TargetType="Border" BasedOn="{StaticResource CardBorderStyle}">
+                <Setter Property="StrokeShape" Value="RoundRectangle 10" />
+                <Setter Property="Stroke" Value="Transparent" />
+                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource iOSSystemBackgroundColor}, Dark={StaticResource iOSSystemBackgroundColor}}" />
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="{AppThemeBinding Light=Black, Dark=#40000000}" 
+                                Offset="0,2" 
+                                Radius="8" 
+                                Opacity="{AppThemeBinding Light=0.15, Dark=0.3}" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            
+            <Style x:Key="AndroidCardStyle" TargetType="Border" BasedOn="{StaticResource CardBorderStyle}">
+                <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+                <Setter Property="Stroke" Value="Transparent" />
+                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource AndroidCardViewColor}, Dark={StaticResource AndroidCardViewColor}}" />
+                <Setter Property="Shadow">
+                    <Setter.Value>
+                        <Shadow Brush="{AppThemeBinding Light=Black, Dark=#40000000}" 
+                                Offset="0,1" 
+                                Radius="4" 
+                                Opacity="{AppThemeBinding Light=0.2, Dark=0.4}" />
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </ContentView.Resources>
+    
+    <Border x:Name="CardBorder" Style="{StaticResource CardBorderStyle}">
+        <Grid RowDefinitions="Auto,*">
+            <!-- Card Header -->
+            <Grid x:Name="HeaderGrid" 
+                  IsVisible="{Binding Source={x:Reference TitleLabel}, Path=Text, Converter={StaticResource StringNotEmptyConverter}}"
+                  ColumnDefinitions="*,Auto" 
+                  Padding="0,0,0,12">
+                <Label x:Name="TitleLabel" 
+                       Grid.Column="0"
+                       Text="{Binding Title}" 
+                       FontSize="18" 
+                       FontAttributes="Bold"
+                       TextColor="{AppThemeBinding Light={StaticResource TextColor}, Dark={StaticResource TextColor}}" />
+                
+                <Button x:Name="ActionButton" 
+                        Grid.Column="1"
+                        IsVisible="False"
+                        Text="Action"
+                        FontSize="14"
+                        Padding="10,5"
+                        HeightRequest="32"
+                        VerticalOptions="Start"
+                        HorizontalOptions="End" />
+            </Grid>
+            
+            <!-- Card Content -->
+            <ContentView x:Name="ContentContainer" 
+                         Grid.Row="1"
+                         Content="{Binding Content}" />
+        </Grid>
+    </Border>
+</ContentView>

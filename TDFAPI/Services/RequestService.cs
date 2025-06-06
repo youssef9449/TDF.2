@@ -133,7 +133,7 @@ namespace TDFAPI.Services
                         return key != null && balances.TryGetValue(key, out var balance) ? balance : 0;
                     },
                     HasConflictingRequestsAsync = _requestRepository.HasConflictingRequestsAsync,
-                    MinAdvanceNoticeDays = 1,
+                    MinAdvanceNoticeDays = 0, // Changed from 1 to 0 to allow same-day requests
                     MaxRequestDurationDays = 30
                 };
 

@@ -69,7 +69,7 @@ public partial class MainPage : ContentPage
 
     private async void OnAdminClicked(object sender, EventArgs e)
     {
-        if (App.CurrentUser != null && App.CurrentUser.IsAdmin == true)
+        if (App.CurrentUser != null && (App.CurrentUser.IsAdmin ?? false))
         {
             var requestService = App.Services.GetRequiredService<IRequestService>();
             var apiService = App.Services.GetRequiredService<ApiService>();

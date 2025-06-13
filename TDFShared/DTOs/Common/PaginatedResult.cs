@@ -14,7 +14,7 @@ namespace TDFShared.DTOs.Common
         /// Items for the current page
         /// </summary>
         [JsonPropertyName("items")]
-        public IEnumerable<T> Items { get; set; }
+        public required IEnumerable<T> Items { get; set; }
         
         /// <summary>
         /// Total number of items across all pages

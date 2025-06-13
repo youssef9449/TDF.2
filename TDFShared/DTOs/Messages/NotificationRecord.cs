@@ -29,13 +29,13 @@ namespace TDFShared.DTOs.Messages
         /// Title of the notification
         /// </summary>
         [JsonPropertyName("title")]
-        public string Title { get; set; }
+        public required string Title { get; set; }
         
         /// <summary>
         /// Content/message of the notification
         /// </summary>
         [JsonPropertyName("message")]
-        public string Message { get; set; }
+        public required string Message { get; set; }
         
         /// <summary>
         /// Type/severity of the notification
@@ -53,6 +53,6 @@ namespace TDFShared.DTOs.Messages
         /// Additional data associated with the notification
         /// </summary>
         [JsonPropertyName("data")]
-        public string Data { get; set; }
+        public required string Data { get; set; }
     }
 } 

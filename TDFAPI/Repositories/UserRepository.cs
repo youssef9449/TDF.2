@@ -92,7 +92,13 @@ namespace TDFAPI.Repositories
                                         .Take(pageSize)
                                         .ToListAsync();
                 var userDtos = users.Select(MapUserDtoFromEntity).ToList();
-                return new PaginatedResult<UserDto>(userDtos, page, pageSize, totalCount);
+                return new PaginatedResult<UserDto>
+                {
+                    Items = userDtos,
+                    PageNumber = page,
+                    PageSize = pageSize,
+                    TotalCount = totalCount
+                };
             }
             catch (Exception ex)
             {

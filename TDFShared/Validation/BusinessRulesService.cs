@@ -156,6 +156,11 @@ namespace TDFShared.Validation
             var errors = new List<string>();
 
             // Get request details
+            if (context.GetRequestAsync == null)
+            {
+                return BusinessRuleValidationResult.Failure("Request validation not available.");
+            }
+
             var getRequestAsync = context.GetRequestAsync;
             var request = await getRequestAsync(requestId);
             if (request == null)
@@ -170,6 +175,11 @@ namespace TDFShared.Validation
             }
 
             // Get approver details
+            if (context.GetUserAsync == null)
+            {
+                return BusinessRuleValidationResult.Failure("User validation not available.");
+            }
+
             var getUserAsync = context.GetUserAsync;
             var approver = await getUserAsync(approverId);
             if (approver == null)

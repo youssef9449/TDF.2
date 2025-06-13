@@ -17,22 +17,22 @@ namespace TDFShared.DTOs.Users
         /// <summary>
         /// Username
         /// </summary>
-        public string Username { get; set; }
+        public required string Username { get; set; }
         
         /// <summary>
         /// Full name
         /// </summary>
-        public string FullName { get; set; }
+        public required string FullName { get; set; }
         
         /// <summary>
         /// Department
         /// </summary>
-        public string Department { get; set; }
+        public required string Department { get; set; }
         
         /// <summary>
         /// Title
         /// </summary>
-        public string Title { get; set; }
+        public required string Title { get; set; }
         
         /// <summary>
         /// Whether the user is active
@@ -57,7 +57,7 @@ namespace TDFShared.DTOs.Users
         /// <summary>
         /// Profile picture data as a base64 string
         /// </summary>
-        public byte[] ProfilePictureData { get; set; }
+        public required byte[] ProfilePictureData { get; set; }
         
         /// <summary>
         /// Current presence status
@@ -67,12 +67,12 @@ namespace TDFShared.DTOs.Users
         /// <summary>
         /// User status message
         /// </summary>
-        public string StatusMessage { get; set; }
+        public required string StatusMessage { get; set; }
         
         /// <summary>
         /// Current device information
         /// </summary>
-        public string CurrentDevice { get; set; }
+        public required string CurrentDevice { get; set; }
         
         /// <summary>
         /// Whether the user is available for chat
@@ -87,7 +87,7 @@ namespace TDFShared.DTOs.Users
         /// <summary>
         /// Skills/competencies
         /// </summary>
-        public List<string> Skills { get; set; }
+        public required List<string> Skills { get; set; }
         
         /// <summary>
         /// When the user was created

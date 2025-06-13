@@ -711,11 +711,21 @@ public class AuthService : IAuthService
             var refreshRequest = new { Token = token, RefreshToken = refreshToken };
             var endpoint = "auth/refresh-token";
 
-            var tokenResponse = await _httpClientService.PostAsync<object, ApiResponse<TokenResponse>>(endpoint, refreshRequest);
+            var apiResponseContent = await _httpClientService.PostAsync<object, string>(endpoint, refreshRequest);
+            _logger.LogInformation("Raw refresh token API response: {Content}", apiResponseContent);
+            var tokenResponse = JsonSerializer.Deserialize<ApiResponse<TokenResponse>>(apiResponseContent, _serializerOptions);
 
             if (tokenResponse?.Data != null)
             {
                 await _secureStorageService.SaveTokenAsync(tokenResponse.Data.Token, tokenResponse.Data.Expiration);
+
+                // Update ApiConfig for in-memory token on desktop
+                if (DeviceHelper.IsDesktop)
+                {
+                    ApiConfig.CurrentToken = tokenResponse.Data.Token;
+                    ApiConfig.TokenExpiration = tokenResponse.Data.Expiration;
+                }
+
                 _logger.LogInformation("Token refreshed successfully");
                 return tokenResponse.Data;
             }
@@ -730,42 +740,7 @@ public class AuthService : IAuthService
         }
     }
 
-    public string GenerateJwtToken(UserDto user)
-    {
-        _logger.LogInformation("Generating JWT token for user {UserId}", user.UserID);
 
-        // Note: In a real application, this would generate a JWT token on the client side
-        // This is typically done on the server side, so this is a simplified version
-        // that just returns a mock token for demonstration purposes
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var key = System.Text.Encoding.ASCII.GetBytes("your-secret-key-here"); // Should be stored securely
-
-        var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.UserID.ToString()),
-            new Claim(ClaimTypes.Name, user.UserName ?? string.Empty)
-        };
-
-        // Add roles if available
-        if (user.Roles != null)
-        {
-            foreach (var role in user.Roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-        }
-
-        var tokenDescriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity(claims),
-            Expires = DateTime.UtcNow.AddHours(24),
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key),SecurityAlgorithms.HmacSha256Signature)
-        };
-
-        var token = tokenHandler.CreateToken(tokenDescriptor);
-        return tokenHandler.WriteToken(token);
-    }
 
     /// <summary>
     /// Hashes a password using the shared SecurityService

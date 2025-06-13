@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Text;
+using TDFMAUI.Helpers;
 
 namespace TDFMAUI.Services
 {
@@ -118,18 +119,68 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var logsDir = Path.Combine(FileSystem.AppDataDirectory, "Logs");
-                Directory.CreateDirectory(logsDir);
+                // First try to save to public Downloads folder (accessible to user)
+                string logFileName = $"TDF_log_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+                string logContent = GetFormattedLogs();
                 
-                var logFile = Path.Combine(logsDir, $"app_log_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-                File.WriteAllText(logFile, GetFormattedLogs());
-                
-                return true;
+                // First attempt: Use public storage for user access
+                try 
+                {
+                    // Get public Downloads directory (Android 10+ compatible)
+                    var publicDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+#if ANDROID
+
+                        // On Android, use the Download directory if possible
+                        publicDir = Android.OS.Environment.GetExternalStoragePublicDirectory(Android.OS.Environment.DirectoryDownloads).AbsolutePath;
+#elif IOS || MACCATALYST
+                        // On iOS/MacCatalyst, use the Documents directory
+                        publicDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+#endif
+                    
+                    var publicLogFile = Path.Combine(publicDir, logFileName);
+                    File.WriteAllText(publicLogFile, logContent);
+                    Debug.WriteLine($"Logs saved to public location: {publicLogFile}");
+                    return true;
+                }
+                catch (Exception publicEx)
+                {
+                    // Fallback to app's private directory if public storage fails
+                    Debug.WriteLine($"Failed to save to public storage: {publicEx.Message}, falling back to private storage");
+                    
+                    var logsDir = Path.Combine(FileSystem.AppDataDirectory, "Logs");
+                    Directory.CreateDirectory(logsDir);
+                    
+                    var logFile = Path.Combine(logsDir, logFileName);
+                    File.WriteAllText(logFile, logContent);
+                    
+                    // Try to share the file since we couldn't save to public location
+                    await ShareLogFile(logFile);
+                    
+                    return true;
+                }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error saving logs: {ex.Message}");
                 return false;
+            }
+        }
+        
+        private static async Task ShareLogFile(string logFilePath)
+        {
+            try
+            {
+                // Share the log file with other apps
+                await Share.RequestAsync(new ShareFileRequest
+                {
+                    Title = "Share TDF Log File",
+                    File = new ShareFile(logFilePath)
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error sharing log file: {ex.Message}");
             }
         }
         

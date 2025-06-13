@@ -20,30 +20,289 @@
                 "focus": true,
                 "panel": "dedicated",
                 "clear": true
-            }
+            
+      }
+    },
+    {
+  "label": "maui: Complete Android Deployment",
+  "dependsOrder": "sequence",
+  "dependsOn": [
+    "maui: Start Android Emulator",  // Start emulator first
+    "maui: Wait for Emulator",       // Wait for device connection
+    "maui: Wait for Boot Completion", // NEW - Wait for full boot
+    "maui: Build for Android",
+    "maui: Deploy to Android",
+    "maui: Launch App"
+  ],
+  "detail": "Full Android deployment including emulator startup",
+  "group": { "kind": "build", "isDefault": true }
+},
+    {
+      "label": "maui: Check Emulator Status",
+      "command": "${env:ANDROID_HOME}/platform-tools/adb.exe",
+      "type": "process",
+      "args": [
+        "-s",
+        "emulator-5554",
+        "shell",
+        "getprop",
+        "sys.boot_completed"
+      ],
+      "detail": "Check if emulator-5554 is ready",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "maui: Start Android Emulator",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { \"$env:LOCALAPPDATA\\Android\\Sdk\" }; $emulatorPath = Join-Path $androidHome 'emulator\\emulator.exe'; if (Test-Path $emulatorPath) { Write-Host \"Starting emulator with AVD: Pixel_7a\"; & $emulatorPath -avd Pixel_7a -no-snapshot-save -no-audio -gpu swiftshader_indirect } else { Write-Error \"Android emulator not found at $emulatorPath\" }"
+      ],
+      "detail": "Start Android emulator with Pixel_7a AVD",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^.*$",
+          "file": 1,
+          "location": 2,
+          "message": 3
         },
-        {
-            "label": "maui: Build for Android",
-            "command": "dotnet",
-            "type": "process",
-            "args": [
-                "build",
-                "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
-                "-f:net8.0-android",
-                "-c:Debug",
-                "/property:GenerateFullPaths=true",
-                "/consoleloggerparameters:NoSummary;ForceNoAlign"
-            ],
-            "problemMatcher": "$msCompile",
-            "detail": "Build TDFMAUI for Android",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "dedicated",
-                "clear": true
-            }
-        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*emulator.*$",
+          "endsPattern": "^.*boot completed.*$"
+        }
+      }
+    },{
+      "label": "maui: Wait for Boot Completion",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { \"$env:LOCALAPPDATA\\Android\\Sdk\" }; $adbPath = Join-Path $androidHome 'platform-tools\\adb.exe'; if (Test-Path $adbPath) { do { Start-Sleep -Seconds 2; $result = & $adbPath -s emulator-5554 shell getprop sys.boot_completed 2>$null } while ($result -ne '1'); Write-Host 'Emulator boot completed' } else { Write-Error \"ADB not found at $adbPath\" }"
+      ],
+      "detail": "Wait until emulator fully boots (Windows PowerShell)",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "maui: Wait for Emulator",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { \"$env:LOCALAPPDATA\\Android\\Sdk\" }; $adbPath = Join-Path $androidHome 'platform-tools\\adb.exe'; if (Test-Path $adbPath) { & $adbPath wait-for-device } else { Write-Error \"ADB not found at $adbPath\" }"
+      ],
+      "detail": "Wait for Android emulator to be ready",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "maui: Build for Android",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+        "-f:net8.0-android",
+        "-c:Debug",
+        "-p:EmbedAssembliesIntoApk=true",
+        "-p:AndroidEnableProfiledAot=false",
+        "-p:AndroidUseDefaultAotProfile=false",
+        "-p:AndroidPackageFormat=apk",
+        "-p:AndroidUseSharedRuntime=true",
+        "-p:AndroidLinkMode=None",
+        "-p:DebugSymbols=true",
+        "-p:DebugType=portable",
+        "/property:GenerateFullPaths=true",
+        "/property:AndroidSdkDirectory=${env:ANDROID_HOME}",
+        "/consoleloggerparameters:NoSummary;ForceNoAlign"
+      ],
+      "group": "build",
+      "problemMatcher": "$msCompile",
+      "detail": "Build TDFMAUI for Android",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "maui: Deploy to Android",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+        "-f:net8.0-android",
+        "-c:Debug",
+        "-t:Install",
+        "-p:EmbedAssembliesIntoApk=true",
+        "-p:AndroidEnableProfiledAot=false",
+        "-p:AndroidUseDefaultAotProfile=false",
+        "-p:AndroidPackageFormat=apk",
+        "-p:AndroidUseSharedRuntime=true",
+        "-p:AndroidLinkMode=None",
+        "-p:DebugSymbols=true",
+        "-p:DebugType=portable",
+        "/property:GenerateFullPaths=true",
+        "/property:AndroidSdkDirectory=${env:ANDROID_HOME}",
+        "/property:AdbTarget=-d",
+        "/consoleloggerparameters:NoSummary;ForceNoAlign"
+      ],
+      "problemMatcher": "$msCompile",
+      "detail": "Install TDFMAUI APK to emulator-5554",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "maui: Launch App",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { \"$env:LOCALAPPDATA\\Android\\Sdk\" }; $adbPath = Join-Path $androidHome 'platform-tools\\adb.exe'; if (Test-Path $adbPath) { & $adbPath -s emulator-5554 shell monkey -p com.TDF.TDFMAUI 1 } else { Write-Error \"ADB not found at $adbPath\" }"
+      ],
+      "detail": "Launch TDFMAUI app on emulator-5554 using package name",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "maui: Clean Android",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "clean",
+        "${workspaceFolder}/TDFMAUI/TDFMAUI.csproj",
+        "-f:net8.0-android",
+        "-c:Debug"
+      ],
+      "group": "build",
+      "detail": "Clean Android build artifacts",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "maui: Restart Emulator",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "maui: Kill Emulator",
+        "maui: Start Android Emulator"
+      ],
+      "detail": "Restart Android emulator"
+    },
+    {
+      "label": "maui: Kill Emulator",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { \"$env:LOCALAPPDATA\\Android\\Sdk\" }; $adbPath = Join-Path $androidHome 'platform-tools\\adb.exe'; if (Test-Path $adbPath) { & $adbPath emu kill } else { Write-Error \"ADB not found at $adbPath\" }"
+      ],
+      "detail": "Kill running Android emulator",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "maui: View Logs",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { \"$env:LOCALAPPDATA\\Android\\Sdk\" }; $adbPath = Join-Path $androidHome 'platform-tools\\adb.exe'; if (Test-Path $adbPath) { & $adbPath -s emulator-5554 logcat -s TDFMAUI } else { Write-Error \"ADB not found at $adbPath\" }"
+      ],
+      "detail": "View TDFMAUI app logs from emulator-5554",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "maui: Uninstall App",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { \"$env:LOCALAPPDATA\\Android\\Sdk\" }; $adbPath = Join-Path $androidHome 'platform-tools\\adb.exe'; if (Test-Path $adbPath) { & $adbPath -s emulator-5554 uninstall com.TDF.TDFMAUI } else { Write-Error \"ADB not found at $adbPath\" }"
+      ],
+      "detail": "Uninstall TDFMAUI app from emulator-5554",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "maui: List Available AVDs",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-Command",
+        "$androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { '$env:LOCALAPPDATA\\Android\\Sdk' }; $emulatorPath = Join-Path $androidHome 'emulator\\emulator.exe'; if (Test-Path $emulatorPath) { Write-Host \"Available AVDs:\"; & $emulatorPath -list-avds } else { Write-Error \"Android emulator not found at $emulatorPath. Please check your Android SDK installation.\" }"
+      ],
+      "detail": "List all available Android Virtual Devices",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated"
+      }
+    },
         {
             "label": "maui: Build for Windows",
             "command": "dotnet",

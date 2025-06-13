@@ -608,7 +608,7 @@ namespace TDFMAUI.Services
                  }
                  throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to get users");
              }
-            return response.Data ?? new PaginatedResult<UserDto>();
+            return response.Data ?? new PaginatedResult<UserDto>() { Items = new List<UserDto>() };
         }
 
         public async Task<List<UserDto>> GetUsersByDepartmentAsync(string department)
@@ -829,13 +829,13 @@ namespace TDFMAUI.Services
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             string endpoint = $"{ApiRoutes.Messages.Base}?userId={userId}&{BuildPaginationQueryString(pagination)}";
-             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
-                 return await QueueRequestAsync<PaginatedResult<ChatMessageDto>>(endpoint, pagination, "GET");
+            if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable: true))
+                return await QueueRequestAsync<PaginatedResult<ChatMessageDto>>(endpoint, pagination, "GET");
 
             var response = await GetAsync<ApiResponse<PaginatedResult<ChatMessageDto>>>(endpoint);
-             if(response == null || !response.Success)
+            if (response == null || !response.Success)
                 throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to get user messages");
-            return response.Data ?? new PaginatedResult<ChatMessageDto>();
+               return response.Data ?? new PaginatedResult<ChatMessageDto>() { Items = new List<ChatMessageDto>() };
         }
 
         public async Task<PaginatedResult<ChatMessageDto>> GetAllMessagesAsync(MessagePaginationDto pagination)
@@ -855,7 +855,7 @@ namespace TDFMAUI.Services
                  }
                  throw new ApiException(statusCode, response?.ErrorMessage ?? "Failed to get all messages");
              }
-            return response.Data ?? new PaginatedResult<ChatMessageDto>();
+            return response.Data ?? new PaginatedResult<ChatMessageDto>() { Items = new List<ChatMessageDto>() };
         }
 
         public async Task<ChatMessageDto> CreateMessageAsync(MessageCreateDto createDto)
@@ -940,7 +940,7 @@ namespace TDFMAUI.Services
             if (response == null || !response.Success)
                 throw new ApiException(response != null ? (HttpStatusCode)response.StatusCode : HttpStatusCode.BadRequest, response?.ErrorMessage ?? "Failed to get private messages");
 
-            return response.Data ?? new PaginatedResult<ChatMessageDto>();
+            return response.Data ?? new PaginatedResult<ChatMessageDto>() { Items = new List<ChatMessageDto>() };
         }
 
         public async Task<bool> MarkNotificationAsSeenAsync(int notificationId)

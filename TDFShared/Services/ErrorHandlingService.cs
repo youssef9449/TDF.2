@@ -19,7 +19,7 @@ namespace TDFShared.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public string GetFriendlyErrorMessage(Exception exception, string context = null)
+        public string GetFriendlyErrorMessage(Exception exception, string? context = null)
         {
             if (exception == null)
                 return "An unknown error occurred.";
@@ -53,7 +53,7 @@ namespace TDFShared.Services
             };
         }
 
-        public async Task ShowErrorAsync(Exception exception, string context = null, string title = "Error")
+        public async Task ShowErrorAsync(Exception exception, string? context = null, string title = "Error")
         {
             var message = GetFriendlyErrorMessage(exception, context);
             await ShowErrorAsync(message, title);
@@ -69,7 +69,7 @@ namespace TDFShared.Services
             await Task.CompletedTask;
         }
 
-        public string LogAndGetFriendlyMessage(Exception exception, string context, ILogger logger = null)
+        public string LogAndGetFriendlyMessage(Exception exception, string context, ILogger? logger = null)
         {
             var loggerToUse = logger ?? _logger;
             var friendlyMessage = GetFriendlyErrorMessage(exception, context);

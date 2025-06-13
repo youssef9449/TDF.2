@@ -73,7 +73,7 @@ namespace TDFShared.DTOs.Messages
         /// <summary>
         /// When the notification was created
         /// </summary>
-        public DateTime Timestamp { get; set; }
+        public new DateTime Timestamp { get; set; }
 
     }
 

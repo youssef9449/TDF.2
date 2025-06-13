@@ -1,11 +1,23 @@
 namespace TDFShared.DTOs.Auth
 {
-    // Represents the response after a registration attempt.
-    // Could include user details or just success status.
+    /// <summary>
+    /// Response DTO for user registration operations
+    /// </summary>
     public class RegisterResponseDto
     {
+        /// <summary>
+        /// Indicates whether the registration was successful
+        /// </summary>
         public bool Success { get; set; }
+
+        /// <summary>
+        /// Message describing the registration result
+        /// </summary>
         public string Message { get; set; } = string.Empty;
-        public UserDetailsDto? UserDetails { get; set; } // Optional: return user details on success
+
+        /// <summary>
+        /// User details for the newly registered user
+        /// </summary>
+        public UserDetailsDto UserDetails { get; set; } = new();
     }
 }

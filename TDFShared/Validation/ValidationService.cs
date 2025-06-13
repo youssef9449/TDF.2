@@ -19,11 +19,22 @@ namespace TDFShared.Validation
             @"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+        /// <summary>
+        /// Initializes a new instance of the ValidationService class.
+        /// </summary>
+        /// <param name="securityService">The security service used for password validation.</param>
+        /// <exception cref="ArgumentNullException">Thrown when securityService is null.</exception>
         public ValidationService(ISecurityService securityService)
         {
             _securityService = securityService ?? throw new ArgumentNullException(nameof(securityService));
         }
 
+        /// <summary>
+        /// Validates an object using data annotations and returns a validation result.
+        /// </summary>
+        /// <typeparam name="T">The type of object to validate.</typeparam>
+        /// <param name="obj">The object to validate.</param>
+        /// <returns>A ValidationResult containing the validation status and any error messages.</returns>
         public ValidationResult<T> ValidateObject<T>(T obj) where T : class
         {
             if (obj == null)
@@ -45,6 +56,12 @@ namespace TDFShared.Validation
             return ValidationResult<T>.Failure(errors);
         }
 
+        /// <summary>
+        /// Validates an object and throws a ValidationException if validation fails.
+        /// </summary>
+        /// <typeparam name="T">The type of object to validate.</typeparam>
+        /// <param name="obj">The object to validate.</param>
+        /// <exception cref="ValidationException">Thrown when validation fails.</exception>
         public void ValidateAndThrow<T>(T obj) where T : class
         {
             var result = ValidateObject(obj);
@@ -54,6 +71,13 @@ namespace TDFShared.Validation
             }
         }
 
+        /// <summary>
+        /// Validates a specific property of an object using its validation attributes.
+        /// </summary>
+        /// <param name="value">The value to validate.</param>
+        /// <param name="propertyName">The name of the property being validated.</param>
+        /// <param name="objectType">The type of the object containing the property.</param>
+        /// <returns>A list of validation error messages, if any.</returns>
         public List<string> ValidateProperty(object? value, string propertyName, Type objectType)
         {
             var errors = new List<string>();
@@ -84,6 +108,13 @@ namespace TDFShared.Validation
             return errors;
         }
 
+        /// <summary>
+        /// Validates that a required string value is not null or empty.
+        /// </summary>
+        /// <param name="value">The value to validate.</param>
+        /// <param name="fieldName">The name of the field being validated.</param>
+        /// <param name="customMessage">Optional custom error message.</param>
+        /// <returns>An error message if validation fails, null if validation succeeds.</returns>
         public string? ValidateRequired(string? value, string fieldName, string? customMessage = null)
         {
             if (string.IsNullOrWhiteSpace(value))
@@ -93,6 +124,14 @@ namespace TDFShared.Validation
             return null;
         }
 
+        /// <summary>
+        /// Validates that a string's length is within specified bounds.
+        /// </summary>
+        /// <param name="value">The string to validate.</param>
+        /// <param name="fieldName">The name of the field being validated.</param>
+        /// <param name="minLength">Optional minimum length requirement.</param>
+        /// <param name="maxLength">Optional maximum length requirement.</param>
+        /// <returns>An error message if validation fails, null if validation succeeds.</returns>
         public string? ValidateStringLength(string? value, string fieldName, int? minLength = null, int? maxLength = null)
         {
             if (string.IsNullOrEmpty(value))
@@ -113,6 +152,14 @@ namespace TDFShared.Validation
             return null;
         }
 
+        /// <summary>
+        /// Validates that a numeric value is within specified bounds.
+        /// </summary>
+        /// <param name="value">The value to validate.</param>
+        /// <param name="fieldName">The name of the field being validated.</param>
+        /// <param name="min">Optional minimum value.</param>
+        /// <param name="max">Optional maximum value.</param>
+        /// <returns>An error message if validation fails, null if validation succeeds.</returns>
         public string? ValidateRange(int value, string fieldName, int? min = null, int? max = null)
         {
             if (min.HasValue && value < min.Value)
@@ -128,6 +175,14 @@ namespace TDFShared.Validation
             return null;
         }
 
+        /// <summary>
+        /// Validates a date range, ensuring dates are in the future and end date is after start date.
+        /// </summary>
+        /// <param name="startDate">The start date of the range.</param>
+        /// <param name="endDate">Optional end date of the range.</param>
+        /// <param name="fieldName">The name of the field being validated.</param>
+        /// <param name="minDaysFromNow">Minimum number of days from today required.</param>
+        /// <returns>A list of validation error messages, if any.</returns>
         public List<string> ValidateDateRange(DateTime startDate, DateTime? endDate, string fieldName = "Date", int minDaysFromNow = 0)
         {
             var errors = new List<string>();
@@ -150,6 +205,11 @@ namespace TDFShared.Validation
             return errors;
         }
 
+        /// <summary>
+        /// Validates a password for strength and security requirements.
+        /// </summary>
+        /// <param name="password">The password to validate.</param>
+        /// <returns>A PasswordValidationResult containing validation status, errors, and strength assessment.</returns>
         public PasswordValidationResult ValidatePassword(string? password)
         {
             if (string.IsNullOrEmpty(password))
@@ -241,6 +301,12 @@ namespace TDFShared.Validation
             return true;
         }
 
+        /// <summary>
+        /// Sanitizes input string by removing potentially dangerous content.
+        /// </summary>
+        /// <param name="input">The input string to sanitize.</param>
+        /// <param name="allowHtml">Whether to allow HTML content in the output.</param>
+        /// <returns>A sanitized version of the input string.</returns>
         public string SanitizeInput(string? input, bool allowHtml = false)
         {
             if (string.IsNullOrEmpty(input))
@@ -269,6 +335,11 @@ namespace TDFShared.Validation
             return sanitized;
         }
 
+        /// <summary>
+        /// Checks if a string contains potentially dangerous patterns.
+        /// </summary>
+        /// <param name="input">The input string to check.</param>
+        /// <returns>True if dangerous patterns are found, false otherwise.</returns>
         public bool ContainsDangerousPatterns(string? input)
         {
             if (string.IsNullOrEmpty(input))

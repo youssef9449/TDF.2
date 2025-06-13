@@ -143,11 +143,34 @@ namespace TDFShared.Validation
     /// </summary>
     public enum PasswordStrength
     {
+        /// <summary>
+        /// Password meets no or very few security requirements
+        /// </summary>
         VeryWeak = 0,
+
+        /// <summary>
+        /// Password meets minimal security requirements
+        /// </summary>
         Weak = 1,
+
+        /// <summary>
+        /// Password meets basic security requirements
+        /// </summary>
         Fair = 2,
+
+        /// <summary>
+        /// Password meets most security requirements
+        /// </summary>
         Good = 3,
+
+        /// <summary>
+        /// Password meets all security requirements
+        /// </summary>
         Strong = 4,
+
+        /// <summary>
+        /// Password exceeds all security requirements
+        /// </summary>
         VeryStrong = 5
     }
 }

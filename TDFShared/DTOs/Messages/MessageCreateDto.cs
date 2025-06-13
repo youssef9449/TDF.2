@@ -40,6 +40,6 @@ namespace TDFShared.DTOs.Messages
         [JsonPropertyName("content")]
         [Required(ErrorMessage = "Message content cannot be empty.")]
         [StringLength(2000, ErrorMessage = "Message content cannot exceed 2000 characters.")]
-        public string MessageText { get; set; }
+        public required string MessageText { get; set; }
     }
 } 

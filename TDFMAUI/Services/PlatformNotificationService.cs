@@ -60,13 +60,13 @@ namespace TDFMAUI.Services
         {
             _logger = logger;
             _localStorage = localStorage;
-            
+
             // Initialize notification event handlers
             InitializeNotificationEventHandlers();
-            
+
             // Initialize scheduled notifications
             InitializeScheduledNotificationsAsync().ConfigureAwait(false);
-            
+
             // Initialize cleanup timer for notification ID mappings
             _cleanupTimer = new System.Threading.Timer(
                 async (state) => await PerformPeriodicCleanupAsync(),
@@ -75,7 +75,7 @@ namespace TDFMAUI.Services
                 CLEANUP_INTERVAL_MS  // Periodic interval
             );
         }
-        
+
         private async Task PerformPeriodicCleanupAsync()
         {
             try
@@ -88,7 +88,7 @@ namespace TDFMAUI.Services
                 _logger.LogError(ex, "Error during periodic notification cleanup");
             }
         }
-        
+
         private void InitializeNotificationEventHandlers()
         {
             try
@@ -97,6 +97,10 @@ namespace TDFMAUI.Services
                 // Register for notification delivery events
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived += OnNotificationReceived;
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped += OnNotificationTapped;
+                Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationCancelled += OnNotificationCancelled;
+#endif
+#if MACCATALYST
+                UNUserNotificationCenter.Current.Delegate = new CustomUNUserNotificationCenterDelegate();
 #endif
                 _logger.LogInformation("Notification event handlers initialized successfully");
             }
@@ -105,15 +109,16 @@ namespace TDFMAUI.Services
                 _logger.LogError(ex, "Error initializing notification event handlers");
             }
         }
-        
-#if !WINDOWS
+
+
+#if !WINDOWS && !MACCATALYST
         private void OnNotificationReceived(Plugin.LocalNotification.EventArgs.NotificationEventArgs e)
         {
             try
             {
-                _logger.LogInformation("Notification received: ID={NotificationId}, Title={Title}", 
+                _logger.LogInformation("Notification received: ID={NotificationId}, Title={Title}",
                     e.Request.NotificationId, e.Request.Title);
-                
+
                 // Convert to our shared DTO type and raise our event
                 var notificationArgs = new TDFShared.DTOs.Messages.NotificationEventArgs
                 {
@@ -123,31 +128,31 @@ namespace TDFMAUI.Services
                     Data = e.Request.ReturningData
                 };
                 LocalNotificationRequested?.Invoke(this, notificationArgs);
-                
+
                 // Use Task.Run to avoid blocking the UI thread with async operations
-                Task.Run(async () => 
+                Task.Run(async () =>
                 {
                     try
                     {
                         // First check if the tracking ID is directly available in the ReturningData
                         string trackingId = e.Request.ReturningData;
-                        
+
                         // If not found in ReturningData, check the mapping
                         if (string.IsNullOrEmpty(trackingId))
                         {
                             // Get the mapping between system notification ID and our tracking ID
-                            var notificationMap = await _localStorage.GetItemAsync<Dictionary<int, string>>("notification_id_map") 
+                            var notificationMap = await _localStorage.GetItemAsync<Dictionary<int, string>>("notification_id_map")
                                 ?? new Dictionary<int, string>();
-                            
+
                             // Look up our tracking ID
                             notificationMap.TryGetValue(e.Request.NotificationId, out trackingId);
                         }
-                        
+
                         if (!string.IsNullOrEmpty(trackingId))
                         {
                             // Update delivery status to indicate successful delivery
                             bool success = await UpdateNotificationDeliveryStatusAsync(trackingId, true);
-                            
+
                             if (success)
                             {
                                 _logger.LogInformation("Updated delivery status for notification {TrackingId}", trackingId);
@@ -159,7 +164,7 @@ namespace TDFMAUI.Services
                         }
                         else
                         {
-                            _logger.LogWarning("Received notification with ID {NotificationId} but no tracking ID was found", 
+                            _logger.LogWarning("Received notification with ID {NotificationId} but no tracking ID was found",
                                 e.Request.NotificationId);
                         }
                     }
@@ -174,14 +179,14 @@ namespace TDFMAUI.Services
                 _logger.LogError(ex, "Error handling notification received event");
             }
         }
-        
+
         private void OnNotificationTapped(Plugin.LocalNotification.EventArgs.NotificationEventArgs e)
         {
             try
             {
-                _logger.LogInformation("Notification tapped: ID={NotificationId}, Title={Title}", 
+                _logger.LogInformation("Notification tapped: ID={NotificationId}, Title={Title}",
                     e.Request.NotificationId, e.Request.Title);
-                
+
                 // Convert to our shared DTO type and raise our event
                 var notificationArgs = new TDFShared.DTOs.Messages.NotificationEventArgs
                 {
@@ -191,31 +196,31 @@ namespace TDFMAUI.Services
                     Data = e.Request.ReturningData
                 };
                 LocalNotificationRequested?.Invoke(this, notificationArgs);
-                
+
                 // Use Task.Run to avoid blocking the UI thread with async operations
-                Task.Run(async () => 
+                Task.Run(async () =>
                 {
                     try
                     {
                         // First check if the tracking ID is directly available in the ReturningData
                         string trackingId = e.Request.ReturningData;
-                        
+
                         // If not found in ReturningData, check the mapping
                         if (string.IsNullOrEmpty(trackingId))
                         {
                             // Get the mapping between system notification ID and our tracking ID
-                            var notificationMap = await _localStorage.GetItemAsync<Dictionary<int, string>>("notification_id_map") 
+                            var notificationMap = await _localStorage.GetItemAsync<Dictionary<int, string>>("notification_id_map")
                                 ?? new Dictionary<int, string>();
-                            
+
                             // Look up our tracking ID
                             notificationMap.TryGetValue(e.Request.NotificationId, out trackingId);
                         }
-                        
+
                         if (!string.IsNullOrEmpty(trackingId))
                         {
                             // First ensure it's marked as delivered
                             bool success = await UpdateNotificationDeliveryStatusAsync(trackingId, true);
-                            
+
                             if (success)
                             {
                                 _logger.LogInformation("Updated delivery status for notification {TrackingId}", trackingId);
@@ -227,7 +232,7 @@ namespace TDFMAUI.Services
                         }
                         else
                         {
-                            _logger.LogWarning("Tapped notification with ID {NotificationId} but no tracking ID was found", 
+                            _logger.LogWarning("Tapped notification with ID {NotificationId} but no tracking ID was found",
                                 e.Request.NotificationId);
                         }
                     }
@@ -274,7 +279,7 @@ namespace TDFMAUI.Services
                 // Check if the notification exists in our stored list
                 var scheduledNotifications = await GetScheduledNotificationsAsync();
                 var notification = scheduledNotifications.FirstOrDefault(n => n.Id == id);
-                
+
                 // If not found in our list, it's invalid
                 if (notification == null)
                     return false;
@@ -292,13 +297,13 @@ namespace TDFMAUI.Services
         {
             if (string.IsNullOrWhiteSpace(title))
                 throw new ArgumentException("Notification title cannot be empty", nameof(title));
-            
+
             if (string.IsNullOrWhiteSpace(message))
                 throw new ArgumentException("Notification message cannot be empty", nameof(message));
-            
+
             if (title.Length > MAX_TITLE_LENGTH)
                 throw new ArgumentException($"Notification title exceeds maximum length of {MAX_TITLE_LENGTH} characters", nameof(title));
-            
+
             if (message.Length > MAX_NOTIFICATION_LENGTH)
                 throw new ArgumentException($"Notification message exceeds maximum length of {MAX_NOTIFICATION_LENGTH} characters", nameof(message));
         }
@@ -310,10 +315,10 @@ namespace TDFMAUI.Services
 
             // Remove any potentially harmful HTML/script content
             content = System.Text.RegularExpressions.Regex.Replace(content, "<[^>]*>", string.Empty);
-            
+
             // Escape special characters for XML/HTML
             content = System.Security.SecurityElement.Escape(content);
-            
+
             return content;
         }
 
@@ -412,7 +417,7 @@ namespace TDFMAUI.Services
                 // Use the tracking ID passed from the parent method
                 // If we need to create a new one, we'll use the title and message to create a consistent ID
                 string trackingId = await LogNotificationAsync(title, message, notificationType, data, false);
-                
+
 #if WINDOWS
                 try
                 {
@@ -490,14 +495,14 @@ namespace TDFMAUI.Services
 #if !WINDOWS
                 // Generate a unique notification ID
                 var notificationId = GenerateNotificationId();
-                
+
                 // Log the notification for tracking
                 string trackingId = await LogNotificationAsync(title, message, notificationType, data, false);
-                
+
                 // Store the mapping between system notification ID and our tracking ID
-                var notificationMap = await _localStorage.GetItemAsync<Dictionary<int, string>>("notification_id_map") 
+                var notificationMap = await _localStorage.GetItemAsync<Dictionary<int, string>>("notification_id_map")
                     ?? new Dictionary<int, string>();
-                
+
                 notificationMap[notificationId] = trackingId;
                 await _localStorage.SetItemAsync("notification_id_map", notificationMap);
 
@@ -529,19 +534,18 @@ namespace TDFMAUI.Services
                 }
 
                 return true;
-#else
+#endif
                 // For Windows, use in-app notification
                 await ShowLocalNotificationAsync(title, message, notificationType, data);
                 return false;
-#endif
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error showing mobile notification");
-                
+
                 // Log the failed notification with error details
                 await LogNotificationAsync(title, message, notificationType, data, false, ex.Message);
-                
+
                 // Fall back to in-app notification
                 await ShowLocalNotificationAsync(title, message, notificationType, data);
                 return false;
@@ -584,7 +588,7 @@ namespace TDFMAUI.Services
 
                 // Generate a unique tracking ID for this notification
                 string trackingId = Guid.NewGuid().ToString();
-                
+
                 history.Add(new TDFMAUI.Helpers.NotificationRecord
                 {
                     Id = trackingId,
@@ -605,7 +609,7 @@ namespace TDFMAUI.Services
                 }
 
                 await _localStorage.SetItemAsync("notification_history", history);
-                
+
                 // Return the tracking ID so it can be used for delivery status updates
                 return trackingId;
             }
@@ -625,7 +629,7 @@ namespace TDFMAUI.Services
                 {
                     return new List<TDFShared.DTOs.Messages.NotificationRecord>();
                 }
-                
+
                 // Convert from local NotificationRecord to shared NotificationRecord
                 return localHistory.Select(local => new TDFShared.DTOs.Messages.NotificationRecord
                 {
@@ -842,7 +846,7 @@ namespace TDFMAUI.Services
                 {
                     var notifications = await GetScheduledNotificationsAsync();
                     var notification = notifications.FirstOrDefault(n => n.Id == id);
-                    
+
                     if (notification == null)
                     {
                         _logger.LogWarning("Attempted to update non-existent notification: {NotificationId}", id);
@@ -900,7 +904,7 @@ namespace TDFMAUI.Services
                     _logger.LogWarning("Cannot update delivery status: Invalid notification ID");
                     return false;
                 }
-                
+
                 var history = await _localStorage.GetItemAsync<List<TDFMAUI.Helpers.NotificationRecord>>("notification_history")
                     ?? new List<TDFMAUI.Helpers.NotificationRecord>();
 
@@ -914,12 +918,12 @@ namespace TDFMAUI.Services
                     notification.RetryCount++;
 
                     await _localStorage.SetItemAsync("notification_history", history);
-                    
+
                     // If this was a successful delivery, clean up the notification ID mapping
                     if (wasDelivered)
                     {
                         await CleanupNotificationIdMappingAsync();
-                        
+
                         // Raise an event or perform any additional actions for successful delivery
                         _logger.LogInformation("Notification {NotificationId} was successfully delivered", notificationId);
                     }
@@ -927,19 +931,19 @@ namespace TDFMAUI.Services
                     {
                         // Handle failure case with specific error
                         _logger.LogWarning("Notification {NotificationId} delivery failed: {Error}", notificationId, error);
-                        
+
                         // Implement retry logic if needed
                         if (notification.RetryCount <= 3)
                         {
-                            _logger.LogInformation("Will retry notification {NotificationId} delivery (attempt {RetryCount}/3)", 
+                            _logger.LogInformation("Will retry notification {NotificationId} delivery (attempt {RetryCount}/3)",
                                 notificationId, notification.RetryCount);
                             // Retry logic would go here
                         }
                     }
-                    
+
                     _logger.LogInformation("Updated delivery status for notification {NotificationId}: Delivered={WasDelivered}, Error={Error}",
                         notificationId, wasDelivered, error ?? "None");
-                    
+
                     return true;
                 }
                 else
@@ -954,7 +958,7 @@ namespace TDFMAUI.Services
                 return false;
             }
         }
-        
+
         /// <summary>
         /// Cleans up old notification ID mappings to prevent memory leaks
         /// </summary>
@@ -963,36 +967,36 @@ namespace TDFMAUI.Services
             try
             {
                 // Get the current notification ID map
-                var notificationMap = await _localStorage.GetItemAsync<Dictionary<int, string>>("notification_id_map") 
+                var notificationMap = await _localStorage.GetItemAsync<Dictionary<int, string>>("notification_id_map")
                     ?? new Dictionary<int, string>();
-                
+
                 if (notificationMap.Count == 0)
                     return;
-                
+
                 // Get the notification history
                 var history = await _localStorage.GetItemAsync<List<TDFMAUI.Helpers.NotificationRecord>>("notification_history")
                     ?? new List<TDFMAUI.Helpers.NotificationRecord>();
-                
+
                 // Create a set of all tracking IDs that have been delivered
                 var deliveredIds = new HashSet<string>(
                     history.Where(n => n.WasDelivered).Select(n => n.Id)
                 );
-                
+
                 // Find all notification IDs that map to delivered tracking IDs
                 var idsToRemove = notificationMap
                     .Where(kvp => deliveredIds.Contains(kvp.Value))
                     .Select(kvp => kvp.Key)
                     .ToList();
-                
+
                 // Remove them from the map
                 foreach (var id in idsToRemove)
                 {
                     notificationMap.Remove(id);
                 }
-                
+
                 // Save the updated map
                 await _localStorage.SetItemAsync("notification_id_map", notificationMap);
-                
+
                 if (idsToRemove.Count > 0)
                 {
                     _logger.LogInformation("Cleaned up {Count} notification ID mappings", idsToRemove.Count);
@@ -1013,14 +1017,14 @@ namespace TDFMAUI.Services
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived -= OnNotificationReceived;
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped -= OnNotificationTapped;
 #endif
-                
+
                 // Dispose the cleanup timer
                 _cleanupTimer?.Dispose();
-                
+
                 // Perform one final cleanup of notification ID mappings
-                Task.Run(async () => 
+                Task.Run(async () =>
                 {
-                    try 
+                    try
                     {
                         await CleanupNotificationIdMappingAsync();
                     }
@@ -1029,7 +1033,7 @@ namespace TDFMAUI.Services
                         _logger.LogError(cleanupEx, "Error during final notification ID mapping cleanup");
                     }
                 }).Wait(1000); // Wait up to 1 second for cleanup to complete
-                
+
                 _logger.LogInformation("PlatformNotificationService disposed");
             }
             catch (Exception ex)
@@ -1038,7 +1042,7 @@ namespace TDFMAUI.Services
             }
         }
 
-        #if MACCATALYST
+#if MACCATALYST
         private async Task ShowMacNotificationAsync(string title, string message, string? data = null)
         {
             try
@@ -1067,6 +1071,6 @@ namespace TDFMAUI.Services
                 System.Diagnostics.Debug.WriteLine($"Error showing macOS notification: {ex.Message}");
             }
         }
-        #endif
+#endif
     }
 }

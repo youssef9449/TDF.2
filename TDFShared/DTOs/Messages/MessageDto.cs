@@ -46,7 +46,7 @@ namespace TDFShared.DTOs.Messages
         /// Profile image URL of the user who sent the message
         /// </summary>
         [JsonPropertyName("fromUserProfileImage")]
-        public byte[] FromUserProfileImage { get; set; }
+        public required byte[] FromUserProfileImage { get; set; }
         
         /// <summary>
         /// When the message was sent

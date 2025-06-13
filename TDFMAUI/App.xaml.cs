@@ -14,8 +14,11 @@ using TDFShared.Enums;
 using System.Linq;
 using TDFMAUI.Helpers;
 using TDFMAUI.Features.Dashboard;
+#if ANDROID || IOS
 using Plugin.Firebase.CloudMessaging;
 using Plugin.Firebase.CloudMessaging.EventArgs;
+#endif
+
 
 namespace TDFMAUI
 {
@@ -197,9 +200,10 @@ namespace TDFMAUI
                 // Use standard console logging until DebugService is ready
                 System.Diagnostics.Debug.WriteLine("App constructor starting");
 
-                // --- Plugin.Firebase v3+ push notification event handlers ---
+                // Set up Firebase Cloud Messaging for push notifications
+#if ANDROID || IOS
                 SetupFirebaseCloudMessaging();
-                // --- End Plugin.Firebase push notification event handlers ---
+#endif
 
                 System.Diagnostics.Debug.WriteLine("App constructor finished");
             }
@@ -1045,11 +1049,11 @@ namespace TDFMAUI
         {
             try
             {
-                // Configure the merged dictionaries for the current theme
-                ConfigureThemeDictionaries();
-                
                 // Add adaptive theme bindings programmatically to ensure proper initialization order
                 AddAdaptiveThemeBindings();
+                
+                // Ensure all necessary resource dictionaries are merged
+                EnsureAllResourceDictionariesMerged();
                 
                 // Let ThemeHelper handle theme application
                 ThemeHelper.ApplyTheme();
@@ -1083,78 +1087,6 @@ namespace TDFMAUI
             }
         }
         
-        /// <summary>
-        /// Configure the merged dictionaries for the current theme
-        /// </summary>
-        private void ConfigureThemeDictionaries()
-        {
-            try
-            {
-                var appTheme = Application.Current?.RequestedTheme ?? AppTheme.Light;
-                var merged = Application.Current.Resources.MergedDictionaries;
-                
-                if (merged == null || merged.Count == 0)
-                    return;
-                
-                // Find the theme dictionaries
-                var colorsDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Colors.xaml"));
-                var lightDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Colors.Light.xaml"));
-                var darkDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Colors.Dark.xaml"));
-                var platformDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("PlatformColors.xaml"));
-                var stylesDict = merged.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Styles.xaml"));
-                
-                // Create a new ordered list of dictionaries
-                var orderedDictionaries = new List<ResourceDictionary>();
-                
-                // Add the appropriate theme dictionary first
-                if (appTheme == AppTheme.Dark && darkDict != null)
-                {
-                    orderedDictionaries.Add(darkDict);
-                }
-                else if (lightDict != null)
-                {
-                    orderedDictionaries.Add(lightDict);
-                }
-                
-                // Add colors dictionary next
-                if (colorsDict != null && !orderedDictionaries.Contains(colorsDict))
-                {
-                    orderedDictionaries.Add(colorsDict);
-                }
-                
-                // Add platform colors dictionary after the theme colors
-                if (platformDict != null && !orderedDictionaries.Contains(platformDict))
-                {
-                    orderedDictionaries.Add(platformDict);
-                }
-                
-                // Add all other dictionaries except styles
-                foreach (var dict in merged)
-                {
-                    if (dict != lightDict && dict != darkDict && dict != stylesDict && dict != colorsDict && dict != platformDict)
-                    {
-                        orderedDictionaries.Add(dict);
-                    }
-                }
-                
-                // Add styles dictionary last
-                if (stylesDict != null)
-                {
-                    orderedDictionaries.Add(stylesDict);
-                }
-                
-                // Replace the merged dictionaries with our ordered list
-                merged.Clear();
-                foreach (var dict in orderedDictionaries)
-                {
-                    merged.Add(dict);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error configuring theme dictionaries: {ex.Message}");
-            }
-        }
 
         private void DisplayFatalErrorPage(string message, Exception ex)
         {
@@ -1221,44 +1153,7 @@ namespace TDFMAUI
             };
         }
 
-        private void SetupFirebaseCloudMessaging()
-        {
-#if ANDROID || IOS
-            try
-            {
-                // Subscribe to notification received
-                CrossFirebaseCloudMessaging.Current.NotificationReceived += async (sender, e) =>
-                {
-                    try
-                    {
-                        var notification = e.Notification;
-                        System.Diagnostics.Debug.WriteLine($"FCM Notification Received: {notification.Title} - {notification.Body}");
-                        var notificationService = Application.Current?.Handler?.MauiContext?.Services?.GetService<IPushNotificationService>();
-                        if (notificationService != null && notification != null)
-                        {
-                            await notificationService.ShowLocalNotificationAsync(
-                                notification.Title ?? "New Message",
-                                notification.Body ?? string.Empty,
-                                NotificationType.Info,
-                                notification.Data?.ToString()
-                            );
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error handling FCM notification: {ex.Message}");
-                    }
-                };
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error setting up FCM: {ex.Message}");
-            }
-#else
-            // FCM is not supported on this platform
-            System.Diagnostics.Debug.WriteLine("Firebase Cloud Messaging is not supported on this platform");
-#endif
-        }
+
 
         private void OnWebSocketError(object sender, WebSocketErrorEventArgs e)
         {
@@ -1295,5 +1190,81 @@ namespace TDFMAUI
                 base.MainPage = value;
             }
         }
+        /// <summary>
+        /// Ensures all necessary resource dictionaries are merged into the application's resources.
+        /// This prevents issues with AppThemeBinding by keeping all theme dictionaries present.
+        /// </summary>
+        private void EnsureAllResourceDictionariesMerged()
+        {
+            try
+            {
+                var merged = Application.Current?.Resources?.MergedDictionaries;
+                if (merged == null) return;
+
+                // Define the expected resource dictionary sources
+                var expectedSources = new List<string>
+                {
+                    "Resources/Styles/Colors.xaml",
+                    "Resources/Styles/Colors.Light.xaml",
+                    "Resources/Styles/Colors.Dark.xaml",
+                    "Resources/Styles/PlatformColors.xaml",
+                    "Resources/Styles/Styles.xaml"
+                };
+
+                foreach (var source in expectedSources)
+                {
+                    if (!merged.Any(d => d.Source?.OriginalString?.Contains(source) == true))
+                    {
+                        // If a dictionary is missing, add it
+                        merged.Add(new ResourceDictionary { Source = new Uri(source, UriKind.Relative) });
+                        System.Diagnostics.Debug.WriteLine($"Added missing resource dictionary: {source}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error ensuring all resource dictionaries are merged: {ex.Message}");
+            }
+        }
+
+#if ANDROID || IOS
+        private void SetupFirebaseCloudMessaging()
+        {
+            try
+            {
+                // Subscribe to FCM notification received event
+                CrossFirebaseCloudMessaging.Current.NotificationReceived += async (sender, e) =>
+                {
+                    try
+                    {
+                        System.Diagnostics.Debug.WriteLine($"FCM Notification received: {e.Notification?.Title}");
+                        
+                        // Show as local notification on Android and iOS
+#if ANDROID || IOS
+                        var platformNotificationService = Services?.GetService<IPlatformNotificationService>();
+                        if (platformNotificationService != null)
+                        {
+                            await platformNotificationService.ShowLocalNotificationAsync(
+                                 e.Notification?.Title ?? "Notification",
+                                 e.Notification?.Body ?? "You have a new message",
+                                 NotificationType.General
+                             );
+                        }
+#endif
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error handling FCM notification: {ex.Message}");
+                    }
+                };
+                
+                System.Diagnostics.Debug.WriteLine("Firebase Cloud Messaging setup completed");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error setting up Firebase Cloud Messaging: {ex.Message}");
+            }
+        }
+#endif
     }
 }

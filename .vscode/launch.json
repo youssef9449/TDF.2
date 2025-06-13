@@ -25,12 +25,19 @@
             }
         },
         {
-            "name": "TDFMAUI: Android Emulator (Direct)",
-            "type": "maui",
+            "name": "TDFMAUI: Android Emulator",
+            "type": "android",
             "request": "launch",
-            "preLaunchTask": "maui: Build for Android",
-            "targetFramework": "net8.0-android"
-        },
+            "preLaunchTask": "maui: Complete Android Deployment",
+            "appSrcRoot": "${workspaceFolder}/TDFMAUI",
+            "apkFile": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-android/com.TDF.TDFMAUI-Signed.apk",
+            "adbPort": 5037,
+            "adbOptions": ["-s", "emulator-5554"],
+            "launchActivity": "crc64e1fb321c08285b90.MainActivity",
+            "packageName": "com.TDF.TDFMAUI",
+            "debugMode": "managed"
+        },  
+        
         {
             "name": "TDFMAUI: Android Launch APK",
             "type": "android",
@@ -38,7 +45,27 @@
             "preLaunchTask": "maui: Build for Android",
             "appSrcRoot": "${workspaceFolder}/TDFMAUI",
             "apkFile": "${workspaceFolder}/TDFMAUI/bin/Debug/net8.0-android/com.TDF.TDFMAUI-Signed.apk",
-            "adbPort": 5037
+            "adbPort": 5037,
+            "adbOptions": ["-d"],
+            "packageName": "com.TDF.TDFMAUI",
+            "launchActivity": "crc641c547f72b37d3626.MainActivity",
+            "debugMode": "managed",
+            "sourceFileMap": {
+                "/TDFMAUI": "${workspaceFolder}/TDFMAUI",
+                "/src": "${workspaceFolder}/TDFMAUI"
+            },
+            "symbolOptions": {
+                "searchPaths": [],
+                "searchMicrosoftSymbolServer": true,
+                "searchNuGetOrgSymbolServer": true
+            },
+            "logging": {
+                "engineLogging": true,
+                "programOutput": true,
+                "exceptions": true,
+                "moduleLoad": false,
+                "trace": true
+            }
         },
         {
             "name": "TDFMAUI: Windows (Default)",

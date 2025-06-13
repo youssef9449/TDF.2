@@ -16,12 +16,15 @@ using System.Diagnostics;
 using TDFShared.Constants;
 using TDFShared.Validation;
 using TDFShared.Services;
-
+#if ANDROID || IOS || WINDOWS
+using Plugin.Firebase;
+using Plugin.Firebase.Auth; // Added for Firebase Auth
+#endif
 #if !WINDOWS && !MACCATALYST
 using Plugin.LocalNotification;
 using Plugin.LocalNotification.EventArgs;
 #endif
-using Plugin.Firebase;
+
 
 namespace TDFMAUI
 {
@@ -73,7 +76,7 @@ namespace TDFMAUI
                 var trackingId = e.Request.ReturningData;
                 
                 // Log notification interaction
-                System.Diagnostics.Debug.WriteLine($"Notification tapped: ID={notificationId}, TrackingID={trackingId}");
+                Debug.WriteLine($"Notification tapped: ID={notificationId}, TrackingID={trackingId}");
                 
                 // Update delivery status in platform notification service
                 if (!string.IsNullOrEmpty(trackingId))
@@ -86,7 +89,7 @@ namespace TDFMAUI
                         Task.Run(async () => {
                             bool success = await ((PlatformNotificationService)notificationService).UpdateNotificationDeliveryStatusAsync(trackingId, true);
                             if (!success) {
-                                System.Diagnostics.Debug.WriteLine($"Failed to update delivery status for tapped notification {trackingId}");
+                                Debug.WriteLine($"Failed to update delivery status for tapped notification {trackingId}");
                             }
                         });
                     }
@@ -94,7 +97,7 @@ namespace TDFMAUI
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in OnLocalNotificationTapped: {ex.Message}");
+                Debug.WriteLine($"Error in OnLocalNotificationTapped: {ex.Message}");
             }
         }
 #else
@@ -112,24 +115,26 @@ namespace TDFMAUI
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();
-            builder
+builder
                 .UseMauiApp<App>()
                 .UseMauiCommunityToolkit()
 #if !WINDOWS && !MACCATALYST
                 .UseLocalNotification(config => {
-                    // Register notification delivery events
                     config.AddCategory(new NotificationCategory(NotificationCategoryType.Status));
-                    // Register event handlers for notification delivery tracking
                     Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived += OnLocalNotificationReceived;
                     Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped += OnLocalNotificationTapped;
                 })
+#endif
+#if ANDROID || IOS
+                .UseFirebase(CrossFirebase.Initialize)
 #endif
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSans-Regular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSans-Semibold");
                     fonts.AddFont("materialdesignicons-webfont.ttf", "MaterialDesignIcons");
-                });
+                })
+                ;
 
             try
             {
@@ -241,12 +246,6 @@ namespace TDFMAUI
 
                 // Add some debug info
                 System.Diagnostics.Debug.WriteLine($"Config loaded for static ApiConfig: BaseUrl={ApiConfig.BaseUrl}, WebSocketUrl={ApiConfig.WebSocketUrl}");
-
-                // Test API connectivity after configuration - DISABLED
-                // Task.Run(async () => {
-                //     bool isConnected = await ApiConfig.TestApiConnectivityAsync();
-                //     System.Diagnostics.Debug.WriteLine($"--- API Connectivity Test Result: {(isConnected ? "SUCCESS" : "FAILURE")} ---");
-                // });
             }
             catch (Exception ex)
             {
@@ -523,32 +522,8 @@ namespace TDFMAUI
                     }
                 };
 
-                // Start network monitoring - DISABLED
-                // Task.Run(async () =>
-                // {
-                //     try
-                //     {
-                //         await networkService.StartMonitoringAsync();
-                //         wsLogger.LogInformation("Network monitoring started");
-                //     }
-                //     catch (Exception ex)
-                //     {
-                //         wsLogger.LogCritical(ex, "Failed to start network monitoring");
-                //
-                //         // Log critical errors to a file in app data directory
-                //         var appDataPath = FileSystem.AppDataDirectory;
-                //         var errorLogPath = Path.Combine(appDataPath, "error.log");
-                //
-                //         try
-                //         {
-                //             File.AppendAllText(errorLogPath, $"{DateTime.Now}: {ex.Message}\n{ex.StackTrace}\n\n");
-                //         }
-                //         catch
-                //         {
-                //             // If we can't even write to the log file, there's not much else we can do
-                //         }
-                //     }
-                // });
+                // Start the network monitor
+              //  networkService.StartMonitoring();   // Start monitoring network status
             }
             catch (Exception ex)
             {

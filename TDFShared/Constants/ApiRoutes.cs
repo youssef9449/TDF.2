@@ -220,7 +220,10 @@ namespace TDFShared.Constants
             /// </summary>
             public const string Verify = Base + "/verify";
 
-            public static string UsersBase => $"{Base}/users";
+            /// <summary>
+            /// Base route for user-related endpoints
+            /// </summary>
+            public static string UsersBase { get; } = "api/users";
         }
 
         /// <summary>

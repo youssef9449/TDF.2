@@ -415,7 +415,8 @@ namespace TDFAPI.Services
                 Timestamp = message.Timestamp,
                 IsRead = message.IsRead,
                 IsDelivered = message.IsDelivered,
-                MessageType = message.MessageType
+                MessageType = message.MessageType,
+                FromUserProfileImage = new byte[0] // Initialize with empty array
             };
         }
 

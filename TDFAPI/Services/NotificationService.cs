@@ -300,7 +300,8 @@ namespace TDFAPI.Services
                 Timestamp = m.Timestamp,
                 IsDelivered = m.IsDelivered,
                 IsRead = m.IsRead,
-                Status = m.Status
+                Status = m.Status,
+                FromUserProfileImage = new byte[0] // Initialize with empty array
             });
         }
 
@@ -320,7 +321,8 @@ namespace TDFAPI.Services
                 Timestamp = m.Timestamp,
                 IsDelivered = m.IsDelivered,
                 IsRead = m.IsRead,
-                Status = m.Status
+                Status = m.Status,
+                FromUserProfileImage = new byte[0] // Initialize with empty array
                 // Note: ReadAt and DeliveredAt are not available in MessageEntity
             });
         }

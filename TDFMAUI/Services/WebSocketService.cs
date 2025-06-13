@@ -65,41 +65,45 @@ namespace TDFMAUI.Services
                     return providedToken;
                 }
 
-                // For desktop platforms, try to get the in-memory token
+                string? tokenToValidate = null;
+                DateTime tokenExpiry = DateTime.MinValue;
+
                 if (DeviceHelper.IsDesktop)
                 {
-                    var desktopToken = ApiConfig.CurrentToken;
-                    if (!string.IsNullOrEmpty(desktopToken) && ApiConfig.TokenExpiration > DateTime.UtcNow)
-                    {
-                        _logger.LogDebug("Using in-memory token for desktop platform");
-                        return desktopToken;
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Desktop platform has no valid in-memory token");
-                        // On desktop, we don't try to refresh from secure storage
-                        // since tokens aren't persisted there
-                        return null;
-                    }
+                    tokenToValidate = ApiConfig.CurrentToken;
+                    tokenExpiry = ApiConfig.TokenExpiration;
                 }
-
-                // For mobile platforms, try to get the stored token
-                var (storedToken, expiration) = await _secureStorage.GetTokenAsync();
-                if (!string.IsNullOrEmpty(storedToken) && expiration > DateTime.UtcNow)
+                else
                 {
-                    _logger.LogDebug("Using stored token from secure storage");
-                    return storedToken;
+                    var (storedToken, expiration) = await _secureStorage.GetTokenAsync();
+                    tokenToValidate = storedToken;
+                    tokenExpiry = expiration;
                 }
 
-                // If no token is available, try to refresh
+                _logger.LogInformation("Token to validate: {TokenPrefix}..., Expiration: {Expiration}, Current UTC: {UtcNow}",
+                    tokenToValidate?.Substring(0, Math.Min(5, tokenToValidate.Length)) ?? "(null)",
+                    tokenExpiry,
+                    DateTime.UtcNow);
+
+                if (!string.IsNullOrEmpty(tokenToValidate) && tokenExpiry > DateTime.UtcNow)
+                {
+                    _logger.LogDebug("Using existing valid token for WebSocket connection");
+                    return tokenToValidate;
+                }
+
+                _logger.LogWarning("No valid existing token found, attempting to refresh.");
+
+                // Attempt to refresh the token
                 var (currentToken, _) = await _secureStorage.GetTokenAsync();
                 var (currentRefreshToken, _) = await _secureStorage.GetRefreshTokenAsync();
+
                 if (!string.IsNullOrEmpty(currentToken) && !string.IsNullOrEmpty(currentRefreshToken))
                 {
                     var refreshResult = await _authService.RefreshTokenAsync(currentToken, currentRefreshToken);
                     if (refreshResult != null)
                     {
-                        // After refresh, try to get the token again
+                        _logger.LogInformation("Token refreshed successfully. Using new token for WebSocket connection.");
+                        // After refresh, the ApiConfig.CurrentToken (for desktop) or secure storage (for mobile) should be updated by AuthService
                         if (DeviceHelper.IsDesktop)
                         {
                             return ApiConfig.CurrentToken;
@@ -110,9 +114,14 @@ namespace TDFMAUI.Services
                             return newToken;
                         }
                     }
+                    else
+                    {
+                        _logger.LogWarning("Token refresh attempt failed. No new token available.");
+                        return null; // Explicitly return null if refresh failed
+                    }
                 }
 
-                _logger.LogWarning("No valid token available for WebSocket connection");
+                _logger.LogWarning("No valid token available for WebSocket connection after all attempts.");
                 return null;
             }
             catch (Exception ex)
@@ -154,10 +163,15 @@ namespace TDFMAUI.Services
                     return false;
                 }
 
+                _logger.LogInformation("Current ApiConfig.CurrentToken (before WebSocket connect): {ApiConfigTokenPrefix}..., Expiration: {ApiConfigTokenExpiration}",
+                    ApiConfig.CurrentToken?.Substring(0, Math.Min(5, ApiConfig.CurrentToken.Length)) ?? "(null)",
+                    ApiConfig.TokenExpiration);
+
                 _logger.LogInformation("Using token for WebSocket connection. Token length: {Length}", authToken.Length);
                 _logger.LogInformation("WebSocket token prefix: {Prefix}..., suffix: ...{Suffix}", 
                     authToken.Substring(0, Math.Min(5, authToken.Length)),
                     authToken.Substring(Math.Max(0, authToken.Length - 5)));
+                _logger.LogInformation("Full WebSocket token: {Token}", authToken); // For debugging purposes, log full token
 
                 _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {authToken}");
 

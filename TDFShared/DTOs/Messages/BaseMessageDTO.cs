@@ -81,7 +81,7 @@ namespace TDFShared.DTOs.Messages
 
         public bool IsRead { get; set; }
         public bool IsDelivered { get; set; }
-        public string Department { get; set; }
+        public required string Department { get; set; }
 
         /// <summary>
         /// Optional idempotency key for message tracking

@@ -10,34 +10,34 @@ namespace TDFShared.DTOs.Users
     {
         public int UserID { get; set; }
 
-        public string Username { get; set; }
+        public required string Username { get; set; }
 
         /// <summary>
         /// User's full name
         /// </summary>
         [JsonPropertyName("fullName")]
         [StringLength(100, MinimumLength = 2, ErrorMessage = "Full name must be between 2 and 100 characters")]
-        public string FullName { get; set; }
+        public required string FullName { get; set; }
         
         /// <summary>
         /// User's department
         /// </summary>
         [JsonPropertyName("department")]
         [StringLength(100, ErrorMessage = "Department cannot exceed 100 characters")]
-        public string Department { get; set; }
+        public required string Department { get; set; }
         
         /// <summary>
         /// User's job title
         /// </summary>
         [JsonPropertyName("title")]
         [StringLength(100, ErrorMessage = "Title cannot exceed 100 characters")]
-        public string Title { get; set; }
+        public required string Title { get; set; }
         
         /// <summary>
         /// URL to user's profile image
         /// </summary>
         [JsonPropertyName("picture")]
-        public byte[] Picture { get; set; }
+        public required byte[] Picture { get; set; }
         
         /// <summary>
         /// Whether the user is an administrator

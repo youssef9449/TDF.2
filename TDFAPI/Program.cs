@@ -840,8 +840,8 @@ app.Map("/ws", async context =>
     var wsAuthHelper = new WebSocketAuthenticationHelper(
         logger,
         key,
-        IniConfiguration.JwtIssuer,
-        IniConfiguration.JwtAudience,
+        builder.Configuration["Jwt:Issuer"] ?? "tdfapi",
+        builder.Configuration["Jwt:Audience"] ?? "tdfapp",
         !app.Environment.IsDevelopment()
     );
 

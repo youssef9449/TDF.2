@@ -20,21 +20,6 @@ namespace TDFShared.Configuration
         public int TimeoutSeconds { get; set; } = 30;
 
         /// <summary>
-        /// Maximum number of retry attempts
-        /// </summary>
-        public int MaxRetries { get; set; } = 3;
-
-        /// <summary>
-        /// Initial delay between retries in milliseconds
-        /// </summary>
-        public int InitialRetryDelayMs { get; set; } = 1000;
-
-        /// <summary>
-        /// Maximum delay between retries in milliseconds
-        /// </summary>
-        public int MaxRetryDelayMs { get; set; } = 30000;
-
-        /// <summary>
         /// Whether to use exponential backoff for retries
         /// </summary>
         public bool UseExponentialBackoff { get; set; } = true;
@@ -107,15 +92,6 @@ namespace TDFShared.Configuration
 
             if (TimeoutSeconds <= 0)
                 throw new InvalidOperationException("TimeoutSeconds must be greater than 0");
-
-            if (MaxRetries < 0)
-                throw new InvalidOperationException("MaxRetries must be 0 or greater");
-
-            if (InitialRetryDelayMs <= 0)
-                throw new InvalidOperationException("InitialRetryDelayMs must be greater than 0");
-
-            if (MaxRetryDelayMs < InitialRetryDelayMs)
-                throw new InvalidOperationException("MaxRetryDelayMs must be greater than or equal to InitialRetryDelayMs");
 
             if (MaxConcurrentRequests <= 0)
                 throw new InvalidOperationException("MaxConcurrentRequests must be greater than 0");
@@ -206,6 +182,21 @@ namespace TDFShared.Configuration
     public class RetryPolicySettings
     {
         /// <summary>
+        /// Maximum number of retry attempts
+        /// </summary>
+        public int MaxRetries { get; set; } = 3;
+
+        /// <summary>
+        /// Initial delay between retries in milliseconds
+        /// </summary>
+        public int InitialRetryDelayMs { get; set; } = 1000;
+
+        /// <summary>
+        /// Maximum delay between retries in milliseconds
+        /// </summary>
+        public int MaxRetryDelayMs { get; set; } = 30000;
+
+        /// <summary>
         /// HTTP status codes that should trigger a retry
         /// </summary>
         public int[] RetryableStatusCodes { get; set; } = { 408, 429, 500, 502, 503, 504 };
@@ -220,8 +211,20 @@ namespace TDFShared.Configuration
         /// </summary>
         public double JitterFactor { get; set; } = 0.1;
 
+        /// <summary>
+        /// Validates the retry policy settings
+        /// </summary>
         public void Validate()
         {
+            if (MaxRetries < 0)
+                throw new ArgumentException("MaxRetries must be non-negative", nameof(MaxRetries));
+
+            if (InitialRetryDelayMs < 0)
+                throw new ArgumentException("InitialRetryDelayMs must be non-negative", nameof(InitialRetryDelayMs));
+
+            if (MaxRetryDelayMs < InitialRetryDelayMs)
+                throw new ArgumentException("MaxRetryDelayMs must be greater than or equal to InitialRetryDelayMs", nameof(MaxRetryDelayMs));
+
             if (JitterFactor < 0.0 || JitterFactor > 1.0)
                 throw new InvalidOperationException("JitterFactor must be between 0.0 and 1.0");
         }
@@ -252,10 +255,13 @@ namespace TDFShared.Configuration
         /// </summary>
         public int SuccessThreshold { get; set; } = 3;
 
+        /// <summary>
+        /// Validates the circuit breaker settings
+        /// </summary>
         public void Validate()
         {
-            if (FailureThreshold <= 0)
-                throw new InvalidOperationException("FailureThreshold must be greater than 0");
+            if (FailureThreshold < 1)
+                throw new ArgumentException("FailureThreshold must be at least 1", nameof(FailureThreshold));
 
             if (OpenDurationSeconds <= 0)
                 throw new InvalidOperationException("OpenDurationSeconds must be greater than 0");

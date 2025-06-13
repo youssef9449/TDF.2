@@ -70,7 +70,7 @@ public partial class ProfilePage : ContentPage, INotifyPropertyChanged
                 UserID = App.CurrentUser.UserID,
                 Username = App.CurrentUser.UserName,
                 FullName = App.CurrentUser.FullName,
-
+                Picture = App.CurrentUser.Picture?? Array.Empty<byte>(),
                 Department = App.CurrentUser.Department,
                 Title = App.CurrentUser.Title,
                 IsAdmin = App.CurrentUser.IsAdmin ?? false,
@@ -87,7 +87,7 @@ public partial class ProfilePage : ContentPage, INotifyPropertyChanged
                 App.CurrentUser.FullName = updatedUserDto.FullName;
                 App.CurrentUser.Department = updatedUserDto.Department;
                 App.CurrentUser.Title = updatedUserDto.Title;
-
+                App.CurrentUser.Picture = updatedUserDto.Picture;
                 App.CurrentUser.IsAdmin = updatedUserDto.IsAdmin;
                 App.CurrentUser.IsActive = updatedUserDto.IsActive;
                 // Update other fields if necessary

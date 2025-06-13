@@ -34,6 +34,12 @@ namespace TDFMAUI
 
         public bool IsDevelopmentMode => ApiConfig.DevelopmentMode;
 
+        /// <summary>
+        /// Gets a value indicating whether the current device is a desktop device.
+        /// Uses DeviceHelper.IsDesktop for consistent platform detection.
+        /// </summary>
+        public bool IsDesktopUser => DeviceHelper.IsDesktop;
+
         public AppShell(IAuthService authService, ILogger<AppShell> logger, IUserPresenceService userPresenceService)
         {
             try
@@ -131,6 +137,7 @@ namespace TDFMAUI
             OnPropertyChanged(nameof(IsAdmin));
             OnPropertyChanged(nameof(IsHR));
             OnPropertyChanged(nameof(IsManager));
+            OnPropertyChanged(nameof(IsDesktopUser));
         }
 
         protected override void OnAppearing()

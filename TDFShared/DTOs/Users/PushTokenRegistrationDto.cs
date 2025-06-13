@@ -12,31 +12,31 @@ namespace TDFShared.DTOs.Users
         /// </summary>
         [Required]
         [StringLength(500)]
-        public string Token { get; set; }
+        public required string Token { get; set; }
 
         /// <summary>
         /// The platform the token is for (ios, android, windows, macos)
         /// </summary>
         [Required]
         [StringLength(50)]
-        public string Platform { get; set; }
+        public required string Platform { get; set; }
 
         /// <summary>
         /// The name of the device
         /// </summary>
         [StringLength(100)]
-        public string DeviceName { get; set; }
+        public required string DeviceName { get; set; }
 
         /// <summary>
         /// The model of the device
         /// </summary>
         [StringLength(100)]
-        public string DeviceModel { get; set; }
+        public required string DeviceModel { get; set; }
 
         /// <summary>
         /// The version of the app
         /// </summary>
         [StringLength(50)]
-        public string AppVersion { get; set; }
+        public required string AppVersion { get; set; }
     }
 } 

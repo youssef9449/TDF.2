@@ -18,10 +18,7 @@ namespace TDFShared.Services
         /// </summary>
         Task<TokenResponse?> RefreshTokenAsync(string token, string refreshToken);
         
-        /// <summary>
-        /// Generates a JWT token for the specified user
-        /// </summary>
-        string GenerateJwtToken(UserDto user);
+
         
         /// <summary>
         /// Hashes a password with a generated salt

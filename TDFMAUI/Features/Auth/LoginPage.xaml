@@ -5,15 +5,15 @@
              xmlns:vm="clr-namespace:TDFMAUI.ViewModels"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              x:Class="TDFMAUI.Features.Auth.LoginPage"
-             x:DataType="vm:LoginPageViewModel"
+             x:DataType="{x:Null}"
              Title="Login"
              BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <ContentPage.Resources>
         <Style x:Key="EntryStyle" TargetType="Entry">
-            <Setter Property="TextColor" Value="{StaticResource TextColor}" />
-            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F5F5F7, Dark={StaticResource DarkSurfaceVariant}}" />
-            <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light=#999999, Dark={StaticResource DarkTextTertiary}}" />
+            <Setter Property="TextColor" Value="{AppThemeBinding Light=Black, Dark={StaticResource TextColor}}" />
+            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource DarkSurfaceVariant}}" />
+            <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource DarkTextTertiary}}" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="HeightRequest" Value="40" />
             <Setter Property="ReturnCommand" Value="{Binding LoginCommand}" />
@@ -24,7 +24,7 @@
         <Style x:Key="LoginInputFrameStyle" TargetType="Frame">
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#F5F5F7, Dark={StaticResource DarkSurfaceVariant}}" />
+            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource DarkSurfaceVariant}}" />
             <Setter Property="HasShadow" Value="False" />
             <Setter Property="BorderColor" Value="Transparent" />
             <Setter Property="HeightRequest" Value="45" />
@@ -65,6 +65,7 @@
                                        Placeholder="User Name"
                                        Text="{Binding Username}"
                                        Keyboard="Text"
+                                       TextColor="{AppThemeBinding Light=Black, Dark=White}"
                                        Margin="15,0" />
                             </Frame>
 
@@ -74,6 +75,7 @@
                                        Placeholder="Password"
                                        IsPassword="True"
                                        Text="{Binding Password}"
+                                       TextColor="{AppThemeBinding Light=Black, Dark=White}"
                                        Margin="15,0" />
                             </Frame>
 

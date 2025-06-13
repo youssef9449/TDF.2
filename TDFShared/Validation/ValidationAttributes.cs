@@ -14,6 +14,10 @@ namespace TDFShared.Validation
     {
         private readonly int _minDaysFromNow;
 
+        /// <summary>
+        /// Initializes a new instance of the FutureDateAttribute class.
+        /// </summary>
+        /// <param name="minDaysFromNow">Minimum number of days from today required (0 = today allowed, 1 = tomorrow minimum, etc.)</param>
         public FutureDateAttribute(int minDaysFromNow = 0)
         {
             _minDaysFromNow = minDaysFromNow;
@@ -22,6 +26,11 @@ namespace TDFShared.Validation
                 : "Date must be in the future.";
         }
 
+        /// <summary>
+        /// Determines whether the value of the date is valid.
+        /// </summary>
+        /// <param name="value">The value to validate.</param>
+        /// <returns>True if the value is null or a valid future date; otherwise, false.</returns>
         public override bool IsValid(object? value)
         {
             if (value is not DateTime date)
@@ -39,6 +48,11 @@ namespace TDFShared.Validation
         private readonly string _startDateProperty;
         private readonly int _maxDurationDays;
 
+        /// <summary>
+        /// Initializes a new instance of the DateRangeAttribute class.
+        /// </summary>
+        /// <param name="startDateProperty">The name of the property containing the start date.</param>
+        /// <param name="maxDurationDays">Maximum allowed duration in days (default: 365).</param>
         public DateRangeAttribute(string startDateProperty, int maxDurationDays = 365)
         {
             _startDateProperty = startDateProperty;
@@ -46,6 +60,12 @@ namespace TDFShared.Validation
             ErrorMessage = $"End date must be after start date and within {maxDurationDays} days.";
         }
 
+        /// <summary>
+        /// Validates the end date against the start date and maximum duration.
+        /// </summary>
+        /// <param name="value">The end date to validate.</param>
+        /// <param name="validationContext">The validation context.</param>
+        /// <returns>ValidationResult.Success if valid; otherwise, a ValidationResult with an error message.</returns>
         protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
         {
             if (value is not DateTime endDate)
@@ -78,6 +98,11 @@ namespace TDFShared.Validation
         private readonly string _leaveTypeProperty;
         private readonly LeaveType[] _requiredForTypes;
 
+        /// <summary>
+        /// Initializes a new instance of the RequiredForLeaveTypeAttribute class.
+        /// </summary>
+        /// <param name="leaveTypeProperty">The name of the property containing the leave type.</param>
+        /// <param name="requiredForTypes">The leave types for which this field is required.</param>
         public RequiredForLeaveTypeAttribute(string leaveTypeProperty, params LeaveType[] requiredForTypes)
         {
             _leaveTypeProperty = leaveTypeProperty;
@@ -85,6 +110,12 @@ namespace TDFShared.Validation
             ErrorMessage = $"This field is required for {string.Join(", ", requiredForTypes)} leave types.";
         }
 
+        /// <summary>
+        /// Validates that the field has a value when the leave type requires it.
+        /// </summary>
+        /// <param name="value">The value to validate.</param>
+        /// <param name="validationContext">The validation context.</param>
+        /// <returns>ValidationResult.Success if valid; otherwise, a ValidationResult with an error message.</returns>
         protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
         {
             var leaveTypeProperty = validationContext.ObjectType.GetProperty(_leaveTypeProperty);
@@ -112,12 +143,22 @@ namespace TDFShared.Validation
     {
         private readonly string _startTimeProperty;
 
+        /// <summary>
+        /// Initializes a new instance of the TimeRangeAttribute class.
+        /// </summary>
+        /// <param name="startTimeProperty">The name of the property containing the start time.</param>
         public TimeRangeAttribute(string startTimeProperty)
         {
             _startTimeProperty = startTimeProperty;
             ErrorMessage = "End time must be after start time.";
         }
 
+        /// <summary>
+        /// Validates that the end time is after the start time.
+        /// </summary>
+        /// <param name="value">The end time to validate.</param>
+        /// <param name="validationContext">The validation context.</param>
+        /// <returns>ValidationResult.Success if valid; otherwise, a ValidationResult with an error message.</returns>
         protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
         {
             if (value is not TimeSpan endTime)
@@ -149,6 +190,14 @@ namespace TDFShared.Validation
         private readonly bool _requireDigit;
         private readonly bool _requireSpecialChar;
 
+        /// <summary>
+        /// Initializes a new instance of the StrongPasswordAttribute class.
+        /// </summary>
+        /// <param name="minLength">Minimum password length (default: 8).</param>
+        /// <param name="requireUppercase">Whether to require uppercase letters (default: true).</param>
+        /// <param name="requireLowercase">Whether to require lowercase letters (default: true).</param>
+        /// <param name="requireDigit">Whether to require digits (default: true).</param>
+        /// <param name="requireSpecialChar">Whether to require special characters (default: true).</param>
         public StrongPasswordAttribute(
             int minLength = 8,
             bool requireUppercase = true,
@@ -172,6 +221,11 @@ namespace TDFShared.Validation
             ErrorMessage = $"Password must contain {string.Join(", ", requirements)}.";
         }
 
+        /// <summary>
+        /// Validates that the password meets the strength requirements.
+        /// </summary>
+        /// <param name="value">The password to validate.</param>
+        /// <returns>True if the password meets all requirements; otherwise, false.</returns>
         public override bool IsValid(object? value)
         {
             if (value is not string password)
@@ -212,11 +266,19 @@ namespace TDFShared.Validation
             "mail", "email", "contact", "security", "test", "demo"
         };
 
+        /// <summary>
+        /// Initializes a new instance of the UsernameAttribute class.
+        /// </summary>
         public UsernameAttribute()
         {
             ErrorMessage = "Username must be 3-20 characters and contain only letters, numbers, dots, underscores, or hyphens.";
         }
 
+        /// <summary>
+        /// Validates that the username meets the format requirements and is not reserved.
+        /// </summary>
+        /// <param name="value">The username to validate.</param>
+        /// <returns>True if the username is valid; otherwise, false.</returns>
         public override bool IsValid(object? value)
         {
             if (value is not string username)
@@ -299,14 +361,22 @@ namespace TDFShared.Validation
     public class DepartmentCodeAttribute : ValidationAttribute
     {
         private static readonly Regex DepartmentCodeRegex = new(
-            @"^[A-Z]{2,5}$", 
+            @"^[A-Z]{2,4}$",
             RegexOptions.Compiled);
 
+        /// <summary>
+        /// Initializes a new instance of the DepartmentCodeAttribute class.
+        /// </summary>
         public DepartmentCodeAttribute()
         {
-            ErrorMessage = "Department code must be 2-5 uppercase letters.";
+            ErrorMessage = "Department code must be 2-4 uppercase letters.";
         }
 
+        /// <summary>
+        /// Validates that the department code meets the format requirements.
+        /// </summary>
+        /// <param name="value">The department code to validate.</param>
+        /// <returns>True if the department code is valid; otherwise, false.</returns>
         public override bool IsValid(object? value)
         {
             if (value is not string code)
@@ -317,15 +387,23 @@ namespace TDFShared.Validation
     }
 
     /// <summary>
-    /// Custom validation attribute for business days only
+    /// Custom validation attribute for business days
     /// </summary>
     public class BusinessDayAttribute : ValidationAttribute
     {
+        /// <summary>
+        /// Initializes a new instance of the BusinessDayAttribute class.
+        /// </summary>
         public BusinessDayAttribute()
         {
-            ErrorMessage = "Date must be a business day (Monday-Friday).";
+            ErrorMessage = "Date must be a business day (Monday through Friday).";
         }
 
+        /// <summary>
+        /// Validates that the date is a business day.
+        /// </summary>
+        /// <param name="value">The date to validate.</param>
+        /// <returns>True if the date is a business day; otherwise, false.</returns>
         public override bool IsValid(object? value)
         {
             if (value is not DateTime date)

@@ -7,7 +7,14 @@ using TDFShared.DTOs.Messages;
 using System.Linq;
 using System.Threading;
 using Microsoft.Maui.Devices;
-using Plugin.Firebase.CloudMessaging;
+#if ANDROID || IOS
+using Plugin.Firebase.Core;
+using Plugin.Firebase.Messaging;
+#elif WINDOWS
+using Windows.ApplicationModel.Background;
+using Windows.UI.Notifications;
+#endif
+
 
 namespace TDFMAUI.Services
 {
@@ -350,6 +357,7 @@ namespace TDFMAUI.Services
             try
             {
                 // Check if we have a stored FCM token (for Android)
+#if ANDROID
                 if (DeviceInfo.Platform == DevicePlatform.Android)
                 {
                     // Try to get the token from Firebase Cloud Messaging
@@ -365,6 +373,7 @@ namespace TDFMAUI.Services
                     
                     _logger.LogWarning("Failed to get FCM token. Firebase may not be properly initialized.");
                 }
+#endif
                 
                 // For other platforms or as a fallback, generate a unique token
                 string deviceId = GetDeviceId();

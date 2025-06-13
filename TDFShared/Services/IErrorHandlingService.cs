@@ -14,7 +14,7 @@ namespace TDFShared.Services
         /// <param name="exception">The exception to process</param>
         /// <param name="context">Optional context for the error (e.g., "loading data", "saving request")</param>
         /// <returns>User-friendly error message</returns>
-        string GetFriendlyErrorMessage(Exception exception, string context = null);
+        string GetFriendlyErrorMessage(Exception exception, string? context = null);
 
         /// <summary>
         /// Shows an error message to the user using the appropriate UI mechanism
@@ -22,7 +22,7 @@ namespace TDFShared.Services
         /// <param name="exception">The exception to display</param>
         /// <param name="context">Optional context for the error</param>
         /// <param name="title">Optional custom title for the error dialog</param>
-        Task ShowErrorAsync(Exception exception, string context = null, string title = "Error");
+        Task ShowErrorAsync(Exception exception, string? context = null, string title = "Error");
 
         /// <summary>
         /// Shows a custom error message to the user
@@ -38,7 +38,7 @@ namespace TDFShared.Services
         /// <param name="context">Context for the error</param>
         /// <param name="logger">Optional logger instance</param>
         /// <returns>User-friendly error message</returns>
-        string LogAndGetFriendlyMessage(Exception exception, string context, Microsoft.Extensions.Logging.ILogger logger = null);
+        string LogAndGetFriendlyMessage(Exception exception, string context, Microsoft.Extensions.Logging.ILogger? logger = null);
 
         /// <summary>
         /// Determines if an exception is a network-related error

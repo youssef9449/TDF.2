@@ -21,12 +21,12 @@ namespace TDFShared.DTOs.Common
         /// <summary>
         /// Title of the notification.
         /// </summary>
-        public string Title { get; set; }
+        public required string Title { get; set; }
 
         /// <summary>
         /// Content/message of the notification.
         /// </summary>
-        public string Message { get; set; }
+        public required string Message { get; set; }
 
         /// <summary>
         /// The date and time when the notification should be fired (in UTC).
@@ -36,7 +36,7 @@ namespace TDFShared.DTOs.Common
         /// <summary>
         /// The time zone for the scheduled notification (IANA or Windows format).
         /// </summary>
-        public string TimeZone { get; set; }
+        public required string TimeZone { get; set; }
 
         /// <summary>
         /// Optional additional data for the notification.

@@ -318,14 +318,14 @@ namespace TDFShared.Services
 
                 // Standard identity claims
                 new Claim(ClaimTypes.NameIdentifier, userIdString),
-                new Claim(ClaimTypes.Name, user.UserName),
+                new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
                 new Claim(ClaimTypes.GivenName, user.FullName ?? string.Empty),
 
                 // Application-specific claims
                 new Claim("userId", userIdString),
-                new Claim("username", user.UserName),
+                new Claim("username", user.UserName ?? string.Empty),
                 new Claim("fullName", user.FullName ?? string.Empty),
-                new Claim("department", user.Department),
+                new Claim("department", user.Department ?? string.Empty),
                 new Claim("title", user.Title ?? string.Empty),
                 new Claim("isActive", user.IsActive.ToString().ToLowerInvariant()),
 
@@ -336,9 +336,16 @@ namespace TDFShared.Services
             };
 
             // Add role claims using RoleService (roles are a list)
-            foreach (var role in _roleService.GetRoles(user))
+            var roles = _roleService.GetRoles(user);
+            if (roles != null)
             {
-                claims.Add(new Claim(ClaimTypes.Role, role));
+                foreach (var role in roles)
+                {
+                    if (!string.IsNullOrEmpty(role))
+                    {
+                        claims.Add(new Claim(ClaimTypes.Role, role));
+                    }
+                }
             }
 
             // Add security-related claims
@@ -352,7 +359,7 @@ namespace TDFShared.Services
                 claims.Add(new Claim("lastLoginIp", user.LastLoginIp));
             }
 
-            // Add account status claims (no .HasValue/.Value, use directly)
+            // Add account status claims
             claims.Add(new Claim("isLocked", user.IsLocked.ToString().ToLowerInvariant()));
             claims.Add(new Claim("failedLoginAttempts", user.FailedLoginAttempts.ToString()));
 

@@ -131,6 +131,7 @@ namespace TDFAPI.Data
                  entity.Property(e => e.IsSeen).IsRequired().HasDefaultValue(false);
                  entity.Property(e => e.Timestamp).IsRequired().HasDefaultValueSql("getdate()").HasColumnType("datetime");
                  entity.Property(e => e.MessageText).HasMaxLength(255).IsUnicode(false);
+                 entity.Property(e => e.Message).HasColumnName("MessageText").HasMaxLength(255).IsUnicode(false);
 
                  // Define relationships
                  entity.HasOne<UserEntity>()

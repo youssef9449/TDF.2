@@ -201,20 +201,50 @@ namespace TDFMAUI.ViewModels
             TDFMAUI.Services.DebugService.StartTimer("LoadRequests");
             try
             {
-                if (DeviceHelper.IsDesktop)
+                _logger.LogInformation("=== Starting LoadRequestsAsync ===");
+                
+                // Enhanced authentication handling for all platforms
+                _logger.LogInformation("Platform: {Platform}, checking authentication...", DeviceHelper.IsDesktop ? "Desktop" : "Mobile");
+                
+                // Always ensure we have a valid token set in the HTTP client
+                var token = await _authService.GetCurrentTokenAsync();
+                if (!string.IsNullOrEmpty(token))
                 {
-                    var token = TDFMAUI.Config.ApiConfig.CurrentToken;
-                    if (!string.IsNullOrEmpty(token))
+                    _logger.LogInformation("Setting authentication token (length: {Length})", token.Length);
+                    await _authService.SetAuthenticationTokenAsync(token);
+                    
+                    // For desktop, also ensure ApiConfig has the token
+                    if (DeviceHelper.IsDesktop)
                     {
-                        await _authService.SetAuthenticationTokenAsync(token);
+                        TDFMAUI.Config.ApiConfig.CurrentToken = token;
                     }
                 }
-                if (_currentUserId == 0 && !(IsAdmin == true || IsHR == true || IsManager == true))
+                else
                 {
-                    _logger.LogWarning("Cannot load requests: User not authenticated.");
-                    await Shell.Current.DisplayAlert("Auth Error", "Could not verify user.", "OK");
+                    _logger.LogError("No authentication token available - user may need to log in again");
+                    await Shell.Current.DisplayAlert("Authentication Error", 
+                        "No valid authentication token found. Please log in again.", "OK");
                     IsBusy = false;
                     return;
+                }
+
+                // Get current user ID and validate authentication
+                _currentUserId = await _authService.GetCurrentUserIdAsync();
+                _logger.LogInformation("Current user ID: {UserId}", _currentUserId);
+                
+                if (_currentUserId == 0)
+                {
+                    _logger.LogWarning("User ID is 0, checking if user has elevated roles...");
+                    var currentUser = await _authService.GetCurrentUserAsync();
+                    if (currentUser == null)
+                    {
+                        _logger.LogError("Cannot load requests: User not authenticated and no user data available.");
+                        await Shell.Current.DisplayAlert("Auth Error", "Could not verify user. Please log in again.", "OK");
+                        IsBusy = false;
+                        return;
+                    }
+                    _logger.LogInformation("User found: {UserName}, Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}", 
+                        currentUser.FullName, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager);
                 }
                 var pagination = new RequestPaginationDto
                 {
@@ -223,58 +253,94 @@ namespace TDFMAUI.ViewModels
                     FilterStatus = ShowPendingOnly ? RequestStatus.Pending : RequestStatus.All
                 };
 
+                _logger.LogInformation("Pagination settings: Page={Page}, PageSize={PageSize}, FilterStatus={FilterStatus}", 
+                    pagination.Page, pagination.PageSize, pagination.FilterStatus);
+
                 ApiResponse<PaginatedResult<RequestResponseDto>>? response = null;
-                var accessLevel = AuthorizationUtilities.GetRequestAccessLevel(await GetCurrentUserDtoAsync());
+                var currentUserDto = await GetCurrentUserDtoAsync();
+                var accessLevel = AuthorizationUtilities.GetRequestAccessLevel(currentUserDto);
+                
+                _logger.LogInformation("User access level: {AccessLevel}", accessLevel);
+                _logger.LogInformation("Current user: {UserName}, Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Department: {Department}", 
+                    currentUserDto?.FullName, currentUserDto?.IsAdmin, currentUserDto?.IsHR, currentUserDto?.IsManager, currentUserDto?.Department);
 
                 switch (accessLevel)
                 {
                     case RequestAccessLevel.All:
+                        _logger.LogInformation("Loading all requests for Admin/HR user");
                         response = await _requestService.GetAllRequestsAsync(pagination);
                         break;
                     case RequestAccessLevel.Department:
                         if (SelectedDepartment != null && SelectedDepartment.Id != "0")
                         {
+                            _logger.LogInformation("Loading requests for department: {Department}", SelectedDepartment.Name);
                             response = await _requestService.GetRequestsByDepartmentAsync(SelectedDepartment.Name, pagination);
                         }
                         else
                         {
-                            // If no specific department is selected, managers should see their own and all managed departments
-                            // For now, default to all requests for simplicity if "All" is selected for managers
+                            _logger.LogInformation("No specific department selected, loading all requests for manager");
                             response = await _requestService.GetAllRequestsAsync(pagination);
                         }
                         break;
                     case RequestAccessLevel.Own:
-                    case RequestAccessLevel.None: // If no access, only show own requests (if any)
+                    case RequestAccessLevel.None:
                     default:
+                        _logger.LogInformation("Loading own requests for regular user");
                         response = await _requestService.GetMyRequestsAsync(pagination);
                         break;
                 }
 
-                if (response?.Success == true && response.Data?.Items != null)
+                _logger.LogInformation("API Response - Success: {Success}, Message: {Message}", 
+                    response?.Success, response?.Message);
+
+                if (response?.Success == true)
                 {
-                    foreach (var request in response.Data.Items)
+                    if (response.Data?.Items != null)
                     {
-                        // Apply client-side filtering for managers if "All" departments is selected
-                        // This is a fallback if the API doesn't handle department filtering for managers
-                        // when "All" is selected. Ideally, the API would return only accessible requests.
-                        if (accessLevel == RequestAccessLevel.Department && SelectedDepartment?.Id == "0")
+                        _logger.LogInformation("Received {Count} requests from API", response.Data.Items.Count());
+                        
+                        foreach (var request in response.Data.Items)
                         {
-                            var currentUser = await GetCurrentUserDtoAsync();
-                            if (currentUser != null && AuthorizationUtilities.CanViewRequest(currentUser, request))
+                            // Apply client-side filtering for managers if "All" departments is selected
+                            if (accessLevel == RequestAccessLevel.Department && SelectedDepartment?.Id == "0")
+                            {
+                                var currentUser = await GetCurrentUserDtoAsync();
+                                if (currentUser != null && AuthorizationUtilities.CanViewRequest(currentUser, request))
+                                {
+                                    Requests.Add(request);
+                                    _logger.LogDebug("Added request {RequestId} for user {UserName}", request.RequestID, request.UserName);
+                                }
+                                else
+                                {
+                                    _logger.LogDebug("Filtered out request {RequestId} for user {UserName}", request.RequestID, request.UserName);
+                                }
+                            }
+                            else
                             {
                                 Requests.Add(request);
+                                _logger.LogDebug("Added request {RequestId} for user {UserName}", request.RequestID, request.UserName);
                             }
                         }
-                        else
-                        {
-                            Requests.Add(request);
-                        }
+                        _logger.LogInformation("Successfully loaded {Count} requests after filtering.", Requests.Count);
                     }
-                    _logger.LogInformation("Loaded {Count} requests.", Requests.Count);
+                    else
+                    {
+                        _logger.LogWarning("API returned success but Data.Items is null");
+                    }
                 }
                 else
                 {
-                    _logger.LogWarning("Received null or empty item list when loading requests.");
+                    _logger.LogError("API request failed - Success: {Success}, Message: {Message}", 
+                        response?.Success, response?.Message);
+                    
+                    if (response?.Message != null)
+                    {
+                        await Shell.Current.DisplayAlert("Error", $"Failed to load requests: {response.Message}", "OK");
+                    }
+                    else
+                    {
+                        await Shell.Current.DisplayAlert("Error", "Failed to load requests. Please check your connection and try again.", "OK");
+                    }
                 }
                 // Refresh permissions after loading requests
                 await RefreshRequestPermissionsAsync();
@@ -520,6 +586,53 @@ namespace TDFMAUI.ViewModels
             Departments = new ObservableCollection<LookupItem>(filteredDepartments);
             if (Departments.Count > 0)
                 SelectedDepartment = Departments[0];
+        }
+
+        /// <summary>
+        /// Diagnostic method to test API connectivity and authentication
+        /// </summary>
+        [RelayCommand]
+        private async Task TestApiConnectivityAsync()
+        {
+            try
+            {
+                _logger.LogInformation("=== Testing API Connectivity ===");
+                
+                // Test 1: Check current user
+                var currentUser = await _authService.GetCurrentUserAsync();
+                _logger.LogInformation("Current User Test - Success: {Success}, User: {UserName}", 
+                    currentUser != null, currentUser?.FullName);
+                
+                // Test 2: Check token
+                var token = await _authService.GetCurrentTokenAsync();
+                _logger.LogInformation("Token Test - Has Token: {HasToken}, Length: {Length}", 
+                    !string.IsNullOrEmpty(token), token?.Length ?? 0);
+                
+                // Test 3: Try to get user ID
+                var userId = await _authService.GetCurrentUserIdAsync();
+                _logger.LogInformation("User ID Test - User ID: {UserId}", userId);
+                
+                // Test 4: Try a simple API call
+                try
+                {
+                    var testResponse = await _requestService.GetMyRequestsAsync(new RequestPaginationDto { Page = 1, PageSize = 1 });
+                    _logger.LogInformation("API Test - Success: {Success}, Message: {Message}", 
+                        testResponse?.Success, testResponse?.Message);
+                }
+                catch (Exception apiEx)
+                {
+                    _logger.LogError(apiEx, "API Test failed: {Message}", apiEx.Message);
+                }
+                
+                await Shell.Current.DisplayAlert("Diagnostic Complete", 
+                    $"User: {currentUser?.FullName ?? "None"}\nUser ID: {userId}\nHas Token: {!string.IsNullOrEmpty(token)}", 
+                    "OK");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Diagnostic test failed: {Message}", ex.Message);
+                await Shell.Current.DisplayAlert("Diagnostic Failed", ex.Message, "OK");
+            }
         }
     }
 }

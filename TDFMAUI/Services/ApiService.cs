@@ -349,28 +349,25 @@ namespace TDFMAUI.Services
         {
             if (!CheckNetworkBeforeRequest(endpoint, queueIfUnavailable, data, "POST"))
             {
-                return queueIfUnavailable
-                    ? await QueueRequestAsync<TResponse>(endpoint, data, "POST")
-                    : default!;
+                return await QueueRequestAsync<TResponse>(endpoint, data, "POST");
             }
 
             try
             {
-                // Pass endpoint as-is
+                _logger?.LogDebug("PostAsync: Sending POST request to {Endpoint}", endpoint);
                 var response = await _httpClientService.PostAsync<TRequest, TResponse>(endpoint, data);
+                _logger?.LogDebug("PostAsync: Successfully received response from {Endpoint}", endpoint);
                 return response;
             }
-            catch (HttpRequestException httpEx)
+            catch (HttpRequestException ex)
             {
-                _logger?.LogError(httpEx, "ApiService: HTTP error in PostAsync for {Endpoint}", endpoint);
-                _isNetworkAvailable = false;
-                if (queueIfUnavailable) return await QueueRequestAsync<TResponse>(endpoint, data, "POST");
-                throw new ApiException($"Connection error: {httpEx.Message}", httpEx);
+                _logger?.LogError(ex, "PostAsync: HTTP request error for {Endpoint}: {Message}", endpoint, ex.Message);
+                throw;
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "ApiService: Error in PostAsync for {Endpoint}: {Message}", endpoint, ex.Message);
-                throw new ApiException(ex.Message, ex);
+                _logger?.LogError(ex, "PostAsync: Unexpected error for {Endpoint}: {Message}", endpoint, ex.Message);
+                throw;
             }
         }
 
@@ -511,6 +508,10 @@ namespace TDFMAUI.Services
                 
                 // Try to extract more specific error message from response content
                 string errorMessage = ex.Message;
+                if (!string.IsNullOrEmpty(ex.ResponseContent))
+                {
+                    errorMessage += $" Details: {ex.ResponseContent}";
+                }
                 
                 // If we have response content, try to extract a more specific message
                 if (!string.IsNullOrEmpty(ex.ResponseContent))
@@ -1134,13 +1135,44 @@ namespace TDFMAUI.Services
         {
             try
             {
+                _logger?.LogInformation("Creating request with data: {@RequestDto}", requestDto);
                 var response = await PostAsync<RequestCreateDto, ApiResponse<RequestResponseDto>>(ApiRoutes.Requests.Base, requestDto);
-                return response ?? new ApiResponse<RequestResponseDto> { Success = false, Message = "Failed to create request" };
+                
+                if (response == null)
+                {
+                    _logger?.LogWarning("CreateRequestAsync: Received null response from server");
+                    return new ApiResponse<RequestResponseDto> { Success = false, Message = "Failed to create request: No response from server" };
+                }
+
+                if (!response.Success)
+                {
+                    _logger?.LogWarning("CreateRequestAsync: Server returned unsuccessful response: {Message}", response.Message);
+                    return response;
+                }
+
+                if (response.Data == null)
+                {
+                    _logger?.LogWarning("CreateRequestAsync: Server returned success but no data");
+                    return new ApiResponse<RequestResponseDto> { Success = false, Message = "Failed to create request: No data received" };
+                }
+
+                _logger?.LogInformation("Successfully created request with ID: {RequestId}", response.Data.RequestID);
+                return response;
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger?.LogError(ex, "Network error creating request: {Message}", ex.Message);
+                return new ApiResponse<RequestResponseDto> { Success = false, Message = "Network error: " + ex.Message };
+            }
+            catch (JsonException ex)
+            {
+                _logger?.LogError(ex, "JSON parsing error creating request: {Message}", ex.Message);
+                return new ApiResponse<RequestResponseDto> { Success = false, Message = "Error processing server response" };
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error creating request: {Message}", ex.Message);
-                return new ApiResponse<RequestResponseDto> { Success = false, Message = ex.Message };
+                _logger?.LogError(ex, "Unexpected error creating request: {Message}", ex.Message);
+                return new ApiResponse<RequestResponseDto> { Success = false, Message = "An unexpected error occurred" };
             }
         }
 

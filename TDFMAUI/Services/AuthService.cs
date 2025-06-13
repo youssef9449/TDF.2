@@ -801,8 +801,16 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<string?> GetCurrentTokenAsync()
     {
-        var (token, _) = await _secureStorageService.GetTokenAsync();
-        return string.IsNullOrEmpty(token) ? null : token;
+        try
+        {
+            // Use the same logic as GetTokenAsync for consistency
+            return await GetTokenAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting current authentication token");
+            return null;
+        }
     }
 
     public async Task SetAuthenticationTokenAsync(string token)
@@ -818,6 +826,7 @@ public class AuthService : IAuthService
             // If we have a valid in-memory token, return it
             if (!string.IsNullOrEmpty(_currentToken) && DateTime.UtcNow < _tokenExpiration)
             {
+                _logger.LogDebug("Returning valid in-memory token");
                 return _currentToken;
             }
 
@@ -827,9 +836,20 @@ public class AuthService : IAuthService
             {
                 _currentToken = storedToken;
                 _tokenExpiration = expiration;
+                _logger.LogDebug("Retrieved and cached token from secure storage");
                 return storedToken;
             }
 
+            // For desktop platform, also check ApiConfig as fallback
+            if (DeviceHelper.IsDesktop && !string.IsNullOrEmpty(ApiConfig.CurrentToken))
+            {
+                _logger.LogDebug("Retrieved token from ApiConfig for desktop platform");
+                _currentToken = ApiConfig.CurrentToken;
+                _tokenExpiration = ApiConfig.TokenExpiration;
+                return ApiConfig.CurrentToken;
+            }
+
+            _logger.LogWarning("No valid authentication token found");
             return null;
         }
         catch (Exception ex)

@@ -75,7 +75,6 @@
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Spacing="15" x:Name="FormContainer">
-                <!-- Use DeviceHelper properties for responsive layout with VisualStateManager -->
                 <VerticalStackLayout.MaximumWidthRequest>
                     <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="700" Desktop="600" />
                 </VerticalStackLayout.MaximumWidthRequest>
@@ -83,38 +82,6 @@
                     <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
                 </VerticalStackLayout.HorizontalOptions>
                 
-                <VisualStateManager.VisualStateGroups>
-                    <VisualStateGroup Name="ScreenSizeStates">
-                        <VisualState Name="CompactUI">
-                            <VisualState.StateTriggers>
-                                <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.UseCompactUI}}" />
-                            </VisualState.StateTriggers>
-                            <VisualState.Setters>
-                                <Setter Property="MaximumWidthRequest" Value="10000" />
-                                <Setter Property="HorizontalOptions" Value="Fill" />
-                            </VisualState.Setters>
-                        </VisualState>
-                        <VisualState Name="MediumUI">
-                            <VisualState.StateTriggers>
-                                <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.UseMediumUI}}" />
-                            </VisualState.StateTriggers>
-                            <VisualState.Setters>
-                                <Setter Property="MaximumWidthRequest" Value="700" />
-                                <Setter Property="HorizontalOptions" Value="Center" />
-                            </VisualState.Setters>
-                        </VisualState>
-                        <VisualState Name="ExpandedUI">
-                            <VisualState.StateTriggers>
-                                <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.UseExpandedUI}}" />
-                            </VisualState.StateTriggers>
-                            <VisualState.Setters>
-                                <Setter Property="MaximumWidthRequest" Value="600" />
-                                <Setter Property="HorizontalOptions" Value="Center" />
-                            </VisualState.Setters>
-                        </VisualState>
-                    </VisualStateGroup>
-                </VisualStateManager.VisualStateGroups>
-
                 <Frame x:Name="FormFrame"
                        BackgroundColor="#0d47a1"
                        Padding="{OnIdiom Phone='12', Default='20'}"
@@ -144,130 +111,117 @@
                         </VisualStateGroup>
                     </VisualStateManager.VisualStateGroups>
                     
-                    <!-- Responsive Form Layout -->
-                    <Grid x:Name="ResponsiveFormGrid"
+                    <Grid x:Name="FormGrid" 
+                          ColumnDefinitions="{OnIdiom Phone='*', Default='Auto,*'}"
+                          RowDefinitions="Auto,Auto,Auto,Auto,Auto"
                           ColumnSpacing="{OnPlatform WinUI=15, MacCatalyst=15, Default=10}"
-                          RowSpacing="{OnPlatform WinUI=20, MacCatalyst=20, Default=15}"
-                          Margin="{OnPlatform WinUI='10,15,10,15', MacCatalyst='10,15,10,15', Default='0,5,0,5'}">
-                            <Label x:Name="LeaveTypeLabel" Text="Leave Type" Style="{StaticResource FormFieldTitleLabelStyle}"/>
-                            <Border x:Name="LeaveTypeBorder" StrokeThickness="1"
-                                    Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='LeaveType'}"
-                                    Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=#1565c0}">
-                                <Picker ItemsSource="{Binding LeaveTypes}" SelectedItem="{Binding SelectedLeaveType}" 
-                                        Title="Select Leave Type" 
-                                        TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}" 
-                                        TitleColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default=#AAAAAA}"
-                                        BackgroundColor="Transparent"/>
-                            </Border>
+                          RowSpacing="{OnPlatform WinUI=20, MacCatalyst=20, Default=15}">
+                        
+                        <!-- Leave Type -->
+                        <Label Grid.Row="0" Grid.Column="0" 
+                               Text="Leave Type" 
+                               Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                        <Border Grid.Row="0" Grid.Column="1"
+                                StrokeThickness="1"
+                                Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='LeaveType'}"
+                                Padding="0" 
+                                BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=#1565c0}">
+                            <Picker Title="Select Leave Type"
+                                    ItemsSource="{Binding LeaveTypes}"
+                                    SelectedItem="{Binding SelectedLeaveType}"
+                                    IsEnabled="{Binding IsNotBusy}"
+                                    TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                    TitleColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default=#AAAAAA}"
+                                    BackgroundColor="Transparent"/>
+                        </Border>
 
-                            <Label x:Name="StartDateLabel" Text="Start Date" Style="{StaticResource FormFieldTitleLabelStyle}"/>
-                            <Border x:Name="StartDateBorder" StrokeThickness="1"
-                                    Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartDate'}"
-                                    Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
-                                <DatePicker Date="{Binding StartDate}" Format="dddd, MMMM d, yyyy" TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"/>
-                            </Border>
+                        <!-- Start Date -->
+                        <Label Grid.Row="1" Grid.Column="0" 
+                               Text="Start Date" 
+                               Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                        <Border Grid.Row="1" Grid.Column="1"
+                                StrokeThickness="1"
+                                Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartDate'}"
+                                Padding="0" 
+                                BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                            <DatePicker Date="{Binding StartDate}"
+                                       Format="dddd, MMMM d, yyyy"
+                                       TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                       MinimumDate="{Binding MinDate}"
+                                       MaximumDate="{Binding MaxDate}"
+                                       IsEnabled="{Binding IsNotBusy}"/>
+                        </Border>
 
-                            <Label x:Name="EndDateLabel" Text="End Date" Style="{StaticResource FormFieldTitleLabelStyle}"
-                                   IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}"/>
-                            <Border x:Name="EndDateBorder" StrokeThickness="1"
-                                     Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndDate'}"
-                                     Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}"
-                                     IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}">
-                                 <DatePicker Date="{Binding EndDate}" Format="dddd, MMMM d, yyyy" TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"/>
-                             </Border>
+                        <!-- End Date -->
+                        <Label Grid.Row="2" Grid.Column="0" 
+                               Text="End Date" 
+                               Style="{StaticResource FormFieldTitleLabelStyle}"
+                               IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}"/>
+                        <Border Grid.Row="2" Grid.Column="1"
+                                StrokeThickness="1"
+                                Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndDate'}"
+                                Padding="0" 
+                                BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}"
+                                IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}">
+                            <DatePicker Date="{Binding EndDate}"
+                                       Format="dddd, MMMM d, yyyy"
+                                       TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                       MinimumDate="{Binding StartDate}"
+                                       MaximumDate="{Binding MaxDate}"
+                                       IsEnabled="{Binding IsNotBusy}"
+                                       IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}"/>
+                        </Border>
 
-                            <!-- Time Pickers for Permission/External Assignment -->
-                            <Grid x:Name="TimePickersGrid"
-                                  IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToTimePickersVisibilityConverter}}"
-                                  ColumnDefinitions="*,*" ColumnSpacing="10" Margin="0,5,0,0">
-                                <VerticalStackLayout Grid.Column="0">
-                                    <Label Text="From Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
-                                    <Border StrokeThickness="1"
-                                            Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartTime'}"
-                                            Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
-                                         <TimePicker Time="{Binding StartTime}" Format="t" TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}" />
-                                     </Border>
-                                </VerticalStackLayout>
-                                <VerticalStackLayout Grid.Column="1">
-                                    <Label Text="To Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
-                                    <Border StrokeThickness="1"
-                                            Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndTime'}"
-                                            Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
-                                         <TimePicker Time="{Binding EndTime}" Format="t" TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}" />
-                                     </Border>
-                                </VerticalStackLayout>
-                            </Grid>
+                        <!-- Time Pickers -->
+                        <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                              IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToTimePickersVisibilityConverter}}"
+                              ColumnDefinitions="*,*" 
+                              ColumnSpacing="10" 
+                              Margin="0,5,0,0">
+                            <VerticalStackLayout Grid.Column="0">
+                                <Label Text="From Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                                <Border StrokeThickness="1"
+                                        Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartTime'}"
+                                        Padding="0" 
+                                        BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                                    <TimePicker Time="{Binding StartTime}"
+                                               Format="t"
+                                               TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                               IsEnabled="{Binding IsNotBusy}" />
+                                </Border>
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="1">
+                                <Label Text="To Time" Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                                <Border StrokeThickness="1"
+                                        Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndTime'}"
+                                        Padding="0" 
+                                        BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                                    <TimePicker Time="{Binding EndTime}"
+                                               Format="t"
+                                               TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                               IsEnabled="{Binding IsNotBusy}" />
+                                </Border>
+                            </VerticalStackLayout>
+                        </Grid>
 
-                            <Label x:Name="ReasonLabel" Text="Reason" Style="{StaticResource FormFieldTitleLabelStyle}"/>
-                            <Border x:Name="ReasonBorder" StrokeThickness="1"
-                                    Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='Reason'}"
-                                    Padding="0" BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
-                                <Editor Text="{Binding RequestReason}" Placeholder="Enter reason for leave (optional)" 
-                                        TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
-                                        PlaceholderColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default=#AAAAAA}"
-                                        MaxLength="200" AutoSize="TextChanges" HeightRequest="100"/>
-                            </Border>
-
-                            <VisualStateManager.VisualStateGroups>
-                                <VisualStateGroup Name="DeviceStates">
-                                    <VisualState Name="Desktop">
-                                        <VisualState.StateTriggers>
-                                            <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsDesktop}}" />
-                                        </VisualState.StateTriggers>
-                                        <VisualState.Setters>
-                                            <Setter Property="Grid.ColumnDefinitions" Value="Auto,*" />
-                                            <Setter Property="Grid.RowDefinitions" Value="Auto,Auto,Auto,Auto,Auto" />
-                                            <Setter TargetName="LeaveTypeLabel" Property="Grid.Row" Value="0" />
-                                            <Setter TargetName="LeaveTypeLabel" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="LeaveTypeBorder" Property="Grid.Row" Value="0" />
-                                            <Setter TargetName="LeaveTypeBorder" Property="Grid.Column" Value="1" />
-                                            <Setter TargetName="StartDateLabel" Property="Grid.Row" Value="1" />
-                                            <Setter TargetName="StartDateLabel" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="StartDateBorder" Property="Grid.Row" Value="1" />
-                                            <Setter TargetName="StartDateBorder" Property="Grid.Column" Value="1" />
-                                            <Setter TargetName="EndDateLabel" Property="Grid.Row" Value="2" />
-                                            <Setter TargetName="EndDateLabel" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="EndDateBorder" Property="Grid.Row" Value="2" />
-                                            <Setter TargetName="EndDateBorder" Property="Grid.Column" Value="1" />
-                                            <Setter TargetName="TimePickersGrid" Property="Grid.Row" Value="3" />
-                                            <Setter TargetName="TimePickersGrid" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="TimePickersGrid" Property="Grid.ColumnSpan" Value="2" />
-                                            <Setter TargetName="ReasonLabel" Property="Grid.Row" Value="4" />
-                                            <Setter TargetName="ReasonLabel" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="ReasonBorder" Property="Grid.Row" Value="4" />
-                                            <Setter TargetName="ReasonBorder" Property="Grid.Column" Value="1" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                    <VisualState Name="Mobile">
-                                        <VisualState.StateTriggers>
-                                            <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsMobile}}" />
-                                        </VisualState.StateTriggers>
-                                        <VisualState.Setters>
-                                            <Setter Property="Grid.ColumnDefinitions" Value="*" />
-                                            <Setter Property="Grid.RowDefinitions" Value="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" />
-                                            <Setter TargetName="LeaveTypeLabel" Property="Grid.Row" Value="0" />
-                                            <Setter TargetName="LeaveTypeLabel" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="LeaveTypeBorder" Property="Grid.Row" Value="1" />
-                                            <Setter TargetName="LeaveTypeBorder" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="StartDateLabel" Property="Grid.Row" Value="2" />
-                                            <Setter TargetName="StartDateLabel" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="StartDateBorder" Property="Grid.Row" Value="3" />
-                                            <Setter TargetName="StartDateBorder" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="EndDateLabel" Property="Grid.Row" Value="4" />
-                                            <Setter TargetName="EndDateLabel" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="EndDateBorder" Property="Grid.Row" Value="5" />
-                                            <Setter TargetName="EndDateBorder" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="TimePickersGrid" Property="Grid.Row" Value="6" />
-                                            <Setter TargetName="TimePickersGrid" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="TimePickersGrid" Property="Grid.ColumnSpan" Value="1" />
-                                            <Setter TargetName="ReasonLabel" Property="Grid.Row" Value="7" />
-                                            <Setter TargetName="ReasonLabel" Property="Grid.Column" Value="0" />
-                                            <Setter TargetName="ReasonBorder" Property="Grid.Row" Value="8" />
-                                            <Setter TargetName="ReasonBorder" Property="Grid.Column" Value="0" />
-                                        </VisualState.Setters>
-                                    </VisualState>
-                                </VisualStateGroup>
-                            </VisualStateManager.VisualStateGroups>
+                        <!-- Reason -->
+                        <Label Grid.Row="4" Grid.Column="0" 
+                               Text="Reason" 
+                               Style="{StaticResource FormFieldTitleLabelStyle}"/>
+                        <Border Grid.Row="4" Grid.Column="1"
+                                StrokeThickness="1"
+                                Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='Reason'}"
+                                Padding="0" 
+                                BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                            <Editor Text="{Binding RequestReason}" 
+                                   Placeholder="Enter reason for leave (optional)" 
+                                   TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                   PlaceholderColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default=#AAAAAA}"
+                                   MaxLength="200" 
+                                   AutoSize="TextChanges" 
+                                   HeightRequest="100"
+                                   IsEnabled="{Binding IsNotBusy}" />
+                        </Border>
                     </Grid>
                 </Frame>
             </VerticalStackLayout>

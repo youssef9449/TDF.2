@@ -29,14 +29,36 @@
                            VerticalOptions="Center"
                            ZIndex="10"/> <!-- Ensure indicator is on top -->
 
-        <!-- Row 0: Title and New Request Button -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+        <!-- Row 0: Title and Action Buttons -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,10">
             <Label Text="{Binding Title}"
                    FontSize="{OnIdiom Phone=20, Default=24}"
                    FontAttributes="Bold"
                    VerticalOptions="Center" />
 
             <Button Grid.Column="1"
+                    Text="Debug"
+                    Command="{Binding TestApiConnectivityCommand}"
+                    BackgroundColor="Orange"
+                    TextColor="White"
+                    HeightRequest="{OnIdiom Phone=35, Default=40}"
+                    WidthRequest="{OnIdiom Phone=80, Default=100}"
+                    FontSize="{OnIdiom Phone=10, Default=12}"
+                    CornerRadius="{OnIdiom Phone=18, Default=20}"
+                    Margin="0,0,5,0" />
+
+            <Button Grid.Column="2"
+                    Text="Refresh"
+                    Command="{Binding RefreshRequestsCommand}"
+                    BackgroundColor="Gray"
+                    TextColor="White"
+                    HeightRequest="{OnIdiom Phone=35, Default=40}"
+                    WidthRequest="{OnIdiom Phone=80, Default=100}"
+                    FontSize="{OnIdiom Phone=10, Default=12}"
+                    CornerRadius="{OnIdiom Phone=18, Default=20}"
+                    Margin="0,0,5,0" />
+
+            <Button Grid.Column="3"
                     Text="New Request"
                     Command="{Binding GoToAddRequestCommand}"
                     BackgroundColor="{StaticResource Primary}"

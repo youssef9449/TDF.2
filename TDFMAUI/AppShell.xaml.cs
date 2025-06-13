@@ -3,7 +3,6 @@ using TDFMAUI.Features.Auth;
 using TDFMAUI.Features.Admin;
 using TDFMAUI.Features.Dashboard;
 using TDFMAUI.Features.Settings;
-using TDFMAUI.Features.Users;
 using TDFMAUI.Features.Requests;
 using TDFMAUI.Services;
 using System.ComponentModel;
@@ -296,13 +295,27 @@ namespace TDFMAUI
 
         private async void OpenUsersFlyout_Tapped(object sender, EventArgs e)
         {
-            _logger?.LogInformation("OpenUsersFlyout_Tapped called.");
-            if (Shell.Current.CurrentState.Location?.OriginalString != null && !Shell.Current.CurrentState.Location.OriginalString.EndsWith("//users"))
+            try
             {
-                _previousRoute = Shell.Current.CurrentState.Location.OriginalString;
-                 _logger?.LogInformation($"Storing previous route: {_previousRoute} before navigating from tap.");
+                _logger?.LogInformation("OpenUsersFlyout_Tapped called.");
+                
+                // Store current route if not already at users panel
+                if (Shell.Current.CurrentState.Location?.OriginalString != null && 
+                    !Shell.Current.CurrentState.Location.OriginalString.EndsWith("//users"))
+                {
+                    _previousRoute = Shell.Current.CurrentState.Location.OriginalString;
+                    _logger?.LogInformation($"Storing previous route: {_previousRoute} before navigating from tap.");
+                }
+
+                // Navigate to users panel with animation
+                await Shell.Current.GoToAsync("//users", true);
+                _logger?.LogInformation("Successfully navigated to users panel.");
             }
-            await Shell.Current.GoToAsync("//users", true); // Navigate to the shell item, animate
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error navigating to users panel");
+                await DisplayAlert("Navigation Error", "Could not open the users panel. Please try again.", "OK");
+            }
         }
         
         private void ToggleTheme_Clicked(object sender, EventArgs e)

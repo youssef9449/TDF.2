@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -32,7 +33,21 @@ namespace TDFShared.Services
 
         // Configuration properties
         public string BaseUrl { get; set; } = string.Empty;
-        public int TimeoutSeconds { get; set; } = 30;
+        
+        private int _timeoutSeconds = 30;
+        public int TimeoutSeconds 
+        { 
+            get => _timeoutSeconds;
+            set 
+            {
+                _timeoutSeconds = value;
+                if (_httpClient != null)
+                {
+                    _httpClient.Timeout = TimeSpan.FromSeconds(value);
+                }
+            }
+        }
+        
         public int MaxRetries { get; set; } = 3;
         public TimeSpan InitialRetryDelay { get; set; } = TimeSpan.FromSeconds(1);
 
@@ -52,6 +67,9 @@ namespace TDFShared.Services
             _defaultHeaders = new Dictionary<string, string>();
             _semaphore = new SemaphoreSlim(10, 10); // Limit concurrent requests
 
+            // Configure HttpClient timeout
+            _httpClient.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
+
             // Use centralized JSON serialization options for consistency
             _jsonOptions = TDFShared.Helpers.JsonSerializationHelper.CompactOptions;
 
@@ -60,6 +78,7 @@ namespace TDFShared.Services
                 .HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode && IsRetryableStatusCode(r.StatusCode))
                 .Or<HttpRequestException>()
                 .Or<TaskCanceledException>()
+                .Or<IOException>() // Handle IO exceptions that can occur during response reading
                 .WaitAndRetryAsync(
                     retryCount: MaxRetries,
                     sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)) + InitialRetryDelay,
@@ -107,7 +126,16 @@ namespace TDFShared.Services
             {
                 var response = await _httpClient.GetAsync(BuildUrl(endpoint), cancellationToken);
                 await EnsureSuccessStatusCodeAsync(response, endpoint);
-                return await response.Content.ReadAsStringAsync();
+                
+                try
+                {
+                    return await response.Content.ReadAsStringAsync();
+                }
+                catch (IOException ioEx)
+                {
+                    _logger.LogError(ioEx, "IO error reading raw response content from {Endpoint}: {Message}", endpoint, ioEx.Message);
+                    throw new ApiException($"Failed to read response from {endpoint}: Connection was closed unexpectedly", ioEx);
+                }
             }, endpoint);
         }
 
@@ -117,7 +145,11 @@ namespace TDFShared.Services
             {
                 var json = JsonSerializer.Serialize(data, _jsonOptions);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
+                
+                _logger.LogDebug("Sending POST request to {Endpoint} with content length {ContentLength}", endpoint, json.Length);
                 var response = await _httpClient.PostAsync(BuildUrl(endpoint), content, cancellationToken);
+                _logger.LogDebug("Received response from {Endpoint} with status {StatusCode}", endpoint, response.StatusCode);
+                
                 return await ProcessResponseAsync<TResponse>(response, endpoint);
             }, endpoint);
         }
@@ -341,13 +373,50 @@ namespace TDFShared.Services
         {
             await EnsureSuccessStatusCodeAsync(response, endpoint);
 
-            if (typeof(T) == typeof(string))
+            string rawContent;
+            try
             {
-                var content = await response.Content.ReadAsStringAsync();
-                return (T)(object)content;
+                _logger.LogDebug("Starting to read response content from {Endpoint} with status {StatusCode}", endpoint, response.StatusCode);
+                
+                // Check if the response has content
+                if (response.Content == null)
+                {
+                    _logger.LogWarning("Response from {Endpoint} has no content", endpoint);
+                    rawContent = string.Empty;
+                }
+                else
+                {
+                    // Read the content with proper error handling for IO exceptions
+                    rawContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogDebug("Successfully read {ContentLength} characters from {Endpoint}", rawContent.Length, endpoint);
+                }
+            }
+            catch (IOException ioEx)
+            {
+                _logger.LogError(ioEx, "IO error reading response content from {Endpoint}: {Message}. Response status: {StatusCode}", 
+                    endpoint, ioEx.Message, response.StatusCode);
+                throw new ApiException($"Failed to read response from {endpoint}: Connection was closed unexpectedly", ioEx);
+            }
+            catch (ObjectDisposedException odEx)
+            {
+                _logger.LogError(odEx, "Response or content was disposed while reading from {Endpoint}: {Message}", endpoint, odEx.Message);
+                throw new ApiException($"Failed to read response from {endpoint}: Response was disposed", odEx);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error reading response content from {Endpoint}: {Message}. Response status: {StatusCode}", 
+                    endpoint, ex.Message, response.StatusCode);
+                throw new ApiException($"Failed to read response from {endpoint}: {ex.Message}", ex);
             }
 
-            string rawContent = await response.Content.ReadAsStringAsync();
+            if (typeof(T) == typeof(string))
+            {
+                return (T)(object)rawContent;
+            }
+
+            _logger.LogDebug("Received raw content for {Endpoint}. Length: {Length}. Content: {Content}",
+                endpoint, rawContent.Length, rawContent.Length > 200 ? rawContent.Substring(0, 200) + "..." : rawContent);
+
             if (string.IsNullOrEmpty(rawContent))
             {
                 _logger.LogWarning("Empty response body for {Endpoint}", endpoint);
@@ -507,7 +576,22 @@ namespace TDFShared.Services
             if (response.IsSuccessStatusCode)
                 return;
 
-            var errorContent = await response.Content.ReadAsStringAsync();
+            string errorContent;
+            try
+            {
+                errorContent = await response.Content.ReadAsStringAsync();
+            }
+            catch (IOException ioEx)
+            {
+                _logger.LogError(ioEx, "IO error reading error response content from {Endpoint}: {Message}", endpoint, ioEx.Message);
+                errorContent = $"Failed to read error response: {ioEx.Message}";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error reading error response content from {Endpoint}: {Message}", endpoint, ex.Message);
+                errorContent = $"Failed to read error response: {ex.Message}";
+            }
+
             var errorMessage = GetFriendlyErrorMessage(response.StatusCode, errorContent);
 
             // Check for authentication errors

@@ -34,18 +34,36 @@
                          HeightRequest="30"
                          WidthRequest="30"
                          Margin="0,0,10,0"
-                         VerticalOptions="Center" />
+                         VerticalOptions="Center"
+                         ToolTipProperties.Text="Show Online Users"
+                         BackgroundColor="Transparent"
+                         Padding="2">
+                <ImageButton.Triggers>
+                    <DataTrigger TargetType="ImageButton" 
+                                Binding="{Binding Source={RelativeSource AncestorType={x:Type local:AppShell}}, Path=IsDesktopUser}" 
+                                Value="True">
+                        <Setter Property="Opacity" Value="0.8" />
+                    </DataTrigger>
+                </ImageButton.Triggers>
+            </ImageButton>
         </Grid>
     </Shell.TitleView>
 
     <Shell.FlyoutHeader>
         <Grid HeightRequest="100" BackgroundColor="#512BD4">
+            <Image Source="tdf_logo.png"
+                   HeightRequest="60"
+                   WidthRequest="60"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   Margin="0,0,0,10"/>
             <Label Text="TDF Internal System"
                    TextColor="White"
                    FontSize="20"
                    FontAttributes="Bold"
                    HorizontalOptions="Center"
-                   VerticalOptions="Center"/>
+                   VerticalOptions="Center"
+                   Margin="0,50,0,0"/>
         </Grid>
     </Shell.FlyoutHeader>
 

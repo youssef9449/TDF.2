@@ -12,22 +12,26 @@
     <ContentPage.Resources>
         <Style x:Key="EntryStyle" TargetType="Entry">
             <Setter Property="TextColor" Value="{AppThemeBinding Light=Black, Dark={StaticResource TextColor}}" />
-            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource DarkSurfaceVariant}}" />
+            <Setter Property="BackgroundColor" Value="Transparent" />
             <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource DarkTextTertiary}}" />
             <Setter Property="FontSize" Value="15" />
-            <Setter Property="HeightRequest" Value="40" />
             <Setter Property="ReturnCommand" Value="{Binding LoginCommand}" />
             <Setter Property="ClearButtonVisibility" Value="WhileEditing" />
             <Setter Property="IsEnabled" Value="{Binding IsNotBusy}" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="VerticalOptions" Value="Fill" />
+            <Setter Property="HorizontalOptions" Value="Fill" />
+            <Setter Property="HeightRequest" Value="45" />
         </Style>
         
         <Style x:Key="LoginInputFrameStyle" TargetType="Frame">
             <Setter Property="CornerRadius" Value="10" />
-            <Setter Property="Padding" Value="0" />
+            <Setter Property="Padding" Value="15,0" />
             <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource DarkSurfaceVariant}}" />
             <Setter Property="HasShadow" Value="False" />
             <Setter Property="BorderColor" Value="Transparent" />
             <Setter Property="HeightRequest" Value="45" />
+            <Setter Property="Margin" Value="0,5" />
         </Style>
     </ContentPage.Resources>
 
@@ -65,8 +69,7 @@
                                        Placeholder="User Name"
                                        Text="{Binding Username}"
                                        Keyboard="Text"
-                                       TextColor="{AppThemeBinding Light=Black, Dark=White}"
-                                       Margin="15,0" />
+                                       TextColor="{AppThemeBinding Light=Black, Dark=White}" />
                             </Frame>
 
                             <!-- Password input -->
@@ -75,8 +78,7 @@
                                        Placeholder="Password"
                                        IsPassword="True"
                                        Text="{Binding Password}"
-                                       TextColor="{AppThemeBinding Light=Black, Dark=White}"
-                                       Margin="15,0" />
+                                       TextColor="{AppThemeBinding Light=Black, Dark=White}" />
                             </Frame>
 
                             <!-- Error message -->

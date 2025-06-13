@@ -10,6 +10,9 @@ using TDFShared.Enums;
 using Microsoft.Extensions.Logging;
 using TDFMAUI.Helpers; // For ByteArrayToImageSourceConverter & GetStatusColor, if moved
 using TDFShared.Services;
+using TDFShared.DTOs.Common;
+using TDFShared.DTOs.Users;
+using TDFShared.Constants;
 
 namespace TDFMAUI
 {
@@ -54,10 +57,68 @@ namespace TDFMAUI
             }
         }
 
+        // Pagination properties
+        private int _currentPage = 1;
+        public int CurrentPage
+        {
+            get => _currentPage;
+            set
+            {
+                _currentPage = value;
+                OnPropertyChanged(nameof(CurrentPage));
+            }
+        }
+
+        private int _totalPages = 1;
+        public int TotalPages
+        {
+            get => _totalPages;
+            set
+            {
+                _totalPages = value;
+                OnPropertyChanged(nameof(TotalPages));
+            }
+        }
+
+        private bool _hasNextPage;
+        public bool HasNextPage
+        {
+            get => _hasNextPage;
+            set
+            {
+                _hasNextPage = value;
+                OnPropertyChanged(nameof(HasNextPage));
+            }
+        }
+
+        private bool _hasPreviousPage;
+        public bool HasPreviousPage
+        {
+            get => _hasPreviousPage;
+            set
+            {
+                _hasPreviousPage = value;
+                OnPropertyChanged(nameof(HasPreviousPage));
+            }
+        }
+
+        private bool _hasPagination = true;
+        public bool HasPagination
+        {
+            get => _hasPagination;
+            set
+            {
+                _hasPagination = value;
+                OnPropertyChanged(nameof(HasPagination));
+            }
+        }
+
         /// <summary>
         /// Command to refresh the user list
         /// </summary>
         public ICommand RefreshUsersCommand { get; private set; }
+        public ICommand NextPageCommand { get; private set; }
+        public ICommand PreviousPageCommand { get; private set; }
 
         // Parameterless constructor for XAML instantiation
         public UsersRightPanel()
@@ -86,6 +147,8 @@ namespace TDFMAUI
 
             BindingContext = this;
             RefreshUsersCommand = new Command(async () => await RefreshUsersAsync());
+            NextPageCommand = new Command(async () => await LoadNextPageAsync());
+            PreviousPageCommand = new Command(async () => await LoadPreviousPageAsync());
         }
 
         // Constructor with dependency injection (can be kept for testing or direct instantiation)
@@ -103,6 +166,8 @@ namespace TDFMAUI
 
             BindingContext = this;
             RefreshUsersCommand = new Command(async () => await RefreshUsersAsync());
+            NextPageCommand = new Command(async () => await LoadNextPageAsync());
+            PreviousPageCommand = new Command(async () => await LoadPreviousPageAsync());
         }
 
         protected override async void OnAppearing()
@@ -176,7 +241,8 @@ namespace TDFMAUI
                 return;
             }
 
-            _logger?.LogInformation("User status changed: UserID {UserId}, Status {Status}. Updating panel.", e.UserId, e.Status);
+            _logger?.LogInformation("User status changed: UserID {UserId}, Status {Status}, Username {Username}. Updating panel.", 
+                e.UserId, e.Status, e.Username);
 
             MainThread.BeginInvokeOnMainThread(async () =>
             {
@@ -188,12 +254,14 @@ namespace TDFMAUI
                     {
                         // Update the user's status
                         existingUser.Status = e.Status;
-                        _logger?.LogInformation("Updated user {Username} (ID: {UserId}) status to {Status} in UsersRightPanel", e.Username, e.UserId, e.Status);
+                        _logger?.LogInformation("Updated user {Username} (ID: {UserId}) status to {Status} in UsersRightPanel", 
+                            existingUser.Username, e.UserId, e.Status);
                     }
                     else if (e.Status != UserPresenceStatus.Offline)
                     {
                         // If user not in collection and they're not offline, refresh the full list
-                        _logger?.LogInformation("User {Username} (ID: {UserId}) not found in collection, refreshing panel", e.Username, e.UserId);
+                        _logger?.LogInformation("User {Username} (ID: {UserId}) not found in collection, refreshing panel", 
+                            e.Username, e.UserId);
                         await RefreshUsersAsync();
                     }
                 }
@@ -233,64 +301,104 @@ namespace TDFMAUI
             });
         }
 
+        private async Task LoadNextPageAsync()
+        {
+            if (HasNextPage)
+            {
+                CurrentPage++;
+                await RefreshUsersAsync();
+            }
+        }
+
+        private async Task LoadPreviousPageAsync()
+        {
+            if (HasPreviousPage)
+            {
+                CurrentPage--;
+                await RefreshUsersAsync();
+            }
+        }
+
         private async Task RefreshUsersAsync()
         {
-            if (IsLoading && !IsRefreshing) return; // Avoid concurrent full loads unless it's a pull-to-refresh
+            if (IsLoading && !IsRefreshing) return;
 
-            if (!IsRefreshing) // Only set IsLoading if not a pull-to-refresh action
+            if (!IsRefreshing)
             {
                 IsLoading = true;
             }
 
             try
             {
-                _logger.LogInformation("UsersRightPanel: Refreshing users...");
+                _logger?.LogInformation("UsersRightPanel: Refreshing users... Page {Page}", CurrentPage);
 
-                // Check for connectivity
                 var isConnected = _connectivityService.IsConnected();
                 Dictionary<int, UserPresenceInfo> onlineUsersDetails;
 
-                // Update offline indicator visibility
                 MainThread.BeginInvokeOnMainThread(() => {
                     offlineIndicator.IsVisible = !isConnected;
                 });
 
                 if (isConnected)
                 {
-                    // Get online users from service if connected
-                    onlineUsersDetails = await _userPresenceService.GetOnlineUsersAsync();
+                    // Get users from the paginated API endpoint
+                    var apiResponse = await _apiService.GetAsync<ApiResponse<PaginatedResult<UserDto>>>(
+                        $"{ApiRoutes.Users.GetAllWithStatus}?pageNumber={CurrentPage}&pageSize=10");
+                    
+                    if (apiResponse?.Success == true && apiResponse.Data != null)
+                    {
+                        onlineUsersDetails = new Dictionary<int, UserPresenceInfo>();
+                        foreach (var user in apiResponse.Data.Items)
+                        {
+                            onlineUsersDetails[user.UserID] = new UserPresenceInfo
+                            {
+                                UserId = user.UserID,
+                                Username = user.UserName,
+                                FullName = user.FullName,
+                                Department = user.Department,
+                                Status = user.PresenceStatus,
+                                StatusMessage = user.StatusMessage,
+                                IsAvailableForChat = user.IsAvailableForChat ?? false,
+                                ProfilePictureData = user.Picture
+                            };
+                        }
+
+                        // Update pagination info
+                        TotalPages = apiResponse.Data.TotalPages;
+                        HasNextPage = CurrentPage < TotalPages;
+                        HasPreviousPage = CurrentPage > 1;
+                        HasPagination = TotalPages > 1;
+
+                        _logger?.LogInformation("UsersRightPanel: Retrieved {Count} users from service", onlineUsersDetails.Count);
+                    }
+                    else
+                    {
+                        _logger?.LogWarning("UsersRightPanel: API returned unsuccessful response");
+                        onlineUsersDetails = new Dictionary<int, UserPresenceInfo>();
+                    }
                 }
                 else
                 {
-                    // Use cached data when offline
-                    _logger.LogWarning("UsersRightPanel: Device is offline, using cached user data.");
+                    _logger?.LogWarning("UsersRightPanel: Device is offline, using cached user data.");
                     onlineUsersDetails = await Task.FromResult(_userPresenceService.GetCachedOnlineUsers());
                 }
 
-                // Get the current user ID to exclude from the list
                 var currentAppUserId = App.CurrentUser?.UserID ?? 0;
-
-                if (currentAppUserId <= 0)
-                {
-                    _logger.LogWarning("UsersRightPanel: Current user ID is invalid or not set");
-                }
-                else
-                {
-                    _logger.LogInformation("UsersRightPanel: Will exclude current user ID: {CurrentAppUserId}", currentAppUserId);
-                }
 
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
                     var currentUsers = new ObservableCollection<UserViewModel>();
                     if (onlineUsersDetails != null)
                     {
-                        // Filter out the current user and create view models for other users
                         var filteredUsers = onlineUsersDetails.Values
-                            .Where(u => u.UserId != currentAppUserId && u.UserId > 0) // Exclude current user and ensure valid IDs
+                            .Where(u => u.UserId != currentAppUserId && u.UserId > 0)
                             .ToList();
 
                         foreach (var userDetail in filteredUsers)
                         {
+                            _logger?.LogDebug("Processing user: ID={UserId}, Name={Username}, Status={Status}", 
+                                userDetail.UserId, userDetail.Username, userDetail.Status);
+
                             var userVm = new UserViewModel
                             {
                                 UserId = userDetail.UserId,
@@ -300,7 +408,9 @@ namespace TDFMAUI
                                 Status = userDetail.Status,
                                 StatusMessage = userDetail.StatusMessage,
                                 IsAvailableForChat = userDetail.IsAvailableForChat,
-                                ProfilePictureData = userDetail.ProfilePictureData
+                                ProfilePictureData = userDetail.ProfilePictureData != null && userDetail.ProfilePictureData.Length > 0 
+                                    ? userDetail.ProfilePictureData 
+                                    : null
                             };
 
                             currentUsers.Add(userVm);
@@ -308,14 +418,14 @@ namespace TDFMAUI
 
                         int userCount = currentUsers.Count;
                         int totalUsers = onlineUsersDetails.Count;
-                        _logger.LogInformation("UsersRightPanel: Displaying {UserCount} users (filtered from {TotalUsers} total users).", userCount, totalUsers);
+                        _logger?.LogInformation("UsersRightPanel: Displaying {UserCount} users (filtered from {TotalUsers} total users). Page {CurrentPage} of {TotalPages}", 
+                            userCount, totalUsers, CurrentPage, TotalPages);
                     }
                     else
                     {
-                        _logger.LogWarning("UsersRightPanel: GetOnlineUsersAsync returned null.");
+                        _logger?.LogWarning("UsersRightPanel: GetOnlineUsersAsync returned null.");
                     }
 
-                    // Update the collection
                     Users.Clear();
                     foreach(var u in currentUsers) Users.Add(u);
                     OnPropertyChanged(nameof(Users));
@@ -323,17 +433,7 @@ namespace TDFMAUI
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "UsersRightPanel: Failed to load online users.");
-                // Show a non-intrusive error message for the side panel
-                MainThread.BeginInvokeOnMainThread(() =>
-                {
-                    if (_users.Count == 0)
-                    {
-                        // Only show error indicators if we don't have any existing data to display
-                        // This prevents disrupting the user experience for temporary issues
-                        // Consider adding a small indicator in the UI to show connectivity status
-                    }
-                });
+                _logger?.LogError(ex, "UsersRightPanel: Failed to load online users.");
             }
             finally
             {

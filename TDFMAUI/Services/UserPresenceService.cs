@@ -82,18 +82,16 @@ namespace TDFMAUI.Services
             try
             {
                 _logger.LogInformation("Attempting to fetch all users with status from API endpoint: users/all");
-                
-                // Get all users with their status from the API
-                var allUsersData = await _apiService.GetAsync<IEnumerable<UserDto>>(ApiRoutes.Users.GetAllWithStatus);
-                
-                if (allUsersData == null)
+                // Get all users with their status from the API as a paginated result (wrapped in ApiResponse)
+                var apiResponse = await _apiService.GetAsync<ApiResponse<PaginatedResult<UserDto>>>(ApiRoutes.Users.GetAllWithStatus);
+                if (apiResponse == null || !apiResponse.Success || apiResponse.Data == null || apiResponse.Data.Items == null)
                 {
-                    _logger.LogWarning("API returned null for users");
+                    _logger.LogWarning("API returned null or unsuccessful response for users");
                     return new Dictionary<int, UserPresenceInfo>();
                 }
 
                 var result = new Dictionary<int, UserPresenceInfo>();
-                foreach (var user in allUsersData)
+                foreach (var user in apiResponse.Data.Items)
                 {
                     result[user.UserID] = new UserPresenceInfo
                     {

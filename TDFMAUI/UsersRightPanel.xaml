@@ -3,10 +3,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="TDFMAUI.UsersRightPanel"
              xmlns:viewModels="clr-namespace:TDFMAUI.ViewModels"
+             xmlns:enums="clr-namespace:TDFShared.Enums;assembly=TDFShared"
              xmlns:converters="clr-namespace:TDFMAUI.Converters"
              xmlns:local="clr-namespace:TDFMAUI"
              x:DataType="local:UsersRightPanel"
-             BackgroundColor="{AppThemeBinding Light=#F7F7F7, Dark=#2D2D2D}"
+             BackgroundColor="{AppThemeBinding Light=#F7F7F7, Dark=#1E1E1E}"
              Shell.NavBarIsVisible="False">
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -31,7 +32,7 @@
                 <Setter Property="Margin" Value="6,3" />
                 <Setter Property="CornerRadius" Value="8" />
                 <Setter Property="BorderColor" Value="{AppThemeBinding Light=#E0E0E0, Dark=#393939}" />
-                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=White, Dark=#343434}" />
+                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=White, Dark=#2D2D2D}" />
                 <Setter Property="HasShadow" Value="{OnPlatform iOS=false, Android=true, WinUI=true, MacCatalyst=true}" />
                 <Setter Property="Opacity" Value="0.92" />
             </Style>
@@ -41,7 +42,9 @@
                 <Setter Property="Aspect" Value="AspectFill" />
                 <Setter Property="HeightRequest" Value="50" />
                 <Setter Property="WidthRequest" Value="50" />
-                <Setter Property="BackgroundColor" Value="{AppThemeBinding Light=#E0E0E0, Dark=#444444}" />
+                <Setter Property="BackgroundColor" Value="Transparent" />
+                <Setter Property="HorizontalOptions" Value="Fill" />
+                <Setter Property="VerticalOptions" Value="Fill" />
             </Style>
             
             <!-- Name text style -->
@@ -71,7 +74,7 @@
     </ContentPage.Resources>
 
     <!-- Main layout grid -->
-    <Grid RowDefinitions="Auto, *" ColumnDefinitions="*, Auto" 
+    <Grid RowDefinitions="Auto, *, Auto" ColumnDefinitions="*, Auto" 
           Padding="{OnPlatform iOS='15,35,15,15', Default='15'}"
           BackgroundColor="{AppThemeBinding Light=#F0F0F0, Dark=#1E1E1E}">
           
@@ -100,7 +103,8 @@
         <RefreshView Grid.Row="1" Grid.ColumnSpan="2" 
                      x:Name="refreshView" 
                      IsRefreshing="{Binding IsRefreshing}" 
-                     Command="{Binding RefreshUsersCommand}">
+                     Command="{Binding RefreshUsersCommand}"
+                     BackgroundColor="Transparent">
                      
             <CollectionView x:Name="usersCollection" 
                             ItemsSource="{Binding Users}" 
@@ -116,9 +120,23 @@
                                         StrokeThickness="0"
                                         WidthRequest="50" 
                                         HeightRequest="50"
-                                        StrokeShape="Ellipse">
+                                        StrokeShape="Ellipse"
+                                        BackgroundColor="{AppThemeBinding Light=#E0E0E0, Dark=#444444}">
                                     <Image Style="{StaticResource ProfileImageStyle}"
-                                           Source="{Binding ProfilePictureData, Converter={StaticResource ByteArrayToImageSourceConverter}}">
+                                           Source="{Binding ProfilePictureData, Converter={StaticResource ByteArrayToImageSourceConverter}}"
+                                           BackgroundColor="Transparent">
+                                        <Image.Triggers>
+                                            <DataTrigger TargetType="Image" 
+                                                         Binding="{Binding ProfilePictureData}" 
+                                                         Value="{x:Null}">
+                                                <Setter Property="Source" Value="default_profile.png" />
+                                            </DataTrigger>
+                                            <DataTrigger TargetType="Image" 
+                                                         Binding="{Binding ProfilePictureData}" 
+                                                         Value="{x:Null}">
+                                                <Setter Property="Aspect" Value="AspectFit" />
+                                            </DataTrigger>
+                                        </Image.Triggers>
                                     </Image>
                                 </Border>
 
@@ -142,28 +160,28 @@
                                     <Frame.Triggers>
                                         <DataTrigger TargetType="Frame" 
                                                      Binding="{Binding Status}" 
-                                                     Value="Online">
-                                            <Setter Property="BackgroundColor" Value="Green" />
+                                                     Value="{x:Static enums:UserPresenceStatus.Online}">
+                                            <Setter Property="BackgroundColor" Value="#4CAF50" />
                                         </DataTrigger>
                                         <DataTrigger TargetType="Frame" 
                                                      Binding="{Binding Status}" 
-                                                     Value="Away">
-                                            <Setter Property="BackgroundColor" Value="Orange" />
+                                                     Value="{x:Static enums:UserPresenceStatus.Away}">
+                                            <Setter Property="BackgroundColor" Value="#FFC107" />
                                         </DataTrigger>
                                         <DataTrigger TargetType="Frame" 
                                                      Binding="{Binding Status}" 
-                                                     Value="Busy">
-                                            <Setter Property="BackgroundColor" Value="Red" />
+                                                     Value="{x:Static enums:UserPresenceStatus.Busy}">
+                                            <Setter Property="BackgroundColor" Value="#F44336" />
                                         </DataTrigger>
                                         <DataTrigger TargetType="Frame" 
                                                      Binding="{Binding Status}" 
-                                                     Value="DoNotDisturb">
-                                            <Setter Property="BackgroundColor" Value="DarkRed" />
+                                                     Value="{x:Static enums:UserPresenceStatus.DoNotDisturb}">
+                                            <Setter Property="BackgroundColor" Value="#9C27B0" />
                                         </DataTrigger>
                                         <DataTrigger TargetType="Frame" 
                                                      Binding="{Binding Status}" 
-                                                     Value="Offline">
-                                            <Setter Property="BackgroundColor" Value="Gray" />
+                                                     Value="{x:Static enums:UserPresenceStatus.Offline}">
+                                            <Setter Property="BackgroundColor" Value="#9E9E9E" />
                                         </DataTrigger>
                                     </Frame.Triggers>
                                 </Frame>
@@ -197,12 +215,57 @@
             </CollectionView>
         </RefreshView>
         
+        <!-- Pagination Controls -->
+        <Grid Grid.Row="2" Grid.ColumnSpan="2" 
+              ColumnDefinitions="Auto, *, Auto" 
+              Padding="0,10,0,0"
+              IsVisible="{Binding HasPagination}">
+            
+            <!-- Previous Page Button -->
+            <Button Grid.Column="0"
+                    Text="Previous"
+                    Command="{Binding PreviousPageCommand}"
+                    IsEnabled="{Binding HasPreviousPage}"
+                    BackgroundColor="{AppThemeBinding Light=#E0E0E0, Dark=#2D2D2D}"
+                    TextColor="{AppThemeBinding Light=#212121, Dark=#FFFFFF}"
+                    CornerRadius="4"
+                    Padding="12,6"
+                    Margin="0,0,8,0"/>
+
+            <!-- Page Info -->
+            <StackLayout Grid.Column="1" 
+                         Orientation="Horizontal" 
+                         HorizontalOptions="Center" 
+                         VerticalOptions="Center">
+                <Label Text="{Binding CurrentPage}"
+                       TextColor="{AppThemeBinding Light=#212121, Dark=#FFFFFF}"
+                       FontSize="14"/>
+                <Label Text=" of "
+                       TextColor="{AppThemeBinding Light=#757575, Dark=#B0B0B0}"
+                       FontSize="14"/>
+                <Label Text="{Binding TotalPages}"
+                       TextColor="{AppThemeBinding Light=#212121, Dark=#FFFFFF}"
+                       FontSize="14"/>
+            </StackLayout>
+
+            <!-- Next Page Button -->
+            <Button Grid.Column="2"
+                    Text="Next"
+                    Command="{Binding NextPageCommand}"
+                    IsEnabled="{Binding HasNextPage}"
+                    BackgroundColor="{AppThemeBinding Light=#E0E0E0, Dark=#2D2D2D}"
+                    TextColor="{AppThemeBinding Light=#212121, Dark=#FFFFFF}"
+                    CornerRadius="4"
+                    Padding="12,6"
+                    Margin="8,0,0,0"/>
+        </Grid>
+        
         <!-- Loading indicator -->
         <ActivityIndicator Grid.Row="1" 
                            Grid.ColumnSpan="2"
                            IsVisible="{Binding IsLoading}"
                            IsRunning="{Binding IsLoading}"
-                           Color="{StaticResource Primary}"
+                           Color="{AppThemeBinding Light=#0078D7, Dark=#0078D7}"
                            HorizontalOptions="Center"
                            VerticalOptions="Center" />
                            
@@ -211,7 +274,7 @@
                 Grid.ColumnSpan="2"
                 VerticalOptions="Start"
                 Margin="0,5,0,0"
-                BackgroundColor="#222222"
+                BackgroundColor="{AppThemeBinding Light=#222222, Dark=#111111}"
                 Opacity="0.8"
                 StrokeShape="RoundRectangle 8,8,8,8"
                 HeightRequest="40"

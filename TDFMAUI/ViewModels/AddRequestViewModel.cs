@@ -39,6 +39,8 @@ namespace TDFMAUI.ViewModels
         private string _selectedLeaveType = string.Empty;
         private bool _isBusy;
         private int _currentUserId = 0; // <-- Add this field
+        private DateTime _minDate = DateTime.Today;
+        private DateTime _maxDate = DateTime.Today.AddYears(1);
 
         public bool IsEditMode
         {
@@ -159,6 +161,18 @@ namespace TDFMAUI.ViewModels
         }
 
         public bool IsNotBusy => !IsBusy;
+
+        public DateTime MinDate
+        {
+            get => _minDate;
+            set => SetProperty(ref _minDate, value);
+        }
+
+        public DateTime MaxDate
+        {
+            get => _maxDate;
+            set => SetProperty(ref _maxDate, value);
+        }
 
         public RequestCreateDto RequestCreateDto
         {

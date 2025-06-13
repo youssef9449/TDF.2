@@ -45,20 +45,7 @@ namespace TDFShared.DTOs.Messages
         public bool IsBroadcast { get; set; }
         public string? Department { get; set; }
 
-        /// <summary>
-        /// Unique identifier for the notification
-        /// </summary>
-        public int NotificationID { get; set; }
 
-        /// <summary>
-        /// ID of the user receiving the notification
-        /// </summary>
-        public int ReceiverID { get; set; }
-
-        /// <summary>
-        /// Optional ID of the user who sent/triggered the notification
-        /// </summary>
-        public int? SenderID { get; set; }
 
         /// <summary>
         /// Optional ID of a related message
@@ -87,4 +74,4 @@ namespace TDFShared.DTOs.Messages
         High = 2
     }
 
-} 
+}

@@ -527,7 +527,12 @@ builder.Services.AddAuthentication(options =>
             else
             {
                 var username = context.Principal?.Identity?.Name;
-                logger.LogInformation("User {Username} successfully authenticated", username);
+                // Prevent duplicate logging if OnTokenValidated is called multiple times for the same request
+                if (!context.HttpContext.Items.ContainsKey("UserAuthenticatedLogged"))
+                {
+                    logger.LogInformation("User {Username} successfully authenticated", username);
+                    context.HttpContext.Items["UserAuthenticatedLogged"] = true;
+                }
             }
             return Task.CompletedTask;
         }

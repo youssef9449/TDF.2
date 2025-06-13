@@ -18,11 +18,13 @@
     
     <!-- Platform-specific colors for iOS -->
     <Color x:Key="iOSGroupedBackgroundColor">#F2F2F7</Color>
+    <Color x:Key="iOSSystemBackgroundColor">#F2F2F7</Color>
     <Color x:Key="iOSSystemGray">#8E8E93</Color>
     
     <!-- Platform-specific colors for Android -->
     <Color x:Key="AndroidSurfaceColor">#FFFFFF</Color>
     <Color x:Key="AndroidBackgroundColor">#FFFFFF</Color>
+    <Color x:Key="AndroidCardViewColor">#FFFFFF</Color>
     
     <!-- For theme-aware colors, use AppThemeBinding at the point of use, e.g.:
          <Button BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#2D2D2D}" />

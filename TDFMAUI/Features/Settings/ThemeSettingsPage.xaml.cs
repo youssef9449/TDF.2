@@ -97,10 +97,7 @@ namespace TDFMAUI.Features.Settings
             _themeService?.ToggleTheme();
         }
         
-        private void OnToggleThemeClicked(object sender, EventArgs e)
-        {
-            OnToggleTheme();
-        }
+
         
         private void OnThemeRadioCheckedChanged(object sender, CheckedChangedEventArgs e)
         {

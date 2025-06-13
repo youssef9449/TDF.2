@@ -17,7 +17,7 @@ using System.Linq;
 
 namespace TDFMAUI.Features.Dashboard
 {
-    public partial class DashboardViewModel : BaseViewModel
+    public partial class DashboardViewModel : BaseViewModel, IDisposable
     {
         private readonly IRequestService _requestService;
         private readonly INotificationService _notificationService;
@@ -27,6 +27,8 @@ namespace TDFMAUI.Features.Dashboard
 
         [ObservableProperty]
         private string welcomeMessage = "Welcome back!";
+
+        private bool _disposed = false;
 
         [ObservableProperty]
         private DateTime currentDate = DateTime.Now;
@@ -138,16 +140,35 @@ namespace TDFMAUI.Features.Dashboard
         }
 
         [RelayCommand]
-        private async Task Refresh()
+        public async Task Refresh()
         {
             if (IsBusy) return;
 
-            // Cancel any existing refresh operation
-            _refreshCts?.Cancel();
-            _refreshCts = new CancellationTokenSource();
+            // Atomically replace the old CTS with a new one, and get the old one
+            CancellationTokenSource? oldCts = Interlocked.Exchange(ref _refreshCts, new CancellationTokenSource());
+
+            // If there was a previous CTS, try to cancel and dispose it
+            if (oldCts != null)
+            {
+                try
+                {
+                    oldCts.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                    _logger.LogWarning("Attempted to cancel an already disposed CancellationTokenSource during refresh cleanup.");
+                }
+                finally
+                {
+                    oldCts.Dispose();
+                }
+            }
+
+            // Get the token from the newly created CTS
             var ct = _refreshCts.Token;
 
-            await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
+            await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() =>
+            {
                 IsBusy = true;
                 IsRefreshing = true;
             });
@@ -183,11 +204,38 @@ namespace TDFMAUI.Features.Dashboard
             }
             finally
             {
-                await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
+                await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() =>
+                {
                     IsBusy = false;
                     IsRefreshing = false;
                 });
             }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                // Dispose managed state (managed objects)
+                _refreshCts?.Cancel(); // Cancel any ongoing operations
+                _refreshCts?.Dispose(); // Dispose the CancellationTokenSource
+                _refreshCts = null;
+
+                // Unsubscribe from events
+                App.UserChanged -= OnUserChanged;
+            }
+
+            // Free unmanaged resources (unmanaged objects) and override finalizer
+            // Set large fields to null
+            _disposed = true;
         }
 
         private async Task LoadStatsAsync(CancellationToken ct)
@@ -236,7 +284,7 @@ namespace TDFMAUI.Features.Dashboard
             {
                 ct.ThrowIfCancellationRequested();
                 var recent = await _requestService.GetRecentDashboardRequestsAsync();
-                
+
                 await Microsoft.Maui.ApplicationModel.MainThread.InvokeOnMainThreadAsync(() => {
                     RecentRequests.Clear();
                     foreach (var request in recent)
@@ -244,7 +292,7 @@ namespace TDFMAUI.Features.Dashboard
                         RecentRequests.Add(request);
                     }
                 });
-                
+
                 _logger.LogInformation("Loaded {Count} recent requests", RecentRequests.Count);
             }
             catch (OperationCanceledException)

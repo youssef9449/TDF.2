@@ -103,6 +103,8 @@ namespace TDFMAUI.Helpers
                 }
             }
         }
+
+
         
         /// <summary>
         /// Gets whether the app is using platform-specific theme adaptations

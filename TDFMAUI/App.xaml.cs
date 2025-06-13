@@ -950,45 +950,28 @@ namespace TDFMAUI
             base.OnResume();
 
             DebugService.LogInfo("App", "Application resuming");
-
-            // Re-register WebSocketService event handlers if the user is logged in
-            if (CurrentUser != null)
+            
+            if (DeviceHelper.IsMobile)
             {
-                RegisterWebSocketEventHandlers();
-
-                // Check if WebSocket is connected and reconnect if needed
-                if (Services != null)
+                // Re-register WebSocketService event handlers if the user is logged in
+                if (CurrentUser != null)
                 {
-                    var webSocketService = Services.GetService<IWebSocketService>();
-                    var secureStorage = Services.GetService<SecureStorageService>();
-                    
-                    if (webSocketService != null && !webSocketService.IsConnected && secureStorage != null)
-                    {
-                        DebugService.LogInfo("App", "WebSocket not connected, attempting to reconnect");
+                    RegisterWebSocketEventHandlers();
 
-                        // Reconnect in a background task
-                        Task.Run(async () =>
+                    // Check if WebSocket is connected and reconnect if needed
+                    if (Services != null)
+                    {
+                        var webSocketService = Services.GetService<IWebSocketService>();
+                        var secureStorage = Services.GetService<SecureStorageService>();
+
+                        if (webSocketService != null && !webSocketService.IsConnected && secureStorage != null)
                         {
-                            try
+                            DebugService.LogInfo("App", "WebSocket not connected, attempting to reconnect");
+
+                            // Reconnect in a background task
+                            Task.Run(async () =>
                             {
-                                // Handle differently based on platform
-                                if (DeviceHelper.IsDesktop)
-                                {
-                                    // For desktop, use the in-memory token from ApiConfig
-                                    if (!string.IsNullOrEmpty(ApiConfig.CurrentToken) && ApiConfig.TokenExpiration > DateTime.UtcNow)
-                                    {
-                                        DebugService.LogInfo("App", "Using in-memory token for desktop WebSocket reconnection");
-                                        await webSocketService.ConnectAsync(ApiConfig.CurrentToken);
-                                        DebugService.LogInfo("App", "WebSocket reconnected successfully");
-                                    }
-                                    else
-                                    {
-                                        DebugService.LogWarning("App", "Desktop WebSocket reconnect skipped: no valid in-memory token");
-                                        // Don't automatically redirect to login on desktop platforms
-                                        // The user will need to manually log in again
-                                    }
-                                }
-                                else
+                                try
                                 {
                                     // For mobile platforms, use the stored token
                                     var (token, expiration) = await secureStorage.GetTokenAsync();
@@ -1031,12 +1014,12 @@ namespace TDFMAUI
                                         }
                                     }
                                 }
-                            }
-                            catch (Exception ex)
-                            {
-                                DebugService.LogError("App", $"Error reconnecting WebSocket: {ex.Message}");
-                            }
-                        });
+                                catch (Exception ex)
+                                {
+                                    DebugService.LogError("App", $"Error reconnecting WebSocket: {ex.Message}");
+                                }
+                            });
+                        }
                     }
                 }
             }
@@ -1051,13 +1034,13 @@ namespace TDFMAUI
             {
                 // Add adaptive theme bindings programmatically to ensure proper initialization order
                 AddAdaptiveThemeBindings();
-                
+
                 // Ensure all necessary resource dictionaries are merged
                 EnsureAllResourceDictionariesMerged();
-                
+
                 // Let ThemeHelper handle theme application
                 ThemeHelper.ApplyTheme();
-                
+
                 // Apply platform-specific theme adaptations
                 ThemeHelper.ApplyPlatformSpecificAdaptations();
             }

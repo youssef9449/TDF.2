@@ -115,36 +115,38 @@ namespace TDFMAUI.Services
             }
         }
         
-        /// <summary>
-        /// Toggle between light and dark themes
-        /// </summary>
-        public void ToggleTheme()
-        {
-            ThemeHelper.ToggleTheme();
-        }
-        
-        /// <summary>
-        /// Set the app to use the system theme
-        /// </summary>
-        public void UseSystemTheme()
-        {
-            ThemeHelper.UseSystemTheme();
-        }
-        
-        /// <summary>
-        /// Set the app to use light theme
-        /// </summary>
-        public void UseLightTheme()
-        {
-            ThemeHelper.UseLightTheme();
-        }
-        
-        /// <summary>
-        /// Set the app to use dark theme
-        /// </summary>
         public void UseDarkTheme()
         {
-            ThemeHelper.UseDarkTheme();
+            ThemeHelper.FollowSystemTheme = false;
+            ThemeHelper.UserTheme = AppTheme.Dark;
+            ThemeHelper.ApplyTheme();
+        }
+
+        public void UseSystemTheme()
+        {
+            ThemeHelper.FollowSystemTheme = true;
+            ThemeHelper.ApplyTheme();
+        }
+
+        public void UseLightTheme()
+        {
+            ThemeHelper.FollowSystemTheme = false;
+            ThemeHelper.UserTheme = AppTheme.Light;
+            ThemeHelper.ApplyTheme();
+        }
+
+        public void ToggleTheme()
+        {
+            if (ThemeHelper.FollowSystemTheme)
+            {
+                ThemeHelper.FollowSystemTheme = false;
+                ThemeHelper.UserTheme = ThemeHelper.SystemTheme == AppTheme.Dark ? AppTheme.Light : AppTheme.Dark;
+            }
+            else
+            {
+                ThemeHelper.UserTheme = ThemeHelper.UserTheme == AppTheme.Light ? AppTheme.Dark : AppTheme.Light;
+            }
+            ThemeHelper.ApplyTheme();
         }
     }
 }

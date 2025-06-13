@@ -381,17 +381,17 @@ namespace TDFAPI.Controllers
         [HttpGet("all")] // Route: api/users/all
         [Route(ApiRoutes.Users.GetAllWithStatus)]
         [Authorize] // All authenticated users should be able to get this list for presence.
-        public async Task<ActionResult<ApiResponse<IEnumerable<UserDto>>>> GetAllUsersWithStatus()
+        public async Task<ActionResult<ApiResponse<PaginatedResult<UserDto>>>> GetAllUsersWithStatus([FromQuery] int page = 1, [FromQuery] int pageSize = 1000)
         {
             try
             {
-                var users = await _userService.GetAllUsersWithPresenceAsync();
-                return Ok(ApiResponse<IEnumerable<UserDto>>.SuccessResponse(users));
+                var users = await _userService.GetPaginatedAsync(page, pageSize);
+                return Ok(ApiResponse<PaginatedResult<UserDto>>.SuccessResponse(users));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving all users with presence: {Message}", ex.Message);
-                return StatusCode(500, ApiResponse<IEnumerable<UserDto>>.ErrorResponse("An error occurred retrieving all users"));
+                return StatusCode(500, ApiResponse<PaginatedResult<UserDto>>.ErrorResponse("An error occurred retrieving all users"));
             }
         }
     }

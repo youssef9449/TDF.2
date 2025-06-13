@@ -76,21 +76,9 @@ public partial class AddRequestPage : ContentPage
         bool isDesktop = DeviceHelper.IsDesktop;
         bool isMobile = !isDesktop && (DeviceHelper.IsAndroid || DeviceHelper.IsIOS);
 
-        if (isDesktop)
-        {
-            VisualStateManager.GoToState(this, "Desktop");
-            VisualStateManager.GoToState(FormFrame, "Desktop");
-        }
-        else if (isMobile)
-        {
-            VisualStateManager.GoToState(this, "Mobile");
-            VisualStateManager.GoToState(FormFrame, "Mobile");
-        }
-        else
-        {
-            // Default state for other platforms
-            VisualStateManager.GoToState(this, "Mobile");
-            VisualStateManager.GoToState(FormFrame, "Mobile");
-        }
+        // The VisualStateManager in XAML now handles the state changes based on DeviceHelper.IsDesktop/IsMobile
+        // No explicit GoToState calls are needed here for the main layout.
+        // However, if there are other elements that need state changes based on device, they can be added here.
+
     }
 }

@@ -114,8 +114,8 @@ namespace TDFMAUI.ViewModels
                 UserPresenceStatus.Away => Colors.Orange,
                 UserPresenceStatus.Busy => Colors.Red,
                 UserPresenceStatus.DoNotDisturb => Colors.DarkRed,
-                UserPresenceStatus.Offline => Colors.Gray,
-                _ => Colors.Gray
+                UserPresenceStatus.Offline => Application.Current.Resources["TextSecondaryColor"] as Color ?? Colors.Gray,
+            _ => Application.Current.Resources["TextSecondaryColor"] as Color ?? Colors.Gray
             };
         }
 
@@ -175,4 +175,4 @@ namespace TDFMAUI.ViewModels
         }
         #endregion
     }
-} 
+}

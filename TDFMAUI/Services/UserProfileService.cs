@@ -10,16 +10,17 @@ namespace TDFMAUI.Services
 {
     public class UserProfileService : IUserProfileService
     {
-        private UserDetailsDto? _currentUser;
         private readonly ILogger<UserProfileService> _logger;
         private readonly ApiService _apiService;
         private readonly ILocalStorageService _localStorageService;
+        private readonly IUserSessionService _userSessionService;
 
-        public UserProfileService(ApiService apiService, ILocalStorageService localStorageService, ILogger<UserProfileService> logger)
+        public UserProfileService(ApiService apiService, ILocalStorageService localStorageService, ILogger<UserProfileService> logger, IUserSessionService userSessionService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
             _localStorageService = localStorageService ?? throw new ArgumentNullException(nameof(localStorageService));
+            _userSessionService = userSessionService ?? throw new ArgumentNullException(nameof(userSessionService));
             _logger.LogInformation("UserProfileService constructor finished.");
         }
 
@@ -29,25 +30,24 @@ namespace TDFMAUI.Services
         public Task<ImageSource?> GetProfilePictureAsync(int userId) => throw new NotImplementedException();
         public Task<bool> UpdateProfilePictureAsync(int userId, byte[] newPictureData) => throw new NotImplementedException();
 
-        public UserDetailsDto? CurrentUser => _currentUser;
-        public bool IsLoggedIn => _currentUser != null;
+        public UserDetailsDto? CurrentUser => _userSessionService.CurrentUserDetails;
+        public bool IsLoggedIn => _userSessionService.IsLoggedIn;
 
         public void SetUserDetails(UserDetailsDto? userDetails)
         {
-            _currentUser = userDetails;
-            // Optionally raise an event here if other parts of the app need to react to login/logout
+            _userSessionService.SetCurrentUserDetails(userDetails);
+            _logger.LogInformation("User details set via UserSessionService: {UserName}", userDetails?.UserName);
         }
 
         public void ClearUserDetails()
         {
-            _currentUser = null;
-            // Optionally raise event
+            _userSessionService.ClearUserData();
+            _logger.LogInformation("User details cleared via UserSessionService");
         }
 
         public bool HasRole(string role)
         {
-            if (_currentUser?.Roles == null || string.IsNullOrEmpty(role)) return false;
-            return _currentUser.Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
+            return _userSessionService.HasRole(role);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿using Android.App;
+﻿﻿using Android.App;
 using Android.Content.PM;
 using Android.OS;
 using Android.Content;
@@ -309,42 +309,24 @@ namespace TDFMAUI
                 if (Build.VERSION.SdkInt < BuildVersionCodes.O)
                 {
                     LogToFile("MainActivity", "Android version < O (API 26), notification channels not needed");
-                    
-                    // Set up older notification compatibility if needed
                     SetupLegacyNotifications();
                     return;
                 }
 
-                // Only execute this code on Android Oreo (API 26) and above
                 var notificationManager = GetSystemService(NotificationService) as NotificationManager;
                 if (notificationManager == null)
                 {
                     LogToFile("MainActivity", "Failed to get NotificationManager");
                     return;
                 }
-                
-                // Explicitly check Android version again to satisfy the static analyzer
-                if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
-                {
-                    // Call platform-specific implementation using dynamic invocation
-                    // This prevents direct method references that would trigger CA1416
-                    typeof(MainActivity)
-                        .GetMethod("CreateNotificationChannelsForOreo", BindingFlags.NonPublic | BindingFlags.Instance)
-                        ?.Invoke(this, new object[] { notificationManager });
-                    
-                    LogToFile("MainActivity", "Notification channels created via reflection");
-                }
-                else
-                {
-                    // This branch should never execute due to previous check, but keeps the analyzer happy
-                    LogToFile("MainActivity", "Unexpected code path - version mismatch");
-                }
-                
-                LogToFile("MainActivity", "Notification setup completed successfully");
+
+                // Create notification channels for Oreo and above
+                CreateNotificationChannelsForOreo(notificationManager);
+                LogToFile("MainActivity", "Notification channels created successfully");
             }
             catch (Exception ex)
             {
-                LogToFile("MainActivity", $"Error setting up notifications: {ex.Message}");
+                LogToFile("MainActivity", $"Error creating notification channels: {ex.Message}");
             }
         }
         

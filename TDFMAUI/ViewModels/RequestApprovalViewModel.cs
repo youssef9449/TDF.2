@@ -33,11 +33,7 @@ namespace TDFMAUI.ViewModels
         private readonly ILogger<RequestApprovalViewModel>? _logger;
         private readonly CancellationTokenSource _cancellationTokenSource = new();
         private bool _disposed = false;
-
-        // Cached user for authorization checks to avoid Task.Run
-        private UserDto? _cachedCurrentUser;
-        private DateTime _userCacheExpiry = DateTime.MinValue;
-        private readonly TimeSpan _userCacheTimeout = TimeSpan.FromMinutes(5);
+        private readonly IUserSessionService? _userSessionService;
 
         private readonly ILookupService? _lookupService;
 
@@ -261,7 +257,8 @@ namespace TDFMAUI.ViewModels
             Services.INotificationService notificationService,
             IAuthService authService,
             ILogger<RequestApprovalViewModel> logger,
-            ILookupService lookupService)
+            ILookupService lookupService,
+            IUserSessionService userSessionService)
         {
             _title = "Request Approval";
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
@@ -269,6 +266,7 @@ namespace TDFMAUI.ViewModels
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _lookupService = lookupService ?? throw new ArgumentNullException(nameof(lookupService));
+            _userSessionService = userSessionService ?? throw new ArgumentNullException(nameof(userSessionService));
 
             Requests = new ObservableCollection<RequestResponseDto>();
             PendingRequests = new ObservableCollection<RequestResponseDto>();
@@ -447,7 +445,8 @@ namespace TDFMAUI.ViewModels
 
                 string remarks = await Shell.Current.DisplayPromptAsync(
                     "Approve Request",
-                    currentUser.IsManager == true ? "Manager remarks (optional):" : "HR remarks (optional):",
+                    currentUser.IsManager == true ? "Manager remarks (optional):" : 
+                    currentUser.IsAdmin == true ? "Admin remarks (optional):" : "HR remarks (optional):",
                     "OK",
                     "Cancel",
                     keyboard: Keyboard.Text
@@ -461,8 +460,9 @@ namespace TDFMAUI.ViewModels
                     if (_requestService != null)
                         result = await _requestService.ManagerApproveRequestAsync(requestId, approvalDto);
                 }
-                else if (currentUser.IsHR == true)
+                else if (currentUser.IsHR == true || currentUser.IsAdmin == true)
                 {
+                    // Both HR and Admin users use HR approval endpoint
                     var approvalDto = new HRApprovalDto { HRRemarks = remarks };
                     if (_requestService != null)
                         result = await _requestService.HRApproveRequestAsync(requestId, approvalDto);
@@ -518,7 +518,8 @@ namespace TDFMAUI.ViewModels
 
             string reason = await Shell.Current.DisplayPromptAsync(
                 "Reject Request",
-                currentUser.IsManager == true ? "Manager rejection reason:" : "HR rejection reason:",
+                currentUser.IsManager == true ? "Manager rejection reason:" : 
+                currentUser.IsAdmin == true ? "Admin rejection reason:" : "HR rejection reason:",
                 "OK",
                 "Cancel",
                 keyboard: Keyboard.Text
@@ -549,8 +550,9 @@ namespace TDFMAUI.ViewModels
                     if (_requestService != null)
                         result = await _requestService.ManagerRejectRequestAsync(requestId, rejectDto);
                 }
-                else if (currentUser.IsHR == true)
+                else if (currentUser.IsHR == true || currentUser.IsAdmin == true)
                 {
+                    // Both HR and Admin users use HR rejection endpoint
                     var rejectDto = new HRRejectDto { HRRemarks = reason };
                     if (_requestService != null)
                         result = await _requestService.HRRejectRequestAsync(requestId, rejectDto);
@@ -616,13 +618,8 @@ namespace TDFMAUI.ViewModels
                 };
 
                 // Use RequestStateManager to ensure proper access control
-                // Refresh user cache if needed
-                if (_cachedCurrentUser == null || DateTime.UtcNow >= _userCacheExpiry)
-                {
-                    await RefreshUserCacheAsync();
-                }
-
-                var currentUser = _cachedCurrentUser;
+                // Get current user from session service
+                var currentUser = _userSessionService?.CurrentUser;
                 if (currentUser == null)
                 {
                     _logger?.LogWarning("No current user found when loading requests");
@@ -638,7 +635,15 @@ namespace TDFMAUI.ViewModels
                     return;
                 }
 
-                var result = _requestService != null ? await _requestService.GetAllRequestsAsync(requestPagination) : null;
+                var result = _requestService != null ? await _requestService.GetRequestsForApprovalAsync(
+                    requestPagination.Page,
+                    requestPagination.PageSize,
+                    SelectedStatus == "All" ? null : SelectedStatus,
+                    SelectedType == "All" ? null : SelectedType,
+                    FromDate,
+                    ToDate,
+                    SelectedDepartment?.Name == "All" ? null : SelectedDepartment?.Name
+                ) : null;
 
                 if (result?.Data?.Items != null)
                 {
@@ -731,37 +736,23 @@ namespace TDFMAUI.ViewModels
         /// </summary>
         private UserDto? GetCachedCurrentUser()
         {
-            // Return cached user if still valid
-            if (_cachedCurrentUser != null && DateTime.UtcNow < _userCacheExpiry)
-            {
-                return _cachedCurrentUser;
-            }
-
-            // Cache is expired or empty, but we can't await here in a synchronous method
-            // For property bindings, we return null and trigger async refresh
-            if (_cachedCurrentUser == null)
-            {
-                _logger?.LogDebug("User cache is empty, triggering async refresh");
-                _ = RefreshUserCacheAsync();
-            }
-
-            return _cachedCurrentUser; // May be null if cache is empty
+            // Use the centralized session service instead of local caching
+            return _userSessionService?.CurrentUser;
         }
 
         /// <summary>
-        /// Refreshes the user cache asynchronously
+        /// Refreshes the user data via session service
         /// </summary>
         private async Task RefreshUserCacheAsync()
         {
             try
             {
-                _logger?.LogDebug("Refreshing user cache");
+                _logger?.LogDebug("Refreshing user data via session service");
                 var user = _authService != null ? await _authService.GetCurrentUserAsync() : null;
                 if (user != null)
                 {
-                    _cachedCurrentUser = user;
-                    _userCacheExpiry = DateTime.UtcNow.Add(_userCacheTimeout);
-                    _logger?.LogDebug("User cache refreshed successfully");
+                    // The AuthService will update the UserSessionService automatically
+                    _logger?.LogDebug("User data refreshed successfully via session service");
 
                     // Notify property changes for authorization-dependent properties
                     OnPropertyChanged(nameof(CanManageRequests));
@@ -770,12 +761,16 @@ namespace TDFMAUI.ViewModels
                 }
                 else
                 {
-                    _logger?.LogWarning("Failed to refresh user cache - no user returned");
+                    _logger?.LogWarning("Failed to refresh user data - no user returned");
+                    // Clear session if no user found
+                    _userSessionService?.ClearUserData();
                 }
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error refreshing user cache");
+                _logger?.LogError(ex, "Error refreshing user data");
+                // Clear session on error
+                _userSessionService?.ClearUserData();
             }
         }
 
@@ -784,9 +779,9 @@ namespace TDFMAUI.ViewModels
         /// </summary>
         private void InvalidateUserCache()
         {
-            _cachedCurrentUser = null;
-            _userCacheExpiry = DateTime.MinValue;
-            _logger?.LogDebug("User cache invalidated");
+            // No longer needed as we use centralized session service
+            // But keeping method for backward compatibility
+            _logger?.LogDebug("User cache invalidation requested - using centralized session service");
         }
 
         #endregion

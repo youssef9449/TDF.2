@@ -11,7 +11,7 @@
     xmlns:settings="clr-namespace:TDFMAUI.Features.Settings"
     xmlns:auth="clr-namespace:TDFMAUI.Features.Auth"
     Shell.FlyoutBehavior="Flyout"
-    FlyoutBackgroundColor="#512BD4"
+    FlyoutBackgroundColor="{StaticResource Primary}"
     Shell.BackgroundColor="White"
     Shell.TitleColor="Black"
     Shell.ForegroundColor="Black"
@@ -50,7 +50,7 @@
     </Shell.TitleView>
 
     <Shell.FlyoutHeader>
-        <Grid HeightRequest="100" BackgroundColor="#512BD4">
+        <Grid HeightRequest="100" BackgroundColor="{StaticResource Primary}">
             <Image Source="tdf_logo.png"
                    HeightRequest="60"
                    WidthRequest="60"

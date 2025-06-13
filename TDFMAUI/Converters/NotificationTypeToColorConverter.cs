@@ -37,11 +37,11 @@ namespace TDFMAUI.Converters
                         return Color.FromArgb("#0288D1"); // Light Blue
                         
                     default:
-                        return Colors.Gray;
+                        return Application.Current.Resources["TextSecondaryColor"] as Color ?? Colors.Gray;
                 }
             }
             
-            return Colors.Gray; // Default color
+            return Application.Current.Resources["TextSecondaryColor"] as Color ?? Colors.Gray; // Default color
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -50,4 +50,4 @@ namespace TDFMAUI.Converters
             throw new NotImplementedException();
         }
     }
-} 
+}

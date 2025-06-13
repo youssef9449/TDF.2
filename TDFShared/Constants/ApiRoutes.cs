@@ -221,6 +221,11 @@ namespace TDFShared.Constants
             public const string Verify = Base + "/verify";
 
             /// <summary>
+            /// Update user connection status route (format with user ID)
+            /// </summary>
+            public const string UpdateConnection = Base + "/{0}/connection";
+
+            /// <summary>
             /// Base route for user-related endpoints
             /// </summary>
             public static string UsersBase { get; } = "api/users";
@@ -302,14 +307,60 @@ namespace TDFShared.Constants
             public const string GetForApproval = Base + "/approval";
 
             /// <summary>
+            /// Get recent requests route
+            /// </summary>
+            public const string GetRecent = Base + "/recent";
+
+            /// <summary>
             /// Get recent requests for dashboard route
             /// </summary>
-            public const string GetRecentDashboard = Base + "/recent";
+            public const string GetRecentDashboard = Base + "/recent-dashboard";
 
             /// <summary>
             /// Get pending requests count for dashboard route
             /// </summary>
             public const string GetPendingDashboardCount = Base + "/pending/count";
+
+            /// <summary>
+            /// Manager approve request route (format with request ID)
+            /// </summary>
+            public const string ManagerApprove = Base + "/{0}/manager/approve";
+
+            /// <summary>
+            /// HR approve request route (format with request ID)
+            /// </summary>
+            public const string HRApprove = Base + "/{0}/hr/approve";
+
+            /// <summary>
+            /// Manager reject request route (format with request ID)
+            /// </summary>
+            public const string ManagerReject = Base + "/{0}/manager/reject";
+
+            /// <summary>
+            /// HR reject request route (format with request ID)
+            /// </summary>
+            public const string HRReject = Base + "/{0}/hr/reject";
+
+            // Controller route templates (for use in [HttpGet], [HttpPost], etc.)
+            /// <summary>
+            /// Manager approve request route template for controller
+            /// </summary>
+            public const string ManagerApproveTemplate = "{id:int}/manager/approve";
+
+            /// <summary>
+            /// HR approve request route template for controller
+            /// </summary>
+            public const string HRApproveTemplate = "{id:int}/hr/approve";
+
+            /// <summary>
+            /// Manager reject request route template for controller
+            /// </summary>
+            public const string ManagerRejectTemplate = "{id:int}/manager/reject";
+
+            /// <summary>
+            /// HR reject request route template for controller
+            /// </summary>
+            public const string HRRejectTemplate = "{id:int}/hr/reject";
         }
 
         /// <summary>

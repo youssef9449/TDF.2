@@ -21,7 +21,7 @@ namespace TDFShared.Enums
             { "unpaid leave", LeaveType.Unpaid },
             { "permission", LeaveType.Permission },
             { "permission leave", LeaveType.Permission },
-            { "external assignment", LeaveType.ExternalAssignment },
+            { "External Assignment", LeaveType.ExternalAssignment },
             { "external assignment leave", LeaveType.ExternalAssignment },
             { "work from home", LeaveType.WorkFromHome },
             { "wfh", LeaveType.WorkFromHome }

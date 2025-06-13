@@ -287,17 +287,21 @@ builder
             builder.Services.AddSingleton<IApiService>(sp => sp.GetRequiredService<ApiService>());
             builder.Services.AddSingleton<SecureStorageService>();
             builder.Services.AddSingleton(SecureStorage.Default);
-            builder.Services.AddSingleton<NetworkMonitorService>();
+            builder.Services.AddSingleton<NetworkService>();
+            builder.Services.AddSingleton<ILogger<ApiService>>(sp => 
+                sp.GetRequiredService<ILoggerFactory>().CreateLogger<ApiService>());
+            builder.Services.AddSingleton<ILogger<NetworkService>>(sp => 
+                sp.GetRequiredService<ILoggerFactory>().CreateLogger<NetworkService>());
+            builder.Services.AddSingleton<ILogger<WebSocketService>>(sp => 
+                sp.GetRequiredService<ILoggerFactory>().CreateLogger<WebSocketService>());
+            builder.Services.AddSingleton<ILogger<TDFMAUI.Services.ConnectivityService>>(sp => 
+                sp.GetRequiredService<ILoggerFactory>().CreateLogger<TDFMAUI.Services.ConnectivityService>());
             builder.Services.AddSingleton<LocalStorageService>();
             builder.Services.AddSingleton<ILocalStorageService, LocalStorageService>();
             builder.Services.AddSingleton<IUserPresenceService, UserPresenceService>();
             builder.Services.AddSingleton<IUserProfileService, UserProfileService>();
 
             // Register NetworkService and IConnectivity
-            builder.Services.AddSingleton(Connectivity.Current);
-            builder.Services.AddSingleton<NetworkService>();
-
-            // Register LookupService
             builder.Services.AddSingleton<LookupService>();
             builder.Services.AddSingleton<ILookupService>(sp => sp.GetRequiredService<LookupService>());
 
@@ -342,6 +346,9 @@ builder
             // Register shared validation services
             builder.Services.AddSingleton<IValidationService, ValidationService>();
             builder.Services.AddSingleton<IBusinessRulesService, BusinessRulesService>();
+
+            // Register centralized user session service
+            builder.Services.AddSingleton<IUserSessionService, UserSessionService>();
 
             // Register AuthService with shared HTTP client service
             builder.Services.AddSingleton<AuthService>();
@@ -446,28 +453,62 @@ builder
                 }
 
                 // Initialize DebugService - THIS IS THE FIRST INITIALIZATION POINT
+                logger?.LogInformation("Initializing DebugService...");
                 DebugService.Initialize();
+                logger?.LogInformation("DebugService initialized.");
 
                 // Assign the final service provider to the static App property
+                logger?.LogInformation("Assigning App.Services...");
                 App.Services = app.Services;
-                logger?.LogInformation("App.Services initialized with ServiceProvider");
+                logger?.LogInformation("App.Services initialized with ServiceProvider.");
+
+                // Initialize the centralized user session service
+                logger?.LogInformation("Attempting to get IUserSessionService from container...");
+                var userSessionService = app.Services.GetRequiredService<IUserSessionService>();
+                logger?.LogInformation("IUserSessionService resolved. Initializing App.UserSessionService...");
+                App.InitializeUserSession(userSessionService);
+                logger?.LogInformation("UserSessionService initialized and connected to App.");
+
+                // Connect UserSessionService to ApiConfig for centralized token management
+                logger?.LogInformation("Connecting UserSessionService to ApiConfig...");
+                ApiConfig.ConnectUserSessionService(userSessionService);
+                logger?.LogInformation("UserSessionService connected to ApiConfig.");
+
+                // Initialize session from persistent storage (important for mobile devices)
+                logger?.LogInformation("Initializing UserSessionService from persistent storage asynchronously...");
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await userSessionService.InitializeAsync();
+                        logger?.LogInformation("UserSessionService initialized from persistent storage.");
+                    }
+                    catch (Exception ex)
+                    {
+                        logger?.LogError(ex, "Error initializing UserSessionService from persistent storage.");
+                    }
+                });
+                logger?.LogInformation("UserSessionService persistent storage initialization task started.");
 
                 // Initialize ApiConfig with isDevelopment: true to ensure DevelopmentHttpClientHandler bypasses SSL validation for the IP.
+                logger?.LogInformation("Initializing ApiConfig...");
                 ApiConfig.Initialize(isDevelopment: true);
-                System.Diagnostics.Debug.WriteLine("ApiConfig.Initialize called with isDevelopment: true (to enable IP cert bypass)");
+                logger?.LogInformation("ApiConfig.Initialize called with isDevelopment: true (to enable IP cert bypass).");
 
                 // Test AppShell resolution - this can help identify DI issues
+                logger?.LogInformation("Attempting to resolve AppShell from container...");
                 try {
                     var appShellLogger = app.Services.GetService<ILogger<AppShell>>();
-                    appShellLogger?.LogInformation("About to resolve AppShell from container");
+                    appShellLogger?.LogInformation("About to resolve AppShell from container.");
 
                     var appShell = app.Services.GetService<AppShell>();
-                    appShellLogger?.LogInformation("AppShell resolution result: {Success}", appShell != null);
+                    logger?.LogInformation("AppShell resolution result: {Success}", appShell != null);
 
                     if (appShell == null) {
-                        appShellLogger?.LogError("CRITICAL: Failed to resolve AppShell from container");
+                        logger?.LogError("CRITICAL: Failed to resolve AppShell from container.");
                     }
                 } catch (Exception shellEx) {
+                    logger?.LogError(shellEx, "Error resolving AppShell from container.");
                     logger?.LogError(shellEx, "Error resolving AppShell");
                 }
 
@@ -487,43 +528,23 @@ builder
                     logger?.LogError(ex, "Failed to add first chance exception handler");
                 }
 
-                // Set up and start the NetworkMonitorService
-                var networkService = app.Services.GetRequiredService<NetworkService>();
+                // Set up network status monitoring
+                var connectivityService = app.Services.GetRequiredService<IConnectivityService>();
+                var apiService = app.Services.GetRequiredService<ApiService>();
                 var webSocketService = app.Services.GetRequiredService<WebSocketService>();
-                var secureStorage = app.Services.GetRequiredService<SecureStorageService>();
-                var wsLogger = app.Services.GetRequiredService<ILogger<WebSocketService>>();
 
-                // Register for network status changes
-                networkService.NetworkStatusChanged += async (sender, isConnected) =>
+                connectivityService.ConnectivityChanged += async (sender, e) =>
                 {
-                    // Log the status change but defer connection attempt during initial startup
-                    wsLogger.LogInformation($"Network status changed. IsConnected: {isConnected}");
-
-                    if (isConnected)
+                    if (e.IsConnected)
                     {
-                        // Attempt to connect web socket when network becomes available
-                        // logger.LogInformation("Network is now available, attempting to connect WebSocket"); // Defer connection
-
-                        // Get auth token
-                        // var tokenResult = await secureStorage.GetTokenAsync();
-                        // var token = tokenResult.Item1;
-                        // if (!string.IsNullOrEmpty(token))
-                        // {
-                        //     // Try to connect with the token
-                        //     // await webSocketService.ConnectAsync(token); // Defer connection
-                        // }
+                        await apiService.TestConnectivityAsync();
+                        await webSocketService.ConnectAsync();
                     }
                     else
                     {
-                        // Log network disconnection
-                        wsLogger.LogWarning("Network is no longer available");
-                        // Optionally, disconnect the WebSocket if it was connected
-                        // if (webSocketService.IsConnected) { await webSocketService.DisconnectAsync(); }
+                        await webSocketService.DisconnectAsync();
                     }
                 };
-
-                // Start the network monitor
-              //  networkService.StartMonitoring();   // Start monitoring network status
             }
             catch (Exception ex)
             {

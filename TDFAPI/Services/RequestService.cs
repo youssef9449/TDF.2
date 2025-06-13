@@ -541,6 +541,9 @@ namespace TDFAPI.Services
                 RequestEndDate = request.RequestToDay,
                 RequestBeginningTime = request.RequestBeginningTime,
                 RequestEndingTime = request.RequestEndingTime,
+                RequestDepartment = request.RequestDepartment,
+                Status = request.RequestManagerStatus, // Manager status as primary status
+                HRStatus = request.RequestHRStatus,     // HR status as separate field
                 CreatedDate = request.CreatedAt.GetValueOrDefault(DateTime.MinValue),
                 LastModifiedDate = request.UpdatedAt,
                 RequestNumberOfDays = request.RequestNumberOfDays,
@@ -576,7 +579,6 @@ namespace TDFAPI.Services
 
         #region Private Methods
 
-        // Only keep helpers that are actually used by the main logic
         private static int CalculateBusinessDays(DateTime startDate, DateTime endDate)
         {
             if (startDate > endDate) return 0;

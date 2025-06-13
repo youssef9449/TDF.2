@@ -85,7 +85,16 @@ namespace TDFMAUI
                     Text = errorStack,
                     TextSize = 12
                 };
-                stackText.SetTextColor(Color.LightGray);
+                var textSecondaryColor = Microsoft.Maui.Graphics.Color.FromArgb("#90A4AE"); // Default fallback
+            try
+            {
+                if (Microsoft.Maui.Controls.Application.Current?.Resources?.ContainsKey("TextSecondaryColor") == true)
+                {
+                    textSecondaryColor = Microsoft.Maui.Controls.Application.Current.Resources["TextSecondaryColor"] as Microsoft.Maui.Graphics.Color ?? textSecondaryColor;
+                }
+            }
+            catch { /* Use fallback */ }
+            stackText.SetTextColor(textSecondaryColor);
                 scrollView.AddView(stackText);
                 layout.AddView(scrollView);
 

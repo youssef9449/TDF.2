@@ -631,7 +631,7 @@ namespace TDFAPI.Controllers
         #region Dashboard Endpoints
 
         // GET: api/requests/recent
-        [HttpGet("recent")]
+        [HttpGet(ApiRoutes.Requests.GetRecent)]
         public async Task<ActionResult<List<RequestResponseDto>>> GetRecentRequests()
         {
             try
@@ -742,6 +742,323 @@ namespace TDFAPI.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving pending requests count");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        #endregion
+
+        #region Approval Management Endpoints
+
+        // GET: api/requests/approval
+        [HttpGet(ApiRoutes.Requests.GetForApproval)]
+        [Authorize(Roles = "Manager,HR,Admin")]
+        public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetRequestsForApproval([FromQuery] RequestPaginationDto pagination)
+        {
+            try
+            {
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                _logger.LogInformation("User {UserId} getting requests for approval (Admin: {IsAdmin}, HR: {IsHR}, Manager: {IsManager}, Dept: {Department})", 
+                    currentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department);
+
+                // Ensure pagination is set
+                pagination ??= new RequestPaginationDto { Page = 1, PageSize = 20, SortBy = "CreatedDate", Ascending = false };
+
+                PaginatedResult<RequestResponseDto> result;
+
+                // Apply role-specific filtering logic for approval workflow
+                if (currentUser.IsHR ?? false)
+                {
+                    // HR: Get requests that are manager-approved and pending HR approval
+                    pagination.FilterStatus = RequestStatus.ManagerApproved;
+                    result = await _requestService.GetAllAsync(pagination);
+                    
+                    // Filter to only show requests where HRStatus is Pending
+                    if (result?.Items != null)
+                    {
+                        var filteredItems = result.Items.Where(r => r.HRStatus == RequestStatus.Pending).ToList();
+                        result = new PaginatedResult<RequestResponseDto>
+                        {
+                            Items = filteredItems,
+                            PageNumber = pagination.Page,
+                            PageSize = pagination.PageSize,
+                            TotalCount = filteredItems.Count
+                        };
+                    }
+                }
+                else if (currentUser.IsAdmin ?? false)
+                {
+                    // Admin: Get all pending requests (both manager and HR approval)
+                    pagination.FilterStatus = RequestStatus.Pending;
+                    result = await _requestService.GetAllAsync(pagination);
+                }
+                else if (currentUser.IsManager ?? false)
+                {
+                    // Manager: Get pending requests from departments they manage
+                    result = await _requestService.GetRequestsForManagerAsync(currentUserId, currentUser.Department, pagination);
+                    
+                    // Filter to only pending requests
+                    if (result?.Items != null)
+                    {
+                        var filteredItems = result.Items.Where(r => r.Status == RequestStatus.Pending).ToList();
+                        result = new PaginatedResult<RequestResponseDto>
+                        {
+                            Items = filteredItems,
+                            PageNumber = pagination.Page,
+                            PageSize = pagination.PageSize,
+                            TotalCount = filteredItems.Count
+                        };
+                    }
+                }
+                else
+                {
+                    // Regular users cannot access approval endpoint
+                    return Forbid("You do not have permission to access approval requests.");
+                }
+
+                _logger.LogInformation("Retrieved {Count} requests for approval for user {UserId}", result?.Items?.Count() ?? 0, currentUserId);
+                return Ok(result ?? new PaginatedResult<RequestResponseDto> { Items = new List<RequestResponseDto>() });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving requests for approval");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        #endregion
+
+        #region Approval and Rejection Endpoints
+
+        // POST: api/requests/{id}/manager/approve
+        [HttpPost(ApiRoutes.Requests.ManagerApproveTemplate)]
+        [Authorize(Roles = "Manager,Admin")]
+        public async Task<ActionResult<bool>> ManagerApproveRequest(int id, [FromBody] ManagerApprovalDto approvalDto)
+        {
+            try
+            {
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                // Verify the user has manager permissions
+                if (!(currentUser.IsManager ?? false) && !(currentUser.IsAdmin ?? false))
+                {
+                    _logger.LogWarning("User {UserId} attempted manager approval without manager role", currentUserId);
+                    return Forbid("You do not have manager permissions.");
+                }
+
+                // Get the request to verify department access for managers (admins can approve any)
+                var request = await _requestService.GetByIdAsync(id);
+                if (request == null)
+                {
+                    return NotFound($"Request with ID {id} not found.");
+                }
+
+                // For managers (non-admin), verify they can manage this department
+                if (!(currentUser.IsAdmin ?? false))
+                {
+                    bool canManageDepartment = RequestStateManager.CanManageDepartment(currentUser, request.RequestDepartment);
+                    if (!canManageDepartment)
+                    {
+                        _logger.LogWarning("Manager {UserId} from department '{UserDept}' tried to approve request {RequestId} from department '{RequestDept}'",
+                            currentUserId, currentUser.Department, id, request.RequestDepartment);
+                        return Forbid("You can only approve requests from your department.");
+                    }
+                }
+
+                _logger.LogInformation("User {UserId} approving request {RequestId} as manager", currentUserId, id);
+                
+                var result = await _requestService.ManagerApproveRequestAsync(id, approvalDto, currentUserId, currentUser.FullName ?? "Unknown");
+                
+                if (result)
+                {
+                    return Ok(true);
+                }
+                else
+                {
+                    return BadRequest("Failed to approve request. It may have already been processed or is not in a valid state for approval.");
+                }
+            }
+            catch (EntityNotFoundException ex)
+            {
+                _logger.LogWarning("Manager approval failed: Request with ID {RequestId} not found.", id);
+                return NotFound(ex.Message);
+            }
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error in manager approval for request {RequestId}: {ErrorMessage}", id, ex.Message);
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in manager approval for request {RequestId}", id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        // POST: api/requests/{id}/hr/approve
+        [HttpPost(ApiRoutes.Requests.HRApproveTemplate)]
+        [Authorize(Roles = "HR,Admin")]
+        public async Task<ActionResult<bool>> HRApproveRequest(int id, [FromBody] HRApprovalDto approvalDto)
+        {
+            try
+            {
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                // Verify the user has HR permissions
+                if (!(currentUser.IsHR ?? false) && !(currentUser.IsAdmin ?? false))
+                {
+                    _logger.LogWarning("User {UserId} attempted HR approval without HR role", currentUserId);
+                    return Forbid("You do not have HR permissions.");
+                }
+
+                _logger.LogInformation("User {UserId} approving request {RequestId} as HR", currentUserId, id);
+                
+                var result = await _requestService.HRApproveRequestAsync(id, approvalDto, currentUserId, currentUser.FullName ?? "Unknown");
+                
+                if (result)
+                {
+                    return Ok(true);
+                }
+                else
+                {
+                    return BadRequest("Failed to approve request. It may not be manager-approved yet or is not in a valid state for HR approval.");
+                }
+            }
+            catch (EntityNotFoundException ex)
+            {
+                _logger.LogWarning("HR approval failed: Request with ID {RequestId} not found.", id);
+                return NotFound(ex.Message);
+            }
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error in HR approval for request {RequestId}: {ErrorMessage}", id, ex.Message);
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in HR approval for request {RequestId}", id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        // POST: api/requests/{id}/manager/reject
+        [HttpPost(ApiRoutes.Requests.ManagerRejectTemplate)]
+        [Authorize(Roles = "Manager,Admin")]
+        public async Task<ActionResult<bool>> ManagerRejectRequest(int id, [FromBody] ManagerRejectDto rejectDto)
+        {
+            try
+            {
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                // Verify the user has manager permissions
+                if (!(currentUser.IsManager ?? false) && !(currentUser.IsAdmin ?? false))
+                {
+                    _logger.LogWarning("User {UserId} attempted manager rejection without manager role", currentUserId);
+                    return Forbid("You do not have manager permissions.");
+                }
+
+                // Get the request to verify department access for managers (admins can reject any)
+                var request = await _requestService.GetByIdAsync(id);
+                if (request == null)
+                {
+                    return NotFound($"Request with ID {id} not found.");
+                }
+
+                // For managers (non-admin), verify they can manage this department
+                if (!(currentUser.IsAdmin ?? false))
+                {
+                    bool canManageDepartment = RequestStateManager.CanManageDepartment(currentUser, request.RequestDepartment);
+                    if (!canManageDepartment)
+                    {
+                        _logger.LogWarning("Manager {UserId} from department '{UserDept}' tried to reject request {RequestId} from department '{RequestDept}'",
+                            currentUserId, currentUser.Department, id, request.RequestDepartment);
+                        return Forbid("You can only reject requests from your department.");
+                    }
+                }
+
+                _logger.LogInformation("User {UserId} rejecting request {RequestId} as manager with reason: {Reason}", currentUserId, id, rejectDto.ManagerRemarks);
+                
+                var result = await _requestService.ManagerRejectRequestAsync(id, rejectDto, currentUserId, currentUser.FullName ?? "Unknown");
+                
+                if (result)
+                {
+                    return Ok(true);
+                }
+                else
+                {
+                    return BadRequest("Failed to reject request. It may have already been processed or is not in a valid state for rejection.");
+                }
+            }
+            catch (EntityNotFoundException ex)
+            {
+                _logger.LogWarning("Manager rejection failed: Request with ID {RequestId} not found.", id);
+                return NotFound(ex.Message);
+            }
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error in manager rejection for request {RequestId}: {ErrorMessage}", id, ex.Message);
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in manager rejection for request {RequestId}", id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        // POST: api/requests/{id}/hr/reject
+        [HttpPost(ApiRoutes.Requests.HRRejectTemplate)]
+        [Authorize(Roles = "HR,Admin")]
+        public async Task<ActionResult<bool>> HRRejectRequest(int id, [FromBody] HRRejectDto rejectDto)
+        {
+            try
+            {
+                int currentUserId = GetCurrentUserId();
+                var currentUser = await GetCachedUserAsync(currentUserId);
+                if (currentUser == null) return Unauthorized("User not found.");
+
+                // Verify the user has HR permissions
+                if (!(currentUser.IsHR ?? false) && !(currentUser.IsAdmin ?? false))
+                {
+                    _logger.LogWarning("User {UserId} attempted HR rejection without HR role", currentUserId);
+                    return Forbid("You do not have HR permissions.");
+                }
+
+                _logger.LogInformation("User {UserId} rejecting request {RequestId} as HR with reason: {Reason}", currentUserId, id, rejectDto.HRRemarks);
+                
+                var result = await _requestService.HRRejectRequestAsync(id, rejectDto, currentUserId, currentUser.FullName ?? "Unknown");
+                
+                if (result)
+                {
+                    return Ok(true);
+                }
+                else
+                {
+                    return BadRequest("Failed to reject request. It may not be manager-approved yet or is not in a valid state for HR rejection.");
+                }
+            }
+            catch (EntityNotFoundException ex)
+            {
+                _logger.LogWarning("HR rejection failed: Request with ID {RequestId} not found.", id);
+                return NotFound(ex.Message);
+            }
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
+            {
+                _logger.LogWarning(ex, "Business rule error in HR rejection for request {RequestId}: {ErrorMessage}", id, ex.Message);
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in HR rejection for request {RequestId}", id);
                 return StatusCode(500, "Internal server error");
             }
         }

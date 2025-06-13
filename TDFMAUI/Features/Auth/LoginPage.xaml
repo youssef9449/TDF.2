@@ -11,9 +11,9 @@
 
     <ContentPage.Resources>
         <Style x:Key="EntryStyle" TargetType="Entry">
-            <Setter Property="TextColor" Value="{AppThemeBinding Light=Black, Dark={StaticResource TextColor}}" />
-            <Setter Property="BackgroundColor" Value="Transparent" />
-            <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource Gray600}, Dark={StaticResource DarkTextTertiary}}" />
+            <Setter Property="TextColor" Value="{StaticResource TextColor}" />
+            <Setter Property="BackgroundColor" Value="{StaticResource SurfaceVariantColor}" />
+            <Setter Property="PlaceholderColor" Value="{StaticResource TextSecondaryColor}" />
             <Setter Property="FontSize" Value="15" />
             <Setter Property="ReturnCommand" Value="{Binding LoginCommand}" />
             <Setter Property="ClearButtonVisibility" Value="WhileEditing" />
@@ -27,7 +27,7 @@
         <Style x:Key="LoginInputFrameStyle" TargetType="Frame">
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="15,0" />
-            <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray100}, Dark={StaticResource DarkSurfaceVariant}}" />
+            <Setter Property="BackgroundColor" Value="{StaticResource Gray100}" />
             <Setter Property="HasShadow" Value="False" />
             <Setter Property="BorderColor" Value="Transparent" />
             <Setter Property="HeightRequest" Value="45" />
@@ -41,7 +41,7 @@
             <Label Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}" HorizontalOptions="End" Margin="0,5,10,0" FontSize="10" TextColor="{StaticResource TextSecondaryColor}"/>
             <Label Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}" HorizontalOptions="End" Margin="0,5,10,0" FontSize="10" TextColor="{StaticResource TextSecondaryColor}"/>
             <!-- Top safe area padding - minimal -->
-            <BoxView Grid.Row="0" BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource DarkBackground}}" HeightRequest="0" />
+            <BoxView Grid.Row="0" BackgroundColor="{StaticResource BackgroundColor}" HeightRequest="0" />
 
             <!-- Main content with ScrollView to ensure everything is visible -->
             <Grid Grid.Row="1" VerticalOptions="FillAndExpand">
@@ -130,7 +130,7 @@
             </Grid>
 
             <!-- Sign up section at bottom - responsive padding -->
-            <VerticalStackLayout Grid.Row="2" BackgroundColor="{AppThemeBinding Light=White, Dark={StaticResource DarkBackground}}" Padding="0,15,0,20">
+            <VerticalStackLayout Grid.Row="2" BackgroundColor="{StaticResource BackgroundColor}" Padding="0,15,0,20">
                 <BoxView HeightRequest="1" BackgroundColor="{StaticResource BorderColor}" Margin="0,0,0,10" />
                 <Label Text="Don't have an account? Sign Up"
                        HorizontalOptions="Center"

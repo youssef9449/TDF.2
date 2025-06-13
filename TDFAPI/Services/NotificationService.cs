@@ -147,7 +147,7 @@ namespace TDFAPI.Services
         {
             try
             {
-                var users = await _userRepository.GetUsersByDepartmentAsync(department);
+                var users = await _userRepository.GetUsersByDepartmentAsync(department ?? string.Empty);
                 foreach (var user in users)
                 {
                     if (user.UserID != senderId)
@@ -159,7 +159,7 @@ namespace TDFAPI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error broadcasting notification to department {Department}", department);
+                _logger.LogError(ex, "Error broadcasting notification to department {Department}", department ?? "all");
                 return false;
             }
         }
@@ -409,12 +409,11 @@ namespace TDFAPI.Services
         {
             try
             {
-                var json = TDFShared.Helpers.JsonSerializationHelper.SerializeCompact(message);
-                await _webSocketManager.SendToAllAsync(json, excludedConnections);
+                await _webSocketManager.SendToAllAsync(message, excludedConnections ?? Enumerable.Empty<string>());
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error broadcasting message to all users");
+                _logger.LogError(ex, "Error sending message to all connections");
             }
         }
 
@@ -478,6 +477,12 @@ namespace TDFAPI.Services
                 {
                     _lastMessageTime.TryRemove(key, out _);
                 }
+
+                var totalCleaned = rateLimitKeys.Count + messageTimeKeys.Count;
+                if (totalCleaned > 0)
+                {
+                    _logger.LogDebug("Cleaned up {Count} expired message entries", totalCleaned);
+                }
             }
             catch (Exception ex)
             {
@@ -517,26 +522,83 @@ namespace TDFAPI.Services
         {
             try
             {
-                // Get user's push tokens
+                var notification = new NotificationEntity
+                {
+                    ReceiverID = userId,
+                    Message = $"{title}: {message}",
+                    IsSeen = false,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                await _notificationRepository.CreateNotificationAsync(notification);
+                await SendPushNotificationIfNeededAsync(userId, notification);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending notification to user {UserId}", userId);
+            }
+        }
+
+        public async Task SendNotificationAsync(IEnumerable<int> userIds, string title, string message, NotificationType type = NotificationType.Info, string? data = null)
+        {
+            try
+            {
+                foreach (var userId in userIds)
+                {
+                    var notification = new NotificationEntity
+                    {
+                        ReceiverID = userId,
+                        Message = $"{title}: {message}",
+                        IsSeen = false,
+                        Timestamp = DateTime.UtcNow
+                    };
+
+                    await _notificationRepository.CreateNotificationAsync(notification);
+                    await SendPushNotificationIfNeededAsync(userId, notification);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending notifications to multiple users");
+            }
+        }
+
+        public async Task SendDepartmentNotificationAsync(string department, string title, string message, NotificationType type = NotificationType.Info, string? data = null)
+        {
+            try
+            {
+                var users = await _userRepository.GetUsersByDepartmentAsync(department);
+                foreach (var user in users)
+                {
+                    var notification = new NotificationEntity
+                    {
+                        ReceiverID = user.UserID,
+                        Message = $"{title}: {message}",
+                        IsSeen = false,
+                        Timestamp = DateTime.UtcNow
+                    };
+
+                    await _notificationRepository.CreateNotificationAsync(notification);
+                    await SendPushNotificationIfNeededAsync(user.UserID, notification);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending department notification to {Department}", department);
+            }
+        }
+
+        private async Task SendPushNotificationIfNeededAsync(int userId, NotificationEntity notification)
+        {
+            try
+            {
                 var tokens = await _pushTokenService.GetUserTokensAsync(userId);
                 if (!tokens.Any())
                 {
-                    _logger.LogWarning("No active push tokens found for user {UserId}", userId);
+                    _logger.LogDebug("No push tokens found for user {UserId}", userId);
                     return;
                 }
 
-                // Create notification record
-                var notification = new NotificationRecord
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Title = title,
-                    Message = message,
-                    Type = type,
-                    Timestamp = DateTime.UtcNow,
-                    Data = data
-                };
-
-                // Send to each token
                 foreach (var token in tokens)
                 {
                     try
@@ -552,80 +614,7 @@ namespace TDFAPI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error sending notification to user {UserId}", userId);
-                throw;
-            }
-        }
-
-        public async Task SendNotificationAsync(IEnumerable<int> userIds, string title, string message, NotificationType type = NotificationType.Info, string? data = null)
-        {
-            try
-            {
-                // Get all users' tokens
-                var userTokens = await _pushTokenService.GetUsersTokensAsync(userIds);
-                if (!userTokens.Any())
-                {
-                    _logger.LogWarning("No active push tokens found for users");
-                    return;
-                }
-
-                // Create notification record
-                var notification = new NotificationRecord
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Title = title,
-                    Message = message,
-                    Type = type,
-                    Timestamp = DateTime.UtcNow,
-                    Data = data
-                };
-
-                // Send to each token
-                foreach (var tokens in userTokens.Values)
-                {
-                    foreach (var token in tokens)
-                    {
-                        try
-                        {
-                            await SendPushNotificationAsync(token, notification);
-                            await _pushTokenService.UpdateTokenLastUsedAsync(token.Token);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Error sending push notification to token {Token}", token.Token);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending notification to users");
-                throw;
-            }
-        }
-
-        public async Task SendDepartmentNotificationAsync(string department, string title, string message, NotificationType type = NotificationType.Info, string? data = null)
-        {
-            try
-            {
-                // Get all users in the department
-                var userIds = await _context.Users
-                    .Where(u => u.Department == department && (u.IsActive ?? false))
-                    .Select(u => u.UserID)
-                    .ToListAsync();
-
-                if (!userIds.Any())
-                {
-                    _logger.LogWarning("No active users found in department {Department}", department);
-                    return;
-                }
-
-                await SendNotificationAsync(userIds, title, message, type, data);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending department notification to {Department}", department);
-                throw;
+                _logger.LogError(ex, "Error sending push notifications for user {UserId}", userId);
             }
         }
 
@@ -709,7 +698,7 @@ namespace TDFAPI.Services
             }
         }
 
-        private async Task SendPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationRecord notification)
+        private async Task SendPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationEntity notification)
         {
             // Platform-specific push notification sending logic
             switch (token.Platform.ToLower())
@@ -731,7 +720,7 @@ namespace TDFAPI.Services
             }
         }
 
-        private async Task SendIOSPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationRecord notification)
+        private async Task SendIOSPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationEntity notification)
         {
             try
             {
@@ -744,17 +733,16 @@ namespace TDFAPI.Services
                     {
                         alert = new
                         {
-                            title = notification.Title,
+                            title = "Notification",
                             body = notification.Message
                         },
                         badge = 1,
                         sound = "default",
-                        category = notification.Type.ToString().ToLower(),
+                        category = "default",
                         content_available = 1
                     },
-                    notificationId = notification.Id,
-                    notificationType = notification.Type.ToString(),
-                    data = notification.Data
+                    notificationId = notification.NotificationID,
+                    data = notification.Message
                 };
                 
                 // Serialize the payload
@@ -821,7 +809,7 @@ namespace TDFAPI.Services
             }
         }
 
-        private async Task SendAndroidPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationRecord notification)
+        private async Task SendAndroidPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationEntity notification)
         {
             try
             {
@@ -833,33 +821,6 @@ namespace TDFAPI.Services
                 int? senderId = null;
                 bool isBroadcast = false;
                 string department = string.Empty;
-                
-                // Parse additional data if available
-                if (!string.IsNullOrEmpty(notification.Data))
-                {
-                    try
-                    {
-                        var data = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(notification.Data);
-                        if (data != null)
-                        {
-                            if (data.TryGetValue("senderName", out var senderNameObj))
-                                senderName = senderNameObj?.ToString() ?? string.Empty;
-                            
-                            if (data.TryGetValue("senderId", out var senderIdObj) && senderIdObj != null)
-                                senderId = int.TryParse(senderIdObj.ToString(), out var id) ? id : null;
-                            
-                            if (data.TryGetValue("isBroadcast", out var isBroadcastObj))
-                                isBroadcast = bool.TryParse(isBroadcastObj?.ToString(), out var broadcast) && broadcast;
-                            
-                            if (data.TryGetValue("department", out var departmentObj))
-                                department = departmentObj?.ToString() ?? string.Empty;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Error parsing notification data: {Data}", notification.Data);
-                    }
-                }
 
                 // Create the FCM message with enhanced data
                 var message = new Message
@@ -867,20 +828,15 @@ namespace TDFAPI.Services
                     Token = token.Token,
                     Notification = new Notification
                     {
-                        Title = notification.Title,
+                        Title = "Notification",
                         Body = notification.Message
                     },
                     Data = new Dictionary<string, string>
                     {
-                        { "notificationId", notification.Id },
-                        { "notificationType", notification.Type.ToString() },
-                        { "data", notification.Data ?? string.Empty },
+                        { "notificationId", notification.NotificationID.ToString() },
+                        { "data", notification.Message },
                         { "click_action", "OPEN_NOTIFICATION" },
-                        { "timestamp", DateTime.UtcNow.ToString("o") },
-                        { "senderName", senderName },
-                        { "senderId", senderId?.ToString() ?? string.Empty },
-                        { "isBroadcast", isBroadcast.ToString().ToLower() },
-                        { "department", department }
+                        { "timestamp", DateTime.UtcNow.ToString("o") }
                     },
                     Android = new AndroidConfig
                     {
@@ -891,10 +847,8 @@ namespace TDFAPI.Services
                             Sound = "default",
                             Icon = "@mipmap/appicon",
                             Color = "#4285F4", // Google blue
-                            Tag = notification.Id // Use ID as tag to prevent duplicates
+                            Tag = notification.NotificationID.ToString() // Use ID as tag to prevent duplicates
                         }
-                        // Note: TTL is not directly supported in this version of the Firebase SDK
-                        // We would need to use the HTTP v1 API to set TTL
                     }
                 };
 
@@ -912,7 +866,7 @@ namespace TDFAPI.Services
             }
         }
 
-        private async Task SendWindowsPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationRecord notification)
+        private async Task SendWindowsPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationEntity notification)
         {
             try
             {
@@ -920,16 +874,16 @@ namespace TDFAPI.Services
                 
                 // Create a Windows Toast notification XML payload
                 var toastXml = $@"
-                <toast launch=""notificationId={notification.Id}"">
+                <toast launch=""notificationId={notification.NotificationID}"">
                     <visual>
                         <binding template=""ToastGeneric"">
-                            <text>{notification.Title}</text>
+                            <text>Notification</text>
                             <text>{notification.Message}</text>
                         </binding>
                     </visual>
                     <actions>
-                        <action content=""View"" arguments=""view&amp;notificationId={notification.Id}"" />
-                        <action content=""Dismiss"" arguments=""dismiss&amp;notificationId={notification.Id}"" />
+                        <action content=""View"" arguments=""view&amp;notificationId={notification.NotificationID}"" />
+                        <action content=""Dismiss"" arguments=""dismiss&amp;notificationId={notification.NotificationID}"" />
                     </actions>
                 </toast>";
                 
@@ -950,7 +904,7 @@ namespace TDFAPI.Services
             }
         }
 
-        private async Task SendMacOSPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationRecord notification)
+        private async Task SendMacOSPushNotificationAsync(TDFAPI.Models.PushToken token, NotificationEntity notification)
         {
             try
             {
@@ -963,15 +917,14 @@ namespace TDFAPI.Services
                     {
                         alert = new
                         {
-                            title = notification.Title,
+                            title = "Notification",
                             body = notification.Message
                         },
                         sound = "default",
                         content_available = 1
                     },
-                    notificationId = notification.Id,
-                    notificationType = notification.Type.ToString(),
-                    data = notification.Data
+                    notificationId = notification.NotificationID,
+                    data = notification.Message
                 };
                 
                 // Serialize the payload

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿using Microsoft.UI.Xaml;
+﻿﻿﻿﻿﻿﻿using Microsoft.UI.Xaml;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -617,28 +617,16 @@ namespace TDFMAUI.WinUI
                             {
                                 try
                                 {
-                                    Debug.WriteLine("Setting user status to Offline on Windows app exit");
-                                    
-                                    // First, directly update the user status in the database
-                                    // This ensures the database is updated even if the WebSocket connection is closed
-                                    var apiService = services.GetService<TDFMAUI.Services.ApiService>();
-                                    if (apiService != null)
+                                    // Validate user ID before proceeding
+                                    if (currentUser.UserID <= 0)
                                     {
-                                        try
-                                        {
-                                            // Make a direct API call to update the user's connection status
-                                            var updateData = new { isConnected = false };
-                                            // Use the Users.Update route with the connection endpoint
-                                            await apiService.PutAsync<object, object>($"{ApiRoutes.Users.Base}/{currentUser.UserID}/connection", updateData);
-                                            Debug.WriteLine($"Successfully updated user connection status in database for user {currentUser.UserID}");
-                                        }
-                                        catch (Exception apiEx)
-                                        {
-                                            Debug.WriteLine($"Error updating user connection status in database: {apiEx.Message}");
-                                        }
+                                        Debug.WriteLine($"Invalid user ID ({currentUser.UserID}), skipping status update on Windows app exit");
+                                        return;
                                     }
+
+                                    Debug.WriteLine($"Setting user {currentUser.UserName} (ID: {currentUser.UserID}) status to Offline on Windows app exit");
                                     
-                                    // Then update through the presence service (which uses WebSockets)
+                                    // Update through the presence service which handles both WebSocket and API calls
                                     await userPresenceService.UpdateStatusAsync(UserPresenceStatus.Offline, "");
                                     
                                     // Give it a moment to complete the request

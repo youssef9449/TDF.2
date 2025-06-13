@@ -96,6 +96,14 @@ namespace TDFMAUI.ViewModels
         {
             get => _requestFromDay;
             set {
+                // Prevent setting weekend dates
+                if (IsWeekend(value))
+                {
+                    // Show a user-friendly message
+                    Shell.Current.DisplayAlert("Invalid Date", "Start date cannot be on a weekend (Friday or Saturday). Please select a working day.", "OK");
+                    return; // Don't set the value
+                }
+
                 SetProperty(ref _requestFromDay, value);
                 // Ensure EndDate is not before StartDate
                 if (EndDate.HasValue && EndDate.Value < value)
@@ -121,6 +129,10 @@ namespace TDFMAUI.ViewModels
                      // For now, just don't set if invalid
                      return;
                  }
+
+                 // Note: End dates can be weekends, but they won't count toward leave days
+                 // The business logic in TDFShared will handle the working day calculation
+
                 SetProperty(ref _requestToDay, value);
             }
         }
@@ -570,6 +582,20 @@ namespace TDFMAUI.ViewModels
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+        #endregion
+
+        #region Helper Methods
+
+        /// <summary>
+        /// Checks if a date falls on a weekend (Friday or Saturday)
+        /// </summary>
+        /// <param name="date">The date to check</param>
+        /// <returns>True if the date is Friday or Saturday</returns>
+        private static bool IsWeekend(DateTime date)
+        {
+            return date.DayOfWeek == DayOfWeek.Friday || date.DayOfWeek == DayOfWeek.Saturday;
+        }
+
         #endregion
     }
 }

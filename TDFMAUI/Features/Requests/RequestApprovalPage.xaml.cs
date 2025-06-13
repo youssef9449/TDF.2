@@ -29,7 +29,7 @@ namespace TDFMAUI.Pages
             {
                 return _page.GetStatusColor(status);
             }
-            return Colors.Gray;
+            return Application.Current.Resources["TextSecondaryColor"] as Color ?? Colors.Gray;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
@@ -69,6 +69,7 @@ namespace TDFMAUI.Pages
         private readonly IRequestService _requestService;
         private readonly TDFShared.Services.IAuthService _authService;
         private readonly ILookupService _lookupService;
+        private readonly IUserSessionService _userSessionService;
         private RequestApprovalViewModel _viewModel;
 
         public RequestApprovalPage(
@@ -76,20 +77,22 @@ namespace TDFMAUI.Pages
             IRequestService requestService,
             TDFShared.Services.IAuthService authService,
             ILogger<RequestApprovalViewModel> logger,
-            ILookupService lookupService)
+            ILookupService lookupService,
+            IUserSessionService userSessionService)
         {
             InitializeComponent();
             _notificationService = notificationService;
             _requestService = requestService;
             _authService = authService;
             _lookupService = lookupService;
+            _userSessionService = userSessionService;
 
             // Add converters as resources
             this.Resources.Add("StatusColorConverter", new StatusColorConverter(this));
             this.Resources.Add("StatusTextColorConverter", new StatusTextColorConverter(this));
 
             // Set the binding context
-            _viewModel = new RequestApprovalViewModel(_requestService, _notificationService, _authService, logger, _lookupService);
+            _viewModel = new RequestApprovalViewModel(_requestService, _notificationService, _authService, logger, _lookupService, _userSessionService);
             BindingContext = _viewModel;
 
             // Device-specific config and events
@@ -139,13 +142,13 @@ namespace TDFMAUI.Pages
 
         public Color GetStatusColor(string status)
         {
-            if (string.IsNullOrEmpty(status)) return Colors.Gray;
+            if (string.IsNullOrEmpty(status)) return Application.Current.Resources["TextSecondaryColor"] as Color ?? Colors.Gray;
             return status.ToLowerInvariant() switch
             {
                 "pending" => Colors.Orange,
                 "approved" => Colors.Green,
                 "rejected" => Colors.Red,
-                _ => Colors.Gray,
+                _ => Application.Current.Resources["TextSecondaryColor"] as Color ?? Colors.Gray,
             };
         }
 

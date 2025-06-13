@@ -1,51 +1,66 @@
 using System;
-using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using TDFShared.DTOs.Common;
+using Microsoft.Extensions.Logging;
+using TDFShared.Models;
 
 namespace TDFShared.Services
 {
     /// <summary>
-    /// Interface for HTTP client operations with retry logic, error handling, and authentication
+    /// Interface for HTTP client service with enhanced features
     /// </summary>
     public interface IHttpClientService : IDisposable
     {
         /// <summary>
-        /// Base URL for API requests
+        /// Gets the underlying HttpClient instance
+        /// </summary>
+        HttpClient HttpClient { get; }
+
+        /// <summary>
+        /// Gets the current connectivity information
+        /// </summary>
+        ConnectivityInfo ConnectivityInfo { get; }
+
+        /// <summary>
+        /// Gets the base URL for API requests
         /// </summary>
         string BaseUrl { get; set; }
 
         /// <summary>
-        /// Request timeout in seconds
+        /// Gets or sets the timeout in seconds for HTTP requests
         /// </summary>
         int TimeoutSeconds { get; set; }
 
         /// <summary>
-        /// Maximum number of retry attempts
+        /// Gets or sets the maximum number of retry attempts for failed requests
         /// </summary>
-        int MaxRetries { get; set; }
+        int MaxRetries { get; }
 
         /// <summary>
-        /// Initial delay between retries
+        /// Gets or sets the initial delay before the first retry attempt
         /// </summary>
-        TimeSpan InitialRetryDelay { get; set; }
+        TimeSpan InitialRetryDelay { get; }
 
         /// <summary>
-        /// Event raised when authentication token needs to be refreshed
+        /// Event raised when a token refresh is required
         /// </summary>
-        event EventHandler<TokenRefreshEventArgs> TokenRefreshRequired;
+        event EventHandler<TokenRefreshEventArgs>? TokenRefreshNeeded;
 
         /// <summary>
-        /// Event raised when network connectivity changes
+        /// Event raised when a token is refreshed
         /// </summary>
-        event EventHandler<NetworkStatusEventArgs> NetworkStatusChanged;
+        event EventHandler<TokenRefreshEventArgs>? TokenRefreshCompleted;
+
+        /// <summary>
+        /// Event raised when a token refresh fails
+        /// </summary>
+        event EventHandler<TokenRefreshEventArgs>? TokenRefreshFailed;
 
         /// <summary>
         /// Sets the authentication token for requests
         /// </summary>
-        /// <param name="token">Bearer token</param>
+        /// <param name="token">The authentication token</param>
         Task SetAuthenticationTokenAsync(string token);
 
         /// <summary>
@@ -54,159 +69,123 @@ namespace TDFShared.Services
         Task ClearAuthenticationTokenAsync();
 
         /// <summary>
-        /// Performs a GET request and returns the deserialized response
+        /// Performs a GET request
         /// </summary>
-        /// <typeparam name="T">Type to deserialize response to</typeparam>
-        /// <param name="endpoint">API endpoint (relative to base URL)</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Deserialized response data</returns>
+        /// <typeparam name="T">The type of response</typeparam>
+        /// <param name="endpoint">The endpoint to request</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The response data</returns>
         Task<T> GetAsync<T>(string endpoint, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Performs a GET request and returns the raw response content
+        /// Performs a GET request and returns the raw response
         /// </summary>
-        /// <param name="endpoint">API endpoint (relative to base URL)</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Raw response content as string</returns>
+        /// <param name="endpoint">The endpoint to request</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The raw response</returns>
         Task<string> GetRawAsync(string endpoint, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Performs a POST request with data and returns the deserialized response
+        /// Performs a POST request
         /// </summary>
-        /// <typeparam name="TRequest">Type of request data</typeparam>
-        /// <typeparam name="TResponse">Type of response data</typeparam>
-        /// <param name="endpoint">API endpoint (relative to base URL)</param>
-        /// <param name="data">Request data to serialize and send</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Deserialized response data</returns>
+        /// <typeparam name="TRequest">The type of request data</typeparam>
+        /// <typeparam name="TResponse">The type of response data</typeparam>
+        /// <param name="endpoint">The endpoint to request</param>
+        /// <param name="data">The request data</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The response data</returns>
         Task<TResponse> PostAsync<TRequest, TResponse>(string endpoint, TRequest data, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Performs a POST request with data (fire-and-forget)
+        /// Performs a POST request without response data
         /// </summary>
-        /// <typeparam name="TRequest">Type of request data</typeparam>
-        /// <param name="endpoint">API endpoint (relative to base URL)</param>
-        /// <param name="data">Request data to serialize and send</param>
-        /// <param name="cancellationToken">Cancellation token</param>
+        /// <typeparam name="TRequest">The type of request data</typeparam>
+        /// <param name="endpoint">The endpoint to request</param>
+        /// <param name="data">The request data</param>
+        /// <param name="cancellationToken">The cancellation token</param>
         Task PostAsync<TRequest>(string endpoint, TRequest data, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Performs a PUT request with data and returns the deserialized response
+        /// Performs a PUT request
         /// </summary>
-        /// <typeparam name="TRequest">Type of request data</typeparam>
-        /// <typeparam name="TResponse">Type of response data</typeparam>
-        /// <param name="endpoint">API endpoint (relative to base URL)</param>
-        /// <param name="data">Request data to serialize and send</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Deserialized response data</returns>
+        /// <typeparam name="TRequest">The type of request data</typeparam>
+        /// <typeparam name="TResponse">The type of response data</typeparam>
+        /// <param name="endpoint">The endpoint to request</param>
+        /// <param name="data">The request data</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The response data</returns>
         Task<TResponse> PutAsync<TRequest, TResponse>(string endpoint, TRequest data, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Performs a PUT request with data (fire-and-forget)
+        /// Performs a PUT request without response data
         /// </summary>
-        /// <typeparam name="TRequest">Type of request data</typeparam>
-        /// <param name="endpoint">API endpoint (relative to base URL)</param>
-        /// <param name="data">Request data to serialize and send</param>
-        /// <param name="cancellationToken">Cancellation token</param>
+        /// <typeparam name="TRequest">The type of request data</typeparam>
+        /// <param name="endpoint">The endpoint to request</param>
+        /// <param name="data">The request data</param>
+        /// <param name="cancellationToken">The cancellation token</param>
         Task PutAsync<TRequest>(string endpoint, TRequest data, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Performs a DELETE request
         /// </summary>
-        /// <param name="endpoint">API endpoint (relative to base URL)</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>HTTP response message</returns>
+        /// <param name="endpoint">The endpoint to request</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The response message</returns>
         Task<HttpResponseMessage> DeleteAsync(string endpoint, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Performs a PATCH request with data and returns the deserialized response
+        /// Performs a PATCH request
         /// </summary>
-        /// <typeparam name="TRequest">Type of request data</typeparam>
-        /// <typeparam name="TResponse">Type of response data</typeparam>
-        /// <param name="endpoint">API endpoint (relative to base URL)</param>
-        /// <param name="data">Request data to serialize and send</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>Deserialized response data</returns>
+        /// <typeparam name="TRequest">The type of request data</typeparam>
+        /// <typeparam name="TResponse">The type of response data</typeparam>
+        /// <param name="endpoint">The endpoint to request</param>
+        /// <param name="data">The request data</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The response data</returns>
         Task<TResponse> PatchAsync<TRequest, TResponse>(string endpoint, TRequest data, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Tests connectivity to the API
+        /// Tests the connectivity to the API
         /// </summary>
-        /// <param name="healthCheckEndpoint">Health check endpoint (optional, defaults to "health")</param>
-        /// <param name="cancellationToken">Cancellation token</param>
-        /// <returns>True if API is reachable, false otherwise</returns>
+        /// <param name="healthCheckEndpoint">The health check endpoint to use</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>True if the API is reachable, false otherwise</returns>
         Task<bool> TestConnectivityAsync(string healthCheckEndpoint = "health", CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Gets the current network status
+        /// Gets the current connectivity information
         /// </summary>
-        /// <returns>Network status information</returns>
-        Task<NetworkStatus> GetNetworkStatusAsync();
+        Task<ConnectivityInfo> GetConnectivityInfoAsync();
 
         /// <summary>
-        /// Adds a custom header to all requests
+        /// Adds a default header to all requests
         /// </summary>
-        /// <param name="name">Header name</param>
-        /// <param name="value">Header value</param>
+        /// <param name="name">The header name</param>
+        /// <param name="value">The header value</param>
         void AddDefaultHeader(string name, string value);
 
         /// <summary>
-        /// Removes a custom header from all requests
+        /// Removes a default header from all requests
         /// </summary>
-        /// <param name="name">Header name</param>
+        /// <param name="name">The header name</param>
         void RemoveDefaultHeader(string name);
 
         /// <summary>
-        /// Gets request statistics for monitoring and debugging
+        /// Sends an HTTP request and returns the response
         /// </summary>
-        /// <returns>Request statistics</returns>
-        HttpClientStatistics GetStatistics();
-    }
+        /// <param name="request">The HTTP request to send</param>
+        /// <param name="cancellationToken">A token to cancel the operation</param>
+        /// <returns>The HTTP response message</returns>
+        Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Event arguments for token refresh events
-    /// </summary>
-    public class TokenRefreshEventArgs : EventArgs
-    {
-        public string ExpiredToken { get; set; } = string.Empty;
-        public DateTime ExpirationTime { get; set; }
-        public string Reason { get; set; } = string.Empty;
-    }
+        /// <summary>
+        /// Sends an HTTP request with retry policy, logging, and response deserialization
+        /// </summary>
+        Task<T?> SendAsync<T>(HttpRequestMessage request, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Event arguments for network status events
-    /// </summary>
-    public class NetworkStatusEventArgs : EventArgs
-    {
-        public bool IsConnected { get; set; }
-        public string ConnectionType { get; set; } = string.Empty;
-        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Network status information
-    /// </summary>
-    public class NetworkStatus
-    {
-        public bool IsConnected { get; set; }
-        public bool IsApiReachable { get; set; }
-        public string ConnectionType { get; set; } = string.Empty;
-        public TimeSpan? Latency { get; set; }
-        public DateTime LastChecked { get; set; } = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// HTTP client statistics for monitoring
-    /// </summary>
-    public class HttpClientStatistics
-    {
-        public int TotalRequests { get; set; }
-        public int SuccessfulRequests { get; set; }
-        public int FailedRequests { get; set; }
-        public int RetriedRequests { get; set; }
-        public TimeSpan AverageResponseTime { get; set; }
-        public DateTime LastRequestTime { get; set; }
-        public Dictionary<string, int> ErrorCounts { get; set; } = new Dictionary<string, int>();
-        public Dictionary<int, int> StatusCodeCounts { get; set; } = new Dictionary<int, int>();
+        /// <summary>
+        /// Sends an HTTP request with retry policy, logging, and response deserialization
+        /// </summary>
+        Task<ApiResponseBase<T>?> SendWithResponseAsync<T>(HttpRequestMessage request, CancellationToken cancellationToken = default);
     }
 }

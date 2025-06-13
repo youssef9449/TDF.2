@@ -5,7 +5,7 @@
              Title="Global Chat">
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Padding="10" BackgroundColor="#f0f0f0">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Padding="10" BackgroundColor="{StaticResource SurfaceVariantColor}">
             <Button Grid.Column="0" 
                     Text="Back" 
                     Clicked="OnBackClicked" 
@@ -57,4 +57,4 @@
                     WidthRequest="80" />
         </Grid>
     </Grid>
-</ContentPage> 
+</ContentPage>

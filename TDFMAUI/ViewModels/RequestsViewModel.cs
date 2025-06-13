@@ -181,13 +181,24 @@ namespace TDFMAUI.ViewModels
             foreach (var req in Requests)
             {
                 bool isOwner = req.RequestUserID == user?.UserID;
+                
                 // Use RequestStateManager for state-based checks
-                _canEditDeleteCache[req.RequestID] = user != null && 
-                    RequestStateManager.CanEdit(req, user.IsAdmin ?? false, isOwner);
-
+                var canEdit = user != null && RequestStateManager.CanEdit(req, user.IsAdmin ?? false, isOwner);
+                var canDelete = canEdit; // Same logic for delete
+                
                 // Use AuthorizationUtilities for action-specific checks
-                _canApproveRejectCache[req.RequestID] = user != null && 
-                    AuthorizationUtilities.CanPerformRequestAction(user, req, TDFShared.Utilities.RequestAction.Approve);
+                var canApprove = user != null && AuthorizationUtilities.CanPerformRequestAction(user, req, TDFShared.Utilities.RequestAction.Approve);
+                var canReject = user != null && AuthorizationUtilities.CanPerformRequestAction(user, req, TDFShared.Utilities.RequestAction.Reject);
+                
+                // Cache the permissions
+                _canEditDeleteCache[req.RequestID] = canEdit;
+                _canApproveRejectCache[req.RequestID] = canApprove;
+                
+                // Set the properties on the DTO for UI binding
+                req.CanEdit = canEdit;
+                req.CanDelete = canDelete;
+                req.CanApprove = canApprove;
+                req.CanReject = canReject;
             }
             NotifyCommandsCanExecuteChanged();
         }
@@ -250,7 +261,7 @@ namespace TDFMAUI.ViewModels
                 {
                     Page = 1,
                     PageSize = 50,
-                    FilterStatus = ShowPendingOnly ? RequestStatus.Pending : RequestStatus.All
+                    FilterStatus = ShowPendingOnly ? RequestStatus.Pending : null
                 };
 
                 _logger.LogInformation("Pagination settings: Page={Page}, PageSize={PageSize}, FilterStatus={FilterStatus}", 
@@ -278,8 +289,18 @@ namespace TDFMAUI.ViewModels
                         }
                         else
                         {
-                            _logger.LogInformation("No specific department selected, loading all requests for manager");
-                            response = await _requestService.GetAllRequestsAsync(pagination);
+                            // For managers, if "All" is selected, load requests for their own department
+                            var managerDepartment = currentUserDto?.Department;
+                            if (!string.IsNullOrEmpty(managerDepartment))
+                            {
+                                _logger.LogInformation("Loading requests for manager's department: {Department}", managerDepartment);
+                                response = await _requestService.GetRequestsByDepartmentAsync(managerDepartment, pagination);
+                            }
+                            else
+                            {
+                                _logger.LogWarning("Manager has no department assigned, loading own requests only");
+                                response = await _requestService.GetMyRequestsAsync(pagination);
+                            }
                         }
                         break;
                     case RequestAccessLevel.Own:

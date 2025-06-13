@@ -38,6 +38,7 @@ public class AuthService : IAuthService
     private readonly IRoleService _roleService;
     private readonly IApiService _apiService;
     private readonly ISecureStorage _secureStorage;
+    private readonly IUserSessionService _userSessionService;
     private string? _currentToken;
     private DateTime _tokenExpiration = DateTime.MinValue;
 
@@ -49,7 +50,8 @@ public class AuthService : IAuthService
         ILogger<AuthService> logger,
         IRoleService roleService,
         IApiService apiService,
-        ISecureStorage secureStorage)
+        ISecureStorage secureStorage,
+        IUserSessionService userSessionService)
     {
         try
         {
@@ -84,6 +86,10 @@ public class AuthService : IAuthService
             logger?.LogInformation("Checking SecureStorage...");
             _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
             logger?.LogInformation("SecureStorage resolved successfully.");
+
+            logger?.LogInformation("Checking UserSessionService...");
+            _userSessionService = userSessionService ?? throw new ArgumentNullException(nameof(userSessionService));
+            logger?.LogInformation("UserSessionService resolved successfully.");
 
             logger?.LogInformation("Saving logger reference...");
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -167,7 +173,7 @@ public class AuthService : IAuthService
                     _userProfileService.SetUserDetails(userDetails);
                     await _httpClientService.SetAuthenticationTokenAsync(apiResponse.Data.Token);
 
-                    // Create and set App.CurrentUser from UserDetailsDto
+                    // Create and set current user via UserSessionService
                     var currentUser = new TDFShared.DTOs.Users.UserDto
                     {
                         UserID = userDetails.UserId,
@@ -176,7 +182,8 @@ public class AuthService : IAuthService
                         Department = userDetails.Department,
                         Roles = userDetails.Roles
                     };
-                    App.CurrentUser = currentUser;
+                    _userSessionService.SetCurrentUser(currentUser);
+                    _userSessionService.SetTokens(apiResponse.Data.Token, apiResponse.Data.Expiration);
 
                     _logger.LogInformation("User {Username} logged in with roles: {Roles}",
                         username, string.Join(", ", userDetails.Roles));
@@ -240,7 +247,7 @@ public class AuthService : IAuthService
                         await _secureStorageService.SaveTokenAsync(directTokenResponse.Token, directTokenResponse.Expiration);
                         _userProfileService.SetUserDetails(userDetails);
                         
-                        // Create and set App.CurrentUser from UserDetailsDto
+                        // Create and set current user via UserSessionService
                         var currentUser = new TDFShared.DTOs.Users.UserDto
                         {
                             UserID = userDetails.UserId,
@@ -249,7 +256,8 @@ public class AuthService : IAuthService
                             Department = userDetails.Department,
                             Roles = userDetails.Roles
                         };
-                        App.CurrentUser = currentUser;
+                        _userSessionService.SetCurrentUser(currentUser);
+                        _userSessionService.SetTokens(directTokenResponse.Token, directTokenResponse.Expiration);
                         
                         _logger.LogInformation("User {Username} logged in with roles: {Roles}",
                             username, string.Join(", ", userDetails.Roles));
@@ -280,7 +288,7 @@ public class AuthService : IAuthService
                         await _secureStorageService.SaveTokenAsync(loginResponse.Token, expiration);
                         _userProfileService.SetUserDetails(loginResponse.UserDetails);
 
-                        // Create and set App.CurrentUser from UserDetailsDto
+                        // Create and set current user via UserSessionService
                         var currentUser = new TDFShared.DTOs.Users.UserDto
                         {
                             UserID = loginResponse.UserDetails.UserId,
@@ -289,7 +297,8 @@ public class AuthService : IAuthService
                             Department = loginResponse.UserDetails.Department,
                             Roles = loginResponse.UserDetails.Roles
                         };
-                        App.CurrentUser = currentUser;
+                        _userSessionService.SetCurrentUser(currentUser);
+                        _userSessionService.SetTokens(loginResponse.Token, DateTime.UtcNow.AddHours(24));
 
                         // Create and return TokenResponse
                         return new TokenResponse
@@ -450,7 +459,8 @@ public class AuthService : IAuthService
         try
         {
             // Try to update user status to Offline before clearing credentials
-            if (App.CurrentUser != null)
+            var currentUser = _userSessionService.CurrentUser;
+            if (currentUser != null && currentUser.UserID > 0)
             {
                 try
                 {
@@ -461,7 +471,8 @@ public class AuthService : IAuthService
                         var userPresenceService = serviceProvider.GetService<IUserPresenceService>();
                         if (userPresenceService != null)
                         {
-                            _logger.LogInformation("Setting user status to Offline before logout");
+                            _logger.LogInformation("Setting user {UserName} (ID: {UserId}) status to Offline before logout", 
+                                App.CurrentUser.UserName, App.CurrentUser.UserID);
                             await userPresenceService.UpdateStatusAsync(UserPresenceStatus.Offline, "");
                         }
                     }
@@ -472,6 +483,10 @@ public class AuthService : IAuthService
                     success = false;
                     // Continue with logout even if status update fails
                 }
+            }
+            else if (currentUser != null && currentUser.UserID <= 0)
+            {
+                _logger.LogWarning("Invalid user ID ({UserId}), skipping status update during logout", currentUser.UserID);
             }
 
             // Call the API to logout (which will also update status on server-side)
@@ -496,9 +511,9 @@ public class AuthService : IAuthService
                 _userProfileService.ClearUserDetails();
                 await _secureStorageService.RemoveTokenAsync();
                 
-                // Clear App.CurrentUser
-                App.CurrentUser = null;
-                _logger.LogInformation("App.CurrentUser cleared during logout");
+                // Clear user session including persistent storage
+                await _userSessionService.ClearSessionAsync();
+                _logger.LogInformation("User session and persistent storage cleared during logout");
 
                 // Navigate back to the login page after logout
                 await Shell.Current.GoToAsync("//LoginPage");
@@ -523,8 +538,15 @@ public class AuthService : IAuthService
     {
         try
         {
-            // On app start, token persistence is handled by HandleTokenPersistenceAsync.
-            // Here, always use the in-memory token if present, even on desktop.
+            // First try to get user ID from the session service (faster)
+            var currentUserId = _userSessionService.GetCurrentUserId();
+            if (currentUserId > 0)
+            {
+                _logger.LogInformation("Retrieved User ID {UserId} from UserSessionService", currentUserId);
+                return currentUserId;
+            }
+
+            // Fallback to token parsing if session service doesn't have the user
             var (token, _) = await _secureStorageService.GetTokenAsync();
             if (string.IsNullOrEmpty(token))
             {
@@ -667,33 +689,22 @@ public class AuthService : IAuthService
     {
         try
         {
-            // On app start, token persistence is handled by HandleTokenPersistenceAsync.
-            // Here, always use the in-memory token if present, even on desktop.
-            var userId = await GetCurrentUserIdAsync();
-            if (userId <= 0)
+            _logger.LogInformation("Getting current user details via ApiService");
+
+            // Use the ApiService to get current user instead of making direct HTTP calls
+            var apiResponse = await _apiService.GetCurrentUserAsync();
+            if (apiResponse?.Success == true && apiResponse.Data != null)
             {
-                _logger.LogWarning("GetCurrentUserAsync: No valid user ID found");
+                // Set current user via UserSessionService
+                _userSessionService.SetCurrentUser(apiResponse.Data);
+                _logger.LogInformation("Successfully retrieved current user details and set via UserSessionService: {UserName}", apiResponse.Data.FullName);
+                return apiResponse.Data;
+            }
+            else
+            {
+                _logger.LogWarning("Failed to get current user from ApiService: {Message}", apiResponse?.Message);
                 return null;
             }
-
-            var endpoint = $"users/{userId}";
-            _logger.LogInformation("Getting user details for user {UserId}", userId);
-
-            // Set authentication token if available
-            var (token, _) = await _secureStorageService.GetTokenAsync().ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(token))
-            {
-                await _httpClientService.SetAuthenticationTokenAsync(token);
-            }
-
-            var user = await _httpClientService.GetAsync<UserDto>(endpoint);
-            if (user != null)
-            {
-                // Set App.CurrentUser
-                App.CurrentUser = user;
-                _logger.LogInformation("Successfully retrieved user details for {UserId} and set as App.CurrentUser", userId);
-            }
-            return user;
         }
         catch (Exception ex)
         {

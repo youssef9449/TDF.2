@@ -24,24 +24,35 @@ namespace TDFMAUI
 {
     public partial class App : Application
     {
-        private static UserDto? _currentUser;
         private readonly ILogger<App> _logger;
+        private static IUserSessionService? _userSessionService;
 
-        public static UserDto? CurrentUser
-        {
-            get => _currentUser;
-            set
-            {
-                if (_currentUser != value)
-                {
-                    _currentUser = value;
-                    OnUserChanged(); // Raise the event
-                }
-            }
-        }
+        /// <summary>
+        /// Gets the current user from the centralized session service
+        /// </summary>
+        public static UserDto? CurrentUser => _userSessionService?.CurrentUser;
 
-        // Event to notify when the user changes
+        /// <summary>
+        /// Gets the user session service instance
+        /// </summary>
+        public static IUserSessionService? UserSessionService => _userSessionService;
+
+        // Event to notify when the user changes (for backward compatibility)
         public static event EventHandler? UserChanged;
+
+        /// <summary>
+        /// Initializes the user session service
+        /// </summary>
+        public static void InitializeUserSession(IUserSessionService userSessionService)
+        {
+            _userSessionService = userSessionService;
+            
+            // Subscribe to user changes from the session service
+            _userSessionService.UserChanged += (sender, args) =>
+            {
+                UserChanged?.Invoke(null, EventArgs.Empty);
+            };
+        }
 
         protected static void OnUserChanged()
         {
@@ -58,9 +69,9 @@ namespace TDFMAUI
         {
             try
             {
-                // Initialize logger
-                _logger = Services?.GetService<ILogger<App>>() ?? 
-                    throw new InvalidOperationException("Logger service not available");
+                // Logger will be initialized later via DI. Use Debug.WriteLine for early logs.
+                // _logger = Services?.GetService<ILogger<App>>() ??
+                //     throw new InvalidOperationException("Logger service not available");
 
                 // Check if we're starting in safe mode (from intent)
                 CheckSafeMode();
@@ -194,8 +205,8 @@ namespace TDFMAUI
                     return; // Skip the rest of initialization
                 }
 
-                // We no longer need to initialize DebugService here as it's already initialized in MauiProgram.cs
-                // DebugService.Initialize();
+                // DebugService is initialized in MauiProgram.cs before App constructor finishes.
+                // No need to initialize it here.
 
                 // Use standard console logging until DebugService is ready
                 System.Diagnostics.Debug.WriteLine("App constructor starting");
@@ -258,7 +269,7 @@ namespace TDFMAUI
         {
             try
             {
-                DebugService.LogInfo("App", "OnStart method called");
+                DebugService.LogInfo("App", "OnStart method entered.");
 
                 // Log important app state information
                 DebugService.LogInfo("App", $"Current MainPage type: {MainPage?.GetType().Name ?? "null"}");
@@ -281,7 +292,9 @@ namespace TDFMAUI
                 }
 
                 // MainPage is now set here instead of the constructor
+                DebugService.LogInfo("App", "Calling SetupInitialPageAsync...");
                 await SetupInitialPageAsync(); // Call the setup logic asynchronously
+                DebugService.LogInfo("App", "SetupInitialPageAsync completed.");
 
                 DebugService.LogInfo("App", "OnStart finished");
             }
@@ -312,7 +325,8 @@ namespace TDFMAUI
                     SafeMode = intent.Extras.GetBoolean("safe_mode", false);
                     System.Diagnostics.Debug.WriteLine($"Safe mode from intent: {SafeMode}");
                 }
-            } // <<< Add this closing brace for the 'if (context.PackageManager != null ...)' block
+            }
+        }
 #endif
 
                 // Log the safe mode status
@@ -331,6 +345,7 @@ namespace TDFMAUI
         /// </summary>
         private async Task SetupInitialPageAsync()
         {
+            DebugService.LogInfo("App", "SetupInitialPageAsync entered.");
             try
             {
                 if (Services == null)
@@ -362,17 +377,21 @@ namespace TDFMAUI
 
                     if (isAuthenticated)
                     {
-                        logger.LogInformation("User is authenticated. Showing main shell.");
+                        logger.LogInformation("User is authenticated. Setting MainPage to AppShell.");
                         var shell = Services.GetRequiredService<AppShell>();
                         MainPage = shell;
+                        DebugService.LogInfo("App", "MainPage set to AppShell. Registering WebSocket event handlers.");
                         RegisterWebSocketEventHandlers();
+                        DebugService.LogInfo("App", "Navigating to DashboardPage.");
                         await Shell.Current.GoToAsync("DashboardPage");
+                        DebugService.LogInfo("App", "Navigation to DashboardPage completed.");
                     }
                     else
                     {
-                        logger.LogInformation("User is not authenticated. Showing login page.");
+                        logger.LogInformation("User is not authenticated. Setting MainPage to LoginPage.");
                         var loginPage = Services.GetRequiredService<TDFMAUI.Features.Auth.LoginPage>();
                         MainPage = new NavigationPage(loginPage);
+                        DebugService.LogInfo("App", "MainPage set to LoginPage.");
                     }
                 }
                 catch (Exception ex)
@@ -837,7 +856,7 @@ namespace TDFMAUI
 
         private void UpdateUserStatusToOffline()
         {
-            if (CurrentUser != null)
+            if (CurrentUser != null && CurrentUser.UserID > 0)
             {
                 try
                 {
@@ -852,7 +871,7 @@ namespace TDFMAUI
                         {
                             try
                             {
-                                DebugService.LogInfo("App", "Setting user status to Offline on app closing");
+                                DebugService.LogInfo("App", $"Setting user {CurrentUser.UserName} (ID: {CurrentUser.UserID}) status to Offline on app closing");
 
                                 // Use the cancellation token to prevent hanging
                                 await userPresenceService.UpdateStatusAsync(
@@ -875,6 +894,10 @@ namespace TDFMAUI
                 {
                     DebugService.LogError("App", $"Error getting UserPresenceService: {ex.Message}");
                 }
+            }
+            else if (CurrentUser != null && CurrentUser.UserID <= 0)
+            {
+                DebugService.LogWarning("App", $"Invalid user ID ({CurrentUser.UserID}), skipping status update on app closing");
             }
         }
 
@@ -992,7 +1015,7 @@ namespace TDFMAUI
                                                 try
                                                 {
                                                     // Clear current user and token
-                                                    CurrentUser = null;
+                                                    _userSessionService?.SetCurrentUser(null);
                                                     await secureStorage.RemoveTokenAsync();
 
                                                     // Navigate to login page
@@ -1062,7 +1085,7 @@ namespace TDFMAUI
                 resources["AdaptiveTextColor"] = resources.ContainsKey("TextColor") ? resources["TextColor"] : Colors.Black;
                 resources["AdaptiveBackgroundColor"] = resources.ContainsKey("BackgroundColor") ? resources["BackgroundColor"] : Colors.White;
                 resources["AdaptiveSurfaceColor"] = resources.ContainsKey("SurfaceColor") ? resources["SurfaceColor"] : Colors.White;
-                resources["AdaptiveBorderColor"] = resources.ContainsKey("BorderColor") ? resources["BorderColor"] : Colors.Gray;
+                resources["AdaptiveBorderColor"] = resources.ContainsKey("BorderColor") ? resources["BorderColor"] : (resources.ContainsKey("TextSecondaryColor") ? resources["TextSecondaryColor"] : Colors.Gray);
             }
             catch (Exception ex)
             {
@@ -1188,8 +1211,6 @@ namespace TDFMAUI
                 var expectedSources = new List<string>
                 {
                     "Resources/Styles/Colors.xaml",
-                    "Resources/Styles/Colors.Light.xaml",
-                    "Resources/Styles/Colors.Dark.xaml",
                     "Resources/Styles/PlatformColors.xaml",
                     "Resources/Styles/Styles.xaml"
                 };

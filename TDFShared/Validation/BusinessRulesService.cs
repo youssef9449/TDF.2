@@ -39,6 +39,20 @@ namespace TDFShared.Validation
                 errors.AddRange(basicValidation.Errors);
             }
 
+            // Weekend validation - start date cannot be a weekend
+            if (IsWeekend(request.RequestStartDate))
+            {
+                errors.Add("Start date cannot be on a weekend (Friday or Saturday). Please select a working day.");
+            }
+
+            // Check if the date range contains only weekends (for multi-day requests)
+            if (request.RequestEndDate.HasValue && 
+                request.RequestEndDate.Value.Date != request.RequestStartDate.Date &&
+                CalculateWorkingDays(request.RequestStartDate, request.RequestEndDate.Value) == 0)
+            {
+                errors.Add("The selected date range contains only weekends. Please select working days.");
+            }
+
             // Leave balance validation
             if (RequiresBalanceCheck(request.LeaveType))
             {
@@ -78,6 +92,20 @@ namespace TDFShared.Validation
             if (!basicValidation.IsValid)
             {
                 errors.AddRange(basicValidation.Errors);
+            }
+
+            // Weekend validation - start date cannot be a weekend
+            if (IsWeekend(request.RequestStartDate))
+            {
+                errors.Add("Start date cannot be on a weekend (Friday or Saturday). Please select a working day.");
+            }
+
+            // Check if the date range contains only weekends (for multi-day requests)
+            if (request.RequestEndDate.HasValue && 
+                request.RequestEndDate.Value.Date != request.RequestStartDate.Date &&
+                CalculateWorkingDays(request.RequestStartDate, request.RequestEndDate.Value) == 0)
+            {
+                errors.Add("The selected date range contains only weekends. Please select working days.");
             }
 
             // Get existing request to check if it can be modified
@@ -353,7 +381,45 @@ namespace TDFShared.Validation
         private static int CalculateRequestDays(DateTime startDate, DateTime? endDate)
         {
             DateTime effectiveEndDate = endDate ?? startDate;
-            return (effectiveEndDate.Date - startDate.Date).Days + 1;
+            return CalculateWorkingDays(startDate.Date, effectiveEndDate.Date);
+        }
+
+        /// <summary>
+        /// Calculates the number of working days (excluding weekends) between two dates
+        /// Weekends are Friday and Saturday
+        /// </summary>
+        /// <param name="startDate">Start date (inclusive)</param>
+        /// <param name="endDate">End date (inclusive)</param>
+        /// <returns>Number of working days</returns>
+        private static int CalculateWorkingDays(DateTime startDate, DateTime endDate)
+        {
+            if (endDate < startDate)
+                return 0;
+
+            int workingDays = 0;
+            var current = startDate;
+
+            while (current <= endDate)
+            {
+                // Friday = 5, Saturday = 6 in DayOfWeek enum
+                if (current.DayOfWeek != DayOfWeek.Friday && current.DayOfWeek != DayOfWeek.Saturday)
+                {
+                    workingDays++;
+                }
+                current = current.AddDays(1);
+            }
+
+            return workingDays;
+        }
+
+        /// <summary>
+        /// Checks if a date falls on a weekend (Friday or Saturday)
+        /// </summary>
+        /// <param name="date">The date to check</param>
+        /// <returns>True if the date is Friday or Saturday</returns>
+        private static bool IsWeekend(DateTime date)
+        {
+            return date.DayOfWeek == DayOfWeek.Friday || date.DayOfWeek == DayOfWeek.Saturday;
         }
     }
 }

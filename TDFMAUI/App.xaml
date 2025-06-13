@@ -9,12 +9,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Base color resources -->
+                <!-- Base color resources with theme bindings -->
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
-                
-                <!-- Theme-specific color resources -->
-                <ResourceDictionary Source="Resources/Styles/Colors.Light.xaml" />
-                <ResourceDictionary Source="Resources/Styles/Colors.Dark.xaml" />
                 
                 <!-- Platform-specific color resources -->
                 <ResourceDictionary Source="Resources/Styles/PlatformColors.xaml" />

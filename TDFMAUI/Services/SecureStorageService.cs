@@ -22,15 +22,8 @@ namespace TDFMAUI.Services
         {
             try
             {
-                // Always update in-memory values regardless of platform
-                ApiConfig.CurrentToken = token;
-                ApiConfig.TokenExpiration = expiration;
-                if (refreshToken != null)
-                {
-                    ApiConfig.CurrentRefreshToken = refreshToken;
-                    ApiConfig.RefreshTokenExpiration = refreshTokenExpiration ?? DateTime.MinValue;
-                }
-
+                // Note: ApiConfig updates are now handled by UserSessionService to avoid circular dependencies
+                
                 // Only persist token to secure storage if platform allows it
                 if (ShouldPersistToken())
                 {
@@ -59,15 +52,8 @@ namespace TDFMAUI.Services
 
         public async Task<(string Token, DateTime Expiration)> GetTokenAsync()
         {
-            // On desktop, check in-memory token first
-            if (DeviceHelper.IsDesktop)
-            {
-                if (!string.IsNullOrEmpty(ApiConfig.CurrentToken) && ApiConfig.TokenExpiration > DateTime.UtcNow)
-                {
-                    return (ApiConfig.CurrentToken, ApiConfig.TokenExpiration);
-                }
-                // If not set, fall through to try SecureStorage (should be empty)
-            }
+            // Note: Desktop in-memory token checking is now handled by UserSessionService
+            // This method now only reads from persistent storage
 
             try
             {
@@ -78,9 +64,7 @@ namespace TDFMAUI.Services
                 {
                     DateTime expiration = DateTime.Parse(expirationString);
 
-                    // Update in-memory values
-                    ApiConfig.CurrentToken = token;
-                    ApiConfig.TokenExpiration = expiration;
+                    // Note: ApiConfig updates are now handled by UserSessionService to avoid circular dependencies
 
                     return (token, expiration);
                 }
@@ -95,15 +79,8 @@ namespace TDFMAUI.Services
 
         public async Task<(string Token, DateTime Expiration)> GetRefreshTokenAsync()
         {
-            // On desktop, check in-memory token first
-            if (DeviceHelper.IsDesktop)
-            {
-                if (!string.IsNullOrEmpty(ApiConfig.CurrentRefreshToken) && ApiConfig.RefreshTokenExpiration > DateTime.UtcNow)
-                {
-                    return (ApiConfig.CurrentRefreshToken, ApiConfig.RefreshTokenExpiration);
-                }
-                // If not set, fall through to try SecureStorage (should be empty)
-            }
+            // Note: Desktop in-memory token checking is now handled by UserSessionService
+            // This method now only reads from persistent storage
 
             try
             {
@@ -114,9 +91,7 @@ namespace TDFMAUI.Services
                 {
                     DateTime expiration = DateTime.Parse(expirationString);
 
-                    // Update in-memory values
-                    ApiConfig.CurrentRefreshToken = token;
-                    ApiConfig.RefreshTokenExpiration = expiration;
+                    // Note: ApiConfig updates are now handled by UserSessionService to avoid circular dependencies
 
                     return (token, expiration);
                 }
@@ -138,11 +113,7 @@ namespace TDFMAUI.Services
                 SecureStorage.Remove(RefreshTokenKey);
                 SecureStorage.Remove(RefreshTokenExpirationKey);
 
-                // Also clear in-memory values
-                ApiConfig.CurrentToken = null;
-                ApiConfig.TokenExpiration = DateTime.MinValue;
-                ApiConfig.CurrentRefreshToken = null;
-                ApiConfig.RefreshTokenExpiration = DateTime.MinValue;
+                // Note: ApiConfig clearing is now handled by UserSessionService to avoid circular dependencies
             }
             catch (Exception ex)
             {

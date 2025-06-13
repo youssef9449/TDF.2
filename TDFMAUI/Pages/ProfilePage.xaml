@@ -24,7 +24,7 @@
 
             <!-- User Info -->
             <Frame Grid.Row="0"
-                   BackgroundColor="#0d47a1"
+                   BackgroundColor="{StaticResource Primary}"
                    CornerRadius="15"
                    Padding="20"
                    HasShadow="True">
@@ -39,7 +39,7 @@
                            FontAttributes="Bold"
                            TextColor="White"/>
                     <Entry x:Name="fullNameEntry" 
-                           TextColor="#bbdefb"
+                           TextColor="{StaticResource OnPrimaryColor}"
                            BackgroundColor="White"
                            Placeholder="Enter your full name"/>
                     
@@ -47,7 +47,7 @@
                            FontAttributes="Bold"
                            TextColor="White"/>
                     <Entry x:Name="departmentEntry" 
-                           TextColor="#bbdefb"
+                           TextColor="{StaticResource OnPrimaryColor}"
                            BackgroundColor="White"
                            Placeholder="Enter your department"/>
                     
@@ -55,7 +55,7 @@
                            FontAttributes="Bold"
                            TextColor="White"/>
                     <Entry x:Name="titleEntry" 
-                           TextColor="#bbdefb"
+                           TextColor="{StaticResource OnPrimaryColor}"
                            BackgroundColor="White"
                            Placeholder="Enter your title"/>
                     
@@ -65,7 +65,7 @@
             
             <!-- Change Password -->
             <Frame Grid.Row="1"
-                   BackgroundColor="#0d47a1"
+                   BackgroundColor="{StaticResource Primary}"
                    CornerRadius="15"
                    Padding="20"
                    HasShadow="True">
@@ -84,7 +84,7 @@
             <Button Grid.Row="2"
                     Text="Save Changes"
                     Clicked="OnSaveClicked"
-                    BackgroundColor="#64b5f6"
+                    BackgroundColor="{StaticResource PrimaryLight}"
                     TextColor="White"
                     FontAttributes="Bold"
                     CornerRadius="10"

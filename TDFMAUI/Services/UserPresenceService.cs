@@ -137,6 +137,12 @@ namespace TDFMAUI.Services
                 return;
             }
 
+            if (App.CurrentUser.UserID <= 0)
+            {
+                _logger.LogWarning("Cannot update status: Current user has invalid ID ({UserId})", App.CurrentUser.UserID);
+                return;
+            }
+
             try
             {
                 // Check for cancellation before making the call
@@ -157,14 +163,36 @@ namespace TDFMAUI.Services
                 if (_webSocketService.IsConnected)
                 {
                     await _webSocketService.UpdatePresenceStatusAsync(status.ToString(), statusMessage);
+                    _logger.LogInformation("Status update sent via WebSocket");
                 }
                 else
                 {
-                    _logger.LogWarning("WebSocket is not connected, skipping status update via WebSocket.");
+                    _logger.LogWarning("WebSocket is not connected, will update via API instead");
+                }
+
+                // Always make an API call to ensure the database is updated, especially when WebSocket is not available
+                int userId = App.CurrentUser.UserID;
+                try
+                {
+                    var updateData = new { isConnected = status != UserPresenceStatus.Offline };
+                    await _apiService.PutAsync<object, object>(
+                        string.Format(ApiRoutes.Users.UpdateConnection, userId), 
+                        updateData, 
+                        false); // Don't queue if unavailable during shutdown
+                    _logger.LogInformation("Status update sent via API for user {UserId}", userId);
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogWarning("API status update was cancelled");
+                    // Don't rethrow cancellation for API calls during shutdown
+                }
+                catch (Exception apiEx)
+                {
+                    _logger.LogError(apiEx, "Failed to update status via API, but continuing with local update");
+                    // Don't fail the entire operation if API call fails
                 }
 
                 // Update local cache
-                int userId = App.CurrentUser.UserID;
                 if (_userStatuses.TryGetValue(userId, out var userInfo))
                 {
                     userInfo.Status = status;
@@ -202,6 +230,12 @@ namespace TDFMAUI.Services
             if (App.CurrentUser == null)
             {
                 _logger.LogWarning("Cannot update chat availability: Current user is null");
+                return;
+            }
+
+            if (App.CurrentUser.UserID <= 0)
+            {
+                _logger.LogWarning("Cannot update chat availability: Current user has invalid ID ({UserId})", App.CurrentUser.UserID);
                 return;
             }
 

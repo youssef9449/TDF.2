@@ -394,5 +394,50 @@ namespace TDFAPI.Controllers
                 return StatusCode(500, ApiResponse<PaginatedResult<UserDto>>.ErrorResponse("An error occurred retrieving all users"));
             }
         }
+
+        [HttpPut("{id}/connection")]
+        [Authorize]
+        public async Task<ActionResult<ApiResponse<bool>>> UpdateUserConnection(int id, [FromBody] UpdateConnectionRequest request)
+        {
+            try
+            {
+                if (id <= 0)
+                {
+                    return BadRequest(ApiResponse<bool>.ErrorResponse("Invalid user ID"));
+                }
+
+                if (request == null)
+                {
+                    return BadRequest(ApiResponse<bool>.ErrorResponse("Connection data is required"));
+                }
+
+                // Check if the user is updating their own connection status or is an admin
+                var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+                var isAdmin = User.IsInRole("Admin");
+
+                if (id != currentUserId && !isAdmin)
+                {
+                    _logger.LogWarning("User {CurrentUserId} attempted to update connection status for user {RequestedId}",
+                        currentUserId, id);
+                    return Forbid();
+                }
+
+                // Update user presence based on connection status
+                var success = await _userService.UpdateUserPresenceAsync(id, request.IsConnected);
+                if (!success)
+                {
+                    return NotFound(ApiResponse<bool>.ErrorResponse("User not found or update failed"));
+                }
+
+                _logger.LogInformation("User {UserId} connection status updated to {IsConnected} by user {UpdatedBy}",
+                    id, request.IsConnected, currentUserId);
+                return Ok(ApiResponse<bool>.SuccessResponse(true, "Connection status updated successfully"));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating connection status for user {UserId}: {Message}", id, ex.Message);
+                return StatusCode(500, ApiResponse<bool>.ErrorResponse("An error occurred updating the connection status"));
+            }
+        }
     }
 }

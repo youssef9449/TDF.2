@@ -12,6 +12,24 @@
         <Setter Property="TextColor" Value="{StaticResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSans-Regular" />
     </Style>
+    
+    <Style TargetType="Entry">
+        <Setter Property="TextColor" Value="{StaticResource TextColor}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceColor}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource TextSecondaryColor}" />
+    </Style>
+    
+    <Style TargetType="Editor">
+        <Setter Property="TextColor" Value="{StaticResource TextColor}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceColor}" />
+        <Setter Property="PlaceholderColor" Value="{StaticResource TextSecondaryColor}" />
+    </Style>
+    
+    <Style TargetType="Picker">
+        <Setter Property="TextColor" Value="{StaticResource TextColor}" />
+        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceColor}" />
+        <Setter Property="TitleColor" Value="{StaticResource TextSecondaryColor}" />
+    </Style>
 
     <!-- Headline Styles -->
     <Style x:Key="Headline" TargetType="Label">

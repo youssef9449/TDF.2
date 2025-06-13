@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="TDFMAUI.Features.Admin.AdminPage" 
              Title="Admin"
-             BackgroundColor="#1a237e">
+             BackgroundColor="{StaticResource BackgroundColor}">
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->
@@ -11,13 +11,13 @@
             <Button Text="←" 
                     Clicked="OnBackClicked"
                     BackgroundColor="Transparent"
-                    TextColor="White"
+                    TextColor="{StaticResource TextColor}"
                     FontSize="20"
                     WidthRequest="50"/>
             <Label Text="Admin Panel"
                    FontSize="24"
                    FontAttributes="Bold"
-                   TextColor="White"
+                   TextColor="{StaticResource TextColor}"
                    HorizontalOptions="CenterAndExpand"/>
         </HorizontalStackLayout>
 
@@ -66,7 +66,7 @@
             </Grid.RowDefinitions>
 
             <!-- Users Section -->
-            <Frame x:Name="UsersSectionFrame" BackgroundColor="#0d47a1" 
+            <Frame x:Name="UsersSectionFrame" BackgroundColor="{StaticResource Primary}" 
                    Padding="15"
                    CornerRadius="15"
                    Grid.Column="0" 
@@ -91,7 +91,7 @@
                            TextColor="White"/>
                     <Button Text="Add User"
                             Clicked="OnAddUserClicked"
-                            BackgroundColor="#64b5f6"
+                            BackgroundColor="{StaticResource PrimaryLight}"
                             TextColor="White"
                             CornerRadius="10"/>
                     <!-- Future: Add a simplified user list view here -->
@@ -99,7 +99,7 @@
             </Frame>
             
             <!-- Example: Requests Section (Adapt as needed) -->
-            <Frame x:Name="RequestsSectionFrame" BackgroundColor="#0d47a1" 
+            <Frame x:Name="RequestsSectionFrame" BackgroundColor="{StaticResource Primary}" 
                    Padding="15"
                    CornerRadius="15"
                    Grid.Column="1" 
@@ -126,7 +126,7 @@
                            TextColor="White"/>
                     <Button Text="Manage Requests"
                             Clicked="OnManageRequestsClicked"
-                            BackgroundColor="#64b5f6"
+                            BackgroundColor="{StaticResource PrimaryLight}"
                             TextColor="White"
                             CornerRadius="10"/>
                 </VerticalStackLayout>
@@ -159,4 +159,4 @@
             </VisualState>
         </VisualStateGroup>
     </VisualStateManager.VisualStateGroups>
-</ContentPage> 
+</ContentPage>

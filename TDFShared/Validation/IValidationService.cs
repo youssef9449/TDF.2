@@ -1,39 +1,42 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Threading.Tasks;
 using TDFShared.DTOs.Common;
+using TDFShared.Validation.Results;
+using TDFShared.Exceptions;
 
 namespace TDFShared.Validation
 {
     /// <summary>
-    /// Interface for comprehensive validation services
-    /// Provides unified validation patterns for client and server
+    /// Interface for validation service providing unified validation patterns
+    /// for both client and server-side validation
     /// </summary>
     public interface IValidationService
     {
         /// <summary>
-        /// Validates an object using data annotations and custom rules
+        /// Validates an object using data annotations and returns a validation result.
         /// </summary>
-        /// <typeparam name="T">Type of object to validate</typeparam>
-        /// <param name="obj">Object to validate</param>
-        /// <returns>Validation result with errors if any</returns>
-        ValidationResult<T> ValidateObject<T>(T obj) where T : class;
+        /// <typeparam name="T">The type of object to validate.</typeparam>
+        /// <param name="obj">The object to validate.</param>
+        /// <returns>A ValidationResult containing the validation status and any error messages.</returns>
+        ObjectValidationResult<T> ValidateObject<T>(T obj) where T : class;
 
         /// <summary>
-        /// Validates an object and throws ValidationException if invalid
+        /// Validates an object and throws a ValidationException if validation fails.
         /// </summary>
-        /// <typeparam name="T">Type of object to validate</typeparam>
-        /// <param name="obj">Object to validate</param>
-        /// <exception cref="ValidationException">Thrown when validation fails</exception>
+        /// <typeparam name="T">The type of object to validate.</typeparam>
+        /// <param name="obj">The object to validate.</param>
+        /// <exception cref="TDFShared.Exceptions.ValidationException">Thrown when validation fails.</exception>
         void ValidateAndThrow<T>(T obj) where T : class;
 
         /// <summary>
-        /// Validates a single property value
+        /// Validates a specific property of an object using its validation attributes.
         /// </summary>
-        /// <param name="value">Value to validate</param>
-        /// <param name="propertyName">Name of the property</param>
-        /// <param name="objectType">Type of the containing object</param>
-        /// <returns>List of validation errors</returns>
+        /// <param name="value">The value to validate.</param>
+        /// <param name="propertyName">The name of the property being validated.</param>
+        /// <param name="objectType">The type of the object containing the property.</param>
+        /// <returns>A list of validation error messages, if any.</returns>
         List<string> ValidateProperty(object? value, string propertyName, Type objectType);
 
         /// <summary>
@@ -76,11 +79,32 @@ namespace TDFShared.Validation
         List<string> ValidateDateRange(DateTime startDate, DateTime? endDate, string fieldName = "Date", int minDaysFromNow = 0);
 
         /// <summary>
-        /// Validates password strength using security service
+        /// Validates a password against security requirements.
         /// </summary>
-        /// <param name="password">Password to validate</param>
-        /// <returns>Validation result with strength details</returns>
+        /// <param name="password">The password to validate.</param>
+        /// <returns>A PasswordValidationResult containing validation status, errors, and strength assessment.</returns>
         PasswordValidationResult ValidatePassword(string? password);
+
+        /// <summary>
+        /// Validates a password against security requirements and throws a ValidationException if validation fails.
+        /// </summary>
+        /// <param name="password">The password to validate.</param>
+        /// <exception cref="TDFShared.Exceptions.ValidationException">Thrown when validation fails.</exception>
+        void ValidatePasswordAndThrow(string? password);
+
+        /// <summary>
+        /// Validates a password against security requirements asynchronously.
+        /// </summary>
+        /// <param name="password">The password to validate.</param>
+        /// <returns>A task that represents the asynchronous validation operation.</returns>
+        Task<PasswordValidationResult> ValidatePasswordAsync(string? password);
+
+        /// <summary>
+        /// Validates a password against security requirements asynchronously and throws a ValidationException if validation fails.
+        /// </summary>
+        /// <param name="password">The password to validate.</param>
+        /// <exception cref="TDFShared.Exceptions.ValidationException">Thrown when validation fails.</exception>
+        Task ValidatePasswordAndThrowAsync(string? password);
 
         /// <summary>
         /// Sanitizes input to prevent common injection attacks
@@ -96,81 +120,5 @@ namespace TDFShared.Validation
         /// <param name="input">Input to check</param>
         /// <returns>True if dangerous patterns are detected</returns>
         bool ContainsDangerousPatterns(string? input);
-    }
-
-    /// <summary>
-    /// Generic validation result
-    /// </summary>
-    /// <typeparam name="T">Type of validated object</typeparam>
-    public class ValidationResult<T> where T : class
-    {
-        public bool IsValid { get; set; }
-        public List<string> Errors { get; set; } = new();
-        public T? ValidatedObject { get; set; }
-
-        public static ValidationResult<T> Success(T obj) => new()
-        {
-            IsValid = true,
-            ValidatedObject = obj
-        };
-
-        public static ValidationResult<T> Failure(List<string> errors) => new()
-        {
-            IsValid = false,
-            Errors = errors
-        };
-
-        public static ValidationResult<T> Failure(string error) => new()
-        {
-            IsValid = false,
-            Errors = new List<string> { error }
-        };
-    }
-
-    /// <summary>
-    /// Password validation result with detailed feedback
-    /// </summary>
-    public class PasswordValidationResult
-    {
-        public bool IsValid { get; set; }
-        public List<string> Errors { get; set; } = new();
-        public PasswordStrength Strength { get; set; }
-        public string? StrengthMessage { get; set; }
-    }
-
-    /// <summary>
-    /// Password strength levels
-    /// </summary>
-    public enum PasswordStrength
-    {
-        /// <summary>
-        /// Password meets no or very few security requirements
-        /// </summary>
-        VeryWeak = 0,
-
-        /// <summary>
-        /// Password meets minimal security requirements
-        /// </summary>
-        Weak = 1,
-
-        /// <summary>
-        /// Password meets basic security requirements
-        /// </summary>
-        Fair = 2,
-
-        /// <summary>
-        /// Password meets most security requirements
-        /// </summary>
-        Good = 3,
-
-        /// <summary>
-        /// Password meets all security requirements
-        /// </summary>
-        Strong = 4,
-
-        /// <summary>
-        /// Password exceeds all security requirements
-        /// </summary>
-        VeryStrong = 5
     }
 }

@@ -19,10 +19,10 @@ namespace TDFMAUI.Converters
                     case "rejected":
                         return Color.FromArgb("#E53935"); // Red
                     default:
-                        return Color.FromArgb("#90A4AE"); // Grey
+                        return Application.Current.Resources["TextSecondaryColor"] as Color ?? Color.FromArgb("#90A4AE");
                 }
             }
-            return Color.FromArgb("#90A4AE"); // Default Grey
+            return Application.Current.Resources["TextSecondaryColor"] as Color ?? Color.FromArgb("#90A4AE");
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

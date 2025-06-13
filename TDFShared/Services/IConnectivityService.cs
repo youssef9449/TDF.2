@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using TDFShared.Models;
 
 namespace TDFShared.Services
 {
@@ -62,47 +63,6 @@ namespace TDFShared.Services
     }
 
     /// <summary>
-    /// Detailed connectivity information
-    /// </summary>
-    public class ConnectivityInfo
-    {
-        /// <summary>
-        /// Whether the device is connected to a network
-        /// </summary>
-        public bool IsConnected { get; set; }
-
-        /// <summary>
-        /// Type of network connection (WiFi, Cellular, Ethernet, etc.)
-        /// </summary>
-        public string ConnectionType { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Available connection profiles
-        /// </summary>
-        public string[] ConnectionProfiles { get; set; } = Array.Empty<string>();
-
-        /// <summary>
-        /// Network access level (Internet, Local, None, etc.)
-        /// </summary>
-        public string NetworkAccess { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Whether the connection is metered (limited data)
-        /// </summary>
-        public bool IsMetered { get; set; }
-
-        /// <summary>
-        /// Signal strength (0-100, if available)
-        /// </summary>
-        public int? SignalStrength { get; set; }
-
-        /// <summary>
-        /// When this information was last updated
-        /// </summary>
-        public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
-    }
-
-    /// <summary>
     /// Event args for connectivity status changes
     /// </summary>
     public class TDFConnectivityChangedEventArgs : EventArgs
@@ -128,8 +88,64 @@ namespace TDFShared.Services
         public bool PreviousState { get; set; }
 
         /// <summary>
+        /// Whether the API is reachable
+        /// </summary>
+        public bool IsApiReachable { get; set; }
+
+        /// <summary>
+        /// Network latency in milliseconds
+        /// </summary>
+        public int Latency { get; set; }
+
+        /// <summary>
+        /// Any error that occurred while checking connectivity
+        /// </summary>
+        public string? Error { get; set; }
+
+        /// <summary>
         /// Additional connectivity information
         /// </summary>
         public ConnectivityInfo? ConnectivityInfo { get; set; }
+
+        /// <summary>
+        /// Creates a new instance of TDFConnectivityChangedEventArgs
+        /// </summary>
+        public TDFConnectivityChangedEventArgs()
+        {
+        }
+
+        /// <summary>
+        /// Creates a new instance of TDFConnectivityChangedEventArgs with the specified connection state
+        /// </summary>
+        /// <param name="isConnected">Whether the network is connected</param>
+        public TDFConnectivityChangedEventArgs(bool isConnected)
+        {
+            IsConnected = isConnected;
+        }
+
+        /// <summary>
+        /// Creates a new instance of TDFConnectivityChangedEventArgs with the specified values
+        /// </summary>
+        /// <param name="isConnected">Whether the network is connected</param>
+        /// <param name="connectionType">The type of network connection</param>
+        /// <param name="isApiReachable">Whether the API is reachable</param>
+        /// <param name="latency">The network latency in milliseconds</param>
+        public TDFConnectivityChangedEventArgs(bool isConnected, string connectionType, bool isApiReachable, int latency)
+        {
+            IsConnected = isConnected;
+            ConnectionType = connectionType;
+            IsApiReachable = isApiReachable;
+            Latency = latency;
+        }
+
+        /// <summary>
+        /// Creates a new instance of TDFConnectivityChangedEventArgs with an error
+        /// </summary>
+        /// <param name="error">The error message</param>
+        public TDFConnectivityChangedEventArgs(string error)
+        {
+            IsConnected = false;
+            Error = error;
+        }
     }
 }

@@ -23,9 +23,12 @@ using TDFShared.Enums;
 using TDFShared.Exceptions; // Updated
 using TDFShared.Models.User;
 using TDFShared.Models.Message;
+using TDFShared.Models; // Added for ApiResponseBase
 using System.Net.NetworkInformation;
 using TDFMAUI.Config; // Added
 using TDFMAUI.Helpers; // Added for DeviceHelper
+using TDFShared.Services;
+using ApiDTOs = TDFShared.DTOs.Common;
 
 namespace TDFMAUI.Services
 {
@@ -45,11 +48,27 @@ namespace TDFMAUI.Services
         private readonly TDFShared.Services.IHttpClientService _httpClientService;
         private readonly SecureStorageService _secureStorage;
         private readonly JsonSerializerOptions _jsonOptions;
-        private NetworkMonitorService? _networkMonitor;
-        private bool _isNetworkAvailable = true;
+        private readonly ILogger<ApiService> _logger;
+        private readonly IConnectivityService _connectivityService;
+        private bool _isNetworkAvailable;
+        private bool _isApiReachable;
+        private DateTime _lastApiCheck = DateTime.MinValue;
+        private readonly TimeSpan _apiCheckInterval = TimeSpan.FromSeconds(30);
+        private readonly SemaphoreSlim _reconnectLock = new SemaphoreSlim(1, 1);
+        private bool _isReconnecting;
+        private readonly object _stateLock = new object();
         private readonly Dictionary<string, Queue<PendingRequest>> _pendingRequests = new Dictionary<string, Queue<PendingRequest>>();
-        private readonly ILogger<ApiService>? _logger;
         private bool _initialized;
+
+        /// <summary>
+        /// Event raised when the API becomes reachable
+        /// </summary>
+        public event EventHandler? ApiReachable;
+
+        /// <summary>
+        /// Event raised when the API becomes unreachable
+        /// </summary>
+        public event EventHandler? ApiUnreachable;
 
         // Class to represent a pending API request
         private class PendingRequest
@@ -73,36 +92,52 @@ namespace TDFMAUI.Services
         public ApiService(
             TDFShared.Services.IHttpClientService httpClientService,
             SecureStorageService secureStorage,
-            ILogger<ApiService>? logger,
-            NetworkMonitorService? networkMonitor)
+            ILogger<ApiService> logger,
+            IConnectivityService connectivityService)
         {
             _httpClientService = httpClientService;
             _secureStorage = secureStorage;
             _logger = logger;
-            _networkMonitor = networkMonitor;
+            _connectivityService = connectivityService;
 
             _jsonOptions = TDFShared.Helpers.JsonSerializationHelper.DefaultOptions;
 
             _logger?.LogInformation("ApiService: Initialized");
-            if (_networkMonitor != null)
-            {
-                _isNetworkAvailable = _networkMonitor.IsConnected;
-                _networkMonitor.NetworkStatusChanged += OnNetworkStatusChanged;
-                _logger?.LogInformation("ApiService: Network monitor registered. Initial status: {Status}", (_isNetworkAvailable ? "Connected" : "Disconnected"));
-            }
+            _isNetworkAvailable = _connectivityService.IsConnected();
+            _connectivityService.ConnectivityChanged += OnNetworkStatusChanged;
             _initialized = false;
         }
 
-        private void OnNetworkStatusChanged(object? sender, NetworkStatusChangedEventArgs e)
+        private async Task ReconnectAsync()
         {
-            _isNetworkAvailable = e.IsConnected;
-            _logger?.LogInformation("ApiService: Network status changed: {Status}", (_isNetworkAvailable ? "Connected" : "Disconnected"));
-
-            // If network was restored, we could trigger deferred requests here
-            if (_isNetworkAvailable && _pendingRequests.Count > 0)
+            try
             {
-                // Process pending requests
-                Task.Run(async () => await ProcessPendingRequestsAsync());
+                _isApiReachable = await TestConnectivityAsync();
+                _logger?.LogInformation("ApiService: Reconnection attempt {Status}", (_isApiReachable ? "successful" : "failed"));
+            }
+            catch (Exception ex)
+            {
+                _isApiReachable = false;
+                _logger?.LogError(ex, "ApiService: Error during reconnection attempt");
+            }
+        }
+
+        private void OnNetworkStatusChanged(object? sender, TDFConnectivityChangedEventArgs e)
+        {
+            lock (_stateLock)
+            {
+                _isNetworkAvailable = e.IsConnected;
+                _logger.LogInformation("Network status changed: {IsConnected}", e.IsConnected);
+
+                if (e.IsConnected)
+                {
+                    _ = TestApiConnectivityAsync();
+                }
+                else
+                {
+                    _isApiReachable = false;
+                    ApiUnreachable?.Invoke(this, EventArgs.Empty);
+                }
             }
         }
 
@@ -242,8 +277,7 @@ namespace TDFMAUI.Services
         // Method to handle cleanup when ApiService is disposed
         public void Dispose()
         {
-            if (_networkMonitor != null)
-                _networkMonitor.NetworkStatusChanged -= OnNetworkStatusChanged;
+            _connectivityService.ConnectivityChanged -= OnNetworkStatusChanged;
         }
 
         private async Task InitializeAuthenticationAsync()
@@ -518,7 +552,7 @@ namespace TDFMAUI.Services
                 {
                     try
                     {
-                        var errorResponse = System.Text.Json.JsonSerializer.Deserialize<ApiResponseBase>(
+                        var errorResponse = System.Text.Json.JsonSerializer.Deserialize<ApiDTOs.ApiResponseBase>(
                             ex.ResponseContent,
                             new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true }
                         );
@@ -988,13 +1022,34 @@ namespace TDFMAUI.Services
         {
             try
             {
-                await GetAsync<object>(ApiRoutes.Health.Ping);
-                return true;
+                return await _httpClientService.TestConnectivityAsync();
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "API Connectivity test failed using {Endpoint}", ApiRoutes.Health.Ping);
+                _logger?.LogError(ex, "ApiService: Error testing connectivity");
                 return false;
+            }
+        }
+
+        private async Task TestApiConnectivityAsync()
+        {
+            try
+            {
+                _isApiReachable = await _httpClientService.TestConnectivityAsync();
+                if (_isApiReachable)
+                {
+                    ApiReachable?.Invoke(this, EventArgs.Empty);
+                }
+                else
+                {
+                    ApiUnreachable?.Invoke(this, EventArgs.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Error testing API connectivity");
+                _isApiReachable = false;
+                ApiUnreachable?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -1210,7 +1265,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                string endpoint = $"{TDFShared.Constants.ApiRoutes.Base}/requests/{requestId}/manager/approve";
+                string endpoint = string.Format(TDFShared.Constants.ApiRoutes.Requests.ManagerApprove, requestId);
                 var response = await PostAsync<ManagerApprovalDto, ApiResponse<bool>>(endpoint, approvalDto);
                 return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to approve request" };
             }
@@ -1225,7 +1280,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                string endpoint = $"{TDFShared.Constants.ApiRoutes.Base}/requests/{requestId}/hr/approve";
+                string endpoint = string.Format(TDFShared.Constants.ApiRoutes.Requests.HRApprove, requestId);
                 var response = await PostAsync<HRApprovalDto, ApiResponse<bool>>(endpoint, approvalDto);
                 return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to approve request" };
             }
@@ -1240,7 +1295,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                string endpoint = $"{TDFShared.Constants.ApiRoutes.Base}/requests/{requestId}/manager/reject";
+                string endpoint = string.Format(TDFShared.Constants.ApiRoutes.Requests.ManagerReject, requestId);
                 var response = await PostAsync<ManagerRejectDto, ApiResponse<bool>>(endpoint, rejectDto);
                 return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to reject request" };
             }
@@ -1255,7 +1310,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                string endpoint = $"{TDFShared.Constants.ApiRoutes.Base}/requests/{requestId}/hr/reject";
+                string endpoint = string.Format(TDFShared.Constants.ApiRoutes.Requests.HRReject, requestId);
                 var response = await PostAsync<HRRejectDto, ApiResponse<bool>>(endpoint, rejectDto);
                 return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to reject request" };
             }
@@ -1296,6 +1351,44 @@ namespace TDFMAUI.Services
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error getting requests: {Message}", ex.Message);
+                return new ApiResponse<PaginatedResult<RequestResponseDto>> { Success = false, Message = ex.Message };
+            }
+        }
+
+        public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetRequestsForApprovalAsync(RequestPaginationDto pagination, bool queueIfUnavailable = true)
+        {
+            try
+            {
+                string endpoint = ApiRoutes.Requests.GetForApproval;
+                var queryParams = new List<string>();
+                if (pagination != null)
+                {
+                    queryParams.Add($"page={pagination.Page}");
+                    queryParams.Add($"pageSize={pagination.PageSize}");
+                    if (!string.IsNullOrEmpty(pagination.SortBy))
+                        queryParams.Add($"sortBy={Uri.EscapeDataString(pagination.SortBy)}");
+                    queryParams.Add($"ascending={pagination.Ascending}");
+                    if (pagination.FromDate.HasValue)
+                        queryParams.Add($"fromDate={pagination.FromDate.Value:yyyy-MM-dd}");
+                    if (pagination.ToDate.HasValue)
+                        queryParams.Add($"toDate={pagination.ToDate.Value:yyyy-MM-dd}");
+                    if (pagination.FilterStatus.HasValue)
+                        queryParams.Add($"filterStatus={pagination.FilterStatus.Value}");
+                    if (pagination.FilterType.HasValue)
+                        queryParams.Add($"filterType={pagination.FilterType.Value}");
+                    if (!string.IsNullOrEmpty(pagination.Department))
+                        queryParams.Add($"department={Uri.EscapeDataString(pagination.Department)}");
+                }
+
+                if (queryParams.Count > 0)
+                    endpoint += "?" + string.Join("&", queryParams);
+
+                var response = await GetAsync<ApiResponse<PaginatedResult<RequestResponseDto>>>(endpoint, queueIfUnavailable);
+                return response ?? new ApiResponse<PaginatedResult<RequestResponseDto>> { Success = false, Message = "Failed to get requests for approval" };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error getting requests for approval: {Message}", ex.Message);
                 return new ApiResponse<PaginatedResult<RequestResponseDto>> { Success = false, Message = ex.Message };
             }
         }
@@ -1370,6 +1463,31 @@ namespace TDFMAUI.Services
                 _logger?.LogError(ex, "Error getting leave types: {Message}", ex.Message);
                 return new List<LookupItem>();
             }
+        }
+
+        private async Task<T> ProcessResponseAsync<T>(HttpResponseMessage response, string endpoint)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorResponse = JsonSerializer.Deserialize<ApiResponseBase<T>>(content, _jsonOptions);
+                if (errorResponse?.ValidationErrors != null)
+                {
+                    var validationErrors = errorResponse.ValidationErrors.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => new[] { kvp.Value }
+                    );
+                    throw new ApiException(response.StatusCode, errorResponse.ErrorMessage ?? "Unknown error", validationErrors, content);
+                }
+                throw new ApiException(response.StatusCode, errorResponse?.ErrorMessage ?? $"Error calling {endpoint}: {response.StatusCode}", content);
+            }
+
+            var result = JsonSerializer.Deserialize<T>(content, _jsonOptions);
+            if (result == null)
+            {
+                throw new ApiException(response.StatusCode, $"Failed to deserialize response from {endpoint}", content);
+            }
+            return result;
         }
     }
     #endregion

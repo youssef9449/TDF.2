@@ -5,6 +5,8 @@ using TDFShared.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TDFShared.Validation.Results;
+using System.Threading.Tasks;
 
 namespace TDFShared.Validation
 {
@@ -35,25 +37,33 @@ namespace TDFShared.Validation
         /// <typeparam name="T">The type of object to validate.</typeparam>
         /// <param name="obj">The object to validate.</param>
         /// <returns>A ValidationResult containing the validation status and any error messages.</returns>
-        public ValidationResult<T> ValidateObject<T>(T obj) where T : class
+        public ObjectValidationResult<T> ValidateObject<T>(T obj) where T : class
         {
             if (obj == null)
-                return ValidationResult<T>.Failure("Object cannot be null");
+            {
+                var nullResult = new ObjectValidationResult<T>();
+                nullResult.IsValid = false;
+                nullResult.Errors.Add("Object cannot be null");
+                return nullResult;
+            }
 
-            var validationResults = new List<ValidationResult>();
+            var validationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
             var validationContext = new ValidationContext(obj);
 
             bool isValid = Validator.TryValidateObject(obj, validationContext, validationResults, true);
 
             if (isValid)
-                return ValidationResult<T>.Success(obj);
+                return ObjectValidationResult<T>.Success(obj);
 
             var errors = validationResults
                 .Where(vr => !string.IsNullOrEmpty(vr.ErrorMessage))
                 .Select(vr => vr.ErrorMessage!)
                 .ToList();
 
-            return ValidationResult<T>.Failure(errors);
+            var errorResult = new ObjectValidationResult<T>();
+            errorResult.IsValid = false;
+            errorResult.Errors.AddRange(errors);
+            return errorResult;
         }
 
         /// <summary>
@@ -61,13 +71,13 @@ namespace TDFShared.Validation
         /// </summary>
         /// <typeparam name="T">The type of object to validate.</typeparam>
         /// <param name="obj">The object to validate.</param>
-        /// <exception cref="ValidationException">Thrown when validation fails.</exception>
+        /// <exception cref="TDFShared.Exceptions.ValidationException">Thrown when validation fails.</exception>
         public void ValidateAndThrow<T>(T obj) where T : class
         {
             var result = ValidateObject(obj);
             if (!result.IsValid)
             {
-                throw new System.ComponentModel.DataAnnotations.ValidationException(string.Join("; ", result.Errors));
+                throw new TDFShared.Exceptions.ValidationException(string.Join("; ", result.Errors));
             }
         }
 
@@ -86,7 +96,7 @@ namespace TDFShared.Validation
                 MemberName = propertyName
             };
 
-            var validationResults = new List<ValidationResult>();
+            var validationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
 
             // Get validation attributes for the property
             var property = objectType.GetProperty(propertyName);
@@ -188,178 +198,239 @@ namespace TDFShared.Validation
             var errors = new List<string>();
 
             // Use the same logic as FutureDateAttribute for consistency
-            if (startDate.Date < DateTime.Today.AddDays(minDaysFromNow))
+            var minDate = DateTime.Today.AddDays(minDaysFromNow);
+            if (startDate.Date < minDate)
             {
-                var message = minDaysFromNow > 0
-                    ? $"{fieldName} must be at least {minDaysFromNow} day(s) from today."
-                    : $"{fieldName} cannot be in the past.";
-                errors.Add(message);
+                errors.Add($"{fieldName} must be at least {minDaysFromNow} days from today.");
             }
 
-            // Validate end date is after start date
-            if (endDate.HasValue && endDate.Value.Date < startDate.Date)
+            if (endDate.HasValue)
             {
-                errors.Add("End date must be on or after the start date.");
+                if (endDate.Value.Date < startDate.Date)
+                {
+                    errors.Add($"{fieldName} end date must be after start date.");
+                }
             }
 
             return errors;
         }
 
         /// <summary>
-        /// Validates a password for strength and security requirements.
+        /// Validates a password against security requirements.
         /// </summary>
         /// <param name="password">The password to validate.</param>
         /// <returns>A PasswordValidationResult containing validation status, errors, and strength assessment.</returns>
         public PasswordValidationResult ValidatePassword(string? password)
         {
+            var result = new PasswordValidationResult();
+
             if (string.IsNullOrEmpty(password))
             {
-                return new PasswordValidationResult
-                {
-                    IsValid = false,
-                    Errors = new List<string> { "Password is required." },
-                    Strength = PasswordStrength.VeryWeak
-                };
+                result.IsValid = false;
+                result.Errors.Add("Password is required.");
+                result.Strength = PasswordStrength.VeryWeak;
+                result.StrengthMessage = "Password is empty.";
+                return result;
             }
 
-            // Use the security service for password validation
-            bool isStrong = _securityService.IsPasswordStrong(password, out string validationMessage);
-
-            var result = new PasswordValidationResult
+            // Basic requirements
+            var meetsBasicRequirements = true;
+            if (password.Length < 8)
             {
-                IsValid = isStrong,
-                StrengthMessage = validationMessage
-            };
+                result.Errors.Add("Password must be at least 8 characters long.");
+                meetsBasicRequirements = false;
+            }
 
-            if (!isStrong)
+            if (!password.Any(char.IsUpper))
             {
-                result.Errors.Add(validationMessage);
+                result.Errors.Add("Password must contain at least one uppercase letter.");
+                meetsBasicRequirements = false;
+            }
+
+            if (!password.Any(char.IsLower))
+            {
+                result.Errors.Add("Password must contain at least one lowercase letter.");
+                meetsBasicRequirements = false;
+            }
+
+            if (!password.Any(char.IsDigit))
+            {
+                result.Errors.Add("Password must contain at least one number.");
+                meetsBasicRequirements = false;
+            }
+
+            if (!password.Any(c => !char.IsLetterOrDigit(c)))
+            {
+                result.Errors.Add("Password must contain at least one special character.");
+                meetsBasicRequirements = false;
             }
 
             // Calculate password strength
-            result.Strength = CalculatePasswordStrength(password);
+            result.Strength = CalculatePasswordStrength(password, meetsBasicRequirements);
+            result.StrengthMessage = GetStrengthMessage(result.Strength);
+            result.IsValid = meetsBasicRequirements;
 
             return result;
         }
 
-        private PasswordStrength CalculatePasswordStrength(string password)
+        private PasswordStrength CalculatePasswordStrength(string password, bool meetsBasicRequirements)
         {
-            if (string.IsNullOrEmpty(password))
+            if (!meetsBasicRequirements)
                 return PasswordStrength.VeryWeak;
 
-            int score = 0;
+            var score = 0;
 
-            // Length scoring
-            if (password.Length >= 8) score++;
-            if (password.Length >= 12) score++;
-            if (password.Length >= 16) score++;
+            // Length contribution
+            if (password.Length >= 12) score += 2;
+            else if (password.Length >= 10) score += 1;
 
-            // Character variety scoring
-            if (password.Any(char.IsLower)) score++;
-            if (password.Any(char.IsUpper)) score++;
-            if (password.Any(char.IsDigit)) score++;
-            if (password.Any(c => !char.IsLetterOrDigit(c))) score++;
+            // Character variety contribution
+            if (password.Any(char.IsUpper) && password.Any(char.IsLower)) score += 1;
+            if (password.Any(char.IsDigit)) score += 1;
+            if (password.Any(c => !char.IsLetterOrDigit(c))) score += 1;
 
-            // Pattern complexity
-            if (HasNoRepeatingPatterns(password)) score++;
+            // Complexity contribution
+            if (HasNoRepeatingPatterns(password)) score += 1;
 
             return score switch
             {
-                0 or 1 => PasswordStrength.VeryWeak,
-                2 or 3 => PasswordStrength.Weak,
-                4 or 5 => PasswordStrength.Fair,
-                6 or 7 => PasswordStrength.Good,
-                8 => PasswordStrength.Strong,
+                0 => PasswordStrength.VeryWeak,
+                1 => PasswordStrength.Weak,
+                2 => PasswordStrength.Fair,
+                3 => PasswordStrength.Good,
+                4 => PasswordStrength.Strong,
                 _ => PasswordStrength.VeryStrong
             };
         }
 
         private static bool HasNoRepeatingPatterns(string password)
         {
-            // Check for simple repeating patterns
+            // Check for repeating characters
             for (int i = 0; i < password.Length - 2; i++)
             {
-                if (password[i] == password[i + 1] && password[i + 1] == password[i + 2])
-                {
-                    return false; // Found 3 consecutive identical characters
-                }
+                if (password[i] == password[i + 1] && password[i] == password[i + 2])
+                    return false;
             }
 
-            // Check for sequential patterns (abc, 123, etc.)
-            for (int i = 0; i < password.Length - 2; i++)
+            // Check for common patterns
+            var commonPatterns = new[]
             {
-                if (password[i] + 1 == password[i + 1] && password[i + 1] + 1 == password[i + 2])
-                {
-                    return false; // Found ascending sequence
-                }
-                if (password[i] - 1 == password[i + 1] && password[i + 1] - 1 == password[i + 2])
-                {
-                    return false; // Found descending sequence
-                }
-            }
+                "123", "abc", "qwerty", "password", "admin"
+            };
 
-            return true;
+            return !commonPatterns.Any(pattern => 
+                password.ToLower().Contains(pattern));
+        }
+
+        private static string GetStrengthMessage(PasswordStrength strength) => strength switch
+        {
+            PasswordStrength.VeryWeak => "Password is very weak and does not meet basic requirements.",
+            PasswordStrength.Weak => "Password is weak and should be strengthened.",
+            PasswordStrength.Fair => "Password meets basic requirements but could be stronger.",
+            PasswordStrength.Good => "Password is good and meets most security requirements.",
+            PasswordStrength.Strong => "Password is strong and meets all security requirements.",
+            PasswordStrength.VeryStrong => "Password is very strong and exceeds security requirements.",
+            _ => "Unknown password strength."
+        };
+
+        /// <summary>
+        /// Validates a password against security requirements and throws a ValidationException if validation fails.
+        /// </summary>
+        /// <param name="password">The password to validate.</param>
+        /// <exception cref="TDFShared.Exceptions.ValidationException">Thrown when validation fails.</exception>
+        public void ValidatePasswordAndThrow(string? password)
+        {
+            var result = ValidatePassword(password);
+            if (!result.IsValid)
+            {
+                throw new TDFShared.Exceptions.ValidationException(string.Join("; ", result.Errors));
+            }
         }
 
         /// <summary>
-        /// Sanitizes input string by removing potentially dangerous content.
+        /// Validates a password against security requirements asynchronously.
         /// </summary>
-        /// <param name="input">The input string to sanitize.</param>
-        /// <param name="allowHtml">Whether to allow HTML content in the output.</param>
-        /// <returns>A sanitized version of the input string.</returns>
+        /// <param name="password">The password to validate.</param>
+        /// <returns>A task that represents the asynchronous validation operation.</returns>
+        public async Task<PasswordValidationResult> ValidatePasswordAsync(string? password)
+        {
+            // For now, we'll just call the synchronous method
+            // In the future, this could be made truly asynchronous if needed
+            return await Task.FromResult(ValidatePassword(password));
+        }
+
+        /// <summary>
+        /// Validates a password against security requirements asynchronously and throws a ValidationException if validation fails.
+        /// </summary>
+        /// <param name="password">The password to validate.</param>
+        /// <exception cref="TDFShared.Exceptions.ValidationException">Thrown when validation fails.</exception>
+        public async Task ValidatePasswordAndThrowAsync(string? password)
+        {
+            var result = await ValidatePasswordAsync(password);
+            if (!result.IsValid)
+            {
+                throw new TDFShared.Exceptions.ValidationException(string.Join("; ", result.Errors));
+            }
+        }
+
+        /// <summary>
+        /// Sanitizes input to prevent common injection attacks
+        /// </summary>
+        /// <param name="input">Input string to sanitize</param>
+        /// <param name="allowHtml">Whether to allow HTML tags</param>
+        /// <returns>Sanitized string</returns>
         public string SanitizeInput(string? input, bool allowHtml = false)
         {
             if (string.IsNullOrEmpty(input))
                 return string.Empty;
 
-            var sanitized = input.Trim();
+            // Remove potentially dangerous characters
+            var sanitized = input.Replace("<", "&lt;")
+                               .Replace(">", "&gt;")
+                               .Replace("\"", "&quot;")
+                               .Replace("'", "&#x27;")
+                               .Replace("&", "&amp;");
 
-            if (!allowHtml)
+            if (allowHtml)
             {
-                // Remove HTML tags
-                sanitized = Regex.Replace(sanitized, @"<[^>]*>", string.Empty);
+                // Allow specific HTML tags if requested
+                sanitized = sanitized.Replace("&lt;b&gt;", "<b>")
+                                   .Replace("&lt;/b&gt;", "</b>")
+                                   .Replace("&lt;i&gt;", "<i>")
+                                   .Replace("&lt;/i&gt;", "</i>")
+                                   .Replace("&lt;u&gt;", "<u>")
+                                   .Replace("&lt;/u&gt;", "</u>")
+                                   .Replace("&lt;p&gt;", "<p>")
+                                   .Replace("&lt;/p&gt;", "</p>")
+                                   .Replace("&lt;br&gt;", "<br>");
             }
-
-            // Remove potentially dangerous characters for SQL injection
-            sanitized = sanitized.Replace("'", "''"); // Escape single quotes
-            sanitized = Regex.Replace(sanitized, @"--.*$", string.Empty, RegexOptions.Multiline); // Remove SQL comments
-            sanitized = Regex.Replace(sanitized, @"/\*.*?\*/", string.Empty, RegexOptions.Singleline); // Remove SQL block comments
-
-            // Remove script injection attempts
-            sanitized = Regex.Replace(sanitized, @"<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>", string.Empty, RegexOptions.IgnoreCase);
-            sanitized = Regex.Replace(sanitized, @"javascript:", string.Empty, RegexOptions.IgnoreCase);
-            sanitized = Regex.Replace(sanitized, @"vbscript:", string.Empty, RegexOptions.IgnoreCase);
-            sanitized = Regex.Replace(sanitized, @"onload", string.Empty, RegexOptions.IgnoreCase);
-            sanitized = Regex.Replace(sanitized, @"onerror", string.Empty, RegexOptions.IgnoreCase);
 
             return sanitized;
         }
 
         /// <summary>
-        /// Checks if a string contains potentially dangerous patterns.
+        /// Checks if a string contains potentially dangerous patterns
         /// </summary>
-        /// <param name="input">The input string to check.</param>
-        /// <returns>True if dangerous patterns are found, false otherwise.</returns>
+        /// <param name="input">Input to check</param>
+        /// <returns>True if dangerous patterns are detected</returns>
         public bool ContainsDangerousPatterns(string? input)
         {
             if (string.IsNullOrEmpty(input))
                 return false;
 
-            var dangerousPatterns = new[]
+            // Check for SQL injection patterns
+            var sqlPatterns = new[]
             {
-                @"<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>", // Script tags
-                @"javascript:", // JavaScript protocol
-                @"vbscript:", // VBScript protocol
-                @"data:text/html", // Data URLs with HTML
-                @"(?:'|--|\b(select|union|insert|drop|alter|declare|xp_)\b)", // SQL injection patterns
-                @"(\b(exec|execute|sp_|xp_)\b)", // SQL stored procedure calls
-                @"(\b(cmd|command|shell|system)\b)", // Command injection patterns
-                @"(\.\./|\.\.\\)", // Directory traversal
-                @"(%2e%2e%2f|%2e%2e%5c)", // URL encoded directory traversal
+                "SELECT", "INSERT", "UPDATE", "DELETE", "DROP", "UNION",
+                "--", "/*", "*/", "EXEC", "EXECUTE", "DECLARE"
             };
 
-            return dangerousPatterns.Any(pattern =>
-                Regex.IsMatch(input, pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled));
+            var upperInput = input.ToUpper();
+            return sqlPatterns.Any(pattern => upperInput.Contains(pattern)) ||
+                   input.Contains("'") ||
+                   input.Contains("\"") ||
+                   input.Contains(";") ||
+                   input.Contains("--");
         }
     }
 }

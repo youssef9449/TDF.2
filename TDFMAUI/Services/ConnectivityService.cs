@@ -1,4 +1,9 @@
 using Microsoft.Extensions.Logging;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using TDFMAUI.Config;
+using TDFShared.Models;
 using TDFShared.Services;
 
 namespace TDFMAUI.Services
@@ -11,6 +16,9 @@ namespace TDFMAUI.Services
     {
         private readonly IConnectivity _connectivity;
         private bool _isInitialized = false;
+
+        // Event for network connectivity changes
+        public event EventHandler<TDFConnectivityChangedEventArgs> NetworkStatusChanged;
 
         /// <summary>
         /// Constructor with dependency injection
@@ -51,7 +59,8 @@ namespace TDFMAUI.Services
                     return base.IsConnected();
                 }
 
-                var isConnected = _connectivity.NetworkAccess == NetworkAccess.Internet;
+                var isConnected = _connectivity.NetworkAccess == NetworkAccess.Internet ||
+                                 _connectivity.NetworkAccess == NetworkAccess.ConstrainedInternet;
                 _logger.LogDebug("MAUI platform connectivity check: {IsConnected}", isConnected);
                 return isConnected;
             }
@@ -223,7 +232,8 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var isConnected = _connectivity.NetworkAccess == NetworkAccess.Internet;
+                var isConnected = _connectivity.NetworkAccess == NetworkAccess.Internet ||
+                                 _connectivity.NetworkAccess == NetworkAccess.ConstrainedInternet;
                 var connectionType = GetConnectionType();
                 var profiles = _connectivity.ConnectionProfiles.Select(p => p.ToString()).ToArray();
 
@@ -302,6 +312,8 @@ namespace TDFMAUI.Services
                 return "Cellular";
             if (profiles.Contains(ConnectionProfile.Ethernet))
                 return "Ethernet";
+            if (profiles.Contains(ConnectionProfile.Bluetooth))
+                return "Bluetooth";
 
             return "Unknown";
         }

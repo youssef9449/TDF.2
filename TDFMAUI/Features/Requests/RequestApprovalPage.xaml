@@ -138,9 +138,9 @@
                                 <Label Grid.Column="1" Text="{Binding LeaveType}" VerticalOptions="Center"/>
                                 <Label Grid.Column="2" Text="{Binding RequestStartDate, StringFormat='{0:d}'}" VerticalOptions="Center"/>
                                 <Label Grid.Column="3" Text="{Binding Status}" VerticalOptions="Center" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}"/>
-                                <Button Grid.Column="4" Text="Approve" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ApproveCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
-                                <Button Grid.Column="5" Text="Reject" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=RejectCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
-                                <Button Grid.Column="6" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ViewCommand}" CommandParameter="{Binding RequestID}"/>
+                                <Button Grid.Column="4" Text="Approve" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ApproveRequestCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
+                                <Button Grid.Column="5" Text="Reject" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=RejectRequestCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
+                                <Button Grid.Column="6" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding RequestID}"/>
                             </Grid>
 
                             <!-- Mobile View -->
@@ -150,9 +150,9 @@
                                 <Label Text="{Binding RequestStartDate, StringFormat='From: {0:d}'}"/>
                                 <Label Text="{Binding Status}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}"/>
                                 <HorizontalStackLayout Spacing="5" Margin="0,5,0,0">
-                                    <Button Text="Approve" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ApproveCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
-                                    <Button Text="Reject" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=RejectCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
-                                    <Button Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ViewCommand}" CommandParameter="{Binding RequestID}"/>
+                                    <Button Text="Approve" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ApproveRequestCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
+                                    <Button Text="Reject" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=RejectRequestCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
+                                    <Button Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding RequestID}"/>
                                 </HorizontalStackLayout>
                             </StackLayout>
                         </Grid>

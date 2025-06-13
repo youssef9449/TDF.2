@@ -8,8 +8,7 @@ using System.Net.Http;
 using System;
 using TDFShared.DTOs.Messages;
 using TDFMAUI.Helpers;
-using System.Drawing;
-using Color = System.Drawing.Color;
+using Color = Microsoft.Maui.Graphics.Color;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -27,26 +26,27 @@ namespace TDFMAUI.ViewModels
         private string _newMessageText;
 
         [ObservableProperty]
-        private Color senderStatusColor = Color.Gray; // Default gray
+        private Color senderStatusColor = Application.Current.Resources.TryGetValue("TextSecondaryColor", out var resourceValue) && resourceValue is Color colorValue ? colorValue : Colors.Gray;
 
         [ObservableProperty]
         private bool showSenderStatus;
 
         [ObservableProperty]
-        private string senderName;
+        private string senderName = string.Empty;
 
         [ObservableProperty]
-        ObservableCollection<ChatMessageDto> messages;
+        ObservableCollection<ChatMessageDto> messages = new ObservableCollection<ChatMessageDto>();
 
         [ObservableProperty]
-        ChatMessageDto selectedMessage;
+        ChatMessageDto? selectedMessage;
 
-        public MessagesViewModel(ApiService apiService = null, ILogger<MessagesViewModel> logger = null)
+        public MessagesViewModel(ApiService? apiService = null, ILogger<MessagesViewModel>? logger = null)
         {
+            _newMessageText = string.Empty;
             if (apiService == null)
             {
                 // Use App.Current.Services to get the ApiService
-                _apiService = App.Current.Handler.MauiContext.Services.GetService<ApiService>();
+                _apiService = App.Current?.Handler?.MauiContext?.Services?.GetService<ApiService>();
                 if (_apiService == null)
                 {
                     throw new InvalidOperationException("ApiService could not be resolved from dependency injection.");

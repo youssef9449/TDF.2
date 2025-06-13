@@ -207,65 +207,37 @@ namespace TDFMAUI.Helpers
                 var mergedDictionaries = Application.Current.Resources.MergedDictionaries;
                 
                 // Find the theme dictionaries
-                var lightDict = mergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString?.Contains("Colors.Light.xaml") == true);
-                var darkDict = mergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString?.Contains("Colors.Dark.xaml") == true);
+                var colorsDict = mergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString?.Contains("Colors.xaml") == true && !d.Source?.OriginalString?.Contains("Colors.Light.xaml") == true && !d.Source?.OriginalString?.Contains("Colors.Dark.xaml") == true);
                 var platformDict = mergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString?.Contains("PlatformColors.xaml") == true);
                 var stylesDict = mergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString?.Contains("Styles.xaml") == true);
                 
-                // Load light theme resources
-                if (lightDict != null)
+                // Load theme resources from Colors.xaml (which now uses AppThemeBinding)
+                if (colorsDict != null)
                 {
-                    foreach (var key in lightDict.Keys)
+                    foreach (var key in colorsDict.Keys)
                     {
-                        if (key is string stringKey && lightDict[key] != null)
+                        if (key is string stringKey && colorsDict[key] != null)
                         {
-                            _lightThemeResources[stringKey] = lightDict[key];
+                            // Since Colors.xaml now uses AppThemeBinding, the resources will automatically adapt
+                            _lightThemeResources[stringKey] = colorsDict[key];
+                            _darkThemeResources[stringKey] = colorsDict[key];
                         }
                     }
                 }
                 else
                 {
-                    // Fallback light theme resources if dictionary not found
+                    // Fallback theme resources if dictionary not found
                     _lightThemeResources["BackgroundColor"] = Colors.White;
-                    _lightThemeResources["ForegroundColor"] = Colors.Black;
-                    _lightThemeResources["PrimaryColor"] = Color.FromArgb("#FF0078D7");
-                    _lightThemeResources["SecondaryColor"] = Color.FromArgb("#FF6C757D");
-                    _lightThemeResources["AccentColor"] = Color.FromArgb("#FF0078D7");
-                    _lightThemeResources["SurfaceColor"] = Color.FromArgb("#FFF8F9FA");
-                    _lightThemeResources["CardColor"] = Colors.White;
-                    _lightThemeResources["BorderColor"] = Color.FromArgb("#FFCED4DA");
                     _lightThemeResources["TextColor"] = Colors.Black;
+                    _lightThemeResources["Primary"] = Color.FromArgb("#FF0078D7");
+                    _lightThemeResources["SurfaceColor"] = Color.FromArgb("#FFF8F9FA");
                     _lightThemeResources["TextSecondaryColor"] = Color.FromArgb("#FF6C757D");
-                    _lightThemeResources["TextTertiaryColor"] = Color.FromArgb("#FF8A8A8A");
-                    _lightThemeResources["DividerColor"] = Color.FromArgb("#FFE0E0E0");
-                }
-                
-                // Load dark theme resources
-                if (darkDict != null)
-                {
-                    foreach (var key in darkDict.Keys)
-                    {
-                        if (key is string stringKey && darkDict[key] != null)
-                        {
-                            _darkThemeResources[stringKey] = darkDict[key];
-                        }
-                    }
-                }
-                else
-                {
-                    // Fallback dark theme resources if dictionary not found
+                    
                     _darkThemeResources["BackgroundColor"] = Color.FromArgb("#FF121212");
-                    _darkThemeResources["ForegroundColor"] = Colors.White;
-                    _darkThemeResources["PrimaryColor"] = Color.FromArgb("#FF0078D7");
-                    _darkThemeResources["SecondaryColor"] = Color.FromArgb("#FF6C757D");
-                    _darkThemeResources["AccentColor"] = Color.FromArgb("#FF0078D7");
-                    _darkThemeResources["SurfaceColor"] = Color.FromArgb("#FF1E1E1E");
-                    _darkThemeResources["CardColor"] = Color.FromArgb("#FF2D2D2D");
-                    _darkThemeResources["BorderColor"] = Color.FromArgb("#FF444444");
                     _darkThemeResources["TextColor"] = Colors.White;
+                    _darkThemeResources["Primary"] = Color.FromArgb("#FF0078D7");
+                    _darkThemeResources["SurfaceColor"] = Color.FromArgb("#FF1E1E1E");
                     _darkThemeResources["TextSecondaryColor"] = Color.FromArgb("#FFB0B0B0");
-                    _darkThemeResources["TextTertiaryColor"] = Color.FromArgb("#FF8A8A8A");
-                    _darkThemeResources["DividerColor"] = Color.FromArgb("#FF333333");
                 }
                 
                 // Load platform-specific resources
@@ -416,27 +388,12 @@ namespace TDFMAUI.Helpers
                 var mergedDictionaries = Application.Current.Resources.MergedDictionaries;
                 if (mergedDictionaries == null) return;
                 
-                // Find the theme dictionaries
-                var lightDict = mergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString?.Contains("Colors.Light.xaml") == true);
-                var darkDict = mergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString?.Contains("Colors.Dark.xaml") == true);
-                
-                // Get the appropriate theme resources
-                var themeResources = theme == AppTheme.Dark ? _darkThemeResources : _lightThemeResources;
-                
-                // Apply theme resources from the appropriate dictionary first
-                var sourceDict = theme == AppTheme.Dark ? darkDict : lightDict;
-                if (sourceDict != null)
-                {
-                    foreach (var key in sourceDict.Keys)
-                    {
-                        if (key is string stringKey)
-                        {
-                            Application.Current.Resources[stringKey] = sourceDict[key];
-                        }
-                    }
-                }
+                // Since we're using AppThemeBinding in Colors.xaml, the theme switching is automatic
+                // We just need to ensure the UserAppTheme is set correctly
+                // The AppThemeBinding will handle the color switching automatically
                 
                 // Apply our enhanced theme resources (these will override any conflicts)
+                var themeResources = theme == AppTheme.Dark ? _darkThemeResources : _lightThemeResources;
                 foreach (var key in themeResources.Keys)
                 {
                     Application.Current.Resources[key] = themeResources[key];

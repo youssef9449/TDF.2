@@ -277,6 +277,21 @@ namespace TDFMAUI.Helpers
         }
         
         /// <summary>
+        /// Gets the secondary text color based on current theme
+        /// </summary>
+        public static Color GetSecondaryTextColor()
+        {
+            try
+            {
+                return Application.Current?.Resources["TextSecondaryColor"] as Color ?? Colors.Gray;
+            }
+            catch
+            {
+                return Colors.Gray; // Default fallback
+            }
+        }
+        
+        /// <summary>
         /// Gets whether the device supports dark mode
         /// </summary>
         public static bool SupportsDarkMode
@@ -357,31 +372,23 @@ namespace TDFMAUI.Helpers
                     System.Diagnostics.Debug.WriteLine("Cannot update status: MauiContext or CurrentUser is null");
                     return;
                 }
+
+                // Validate user ID before proceeding
+                if (App.CurrentUser.UserID <= 0)
+                {
+                    System.Diagnostics.Debug.WriteLine($"DeviceHelper: Invalid user ID ({App.CurrentUser.UserID}), skipping status update");
+                    return;
+                }
                 
                 var userPresenceService = Application.Current.Handler.MauiContext.Services.GetService<IUserPresenceService>();
                 if (userPresenceService != null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"DeviceHelper: Setting user {App.CurrentUser.UserName} status to Offline on app exit");
+                    System.Diagnostics.Debug.WriteLine($"DeviceHelper: Setting user {App.CurrentUser.UserName} (ID: {App.CurrentUser.UserID}) status to Offline on app exit");
                     
-                    // Update status through the presence service
+                    // Update status through the presence service only
+                    // The presence service will handle the API call internally
                     await userPresenceService.UpdateStatusAsync(TDFShared.Enums.UserPresenceStatus.Offline, "");
-                    
-                    // Also make a direct API call to ensure the database is updated
-                    var apiService = Application.Current.Handler.MauiContext.Services.GetService<Services.ApiService>();
-                    if (apiService != null)
-                    {
-                        try
-                        {
-                            var updateData = new { isConnected = false };
-                            // Use the Users.Base route with the connection endpoint
-                            await apiService.PutAsync<object, object>($"{ApiRoutes.Users.Base}/{App.CurrentUser.UserID}/connection", updateData);
-                            System.Diagnostics.Debug.WriteLine("DeviceHelper: Successfully updated user connection status in database");
-                        }
-                        catch (Exception apiEx)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"DeviceHelper: Error updating user connection status in database: {apiEx.Message}");
-                        }
-                    }
+                    System.Diagnostics.Debug.WriteLine("DeviceHelper: Successfully updated user status to Offline");
                 }
                 else
                 {
@@ -696,4 +703,4 @@ namespace TDFMAUI.Helpers
             }
         }*/
     }
-} 
+}

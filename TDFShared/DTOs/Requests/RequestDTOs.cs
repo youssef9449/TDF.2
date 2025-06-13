@@ -230,5 +230,22 @@ namespace TDFShared.DTOs.Requests
         /// <summary>Row version for concurrency</summary>
         [JsonPropertyName("rowVersion")]
         public byte[]? RowVersion { get; set; }
+
+        // Client-side computed properties for UI permissions
+        /// <summary>Whether the current user can approve this request</summary>
+        [JsonIgnore]
+        public bool CanApprove { get; set; }
+
+        /// <summary>Whether the current user can reject this request</summary>
+        [JsonIgnore]
+        public bool CanReject { get; set; }
+
+        /// <summary>Whether the current user can edit this request</summary>
+        [JsonIgnore]
+        public bool CanEdit { get; set; }
+
+        /// <summary>Whether the current user can delete this request</summary>
+        [JsonIgnore]
+        public bool CanDelete { get; set; }
     }
 }

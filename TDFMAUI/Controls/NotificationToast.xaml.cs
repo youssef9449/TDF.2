@@ -24,7 +24,7 @@ namespace TDFMAUI.Controls
             BindableProperty.Create(nameof(TitleColor), typeof(Color), typeof(NotificationToast), Colors.Black);
 
         public static readonly BindableProperty CloseButtonColorProperty =
-            BindableProperty.Create(nameof(CloseButtonColor), typeof(Color), typeof(NotificationToast), Colors.DarkGray);
+            BindableProperty.Create(nameof(CloseButtonColor), typeof(Color), typeof(NotificationToast), Application.Current?.Resources["TextSecondaryColor"] as Color ?? Colors.DarkGray);
 
         public static readonly BindableProperty IconSourceProperty =
             BindableProperty.Create(nameof(IconSource), typeof(ImageSource), typeof(NotificationToast));

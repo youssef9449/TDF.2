@@ -134,7 +134,7 @@
                                                     Padding="8,4"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=ApproveRequestCommand}"
                                                     CommandParameter="{Binding .}"
-                                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanApproveRejectRequest, Converter={StaticResource CanApproveRejectConverter}}"
+                                                    IsVisible="{Binding CanApprove}"
                                                     />
 
                                             <Button Text="Reject"
@@ -142,7 +142,7 @@
                                                     Padding="8,4"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=RejectRequestCommand}"
                                                     CommandParameter="{Binding .}"
-                                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanApproveRejectRequest, Converter={StaticResource CanApproveRejectConverter}}"
+                                                    IsVisible="{Binding CanReject}"
                                                     />
 
                                             <Button Text="Edit"
@@ -150,7 +150,7 @@
                                                     Padding="8,4"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=EditRequestCommand}"
                                                     CommandParameter="{Binding .}"
-                                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanEditDeleteRequest, Converter={StaticResource CanEditDeleteConverter}}"
+                                                    IsVisible="{Binding CanEdit}"
                                                     />
 
                                             <Button Text="Delete"
@@ -158,7 +158,7 @@
                                                     Padding="8,4"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=DeleteRequestCommand}"
                                                     CommandParameter="{Binding .}"
-                                                    IsVisible="{Binding Source={RelativeSource AncestorType={x:Type viewModels:RequestsViewModel}}, Path=CanEditDeleteRequest, Converter={StaticResource CanEditDeleteConverter}}"
+                                                    IsVisible="{Binding CanDelete}"
                                                     />
                                         </HorizontalStackLayout>
                                     </VerticalStackLayout>

@@ -190,7 +190,7 @@ public partial class GlobalChatPage : ContentPage
             {
                 Text = timestamp.ToString("HH:mm"),
                 FontSize = 12,
-                TextColor = Colors.Gray,
+                TextColor = Application.Current.Resources["TextSecondaryColor"] as Color ?? Colors.Gray,
                 HorizontalOptions = LayoutOptions.End
             };
 

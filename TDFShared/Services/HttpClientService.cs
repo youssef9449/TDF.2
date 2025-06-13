@@ -5,83 +5,164 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Linq;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Extensions.Http;
-using TDFShared.DTOs.Common;
+using Polly.CircuitBreaker;
+using TDFShared.Models;
 using TDFShared.Exceptions;
+using TDFShared.Validation;
+using TDFShared.Validation.Results;
 
 namespace TDFShared.Services
 {
     /// <summary>
+    /// Extension methods for Polly Context
+    /// </summary>
+    public static class PollyContextExtensions
+    {
+        /// <summary>
+        /// Adds a logger to the context
+        /// </summary>
+        /// <param name="context">The context</param>
+        /// <param name="logger">The logger</param>
+        /// <returns>The context with the logger</returns>
+        public static Context WithLogger(this Context context, ILogger logger)
+        {
+            context["logger"] = logger;
+            return context;
+        }
+
+        /// <summary>
+        /// Adds an endpoint to the context
+        /// </summary>
+        /// <param name="context">The context</param>
+        /// <param name="endpoint">The endpoint</param>
+        /// <returns>The context with the endpoint</returns>
+        public static Context WithEndpoint(this Context context, string endpoint)
+        {
+            context["endpoint"] = endpoint;
+            return context;
+        }
+    }
+
+    /// <summary>
     /// Shared HTTP client service with retry logic, error handling, and authentication
     /// Uses Polly for resilience patterns and provides comprehensive error handling
     /// </summary>
-    public class HttpClientService : IHttpClientService
+    public class HttpClientService : IHttpClientService, IDisposable
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<HttpClientService> _logger;
+        private readonly IConnectivityService _connectivityService;
+        private readonly IAuthService _authService;
+        private readonly SemaphoreSlim _semaphore = new(1, 1);
+        private readonly Dictionary<string, string> _defaultHeaders = new();
+        private readonly Dictionary<string, string> _defaultQueryParams = new();
         private readonly JsonSerializerOptions _jsonOptions;
+        private readonly IAsyncPolicy<HttpResponseMessage> _combinedPolicy;
+        private readonly IAsyncPolicy<HttpResponseMessage> _retryPolicy;
         private readonly HttpClientStatistics _statistics;
         private readonly object _statisticsLock = new object();
-        private readonly Dictionary<string, string> _defaultHeaders;
-        private readonly SemaphoreSlim _semaphore;
+        private bool _disposed;
+        private readonly ConnectivityInfo _connectivityInfo;
+        private int _timeoutSeconds = 30;
+        private readonly int _maxRetries = 3;
+        private readonly TimeSpan _initialRetryDelay = TimeSpan.FromSeconds(1);
 
-        // Configuration properties
+        /// <summary>
+        /// Gets the HttpClient instance
+        /// </summary>
+        public HttpClient HttpClient => _httpClient;
+
+        /// <summary>
+        /// Gets the current connectivity information
+        /// </summary>
+        public ConnectivityInfo ConnectivityInfo => _connectivityInfo;
+
+        /// <summary>
+        /// Gets or sets the base URL for all HTTP requests
+        /// </summary>
         public string BaseUrl { get; set; } = string.Empty;
         
-        private int _timeoutSeconds = 30;
+        /// <summary>
+        /// Gets or sets the timeout in seconds for HTTP requests
+        /// </summary>
         public int TimeoutSeconds 
         { 
             get => _timeoutSeconds;
             set 
             {
                 _timeoutSeconds = value;
-                if (_httpClient != null)
-                {
-                    _httpClient.Timeout = TimeSpan.FromSeconds(value);
-                }
+                _httpClient.Timeout = TimeSpan.FromSeconds(value);
             }
         }
         
-        public int MaxRetries { get; set; } = 3;
-        public TimeSpan InitialRetryDelay { get; set; } = TimeSpan.FromSeconds(1);
+        /// <summary>
+        /// Gets or sets the maximum number of retry attempts for failed requests
+        /// </summary>
+        public int MaxRetries => _maxRetries;
 
-        // Events
-        public event EventHandler<TokenRefreshEventArgs>? TokenRefreshRequired;
-        public event EventHandler<NetworkStatusEventArgs>? NetworkStatusChanged;
+        /// <summary>
+        /// Gets or sets the initial delay before the first retry attempt
+        /// </summary>
+        public TimeSpan InitialRetryDelay => _initialRetryDelay;
 
-        // Retry policy using Polly
-        private readonly IAsyncPolicy<HttpResponseMessage> _retryPolicy;
+        /// <summary>
+        /// Event raised when a token refresh is required
+        /// </summary>
+        public event EventHandler<TokenRefreshEventArgs>? TokenRefreshNeeded;
 
-        public HttpClientService(HttpClient httpClient, ILogger<HttpClientService> logger)
+        /// <summary>
+        /// Event raised when a token is refreshed
+        /// </summary>
+        public event EventHandler<TokenRefreshEventArgs>? TokenRefreshCompleted;
+
+        /// <summary>
+        /// Event raised when a token refresh fails
+        /// </summary>
+        public event EventHandler<TokenRefreshEventArgs>? TokenRefreshFailed;
+
+        /// <summary>
+        /// Initializes a new instance of the HttpClientService class
+        /// </summary>
+        /// <param name="httpClient">The HttpClient instance to use</param>
+        /// <param name="logger">The logger instance</param>
+        /// <param name="connectivityService">The connectivity service</param>
+        /// <param name="authService">The authentication service</param>
+        public HttpClientService(
+            HttpClient httpClient, 
+            ILogger<HttpClientService> logger,
+            IConnectivityService connectivityService,
+            IAuthService authService)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _connectivityService = connectivityService ?? throw new ArgumentNullException(nameof(connectivityService));
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
 
             _statistics = new HttpClientStatistics();
             _defaultHeaders = new Dictionary<string, string>();
-            _semaphore = new SemaphoreSlim(10, 10); // Limit concurrent requests
-
-            // Configure HttpClient timeout
-            _httpClient.Timeout = TimeSpan.FromSeconds(TimeoutSeconds);
+            _semaphore = new SemaphoreSlim(1, 1);
 
             // Use centralized JSON serialization options for consistency
-            _jsonOptions = TDFShared.Helpers.JsonSerializationHelper.CompactOptions;
+            _jsonOptions = TDFShared.Helpers.JsonSerializationHelper.DefaultOptions;
 
             // Configure retry policy with exponential backoff
-            _retryPolicy = Policy
-                .HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode && IsRetryableStatusCode(r.StatusCode))
+            _retryPolicy = Policy<HttpResponseMessage>
+                .HandleResult(r => !r.IsSuccessStatusCode && IsRetryableStatusCode(r.StatusCode))
                 .Or<HttpRequestException>()
                 .Or<TaskCanceledException>()
                 .Or<IOException>() // Handle IO exceptions that can occur during response reading
                 .WaitAndRetryAsync(
-                    retryCount: MaxRetries,
-                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)) + InitialRetryDelay,
+                    retryCount: _maxRetries,
+                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)) + _initialRetryDelay,
                     onRetry: (outcome, timespan, retryCount, context) =>
                     {
                         _logger.LogWarning("Retry attempt {RetryCount} for {Endpoint} in {Delay}ms",
@@ -93,10 +174,19 @@ namespace TDFShared.Services
                         }
                     });
 
+            // Use retry policy directly
+            _combinedPolicy = _retryPolicy;
+
             _logger.LogInformation("HttpClientService initialized with BaseUrl: {BaseUrl}, Timeout: {Timeout}s, MaxRetries: {MaxRetries}",
                 BaseUrl, TimeoutSeconds, MaxRetries);
+
+            _connectivityInfo = new ConnectivityInfo();
         }
 
+        /// <summary>
+        /// Sets the authentication token for subsequent requests
+        /// </summary>
+        /// <param name="token">The authentication token</param>
         public async Task SetAuthenticationTokenAsync(string token)
         {
             _logger?.LogInformation("HttpClientService: Setting Authorization header with token of length {Length}", token?.Length ?? 0);
@@ -104,6 +194,9 @@ namespace TDFShared.Services
             await Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Clears the authentication token from subsequent requests
+        /// </summary>
         public async Task ClearAuthenticationTokenAsync()
         {
             _httpClient.DefaultRequestHeaders.Authorization = null;
@@ -111,579 +204,604 @@ namespace TDFShared.Services
             await Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Sends a GET request and deserializes the response
+        /// </summary>
+        /// <typeparam name="T">The type to deserialize the response to</typeparam>
+        /// <param name="endpoint">The endpoint to send the request to</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The deserialized response</returns>
         public async Task<T> GetAsync<T>(string endpoint, CancellationToken cancellationToken = default)
         {
             return await ExecuteWithRetryAsync(async () =>
             {
-                var response = await _httpClient.GetAsync(BuildUrl(endpoint), cancellationToken);
-                return await ProcessResponseAsync<T>(response, endpoint);
+                var url = BuildUrl(endpoint);
+                _logger.LogDebug("Sending GET request to {Url}", url);
+
+                var response = await _httpClient.GetAsync(url, cancellationToken);
+                return await ProcessResponseAsync<T>(response, endpoint, cancellationToken);
             }, endpoint);
         }
 
+        /// <summary>
+        /// Sends a GET request and returns the raw response string
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request to</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The raw response string</returns>
         public async Task<string> GetRawAsync(string endpoint, CancellationToken cancellationToken = default)
         {
             return await ExecuteWithRetryAsync(async () =>
             {
-                var response = await _httpClient.GetAsync(BuildUrl(endpoint), cancellationToken);
-                await EnsureSuccessStatusCodeAsync(response, endpoint);
-                
-                try
-                {
-                    return await response.Content.ReadAsStringAsync();
-                }
-                catch (IOException ioEx)
-                {
-                    _logger.LogError(ioEx, "IO error reading raw response content from {Endpoint}: {Message}", endpoint, ioEx.Message);
-                    throw new ApiException($"Failed to read response from {endpoint}: Connection was closed unexpectedly", ioEx);
-                }
+                var url = BuildUrl(endpoint);
+                _logger.LogDebug("Sending GET request to {Url}", url);
+
+                var response = await _httpClient.GetAsync(url, cancellationToken);
+                await EnsureSuccessStatusCodeAsync(response, endpoint, cancellationToken);
+                return await response.Content.ReadAsStringAsync(cancellationToken);
             }, endpoint);
         }
 
+        /// <summary>
+        /// Sends a POST request with data and deserializes the response
+        /// </summary>
+        /// <typeparam name="TRequest">The type of data to send</typeparam>
+        /// <typeparam name="TResponse">The type to deserialize the response to</typeparam>
+        /// <param name="endpoint">The endpoint to send the request to</param>
+        /// <param name="data">The data to send</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The deserialized response</returns>
         public async Task<TResponse> PostAsync<TRequest, TResponse>(string endpoint, TRequest data, CancellationToken cancellationToken = default)
         {
             return await ExecuteWithRetryAsync(async () =>
             {
-                var json = JsonSerializer.Serialize(data, _jsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-                
-                _logger.LogDebug("Sending POST request to {Endpoint} with content length {ContentLength}", endpoint, json.Length);
-                var response = await _httpClient.PostAsync(BuildUrl(endpoint), content, cancellationToken);
-                _logger.LogDebug("Received response from {Endpoint} with status {StatusCode}", endpoint, response.StatusCode);
-                
-                return await ProcessResponseAsync<TResponse>(response, endpoint);
+                var url = BuildUrl(endpoint);
+                _logger.LogDebug("Sending POST request to {Url}", url);
+
+                var content = new StringContent(
+                    JsonSerializer.Serialize(data, _jsonOptions),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var response = await _httpClient.PostAsync(url, content, cancellationToken);
+                return await ProcessResponseAsync<TResponse>(response, endpoint, cancellationToken);
             }, endpoint);
         }
 
+        /// <summary>
+        /// Sends a POST request with data
+        /// </summary>
+        /// <typeparam name="TRequest">The type of data to send</typeparam>
+        /// <param name="endpoint">The endpoint to send the request to</param>
+        /// <param name="data">The data to send</param>
+        /// <param name="cancellationToken">The cancellation token</param>
         public async Task PostAsync<TRequest>(string endpoint, TRequest data, CancellationToken cancellationToken = default)
         {
             await ExecuteWithRetryAsync(async () =>
             {
-                var json = JsonSerializer.Serialize(data, _jsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync(BuildUrl(endpoint), content, cancellationToken);
-                await EnsureSuccessStatusCodeAsync(response, endpoint);
-                return response;
+                var url = BuildUrl(endpoint);
+                _logger.LogDebug("Sending POST request to {Url}", url);
+
+                var content = new StringContent(
+                    JsonSerializer.Serialize(data, _jsonOptions),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var response = await _httpClient.PostAsync(url, content, cancellationToken);
+                await EnsureSuccessStatusCodeAsync(response, endpoint, cancellationToken);
+                return true;
             }, endpoint);
         }
 
+        /// <summary>
+        /// Sends a PUT request with data and deserializes the response
+        /// </summary>
+        /// <typeparam name="TRequest">The type of data to send</typeparam>
+        /// <typeparam name="TResponse">The type to deserialize the response to</typeparam>
+        /// <param name="endpoint">The endpoint to send the request to</param>
+        /// <param name="data">The data to send</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The deserialized response</returns>
         public async Task<TResponse> PutAsync<TRequest, TResponse>(string endpoint, TRequest data, CancellationToken cancellationToken = default)
         {
             return await ExecuteWithRetryAsync(async () =>
             {
-                var json = JsonSerializer.Serialize(data, _jsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var response = await _httpClient.PutAsync(BuildUrl(endpoint), content, cancellationToken);
-                return await ProcessResponseAsync<TResponse>(response, endpoint);
+                var url = BuildUrl(endpoint);
+                _logger.LogDebug("Sending PUT request to {Url}", url);
+
+                var content = new StringContent(
+                    JsonSerializer.Serialize(data, _jsonOptions),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var response = await _httpClient.PutAsync(url, content, cancellationToken);
+                return await ProcessResponseAsync<TResponse>(response, endpoint, cancellationToken);
             }, endpoint);
         }
 
+        /// <summary>
+        /// Sends a PUT request with data
+        /// </summary>
+        /// <typeparam name="TRequest">The type of data to send</typeparam>
+        /// <param name="endpoint">The endpoint to send the request to</param>
+        /// <param name="data">The data to send</param>
+        /// <param name="cancellationToken">The cancellation token</param>
         public async Task PutAsync<TRequest>(string endpoint, TRequest data, CancellationToken cancellationToken = default)
         {
             await ExecuteWithRetryAsync(async () =>
             {
-                var json = JsonSerializer.Serialize(data, _jsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var response = await _httpClient.PutAsync(BuildUrl(endpoint), content, cancellationToken);
-                await EnsureSuccessStatusCodeAsync(response, endpoint);
-                return response;
+                var url = BuildUrl(endpoint);
+                _logger.LogDebug("Sending PUT request to {Url}", url);
+
+                var content = new StringContent(
+                    JsonSerializer.Serialize(data, _jsonOptions),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var response = await _httpClient.PutAsync(url, content, cancellationToken);
+                await EnsureSuccessStatusCodeAsync(response, endpoint, cancellationToken);
+                return true;
             }, endpoint);
         }
 
+        /// <summary>
+        /// Sends a DELETE request
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request to</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The HTTP response message</returns>
         public async Task<HttpResponseMessage> DeleteAsync(string endpoint, CancellationToken cancellationToken = default)
         {
             return await ExecuteWithRetryAsync(async () =>
             {
-                var response = await _httpClient.DeleteAsync(BuildUrl(endpoint), cancellationToken);
-                await EnsureSuccessStatusCodeAsync(response, endpoint);
+                var url = BuildUrl(endpoint);
+                _logger.LogDebug("Sending DELETE request to {Url}", url);
+
+                var response = await _httpClient.DeleteAsync(url, cancellationToken);
+                await EnsureSuccessStatusCodeAsync(response, endpoint, cancellationToken);
                 return response;
             }, endpoint);
         }
 
+        /// <summary>
+        /// Sends a PATCH request with data and deserializes the response
+        /// </summary>
+        /// <typeparam name="TRequest">The type of data to send</typeparam>
+        /// <typeparam name="TResponse">The type to deserialize the response to</typeparam>
+        /// <param name="endpoint">The endpoint to send the request to</param>
+        /// <param name="data">The data to send</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The deserialized response</returns>
         public async Task<TResponse> PatchAsync<TRequest, TResponse>(string endpoint, TRequest data, CancellationToken cancellationToken = default)
         {
             return await ExecuteWithRetryAsync(async () =>
             {
-                var json = JsonSerializer.Serialize(data, _jsonOptions);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var request = new HttpRequestMessage(new HttpMethod("PATCH"), BuildUrl(endpoint)) { Content = content };
+                var url = BuildUrl(endpoint);
+                _logger.LogDebug("Sending PATCH request to {Url}", url);
+
+                var content = new StringContent(
+                    JsonSerializer.Serialize(data, _jsonOptions),
+                    Encoding.UTF8,
+                    "application/json");
+
+                var request = new HttpRequestMessage(new HttpMethod("PATCH"), url)
+                {
+                    Content = content
+                };
+
                 var response = await _httpClient.SendAsync(request, cancellationToken);
-                return await ProcessResponseAsync<TResponse>(response, endpoint);
+                return await ProcessResponseAsync<TResponse>(response, endpoint, cancellationToken);
             }, endpoint);
         }
 
+        /// <summary>
+        /// Tests connectivity to the API
+        /// </summary>
+        /// <param name="healthCheckEndpoint">The health check endpoint to use</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>True if the API is accessible, false otherwise</returns>
         public async Task<bool> TestConnectivityAsync(string healthCheckEndpoint = "health", CancellationToken cancellationToken = default)
         {
             try
             {
-                var stopwatch = Stopwatch.StartNew();
-                var response = await _httpClient.GetAsync(BuildUrl(healthCheckEndpoint), cancellationToken);
-                stopwatch.Stop();
+                var url = BuildUrl(healthCheckEndpoint);
+                _logger.LogDebug("Testing connectivity to {Url}", url);
 
-                var isReachable = response.IsSuccessStatusCode;
-                _logger.LogInformation("API connectivity test: {Status} (Response time: {ResponseTime}ms)",
-                    isReachable ? "Success" : "Failed", stopwatch.ElapsedMilliseconds);
-
-                return isReachable;
+                var response = await _httpClient.GetAsync(url, cancellationToken);
+                return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "API connectivity test failed");
+                _logger.LogError(ex, "Error testing connectivity to {Endpoint}", healthCheckEndpoint);
                 return false;
             }
         }
 
-        public async Task<NetworkStatus> GetNetworkStatusAsync()
+        /// <summary>
+        /// Gets the current connectivity information
+        /// </summary>
+        public async Task<ConnectivityInfo> GetConnectivityInfoAsync()
         {
-            var status = new NetworkStatus();
+            var info = new ConnectivityInfo
+            {
+                IsConnected = await TestConnectivityAsync(),
+                LastUpdated = DateTime.UtcNow,
+                ConnectionType = "Unknown",
+                NetworkAccess = "Unknown",
+                ConnectionProfiles = Array.Empty<string>()
+            };
 
             try
             {
-                var stopwatch = Stopwatch.StartNew();
-                status.IsApiReachable = await TestConnectivityAsync();
-                stopwatch.Stop();
-                status.Latency = stopwatch.Elapsed;
-                status.IsConnected = true; // Basic implementation - can be enhanced with platform-specific checks
-                status.ConnectionType = "Unknown"; // Platform-specific implementation needed
-            }
-            catch
-            {
-                status.IsConnected = false;
-                status.IsApiReachable = false;
-            }
-
-            return status;
-        }
-
-        public void AddDefaultHeader(string name, string value)
-        {
-            _defaultHeaders[name] = value;
-            _httpClient.DefaultRequestHeaders.Remove(name);
-            _httpClient.DefaultRequestHeaders.Add(name, value);
-            _logger.LogDebug("Added default header: {HeaderName}", name);
-        }
-
-        public void RemoveDefaultHeader(string name)
-        {
-            _defaultHeaders.Remove(name);
-            _httpClient.DefaultRequestHeaders.Remove(name);
-            _logger.LogDebug("Removed default header: {HeaderName}", name);
-        }
-
-        public HttpClientStatistics GetStatistics()
-        {
-            lock (_statisticsLock)
-            {
-                return new HttpClientStatistics
+                var response = await _httpClient.GetAsync("health", HttpCompletionOption.ResponseHeadersRead);
+                info.IsConnected = response.IsSuccessStatusCode;
+                if (response.Headers.Date.HasValue)
                 {
-                    TotalRequests = _statistics.TotalRequests,
-                    SuccessfulRequests = _statistics.SuccessfulRequests,
-                    FailedRequests = _statistics.FailedRequests,
-                    RetriedRequests = _statistics.RetriedRequests,
-                    AverageResponseTime = _statistics.AverageResponseTime,
-                    LastRequestTime = _statistics.LastRequestTime,
-                    ErrorCounts = new Dictionary<string, int>(_statistics.ErrorCounts),
-                    StatusCodeCounts = new Dictionary<int, int>(_statistics.StatusCodeCounts)
-                };
-            }
-        }
-
-        public void Dispose()
-        {
-            _semaphore?.Dispose();
-            _httpClient?.Dispose();
-            _logger.LogDebug("HttpClientService disposed");
-        }
-
-        // Private helper methods
-        private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, string endpoint)
-        {
-            await _semaphore.WaitAsync();
-            try
-            {
-                var stopwatch = Stopwatch.StartNew();
-                var context = new Context(endpoint);
-                context["endpoint"] = endpoint;
-
-                T? result = default; // Variable to store the actual result of the operation
-
-                // Create a wrapper that executes the operation and returns an HttpResponseMessage for the retry policy
-                var httpResponseOperation = async (Context ctx) =>
-                {
-                    try
-                    {
-                        result = await operation(); // Execute the actual operation and store its result
-
-                        // If T is HttpResponseMessage, return it directly for policy evaluation
-                        if (result is HttpResponseMessage httpResponse)
-                        {
-                            // If the response is successful or it's a client error (400-level), don't retry
-                            if (httpResponse.IsSuccessStatusCode || (int)httpResponse.StatusCode < 500)
-                            {
-                                return httpResponse;
-                            }
-                            // Only retry for server errors (500-level)
-                            if (!IsRetryableStatusCode(httpResponse.StatusCode))
-                            {
-                                return httpResponse;
-                            }
-                        }
-
-                        // For other types, create a successful HttpResponseMessage for the policy to consider it successful
-                        // The actual 'result' (of type T) is already stored.
-                        return new HttpResponseMessage(HttpStatusCode.OK);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Request to {Endpoint} failed: {Message}", endpoint, ex.Message);
-                        throw; // Re-throw to allow Polly to handle retries based on the exception
-                    }
-                };
-
-                // Execute the operation with retry policy
-                // The policy will execute httpResponseOperation, which in turn executes the original 'operation'
-                var httpResult = await _retryPolicy.ExecuteAsync(httpResponseOperation, context);
-
-                // After the policy has completed (either successfully or after retries),
-                // return the 'result' that was captured during the *last successful* execution of 'operation'.
-                // If the policy failed and re-threw an exception, this part won't be reached.
-                stopwatch.Stop();
-                UpdateStatistics(true, stopwatch.Elapsed, null);
-                return result!; // Use null-forgiving operator as 'result' will be set if no exception was thrown
+                    info.SignalStrength = (int)response.Headers.Date.Value.Subtract(DateTime.UtcNow).TotalMilliseconds;
+                }
             }
             catch (Exception ex)
             {
-                UpdateStatistics(false, TimeSpan.Zero, ex);
-                throw;
+                _logger.LogWarning(ex, "Failed to get API connectivity info");
+                info.IsConnected = false;
+                info.SignalStrength = null;
             }
-            finally
+
+            return info;
+        }
+
+        /// <summary>
+        /// Adds a default header to all requests
+        /// </summary>
+        /// <param name="name">The header name</param>
+        /// <param name="value">The header value</param>
+        public void AddDefaultHeader(string name, string value)
+        {
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
+
+            _defaultHeaders[name] = value;
+            _httpClient.DefaultRequestHeaders.TryAddWithoutValidation(name, value);
+        }
+
+        /// <summary>
+        /// Removes a default header from all requests
+        /// </summary>
+        /// <param name="name">The header name</param>
+        public void RemoveDefaultHeader(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                throw new ArgumentNullException(nameof(name));
+
+            _defaultHeaders.Remove(name);
+            _httpClient.DefaultRequestHeaders.Remove(name);
+        }
+
+        /// <summary>
+        /// Gets the current HTTP client statistics
+        /// </summary>
+        /// <returns>The current statistics</returns>
+        public HttpClientStatistics GetStatistics()
+        {
+            return _statistics.Clone();
+        }
+
+        /// <summary>
+        /// Disposes the HTTP client service
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Disposes the HTTP client service
+        /// </summary>
+        /// <param name="disposing">Whether the service is being disposed</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
             {
-                _semaphore.Release();
+                if (disposing)
+                {
+                    _httpClient.Dispose();
+                    _semaphore.Dispose();
+                }
+
+                _disposed = true;
             }
         }
 
         /// <summary>
-        /// Process the HTTP response and deserialize the content to the requested type.
+        /// Validates the endpoint
         /// </summary>
-        /// <typeparam name="T">The type to deserialize to</typeparam>
-        /// <param name="response">The HTTP response message</param>
-        /// <param name="endpoint">The API endpoint that was called</param>
-        /// <returns>The deserialized response object</returns>
-        /// <exception cref="ApiException">Thrown when deserialization fails</exception>
-        private async Task<T> ProcessResponseAsync<T>(HttpResponseMessage response, string endpoint)
+        /// <param name="endpoint">The endpoint to validate</param>
+        private void ValidateEndpoint(string endpoint)
         {
-            await EnsureSuccessStatusCodeAsync(response, endpoint);
+            if (string.IsNullOrEmpty(endpoint))
+                throw new ArgumentNullException(nameof(endpoint));
 
-            string rawContent;
+            if (string.IsNullOrEmpty(BaseUrl))
+                throw new InvalidOperationException("BaseUrl must be set before making requests.");
+        }
+
+        /// <summary>
+        /// Validates the request data
+        /// </summary>
+        /// <typeparam name="T">The type of data to validate</typeparam>
+        /// <param name="endpoint">The endpoint to validate</param>
+        /// <param name="data">The data to validate</param>
+        private void ValidateRequest<T>(string endpoint, T? data) where T : class
+        {
+            ValidateEndpoint(endpoint);
+
+            if (data == null)
+                return;
+
+            if (data is IValidatable validatable)
+            {
+                var validationResult = validatable.Validate();
+                if (!validationResult.IsValid)
+                {
+                    var errorMessage = validationResult.Errors.Count > 0
+                        ? string.Join("; ", validationResult.Errors)
+                        : "Request validation failed.";
+                    throw new TDFShared.Exceptions.ValidationException(errorMessage);
+                }
+            }
+
+            if (!IsValidJson(data))
+                throw new TDFShared.Exceptions.ValidationException("Request data is not valid JSON.");
+        }
+
+        /// <summary>
+        /// Checks if the data is valid JSON
+        /// </summary>
+        /// <param name="data">The data to check</param>
+        /// <returns>True if the data is valid JSON, false otherwise</returns>
+        private bool IsValidJson(object data)
+        {
             try
             {
-                _logger.LogDebug("Starting to read response content from {Endpoint} with status {StatusCode}", endpoint, response.StatusCode);
-                
-                // Check if the response has content
-                if (response.Content == null)
-                {
-                    _logger.LogWarning("Response from {Endpoint} has no content", endpoint);
-                    rawContent = string.Empty;
-                }
-                else
-                {
-                    // Read the content with proper error handling for IO exceptions
-                    rawContent = await response.Content.ReadAsStringAsync();
-                    _logger.LogDebug("Successfully read {ContentLength} characters from {Endpoint}", rawContent.Length, endpoint);
-                }
-            }
-            catch (IOException ioEx)
-            {
-                _logger.LogError(ioEx, "IO error reading response content from {Endpoint}: {Message}. Response status: {StatusCode}", 
-                    endpoint, ioEx.Message, response.StatusCode);
-                throw new ApiException($"Failed to read response from {endpoint}: Connection was closed unexpectedly", ioEx);
-            }
-            catch (ObjectDisposedException odEx)
-            {
-                _logger.LogError(odEx, "Response or content was disposed while reading from {Endpoint}: {Message}", endpoint, odEx.Message);
-                throw new ApiException($"Failed to read response from {endpoint}: Response was disposed", odEx);
+                JsonSerializer.Serialize(data, _jsonOptions);
+                return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error reading response content from {Endpoint}: {Message}. Response status: {StatusCode}", 
-                    endpoint, ex.Message, response.StatusCode);
-                throw new ApiException($"Failed to read response from {endpoint}: {ex.Message}", ex);
-            }
-
-            if (typeof(T) == typeof(string))
-            {
-                return (T)(object)rawContent;
-            }
-
-            _logger.LogDebug("Received raw content for {Endpoint}. Length: {Length}. Content: {Content}",
-                endpoint, rawContent.Length, rawContent.Length > 200 ? rawContent.Substring(0, 200) + "..." : rawContent);
-
-            if (string.IsNullOrEmpty(rawContent))
-            {
-                _logger.LogWarning("Empty response body for {Endpoint}", endpoint);
-                if (typeof(T).IsValueType)
-                {
-                    return default!;
-                }
-                throw new ApiException($"Empty response from {endpoint}");
-            }
-
-            try
-            {
-                // Special handling for ApiResponse<List<LookupItem>>
-                if (typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(ApiResponse<>) &&
-                    typeof(T).GetGenericArguments()[0] == typeof(List<LookupItem>))
-                {
-                    _logger.LogDebug("Processing ApiResponse<List<LookupItem>> response from {Endpoint}", endpoint);
-                    try
-                    {
-                        using var doc = JsonDocument.Parse(rawContent);
-                        var lookupItems = new List<LookupItem>();
-
-                        // Parse the data array if it exists
-                        if (doc.RootElement.TryGetProperty("data", out JsonElement dataElement) &&
-                            dataElement.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (JsonElement element in dataElement.EnumerateArray())
-                            {
-                                var lookupItem = new LookupItem();
-
-                                // Name is required, use empty string if not found
-                                lookupItem.Name = element.TryGetProperty("name", out JsonElement nameElement)
-                                    ? nameElement.GetString() ?? string.Empty
-                                    : string.Empty;
-
-                                // ID defaults to name if not present
-                                lookupItem.Id = element.TryGetProperty("id", out JsonElement idElement)
-                                    ? idElement.GetString() ?? lookupItem.Name
-                                    : lookupItem.Name;
-
-                                // Description is optional
-                                if (element.TryGetProperty("description", out JsonElement descElement))
-                                {
-                                    lookupItem.Description = descElement.GetString();
-                                }
-
-                                // Value is optional, defaults to Name
-                                lookupItem.Value = element.TryGetProperty("value", out JsonElement valueElement)
-                                    ? valueElement.GetString() ?? lookupItem.Name
-                                    : lookupItem.Name;
-
-                                // SortOrder is optional
-                                if (element.TryGetProperty("sortOrder", out JsonElement sortOrderElement))
-                                {
-                                    if (sortOrderElement.ValueKind == JsonValueKind.Number)
-                                    {
-                                        lookupItem.SortOrder = sortOrderElement.GetInt32();
-                                    }
-                                    else if (sortOrderElement.ValueKind == JsonValueKind.String &&
-                                            int.TryParse(sortOrderElement.GetString(), out var parsedOrder))
-                                    {
-                                        lookupItem.SortOrder = parsedOrder;
-                                    }
-                                }
-
-                                lookupItems.Add(lookupItem);
-                            }
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Response from {Endpoint} has no data array or data is not an array", endpoint);
-                        }
-
-                        // Get success status (default false)
-                        var success = doc.RootElement.TryGetProperty("success", out JsonElement successElement) &&
-                                    successElement.ValueKind == JsonValueKind.True;
-
-                        // Get message (default to empty)
-                        var message = doc.RootElement.TryGetProperty("message", out JsonElement messageElement)
-                            ? messageElement.GetString() ?? string.Empty
-                            : string.Empty;
-
-                        // Get status code (default to 200 OK)
-                        var statusCode = doc.RootElement.TryGetProperty("statusCode", out JsonElement statusElement) &&
-                                       statusElement.ValueKind == JsonValueKind.Number
-                            ? statusElement.GetInt32()
-                            : (int)HttpStatusCode.OK;
-
-                        // Get error message if present
-                        var errorMessage = doc.RootElement.TryGetProperty("errorMessage", out JsonElement errorElement)
-                            ? errorElement.GetString()
-                            : null;
-
-                        var apiResponse = new ApiResponse<List<LookupItem>>
-                        {
-                            Success = success,
-                            Message = message,
-                            StatusCode = statusCode,
-                            ErrorMessage = errorMessage,
-                            Data = lookupItems
-                        };
-
-                        if (!success)
-                        {
-                            _logger.LogWarning("Unsuccessful response from {Endpoint}. Message: {Message}, Error: {Error}", 
-                                endpoint, message, errorMessage ?? "none");
-                        }
-                        else
-                        {
-                            _logger.LogDebug("Successfully processed {Count} lookup items from {Endpoint}", 
-                                lookupItems.Count, endpoint);
-                        }
-
-                        return (T)(object)apiResponse;
-                    }
-                    catch (JsonException jsonEx)
-                    {
-                        _logger.LogError(jsonEx, "JSON parsing error processing response from {Endpoint}. Content: {Content}", 
-                            endpoint, rawContent);
-                        throw new ApiException($"Failed to parse JSON response from {endpoint}: {jsonEx.Message}", jsonEx);
-                    }
-                }
-
-                // Standard deserialization for other types
-                try
-                {
-                    // Added paginated result handling
-                    if (typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(IEnumerable<>))
-                    {
-                        var paginatedResultType = typeof(PaginatedResult<>).MakeGenericType(typeof(T).GetGenericArguments()[0]);
-                        dynamic paginatedResult = JsonSerializer.Deserialize(rawContent, paginatedResultType, _jsonOptions)!;
-                        return (T)paginatedResult.Items;
-                    }
-                    var result = JsonSerializer.Deserialize<T>(rawContent, _jsonOptions);
-                    if (result == null && !typeof(T).IsValueType)
-                    {
-                        throw new ApiException($"Deserialization returned null for non-nullable type {typeof(T).Name}");
-                    }
-                    return result!;
-                }
-                catch (JsonException jsonEx)
-                {
-                    _logger.LogError(jsonEx, "JSON deserialization error for type {Type} from {Endpoint}. Content: {Content}", 
-                        typeof(T).Name, endpoint, rawContent);
-                    throw new ApiException($"Failed to deserialize {typeof(T).Name} from {endpoint}: {jsonEx.Message}", jsonEx);
-                }
-            }
-            catch (Exception ex) when (ex is not ApiException)
-            {
-                _logger.LogError(ex, "Error processing response from {Endpoint}. Content: {Content}", endpoint, rawContent);
-                throw new ApiException($"Failed to process response from {endpoint}: {ex.Message}", ex);
+                _logger.LogError(ex, "Error serializing request data to JSON");
+                return false;
             }
         }
 
-        private async Task EnsureSuccessStatusCodeAsync(HttpResponseMessage response, string endpoint)
+        /// <summary>
+        /// Executes an operation with retry logic
+        /// </summary>
+        /// <typeparam name="T">The type of result</typeparam>
+        /// <param name="operation">The operation to execute</param>
+        /// <param name="endpoint">The endpoint being accessed</param>
+        /// <returns>The operation result</returns>
+        private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, string endpoint)
+        {
+            var retryCount = 0;
+            var delay = InitialRetryDelay;
+
+            while (true)
+            {
+                try
+                {
+                    return await operation();
+                }
+                catch (Exception ex) when (IsRetryableException(ex) && retryCount < MaxRetries)
+                {
+                    retryCount++;
+                    _logger.LogWarning(ex, "Retry {RetryCount} of {MaxRetries} for {Endpoint}", retryCount, MaxRetries, endpoint);
+                    await Task.Delay(delay);
+                    delay *= 2; // Exponential backoff
+                }
+            }
+        }
+
+        /// <summary>
+        /// Processes an HTTP response
+        /// </summary>
+        /// <typeparam name="T">The type of response to deserialize</typeparam>
+        /// <param name="response">The HTTP response</param>
+        /// <param name="endpoint">The endpoint that was called</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        /// <returns>The deserialized response</returns>
+        private async Task<T> ProcessResponseAsync<T>(HttpResponseMessage response, string endpoint, CancellationToken cancellationToken)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                await EnsureSuccessStatusCodeAsync(response, endpoint, cancellationToken);
+
+                var content = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (string.IsNullOrEmpty(content))
+                    return default!;
+
+                try
+                {
+                    var result = JsonSerializer.Deserialize<T>(content, _jsonOptions) ?? throw new JsonException("Deserialized result is null");
+                    stopwatch.Stop();
+                    UpdateStatistics(true, stopwatch.Elapsed, false);
+                    return result;
+                }
+                catch (JsonException)
+                {
+                    _logger.LogError("Error deserializing response from {Endpoint}", endpoint);
+                    throw new HttpRequestException($"Error deserializing response from {endpoint}");
+                }
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                UpdateStatistics(false, stopwatch.Elapsed, false);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Ensures the HTTP response has a success status code
+        /// </summary>
+        /// <param name="response">The HTTP response</param>
+        /// <param name="endpoint">The endpoint that was accessed</param>
+        /// <param name="cancellationToken">The cancellation token</param>
+        private async Task EnsureSuccessStatusCodeAsync(HttpResponseMessage response, string endpoint, CancellationToken cancellationToken = default)
         {
             if (response.IsSuccessStatusCode)
                 return;
 
-            string errorContent;
-            try
-            {
-                errorContent = await response.Content.ReadAsStringAsync();
-            }
-            catch (IOException ioEx)
-            {
-                _logger.LogError(ioEx, "IO error reading error response content from {Endpoint}: {Message}", endpoint, ioEx.Message);
-                errorContent = $"Failed to read error response: {ioEx.Message}";
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Unexpected error reading error response content from {Endpoint}: {Message}", endpoint, ex.Message);
-                errorContent = $"Failed to read error response: {ex.Message}";
-            }
-
+            var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
             var errorMessage = GetFriendlyErrorMessage(response.StatusCode, errorContent);
 
-            // Check for authentication errors
-            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            switch (response.StatusCode)
             {
-                _logger.LogWarning("Authentication error for {Endpoint}", endpoint);
-                TokenRefreshRequired?.Invoke(this, new TokenRefreshEventArgs
-                {
-                    Reason = "Authentication token expired or invalid",
-                    ExpirationTime = DateTime.UtcNow
-                });
-            }
+                case HttpStatusCode.Unauthorized:
+                    _logger.LogWarning("Unauthorized access to {Endpoint}", endpoint);
+                    TokenRefreshNeeded?.Invoke(this, new TokenRefreshEventArgs());
+                    throw new UnauthorizedAccessException("You don't have permission to perform this action.");
 
-            lock (_statisticsLock)
-            {
-                var statusCode = (int)response.StatusCode;
-                _statistics.StatusCodeCounts[statusCode] =
-                    _statistics.StatusCodeCounts.TryGetValue(statusCode, out var count) ? count + 1 : 1;
-            }
+                case HttpStatusCode.Forbidden:
+                    _logger.LogWarning("Forbidden access to {Endpoint}", endpoint);
+                    throw new UnauthorizedAccessException("You don't have permission to perform this action.");
 
-            throw new ApiException(response.StatusCode, errorMessage, errorContent);
+                case HttpStatusCode.NotFound:
+                    _logger.LogWarning("Resource not found at {Endpoint}", endpoint);
+                    throw new InvalidOperationException($"The requested resource at {endpoint} was not found.");
+
+                case HttpStatusCode.BadRequest:
+                    _logger.LogWarning("Bad request to {Endpoint}: {Error}", endpoint, errorMessage);
+                    throw new TDFShared.Exceptions.ValidationException(errorMessage);
+
+                case HttpStatusCode.InternalServerError:
+                    _logger.LogError("Server error at {Endpoint}: {Error}", endpoint, errorMessage);
+                    throw new InvalidOperationException("An unexpected error occurred. Please try again later.");
+
+                case HttpStatusCode.RequestTimeout:
+                    _logger.LogWarning("Request timeout at {Endpoint}", endpoint);
+                    throw new TimeoutException("The request timed out. Please try again.");
+
+                case HttpStatusCode.ServiceUnavailable:
+                    _logger.LogWarning("Service unavailable at {Endpoint}", endpoint);
+                    throw new InvalidOperationException("The service is currently unavailable. Please try again later.");
+
+                default:
+                    _logger.LogError("HTTP error {StatusCode} at {Endpoint}: {Error}", response.StatusCode, endpoint, errorMessage);
+                    throw new InvalidOperationException($"An error occurred while accessing {endpoint}. Please try again later.");
+            }
         }
 
+        /// <summary>
+        /// Builds the full URL for a request
+        /// </summary>
+        /// <param name="endpoint">The endpoint to build the URL for</param>
+        /// <returns>The full URL</returns>
         private string BuildUrl(string endpoint)
         {
+            if (string.IsNullOrEmpty(endpoint))
+                throw new ArgumentNullException(nameof(endpoint));
+
             if (string.IsNullOrEmpty(BaseUrl))
-                return endpoint;
+                throw new InvalidOperationException("BaseUrl must be set before making requests.");
 
             var baseUrl = BaseUrl.TrimEnd('/');
-            var cleanEndpoint = endpoint.TrimStart('/');
-            return $"{baseUrl}/{cleanEndpoint}";
+            var endpointPath = endpoint.TrimStart('/');
+
+            return $"{baseUrl}/{endpointPath}";
         }
 
+        /// <summary>
+        /// Checks if a status code is retryable
+        /// </summary>
+        /// <param name="statusCode">The status code to check</param>
+        /// <returns>True if the status code is retryable, false otherwise</returns>
         private static bool IsRetryableStatusCode(HttpStatusCode statusCode)
         {
-            // Only retry for server errors (500-level) and specific network-related status codes
-            return statusCode == HttpStatusCode.RequestTimeout ||
-                   statusCode == (HttpStatusCode)429 || // TooManyRequests
-                   statusCode == HttpStatusCode.InternalServerError ||
-                   statusCode == HttpStatusCode.BadGateway ||
-                   statusCode == HttpStatusCode.ServiceUnavailable ||
-                   statusCode == HttpStatusCode.GatewayTimeout;
-        }
-
-        private string GetFriendlyErrorMessage(HttpStatusCode statusCode, string errorContent)
-        {
-            // Try to extract error message from API response content
-            if (!string.IsNullOrEmpty(errorContent))
-            {
-                try
-                {
-                    // Try to deserialize as ApiResponse
-                    var apiResponse = JsonSerializer.Deserialize<ApiResponseBase>(
-                        errorContent, 
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                    );
-                    
-                    if (apiResponse != null && !string.IsNullOrEmpty(apiResponse.Message))
-                    {
-                        return apiResponse.Message;
-                    }
-                }
-                catch (JsonException)
-                {
-                    // If we can't deserialize as ApiResponse, just continue to default messages
-                    _logger.LogDebug("Could not deserialize error content as ApiResponse: {Content}", errorContent);
-                }
-            }
-
-            // Default friendly messages based on status code
             return statusCode switch
             {
-                HttpStatusCode.Unauthorized => "Authentication required. Please log in again.",
-                HttpStatusCode.Forbidden => "You don't have permission to access this resource.",
-                HttpStatusCode.NotFound => "The requested resource was not found.",
-                HttpStatusCode.RequestTimeout => "The request timed out. Please try again.",
-                HttpStatusCode.BadRequest => "The request was invalid. Please check your input and try again.",
-                (HttpStatusCode)429 => "Too many requests. Please wait before trying again.", // TooManyRequests
-                HttpStatusCode.InternalServerError => "A server error occurred. Please try again later.",
-                HttpStatusCode.BadGateway => "Service temporarily unavailable. Please try again later.",
-                HttpStatusCode.ServiceUnavailable => "Service temporarily unavailable. Please try again later.",
-                HttpStatusCode.GatewayTimeout => "The request timed out. Please try again.",
-                _ => $"Request failed with status {(int)statusCode}: {statusCode}"
+                HttpStatusCode.RequestTimeout or
+                HttpStatusCode.TooManyRequests or
+                HttpStatusCode.InternalServerError or
+                HttpStatusCode.BadGateway or
+                HttpStatusCode.ServiceUnavailable or
+                HttpStatusCode.GatewayTimeout => true,
+                _ => false
             };
         }
 
-        private void UpdateStatistics(bool success, TimeSpan responseTime, Exception exception)
+        /// <summary>
+        /// Gets a friendly error message for a status code
+        /// </summary>
+        /// <param name="statusCode">The status code</param>
+        /// <param name="errorContent">The error content</param>
+        /// <returns>A friendly error message</returns>
+        private string GetFriendlyErrorMessage(HttpStatusCode statusCode, string errorContent)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(errorContent))
+                {
+                    var errorResponse = JsonSerializer.Deserialize<ApiResponseBase>(errorContent, _jsonOptions);
+                    if (errorResponse != null)
+                    {
+                        // First try to get the error message
+                        if (!string.IsNullOrEmpty(errorResponse.ErrorMessage))
+                            return errorResponse.ErrorMessage;
+
+                        // Then try to get validation errors
+                        if (errorResponse.ValidationErrors != null && errorResponse.ValidationErrors.Count > 0)
+                            return string.Join("; ", errorResponse.ValidationErrors.Select(e => e.Value.TrimEnd('.')));
+
+                        // Finally try to get the message
+                        if (!string.IsNullOrEmpty(errorResponse.Message))
+                            return errorResponse.Message;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error parsing error response");
+            }
+
+            return GetDefaultErrorMessage(statusCode);
+        }
+
+        /// <summary>
+        /// Gets the default error message for a status code
+        /// </summary>
+        /// <param name="statusCode">The status code</param>
+        /// <returns>The default error message</returns>
+        private static string GetDefaultErrorMessage(HttpStatusCode statusCode)
+        {
+            return statusCode switch
+            {
+                HttpStatusCode.BadRequest => "The request was invalid.",
+                HttpStatusCode.Unauthorized => "You are not authorized to access this resource.",
+                HttpStatusCode.Forbidden => "You do not have permission to access this resource.",
+                HttpStatusCode.NotFound => "The requested resource was not found.",
+                HttpStatusCode.RequestTimeout => "The request timed out.",
+                HttpStatusCode.InternalServerError => "An internal server error occurred.",
+                HttpStatusCode.BadGateway => "A bad gateway error occurred.",
+                HttpStatusCode.ServiceUnavailable => "The service is currently unavailable.",
+                HttpStatusCode.GatewayTimeout => "The gateway timed out.",
+                _ => $"An error occurred with status code {statusCode}."
+            };
+        }
+
+        /// <summary>
+        /// Updates the statistics with the result of a request
+        /// </summary>
+        /// <param name="success">Whether the request was successful</param>
+        /// <param name="responseTime">The response time</param>
+        /// <param name="isRetry">Whether this was a retry</param>
+        private void UpdateStatistics(bool success, TimeSpan responseTime, bool isRetry = false)
         {
             lock (_statisticsLock)
             {
                 _statistics.TotalRequests++;
-                _statistics.LastRequestTime = DateTime.UtcNow;
+                _statistics.TotalResponseTime += (long)responseTime.TotalMilliseconds;
 
                 if (success)
                 {
@@ -692,22 +810,118 @@ namespace TDFShared.Services
                 else
                 {
                     _statistics.FailedRequests++;
-
-                    if (exception != null)
-                    {
-                        var errorType = exception.GetType().Name;
-                        _statistics.ErrorCounts[errorType] =
-                            _statistics.ErrorCounts.TryGetValue(errorType, out var count) ? count + 1 : 1;
-                    }
                 }
 
-                // Update average response time
-                if (responseTime > TimeSpan.Zero)
+                if (isRetry)
                 {
-                    var totalTime = _statistics.AverageResponseTime.TotalMilliseconds * (_statistics.TotalRequests - 1) + responseTime.TotalMilliseconds;
-                    _statistics.AverageResponseTime = TimeSpan.FromMilliseconds(totalTime / _statistics.TotalRequests);
+                    _statistics.RetriedRequests++;
+                }
+
+                if (responseTime.TotalMilliseconds > _statistics.MaxResponseTime)
+                {
+                    _statistics.MaxResponseTime = (long)responseTime.TotalMilliseconds;
+                }
+
+                if (responseTime.TotalMilliseconds < _statistics.MinResponseTime || _statistics.MinResponseTime == long.MaxValue)
+                {
+                    _statistics.MinResponseTime = (long)responseTime.TotalMilliseconds;
                 }
             }
+        }
+
+        /// <summary>
+        /// Checks if an exception is a network error
+        /// </summary>
+        /// <param name="ex">The exception to check</param>
+        /// <returns>True if the exception is a network error, false otherwise</returns>
+        private bool IsNetworkError(Exception ex)
+        {
+            return ex switch
+            {
+                HttpRequestException or
+                SocketException or
+                IOException or
+                TaskCanceledException => true,
+                _ => false
+            };
+        }
+
+        /// <summary>
+        /// Checks if an exception is retryable
+        /// </summary>
+        /// <param name="ex">The exception to check</param>
+        /// <returns>True if the exception is retryable, false otherwise</returns>
+        private bool IsRetryableException(Exception ex)
+        {
+            return ex switch
+            {
+                HttpRequestException or
+                SocketException or
+                IOException or
+                TaskCanceledException => true,
+                _ => false
+            };
+        }
+
+        /// <summary>
+        /// Raises the token refreshed event
+        /// </summary>
+        /// <param name="accessToken">The access token</param>
+        /// <param name="refreshToken">The refresh token</param>
+        /// <param name="expiresAt">The token expiration time</param>
+        protected virtual void OnTokenRefreshed(string accessToken, string refreshToken, DateTime expiresAt)
+        {
+            TokenRefreshCompleted?.Invoke(this, new TokenRefreshEventArgs(accessToken, refreshToken, expiresAt));
+        }
+
+        /// <summary>
+        /// Raises the token refresh failed event
+        /// </summary>
+        /// <param name="error">The error message</param>
+        protected virtual void OnTokenRefreshFailed(string error)
+        {
+            TokenRefreshFailed?.Invoke(this, new TokenRefreshEventArgs(error, string.Empty, DateTime.UtcNow));
+        }
+
+        /// <summary>
+        /// Sends an HTTP request and returns the response
+        /// </summary>
+        /// <param name="request">The HTTP request to send</param>
+        /// <param name="cancellationToken">A token to cancel the operation</param>
+        /// <returns>The HTTP response message</returns>
+        public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
+        {
+            ValidateEndpoint(request.RequestUri?.ToString() ?? string.Empty);
+            return await ExecuteWithRetryAsync(async () => await _httpClient.SendAsync(request, cancellationToken), request.RequestUri?.ToString() ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Sends an HTTP request and deserializes the response to the specified type
+        /// </summary>
+        /// <typeparam name="T">The type to deserialize the response to</typeparam>
+        /// <param name="request">The HTTP request to send</param>
+        /// <param name="cancellationToken">A token to cancel the operation</param>
+        /// <returns>The deserialized response</returns>
+        public async Task<T?> SendAsync<T>(HttpRequestMessage request, CancellationToken cancellationToken = default)
+        {
+            ValidateEndpoint(request.RequestUri?.ToString() ?? string.Empty);
+            var response = await SendAsync(request, cancellationToken);
+            return await ProcessResponseAsync<T>(response, request.RequestUri?.ToString() ?? string.Empty, cancellationToken);
+        }
+
+        /// <summary>
+        /// Sends an HTTP request and returns the response wrapped in an ApiResponseBase
+        /// </summary>
+        /// <typeparam name="T">The type of data in the response</typeparam>
+        /// <param name="request">The HTTP request to send</param>
+        /// <param name="cancellationToken">A token to cancel the operation</param>
+        /// <returns>The response wrapped in an ApiResponseBase</returns>
+        public async Task<ApiResponseBase<T>?> SendWithResponseAsync<T>(HttpRequestMessage request, CancellationToken cancellationToken = default)
+        {
+            ValidateEndpoint(request.RequestUri?.ToString() ?? string.Empty);
+            var response = await SendAsync(request, cancellationToken);
+            var result = await ProcessResponseAsync<ApiResponseBase<T>>(response, request.RequestUri?.ToString() ?? string.Empty, cancellationToken);
+            return result;
         }
     }
 }

@@ -80,7 +80,7 @@ public partial class MainPage : ContentPage
 
     private async void OnLogoutClicked(object sender, EventArgs e)
     {
-        App.CurrentUser = null;
+        App.UserSessionService?.SetCurrentUser(null);
         var loginViewModel = App.Services.GetService<LoginPageViewModel>();
         await Navigation.PushAsync(new LoginPage(loginViewModel));
     }

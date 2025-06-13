@@ -11,8 +11,7 @@ using TDFMAUI.ViewModels;
 using TDFShared.DTOs.Users;
 using TDFShared.DTOs.Messages;
 using TDFMAUI.Features.Auth;
-using System.Drawing;
-using Color = System.Drawing.Color;
+using Microsoft.Maui.Graphics;
 
 namespace TDFMAUI.Pages;
 
@@ -84,7 +83,7 @@ public partial class MessagesPage : ContentPage
                 SenderName = e.SenderName,
                 IsRead = false,
                 IsUnread = true,
-                BackgroundColor = "#E3F2FD",
+                BackgroundColor = MessagesPage.ColorToHex((Color)Application.Current.Resources["BlueCardColor"]),
                 ShowSenderStatus = true
             };
             
@@ -107,7 +106,7 @@ public partial class MessagesPage : ContentPage
                 catch
                 {
                     newMessage.SenderStatus = UserPresenceStatus.Offline;
-                    newMessage.SenderStatusColor = Color.Gray;
+                    newMessage.SenderStatusColor = MessagesPage.GetAppResourceColor("TextSecondaryColor");
                 }
             }
             
@@ -193,19 +192,29 @@ public partial class MessagesPage : ContentPage
     {
         return status switch
         {
-            UserPresenceStatus.Online => Color.FromArgb(76, 175, 80),    // Light Green
-            UserPresenceStatus.Away => Color.FromArgb(255, 193, 7),      // Yellow
-            UserPresenceStatus.Busy => Color.FromArgb(255, 152, 0),      // Orange
-            UserPresenceStatus.DoNotDisturb => Color.FromArgb(244, 67, 54), // Red
-            UserPresenceStatus.Offline => Color.Gray,
-            _ => Color.Gray
+            UserPresenceStatus.Online => Color.FromRgb(76, 175, 80),    // Light Green
+            UserPresenceStatus.Away => Color.FromRgb(255, 193, 7),      // Yellow
+            UserPresenceStatus.Busy => Color.FromRgb(255, 152, 0),      // Orange
+            UserPresenceStatus.DoNotDisturb => Color.FromRgb(244, 67, 54), // Red
+            UserPresenceStatus.Offline => MessagesPage.GetAppResourceColor("TextSecondaryColor"),
+                _ => MessagesPage.GetAppResourceColor("TextSecondaryColor")
         };
     }
-    
-    // Helper method to convert System.Drawing.Color to XAML-compatible string
-    public static string ColorToHex(Color color)
+
+    public static Microsoft.Maui.Graphics.Color GetAppResourceColor(string key)
     {
-        return $"#{color.R:X2}{color.G:X2}{color.B:X2}";
+        if (Application.Current.Resources.TryGetValue(key, out var value) && value is Microsoft.Maui.Graphics.Color color)
+        {
+            return color;
+        }
+        // Fallback to a default color if resource not found or not a Color
+        return Microsoft.Maui.Graphics.Colors.Gray;
+    }
+    
+    // Helper method to convert Microsoft.Maui.Graphics.Color to XAML-compatible string
+    public static string ColorToHex(Microsoft.Maui.Graphics.Color color)
+    {
+        return $"#{(byte)(color.Red * 255):X2}{(byte)(color.Green * 255):X2}{(byte)(color.Blue * 255):X2}";
     }
     
     private async Task LoadMessages()
@@ -250,7 +259,9 @@ public partial class MessagesPage : ContentPage
                         IsRead = message.IsRead,
                         IsUnread = !message.IsRead,
                         IsDelivered = message.IsDelivered,
-                        BackgroundColor = message.IsRead ? "#FFFFFF" : "#E3F2FD",
+                        BackgroundColor = MessagesPage.ColorToHex(message.IsRead ?
+                (Color)Application.Current.Resources["SurfaceColor"] :
+                (Color)Application.Current.Resources["BlueCardColor"]),
                         ShowSenderStatus = true
                     };
                     
@@ -313,7 +324,7 @@ public partial class MessagesPage : ContentPage
                 {
                     selectedMessage.IsRead = true;
                     selectedMessage.IsUnread = false;
-                    selectedMessage.BackgroundColor = "#FFFFFF";
+                    selectedMessage.BackgroundColor = MessagesPage.ColorToHex((Color)Application.Current.Resources["SurfaceColor"]);
                 }
             }
 
@@ -362,7 +373,7 @@ public class MessageViewModel : BindableObject
                 if (value)
                 {
                     IsUnread = false;
-                    BackgroundColor = "#FFFFFF"; // White
+                    BackgroundColor = MessagesPage.ColorToHex((Color)Application.Current.Resources["SurfaceColor"]);
                 }
             }
         }
@@ -382,11 +393,11 @@ public class MessageViewModel : BindableObject
                 // Update BackgroundColor
                 if (value)
                 {
-                    BackgroundColor = "#E3F2FD"; // Light blue
+                    BackgroundColor = MessagesPage.ColorToHex((Color)Application.Current.Resources["BlueCardColor"]);
                 }
                 else
                 {
-                    BackgroundColor = "#FFFFFF"; // White
+                    BackgroundColor = MessagesPage.ColorToHex((Color)Application.Current.Resources["SurfaceColor"]);
                 }
             }
         }
@@ -394,7 +405,7 @@ public class MessageViewModel : BindableObject
     
     public bool IsDelivered { get; set; }
     
-    private string _backgroundColor = "#FFFFFF"; // Default white
+    private string _backgroundColor = MessagesPage.ColorToHex((Color)Application.Current.Resources["SurfaceColor"]);
     public string BackgroundColor
     {
         get => _backgroundColor;
@@ -424,7 +435,7 @@ public class MessageViewModel : BindableObject
         }
     }
     
-    private Color _senderStatusColor = Color.Gray; // Default gray
+    private Color _senderStatusColor = MessagesPage.GetAppResourceColor("TextSecondaryColor");
     public Color SenderStatusColor
     {
         get => _senderStatusColor;
@@ -441,7 +452,7 @@ public class MessageViewModel : BindableObject
     }
     
     // This property is used for XAML binding
-    private string _senderStatusColorHex = "#808080"; // Default gray
+    private string _senderStatusColorHex = MessagesPage.ColorToHex((Color)Application.Current.Resources["TextSecondaryColor"]);
     public string SenderStatusColorHex
     {
         get => _senderStatusColorHex;

@@ -83,7 +83,7 @@
                 </VerticalStackLayout.HorizontalOptions>
                 
                 <Frame x:Name="FormFrame"
-                       BackgroundColor="#0d47a1"
+                       BackgroundColor="{StaticResource Primary}"
                        Padding="{OnIdiom Phone='12', Default='20'}"
                        CornerRadius="{OnPlatform WinUI=8, MacCatalyst=10, Default=15}"
                        HasShadow="True"
@@ -95,7 +95,7 @@
                                     <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsDesktop}}" />
                                 </VisualState.StateTriggers>
                                 <VisualState.Setters>
-                                    <Setter Property="BackgroundColor" Value="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=#1976d2}" />
+                                    <Setter Property="BackgroundColor" Value="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default={StaticResource Primary}}" />
                                     <Setter Property="Padding" Value="20" />
                                     <Setter Property="Margin" Value="0,5,0,5" />
                                 </VisualState.Setters>
@@ -105,7 +105,7 @@
                                     <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsMobile}}" />
                                 </VisualState.StateTriggers>
                                 <VisualState.Setters>
-                                    <Setter Property="BackgroundColor" Value="#0d47a1" />
+                                    <Setter Property="BackgroundColor" Value="{StaticResource Primary}" />
                                 </VisualState.Setters>
                             </VisualState>
                         </VisualStateGroup>
@@ -125,13 +125,13 @@
                                 StrokeThickness="1"
                                 Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='LeaveType'}"
                                 Padding="0" 
-                                BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=#1565c0}">
+                                BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default={StaticResource SurfaceColor}}">
                             <Picker Title="Select Leave Type"
                                     ItemsSource="{Binding LeaveTypes}"
                                     SelectedItem="{Binding SelectedLeaveType}"
                                     IsEnabled="{Binding IsNotBusy}"
                                     TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
-                                    TitleColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default=#AAAAAA}"
+                                    TitleColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default={StaticResource TextSecondaryColor}}"
                                     BackgroundColor="Transparent"/>
                         </Border>
 
@@ -216,7 +216,7 @@
                             <Editor Text="{Binding RequestReason}" 
                                    Placeholder="Enter reason for leave (optional)" 
                                    TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
-                                   PlaceholderColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default=#AAAAAA}"
+                                   PlaceholderColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default={StaticResource TextSecondaryColor}}"
                                    MaxLength="200" 
                                    AutoSize="TextChanges" 
                                    HeightRequest="100"
@@ -236,7 +236,7 @@
                     Text="Submit"
                     Command="{Binding SubmitRequestCommand}"
                     IsEnabled="{Binding IsNotBusy}"
-                    BackgroundColor="{OnPlatform WinUI={StaticResource WindowsAccentColor}, MacCatalyst={StaticResource MacOSAccentColor}, Default=#64b5f6}"
+                    BackgroundColor="{OnPlatform WinUI={StaticResource WindowsAccentColor}, MacCatalyst={StaticResource MacOSAccentColor}, Default={StaticResource Primary}}"
                     TextColor="White"
                     WidthRequest="{OnPlatform WinUI=140, MacCatalyst=140, Default={OnIdiom Phone=100, Default=120}}"
                     HeightRequest="{OnPlatform WinUI=50, MacCatalyst=50, Default={OnIdiom Phone=40, Default=45}}"
@@ -275,7 +275,7 @@
                     Text="Cancel"
                     Command="{Binding CancelCommand}"
                     IsEnabled="{Binding IsNotBusy}"
-                    BackgroundColor="{OnPlatform WinUI=#555555, MacCatalyst=#666666, Default=#9e9e9e}"
+                    BackgroundColor="{OnPlatform WinUI=#555555, MacCatalyst=#666666, Default={StaticResource TextSecondaryColor}}"
                     TextColor="White"
                     WidthRequest="{OnPlatform WinUI=140, MacCatalyst=140, Default={OnIdiom Phone=100, Default=120}}"
                     HeightRequest="{OnPlatform WinUI=50, MacCatalyst=50, Default={OnIdiom Phone=40, Default=45}}"

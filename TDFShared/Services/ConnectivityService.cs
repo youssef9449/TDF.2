@@ -3,6 +3,7 @@ using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using TDFShared.Models;
 
 namespace TDFShared.Services
 {

@@ -21,11 +21,11 @@
                 <Label x:Name="userNameLabel"
                        Text="User"
                        FontSize="18"
-                       TextColor="#bbdefb"/>
+                       TextColor="{StaticResource OnPrimaryColor}"/>
             </VerticalStackLayout>
             <Button Grid.Column="1"
                     Clicked="OnLogoutClicked"
-                    BackgroundColor="#64b5f6"
+                    BackgroundColor="{StaticResource PrimaryLight}"
                     TextColor="White"
                     HeightRequest="40"
                     WidthRequest="40"
@@ -40,7 +40,7 @@
         <Grid Grid.Row="1" ColumnDefinitions="*,*" RowDefinitions="*,*" ColumnSpacing="20" RowSpacing="20">
             <!-- Cards -->
             <Frame Grid.Row="0" Grid.Column="0"
-                   BackgroundColor="#0d47a1"
+                   BackgroundColor="{StaticResource Primary}"
                    CornerRadius="15"
                    Padding="20"
                    HasShadow="True">
@@ -51,10 +51,10 @@
                            TextColor="White"/>
                     <Label Text="Submit and track your leave requests"
                            FontSize="14"
-                           TextColor="#bbdefb"/>
+                           TextColor="{StaticResource OnPrimaryColor}"/>
                     <Button Text="Manage Requests"
                             Clicked="OnLeaveRequestsClicked"
-                            BackgroundColor="#64b5f6"
+                            BackgroundColor="{StaticResource PrimaryLight}"
                             TextColor="White"
                             HeightRequest="50"
                             CornerRadius="25"/>
@@ -68,7 +68,7 @@
         <Label Grid.Row="2"
                Text="© 2025 TDF Application"
                FontSize="12"
-               TextColor="#bbdefb"
+               TextColor="{StaticResource OnPrimaryColor}"
                HorizontalOptions="Center"
                Margin="0,20,0,0"/>
     </Grid>

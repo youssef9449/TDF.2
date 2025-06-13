@@ -80,11 +80,6 @@ namespace TDFMAUI.Services
                     tokenExpiry = expiration;
                 }
 
-                _logger.LogInformation("Token to validate: {TokenPrefix}..., Expiration: {Expiration}, Current UTC: {UtcNow}",
-                    tokenToValidate?.Substring(0, Math.Min(5, tokenToValidate.Length)) ?? "(null)",
-                    tokenExpiry,
-                    DateTime.UtcNow);
-
                 if (!string.IsNullOrEmpty(tokenToValidate) && tokenExpiry > DateTime.UtcNow)
                 {
                     _logger.LogDebug("Using existing valid token for WebSocket connection");
@@ -114,14 +109,11 @@ namespace TDFMAUI.Services
                             return newToken;
                         }
                     }
-                    else
-                    {
-                        _logger.LogWarning("Token refresh attempt failed. No new token available.");
-                        return null; // Explicitly return null if refresh failed
-                    }
                 }
 
-                _logger.LogWarning("No valid token available for WebSocket connection after all attempts.");
+                _logger.LogWarning("No valid token available after refresh attempt for WebSocket connection");
+
+                _logger.LogWarning("No valid token available for WebSocket connection");
                 return null;
             }
             catch (Exception ex)
@@ -163,15 +155,10 @@ namespace TDFMAUI.Services
                     return false;
                 }
 
-                _logger.LogInformation("Current ApiConfig.CurrentToken (before WebSocket connect): {ApiConfigTokenPrefix}..., Expiration: {ApiConfigTokenExpiration}",
-                    ApiConfig.CurrentToken?.Substring(0, Math.Min(5, ApiConfig.CurrentToken.Length)) ?? "(null)",
-                    ApiConfig.TokenExpiration);
-
                 _logger.LogInformation("Using token for WebSocket connection. Token length: {Length}", authToken.Length);
                 _logger.LogInformation("WebSocket token prefix: {Prefix}..., suffix: ...{Suffix}", 
                     authToken.Substring(0, Math.Min(5, authToken.Length)),
                     authToken.Substring(Math.Max(0, authToken.Length - 5)));
-                _logger.LogInformation("Full WebSocket token: {Token}", authToken); // For debugging purposes, log full token
 
                 _webSocket.Options.SetRequestHeader("Authorization", $"Bearer {authToken}");
 

@@ -445,7 +445,7 @@ builder.Services.AddSingleton<WebSocketConnectionManager>();
 builder.Services.AddSingleton<MessageStore>();
 
 // Configure authentication
-var key = Encoding.ASCII.GetBytes(IniConfiguration.JwtSecretKey);
+var key = Encoding.ASCII.GetBytes(builder.Configuration["Jwt:SecretKey"] ?? throw new InvalidOperationException("JWT Secret Key not configured."));
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -464,8 +464,8 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         // Set issuer and audience from configuration
-        ValidIssuer = IniConfiguration.JwtIssuer,
-        ValidAudience = IniConfiguration.JwtAudience,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
         // Add clock skew tolerance to prevent minor timing issues
         ClockSkew = TimeSpan.FromMinutes(1),
         // Require signature validation

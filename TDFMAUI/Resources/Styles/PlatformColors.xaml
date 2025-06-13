@@ -3,11 +3,18 @@
                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
     <!-- Platform-specific colors for Windows -->
     <Color x:Key="WindowsControlHighlightColor">#0078D7</Color>
+    <Color x:Key="WindowsBorderColor">#CCCCCC</Color>
+    <Color x:Key="WindowsControlForegroundColor">#000000</Color>
+    <Color x:Key="WindowsControlBackgroundColor">#FFFFFF</Color>
+    <Color x:Key="WindowsControlDisabledColor">#AAAAAA</Color>
     
     <!-- Platform-specific colors for macOS -->
     <Color x:Key="MacOSControlHighlightColor">#0078D7</Color>
     <Color x:Key="MacOSControlForegroundColor">#000000</Color>
     <Color x:Key="MacOSControlBorderColor">#CCCCCC</Color>
+    <Color x:Key="MacOSControlBackgroundColor">#FFFFFF</Color>
+    <Color x:Key="MacOSControlDisabledColor">#AAAAAA</Color>
+    <Color x:Key="MacOSAccentColor">#007AFF</Color>
     
     <!-- Platform-specific colors for iOS -->
     <Color x:Key="iOSGroupedBackgroundColor">#F2F2F7</Color>

@@ -474,6 +474,13 @@ namespace TDFShared.Services
                 // Standard deserialization for other types
                 try
                 {
+                    // Added paginated result handling
+                    if (typeof(T).IsGenericType && typeof(T).GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                    {
+                        var paginatedResultType = typeof(PaginatedResult<>).MakeGenericType(typeof(T).GetGenericArguments()[0]);
+                        dynamic paginatedResult = JsonSerializer.Deserialize(rawContent, paginatedResultType, _jsonOptions)!;
+                        return (T)paginatedResult.Items;
+                    }
                     var result = JsonSerializer.Deserialize<T>(rawContent, _jsonOptions);
                     if (result == null && !typeof(T).IsValueType)
                     {

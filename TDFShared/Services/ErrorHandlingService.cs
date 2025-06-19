@@ -16,6 +16,10 @@ namespace TDFShared.Services
         private readonly ILogger<ErrorHandlingService> _logger;
         private readonly Dictionary<Type, Func<Exception, string>> _errorHandlers;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ErrorHandlingService"/> class.
+        /// </summary>
+        /// <param name="logger">Logger for error handling events.</param>
         public ErrorHandlingService(ILogger<ErrorHandlingService> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -60,6 +64,12 @@ namespace TDFShared.Services
             return "An unexpected error occurred while communicating with the server.";
         }
 
+        /// <summary>
+        /// Gets a user-friendly error message for the given exception and context.
+        /// </summary>
+        /// <param name="exception">The exception to process.</param>
+        /// <param name="context">Optional context for the error.</param>
+        /// <returns>A user-friendly error message.</returns>
         public string GetFriendlyErrorMessage(Exception exception, string? context = null)
         {
             if (exception == null)
@@ -88,6 +98,12 @@ namespace TDFShared.Services
             return $"{contextPrefix}An unexpected error occurred. Please try again.";
         }
 
+        /// <summary>
+        /// Displays an error message asynchronously for the given exception.
+        /// </summary>
+        /// <param name="exception">The exception to display.</param>
+        /// <param name="context">Optional context for the error.</param>
+        /// <param name="title">Title for the error message.</param>
         public async Task ShowErrorAsync(Exception exception, string? context = null, string title = "Error")
         {
             var message = GetFriendlyErrorMessage(exception, context);
@@ -97,6 +113,11 @@ namespace TDFShared.Services
             _logger.LogError(exception, "Error occurred in {Context}: {Message}", context ?? "unknown context", exception.Message);
         }
 
+        /// <summary>
+        /// Displays an error message asynchronously for the given message.
+        /// </summary>
+        /// <param name="message">The error message to display.</param>
+        /// <param name="title">Title for the error message.</param>
         public async Task ShowErrorAsync(string message, string title = "Error")
         {
             // This is a shared library method - actual UI display should be implemented in platform-specific projects
@@ -107,6 +128,13 @@ namespace TDFShared.Services
             await Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Logs the exception and returns a user-friendly error message.
+        /// </summary>
+        /// <param name="exception">The exception to log and process.</param>
+        /// <param name="context">Context for the error.</param>
+        /// <param name="logger">Optional logger to use.</param>
+        /// <returns>A user-friendly error message.</returns>
         public string LogAndGetFriendlyMessage(Exception exception, string context, ILogger? logger = null)
         {
             var loggerToUse = logger ?? _logger;
@@ -117,6 +145,11 @@ namespace TDFShared.Services
             return friendlyMessage;
         }
 
+        /// <summary>
+        /// Determines whether the exception is a network error.
+        /// </summary>
+        /// <param name="exception">The exception to check.</param>
+        /// <returns>True if the exception is a network error; otherwise, false.</returns>
         public bool IsNetworkError(Exception exception)
         {
             if (exception is HttpRequestException httpEx)
@@ -145,6 +178,11 @@ namespace TDFShared.Services
             return false;
         }
 
+        /// <summary>
+        /// Determines whether the exception is an authentication error.
+        /// </summary>
+        /// <param name="exception">The exception to check.</param>
+        /// <returns>True if the exception is an authentication error; otherwise, false.</returns>
         public bool IsAuthenticationError(Exception exception)
         {
             if (exception is UnauthorizedAccessException)
@@ -165,6 +203,11 @@ namespace TDFShared.Services
             return false;
         }
 
+        /// <summary>
+        /// Determines whether the exception is a validation error.
+        /// </summary>
+        /// <param name="exception">The exception to check.</param>
+        /// <returns>True if the exception is a validation error; otherwise, false.</returns>
         public bool IsValidationError(Exception exception)
         {
             if (exception is ValidationException)

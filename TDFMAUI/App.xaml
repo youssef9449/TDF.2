@@ -8,17 +8,11 @@
              x:Class="TDFMAUI.App">
     <Application.Resources>
         <ResourceDictionary>
+            <!-- Resource dictionaries merged at startup for proper theme support -->
             <ResourceDictionary.MergedDictionaries>
-                <!-- Base color resources with theme bindings -->
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
-                
-                <!-- Platform-specific color resources -->
                 <ResourceDictionary Source="Resources/Styles/PlatformColors.xaml" />
-                
-                <!-- Common styles -->
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
-                
-                <!-- Platform-specific resources will be added dynamically -->
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Font Resources -->

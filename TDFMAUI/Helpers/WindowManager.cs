@@ -2,6 +2,8 @@ using Microsoft.Maui.Platform;
 using System.Runtime.InteropServices;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Platform;
+using Microsoft.Maui;
+using Microsoft.Maui.Devices;
 
 #if WINDOWS
 using Microsoft.UI;

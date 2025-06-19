@@ -3,6 +3,7 @@ using TDFMAUI.Config;
 using TDFMAUI.Services;
 using TDFShared.Services;
 using TDFMAUI.Features.Auth;
+using Microsoft.Maui.Controls;
 
 namespace TDFMAUI.Pages
 {

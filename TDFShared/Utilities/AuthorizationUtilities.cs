@@ -161,10 +161,12 @@ namespace TDFShared.Utilities
             };
         }
 
-        #endregion
-
-        #region Private Helper Methods
- 
+        /// <summary>
+        /// Determines whether the specified user can view the given request.
+        /// </summary>
+        /// <param name="user">The user to check.</param>
+        /// <param name="request">The request to check.</param>
+        /// <returns>True if the user can view the request; otherwise, false.</returns>
         public static bool CanViewRequest(UserDto user, RequestResponseDto request)
         {
             // Admin and HR can view all requests
@@ -177,6 +179,10 @@ namespace TDFShared.Utilities
             return (user.IsManager ?? false) && CanAccessDepartment(user, request.RequestDepartment);
         }
 
+        #endregion
+
+        #region Private Helper Methods
+ 
         private static bool CanEditRequest(UserDto user, RequestResponseDto request)
         {
             // Only pending requests can be edited

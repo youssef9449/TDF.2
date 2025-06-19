@@ -1,5 +1,6 @@
 ﻿﻿using Android.App;
 using Android.Runtime;
+using Microsoft.Maui.Hosting;
 
 namespace TDFMAUI
 {

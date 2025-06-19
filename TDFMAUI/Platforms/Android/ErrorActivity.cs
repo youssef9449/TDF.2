@@ -94,7 +94,15 @@ namespace TDFMAUI
                 }
             }
             catch { /* Use fallback */ }
-            stackText.SetTextColor(textSecondaryColor);
+            
+            // Convert MAUI Color to Android Color
+            var androidColor = Color.Argb(
+                (int)(textSecondaryColor.Alpha * 255),
+                (int)(textSecondaryColor.Red * 255),
+                (int)(textSecondaryColor.Green * 255),
+                (int)(textSecondaryColor.Blue * 255)
+            );
+            stackText.SetTextColor(androidColor);
                 scrollView.AddView(stackText);
                 layout.AddView(scrollView);
 

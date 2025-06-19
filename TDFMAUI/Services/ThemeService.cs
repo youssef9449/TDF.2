@@ -1,4 +1,7 @@
+using Microsoft.Maui.ApplicationModel;
 using Microsoft.Maui.Controls;
+using Microsoft.Maui.Devices;
+using Microsoft.Maui.Graphics;
 using System;
 using System.Threading.Tasks;
 using TDFMAUI.Helpers;

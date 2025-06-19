@@ -3,6 +3,8 @@ using TDFMAUI.Helpers;
 using TDFMAUI.Services;
 using Microsoft.Maui.Controls;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui.Devices;
+using Microsoft.Maui.ApplicationModel;
 
 namespace TDFMAUI.Features.Settings
 {

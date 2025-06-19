@@ -1,6 +1,7 @@
 using Microsoft.Maui.Controls;
 using TDFMAUI.Helpers;
 using TDFMAUI.Extensions;
+using Microsoft.Maui.ApplicationModel;
 
 namespace TDFMAUI.Controls
 {

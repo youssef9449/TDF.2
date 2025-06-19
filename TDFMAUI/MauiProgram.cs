@@ -16,13 +16,16 @@ using System.Diagnostics;
 using TDFShared.Constants;
 using TDFShared.Validation;
 using TDFShared.Services;
-#if ANDROID || IOS || WINDOWS
-using Plugin.Firebase;
-using Plugin.Firebase.Auth; // Added for Firebase Auth
-#endif
-#if !WINDOWS && !MACCATALYST
+using Microsoft.Maui.Hosting;
+using Microsoft.Maui.Controls.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui.Storage;
+#if ANDROID || IOS
+using Plugin.Firebase.CloudMessaging;
 using Plugin.LocalNotification;
 using Plugin.LocalNotification.EventArgs;
+using Plugin.FirebasePushNotifications;
+using Plugin.Firebase.Auth; // Added for Firebase Auth
 #endif
 
 
@@ -55,7 +58,7 @@ namespace TDFMAUI
                         Task.Run(async () => {
                             bool success = await ((PlatformNotificationService)notificationService).UpdateNotificationDeliveryStatusAsync(trackingId, true);
                             if (!success) {
-                                System.Diagnostics.Debug.WriteLine($"Failed to update delivery status for received notification {trackingId}");
+                               Debug.WriteLine($"Failed to update delivery status for received notification {trackingId}");
                             }
                         });
                     }
@@ -63,7 +66,7 @@ namespace TDFMAUI
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in OnLocalNotificationReceived: {ex.Message}");
+                Debug.WriteLine($"Error in OnLocalNotificationReceived: {ex.Message}");
             }
         }
         
@@ -104,12 +107,12 @@ namespace TDFMAUI
         // Stub methods for Windows and macOS platforms
         private static void OnLocalNotificationReceived(object e)
         {
-            System.Diagnostics.Debug.WriteLine("Local notifications not supported on Windows or macOS platforms");
+           Debug.WriteLine("Local notifications not supported on Windows or macOS platforms");
         }
         
         private static void OnLocalNotificationTapped(object e)
         {
-            System.Diagnostics.Debug.WriteLine("Local notifications not supported on Windows or macOS platforms");
+          Debug.WriteLine("Local notifications not supported on Windows or macOS platforms");
         }
 #endif
         public static MauiApp CreateMauiApp()
@@ -119,22 +122,19 @@ builder
                 .UseMauiApp<App>()
                 .UseMauiCommunityToolkit()
 #if !WINDOWS && !MACCATALYST
+                .UseFirebasePushNotifications()
                 .UseLocalNotification(config => {
-                    config.AddCategory(new NotificationCategory(NotificationCategoryType.Status));
+                    config.AddCategory(new Plugin.LocalNotification.NotificationCategory(Plugin.LocalNotification.NotificationCategoryType.Status));
                     Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived += OnLocalNotificationReceived;
                     Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped += OnLocalNotificationTapped;
                 })
-#endif
-#if ANDROID || IOS
-                .UseFirebase(CrossFirebase.Initialize)
 #endif
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSans-Regular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSans-Semibold");
                     fonts.AddFont("materialdesignicons-webfont.ttf", "MaterialDesignIcons");
-                })
-                ;
+                });
 
             try
             {
@@ -180,7 +180,7 @@ builder
 
                                             // Load from the temp file
                                             configBuilder.AddJsonFile(tempFile, optional: false);
-                                            System.Diagnostics.Debug.WriteLine($"Loaded configuration from embedded resource via temp file");
+                                            Debug.WriteLine($"Loaded configuration from embedded resource via temp file");
                                             configLoaded = true;
                                         }
                                     }
@@ -294,8 +294,11 @@ builder
                 sp.GetRequiredService<ILoggerFactory>().CreateLogger<NetworkService>());
             builder.Services.AddSingleton<ILogger<WebSocketService>>(sp => 
                 sp.GetRequiredService<ILoggerFactory>().CreateLogger<WebSocketService>());
+            Console.WriteLine("[MauiProgram] we are before the service");            // Register LookupService
+
             builder.Services.AddSingleton<ILogger<TDFMAUI.Services.ConnectivityService>>(sp => 
                 sp.GetRequiredService<ILoggerFactory>().CreateLogger<TDFMAUI.Services.ConnectivityService>());
+            Console.WriteLine("[MauiProgram] we are past the service");            // Register LookupService
             builder.Services.AddSingleton<LocalStorageService>();
             builder.Services.AddSingleton<ILocalStorageService, LocalStorageService>();
             builder.Services.AddSingleton<IUserPresenceService, UserPresenceService>();
@@ -361,7 +364,7 @@ builder
             builder.Services.AddSingleton<IPlatformNotificationService, PlatformNotificationService>();
             builder.Services.AddSingleton<NotificationService>();
             builder.Services.AddSingleton<IExtendedNotificationService>(sp => sp.GetRequiredService<NotificationService>());
-            builder.Services.AddSingleton<TDFMAUI.Services.INotificationService>(sp => sp.GetRequiredService<IExtendedNotificationService>());
+            builder.Services.AddSingleton<Services.INotificationService>(sp => sp.GetRequiredService<IExtendedNotificationService>());
             
             // Register push notification service
             builder.Services.AddSingleton<PushNotificationService>();
@@ -497,17 +500,21 @@ builder
 
                 // Test AppShell resolution - this can help identify DI issues
                 logger?.LogInformation("Attempting to resolve AppShell from container...");
-                try {
+                try
+                {
                     var appShellLogger = app.Services.GetService<ILogger<AppShell>>();
                     appShellLogger?.LogInformation("About to resolve AppShell from container.");
 
                     var appShell = app.Services.GetService<AppShell>();
                     logger?.LogInformation("AppShell resolution result: {Success}", appShell != null);
 
-                    if (appShell == null) {
+                    if (appShell == null)
+                    {
                         logger?.LogError("CRITICAL: Failed to resolve AppShell from container.");
                     }
-                } catch (Exception shellEx) {
+                }
+                catch (Exception shellEx)
+                {
                     logger?.LogError(shellEx, "Error resolving AppShell from container.");
                     logger?.LogError(shellEx, "Error resolving AppShell");
                 }
@@ -515,41 +522,89 @@ builder
                 // Try to register additional handlers for debugging
                 try
                 {
-                    // Add a handler to log unhandled exceptions in case the AppDomain handler misses them
-                    AppDomain.CurrentDomain.FirstChanceException += (sender, args) =>
-                    {
-                        System.Diagnostics.Debug.WriteLine($"FIRST CHANCE EXCEPTION: {args.Exception.GetType().Name}: {args.Exception.Message}");
-                    };
+                    System.Diagnostics.Debug.WriteLine("[MauiProgram] About to add first chance exception handler");
+                    // Temporarily disable FirstChanceException handler as it might cause hanging
+                    // AppDomain.CurrentDomain.FirstChanceException += (sender, args) =>
+                    // {
+                    //     System.Diagnostics.Debug.WriteLine($"FIRST CHANCE EXCEPTION: {args.Exception.GetType().Name}: {args.Exception.Message}");
+                    // };
 
-                    logger?.LogInformation("Added first chance exception handler");
+                    System.Diagnostics.Debug.WriteLine("[MauiProgram] First chance exception handler setup completed (disabled)");
+                    logger?.LogInformation("First chance exception handler setup completed (disabled)");
                 }
                 catch (Exception ex)
                 {
                     logger?.LogError(ex, "Failed to add first chance exception handler");
                 }
 
-                // Set up network status monitoring
-                var connectivityService = app.Services.GetRequiredService<IConnectivityService>();
-                var apiService = app.Services.GetRequiredService<ApiService>();
-                var webSocketService = app.Services.GetRequiredService<WebSocketService>();
-
-                connectivityService.ConnectivityChanged += async (sender, e) =>
+                // Set up network status monitoring - with error handling
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] About to set up network status monitoring");
+                logger?.LogInformation("About to set up network status monitoring...");
+                try
                 {
-                    if (e.IsConnected)
+                    System.Diagnostics.Debug.WriteLine("[MauiProgram] Inside network monitoring try block");
+                    logger?.LogInformation("Setting up network status monitoring...");
+                    System.Diagnostics.Debug.WriteLine("[MauiProgram] About to resolve ConnectivityService");
+                    var connectivityService = app.Services.GetService<IConnectivityService>();
+                    System.Diagnostics.Debug.WriteLine($"[MauiProgram] ConnectivityService resolved: {connectivityService != null}");
+                    if (connectivityService != null)
                     {
-                        await apiService.TestConnectivityAsync();
-                        await webSocketService.ConnectAsync();
+                        System.Diagnostics.Debug.WriteLine("[MauiProgram] ConnectivityService is not null, setting up event handler");
+                        logger?.LogInformation("ConnectivityService resolved successfully");
+                        
+                        // Set up connectivity monitoring without immediately resolving other services
+                        // to avoid potential circular dependencies or initialization issues
+                        System.Diagnostics.Debug.WriteLine("[MauiProgram] About to set up ConnectivityChanged event handler");
+                        connectivityService.ConnectivityChanged += async (sender, e) =>
+                        {
+                            try
+                            {
+                                logger?.LogInformation($"Connectivity changed: {e.IsConnected}");
+                                
+                                // Resolve services only when needed to avoid initialization deadlocks
+                                var apiService = app.Services.GetService<ApiService>();
+                                var webSocketService = app.Services.GetService<WebSocketService>();
+                                
+                                if (e.IsConnected)
+                                {
+                                    if (apiService != null)
+                                        await apiService.TestConnectivityAsync();
+                                    if (webSocketService != null)
+                                        await webSocketService.ConnectAsync();
+                                }
+                                else
+                                {
+                                    if (webSocketService != null)
+                                        await webSocketService.DisconnectAsync();
+                                }
+                            }
+                            catch (Exception connEx)
+                            {
+                                logger?.LogError(connEx, "Error handling connectivity change");
+                            }
+                        };
+                        
+                        System.Diagnostics.Debug.WriteLine("[MauiProgram] ConnectivityChanged event handler set up successfully");
+                        logger?.LogInformation("Network status monitoring set up successfully");
                     }
                     else
                     {
-                        await webSocketService.DisconnectAsync();
+                        logger?.LogWarning("ConnectivityService not available, skipping network monitoring setup");
                     }
-                };
+                }
+                catch (Exception netEx)
+                {
+                    logger?.LogError(netEx, "Error setting up network status monitoring");
+                    // Don't throw - continue with app initialization
+                }
+                logger?.LogInformation("MauiProgram.CreateMauiApp() completed successfully, returning app");
+                System.Diagnostics.Debug.WriteLine("[MauiProgram] CreateMauiApp completed successfully");
             }
             catch (Exception ex)
             {
                 // Log build/initialization errors critically
                 System.Diagnostics.Debug.WriteLine($"CRITICAL ERROR during App Build/Initialization: {ex}");
+                System.Diagnostics.Debug.WriteLine($"Exception details: {ex}");
                 HandleUnhandledException("AppBuildInitialization", ex);
                 // Depending on the error, you might want to stop the app here
                 throw; // Rethrow to ensure the app doesn't proceed incorrectly
@@ -564,6 +619,7 @@ builder
                  throw new ApplicationException("Failed to build or initialize the MauiApp.");
             }
 
+            System.Diagnostics.Debug.WriteLine("[MauiProgram] About to return MauiApp");
             return app;
         }
 

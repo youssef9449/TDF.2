@@ -9,7 +9,8 @@ using System.Threading;
 using Microsoft.Maui.Devices;
 #if ANDROID || IOS
 using Plugin.Firebase.Core;
-using Plugin.Firebase.Messaging;
+using Plugin.Firebase.CloudMessaging;
+using static Plugin.Firebase.CloudMessaging.CrossFirebaseCloudMessaging;
 #elif WINDOWS
 using Windows.ApplicationModel.Background;
 using Windows.UI.Notifications;

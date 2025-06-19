@@ -3,6 +3,7 @@ using TDFShared.DTOs.Users; // For UpdateUserRequest, ChangePasswordDto
 using TDFShared.DTOs.Auth; // Added for UserDetailsDto
 using Microsoft.Maui.Graphics; // For ImageSource
 using System;
+using Microsoft.Maui.Controls;
 
 namespace TDFMAUI.Services
 {

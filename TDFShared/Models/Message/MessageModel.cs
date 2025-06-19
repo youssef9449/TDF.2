@@ -102,14 +102,9 @@ namespace TDFShared.Models.Message
         [JsonIgnore]
         public bool ShowSenderStatus { get; set; } = true;
         
-        // Backwards compatibility properties
-        [JsonIgnore]
-        public int SenderId 
-        { 
-            get => FromUserId; 
-            set => FromUserId = value; 
-        }
-        
+        /// <summary>
+        /// Gets or sets the sender's name (backwards compatibility).
+        /// </summary>
         [JsonIgnore]
         public string SenderName 
         { 
@@ -117,6 +112,9 @@ namespace TDFShared.Models.Message
             set => FromUserName = value; 
         }
         
+        /// <summary>
+        /// Gets or sets the receiver's user ID (backwards compatibility).
+        /// </summary>
         [JsonIgnore]
         public int ReceiverId 
         { 
@@ -124,6 +122,9 @@ namespace TDFShared.Models.Message
             set => ToUserId = value; 
         }
         
+        /// <summary>
+        /// Gets or sets the receiver's name (backwards compatibility).
+        /// </summary>
         [JsonIgnore]
         public string ReceiverName 
         { 
@@ -131,6 +132,9 @@ namespace TDFShared.Models.Message
             set => ToUserName = value; 
         }
         
+        /// <summary>
+        /// Gets or sets the message content (backwards compatibility).
+        /// </summary>
         [JsonIgnore]
         public string MessageContent 
         { 
@@ -138,6 +142,9 @@ namespace TDFShared.Models.Message
             set => Content = value; 
         }
         
+        /// <summary>
+        /// Gets or sets the timestamp when the message was sent (backwards compatibility).
+        /// </summary>
         [JsonIgnore]
         public DateTime Timestamp 
         { 
@@ -145,15 +152,21 @@ namespace TDFShared.Models.Message
             set => SentAt = value; 
         }
         
+        /// <summary>
+        /// Gets or sets the message ID (backwards compatibility).
+        /// </summary>
         [JsonIgnore]
         public int MessageId
         {
             get => Id;
             set => Id = value;
         }
-
-        // UI specific properties - Should be populated by platform-specific ViewModel
+        
+        /// <summary>
+        /// Gets a value indicating whether the message is unread (backwards compatibility).
+        /// </summary>
         [JsonIgnore]
         public bool IsUnread => !IsRead;
+
     }
 } 

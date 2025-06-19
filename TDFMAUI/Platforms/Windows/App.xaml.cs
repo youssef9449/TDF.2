@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿using Microsoft.UI.Xaml;
+﻿﻿﻿﻿﻿﻿﻿﻿using Microsoft.UI.Xaml;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -17,6 +17,9 @@ using Microsoft.Win32;
 using System.Reflection;
 using System.Security.Principal;
 using System.Linq;
+using Microsoft.Maui.Hosting;
+using Microsoft.Maui;
+using Microsoft.Extensions.DependencyInjection;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -491,6 +494,7 @@ namespace TDFMAUI.WinUI
             try
             {
                 Debug.WriteLine("OnLaunched: Starting initialization");
+                Debug.WriteLine("[Windows.App] OnLaunched called - about to initialize MAUI app");
 
                 // Set up UI thread exception handling before calling base implementation
                 SetupUIThreadExceptionHandling();
@@ -498,8 +502,10 @@ namespace TDFMAUI.WinUI
                 // Call base implementation - this is critical
                 try
                 {
+                    Debug.WriteLine("[Windows.App] About to call base.OnLaunched - this should trigger MAUI app creation");
                     base.OnLaunched(args);
                     Debug.WriteLine("OnLaunched: Base implementation completed successfully");
+                    Debug.WriteLine("[Windows.App] base.OnLaunched completed - MAUI app should now be created");
                 }
                 catch (Exception baseEx)
                 {
@@ -513,16 +519,16 @@ namespace TDFMAUI.WinUI
                     throw;
                 }
 
-                // Add specific UI exception handler for WinUI
+               // Add specific UI exception handler for WinUI
                 if (Microsoft.UI.Xaml.Application.Current != null)
-                {
-                    Microsoft.UI.Xaml.Application.Current.UnhandledException += Current_UnhandledException;
-                    Debug.WriteLine("Registered UnhandledException handler for UI exceptions");
-                }
-                else
-                {
-                    Debug.WriteLine("WARNING: Microsoft.UI.Xaml.Application.Current is null, cannot register exception handler");
-                }
+                    {
+                        Microsoft.UI.Xaml.Application.Current.UnhandledException += Current_UnhandledException;
+                        Debug.WriteLine("Registered UnhandledException handler for UI exceptions");
+                    }
+                    else
+                    {
+                        Debug.WriteLine("WARNING: Microsoft.UI.Xaml.Application.Current is null, cannot register exception handler");
+                    }
 
                 // Register for window closed event
                 try
@@ -685,7 +691,10 @@ namespace TDFMAUI.WinUI
         {
             try
             {
-                return MauiProgram.CreateMauiApp();
+                Debug.WriteLine("[Windows.App] CreateMauiApp called - about to call MauiProgram.CreateMauiApp()");
+                var app = MauiProgram.CreateMauiApp();
+                Debug.WriteLine("[Windows.App] MauiProgram.CreateMauiApp() returned successfully");
+                return app;
             }
             catch (Exception ex)
             {

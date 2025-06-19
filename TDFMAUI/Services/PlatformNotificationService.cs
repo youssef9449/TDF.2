@@ -97,10 +97,11 @@ namespace TDFMAUI.Services
                 // Register for notification delivery events
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived += OnNotificationReceived;
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped += OnNotificationTapped;
-                Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationCancelled += OnNotificationCancelled;
 #endif
 #if MACCATALYST
-                UNUserNotificationCenter.Current.Delegate = new CustomUNUserNotificationCenterDelegate();
+                // For Mac Catalyst, we use the UserNotifications framework
+                // The delegate will be set up when requesting permissions
+                _logger.LogInformation("Mac Catalyst notification support initialized");
 #endif
                 _logger.LogInformation("Notification event handlers initialized successfully");
             }
@@ -441,21 +442,35 @@ namespace TDFMAUI.Services
 #elif MACCATALYST
                 try
                 {
-                    var notification = new NSUserNotification
+                    // Use UserNotifications framework for Mac Catalyst
+                    var content = new UNMutableNotificationContent
                     {
                         Title = title,
-                        InformativeText = message,
-                        SoundName = NSUserNotification.NSUserNotificationDefaultSoundName
+                        Body = message,
+                        Sound = UNNotificationSound.Default
                     };
-                    NSUserNotificationCenter.DefaultUserNotificationCenter.DeliverNotification(notification);
+
+                    // Create a trigger for immediate delivery
+                    var trigger = UNTimeIntervalNotificationTrigger.CreateTrigger(0.1, false);
                     
-                    // Mark as delivered since we can't track macOS notifications reliably
+                    // Create the request
+                    var request = UNNotificationRequest.FromIdentifier(
+                        trackingId ?? Guid.NewGuid().ToString(),
+                        content,
+                        trigger
+                    );
+
+                    // Schedule the notification
+                    var center = UNUserNotificationCenter.Current;
+                    await center.AddNotificationRequestAsync(request);
+                    
+                    // Mark as delivered
                     await UpdateNotificationDeliveryStatusAsync(trackingId, true);
                     return true;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error showing macOS notification");
+                    _logger.LogError(ex, "Error showing Mac Catalyst notification");
                     await UpdateNotificationDeliveryStatusAsync(trackingId, false, ex.Message);
                     return false;
                 }
@@ -492,7 +507,7 @@ namespace TDFMAUI.Services
                     return false;
                 }
 
-#if !WINDOWS
+#if !WINDOWS && !MACCATALYST
                 // Generate a unique notification ID
                 var notificationId = GenerateNotificationId();
 
@@ -534,6 +549,71 @@ namespace TDFMAUI.Services
                 }
 
                 return true;
+#elif MACCATALYST
+                // For Mac Catalyst, use UserNotifications framework
+                try
+                {
+                    // Log the notification for tracking
+                    string trackingId = await LogNotificationAsync(title, message, notificationType, data, false);
+
+                    // Use UserNotifications framework for Mac Catalyst
+                    var content = new UNMutableNotificationContent
+                    {
+                        Title = title,
+                        Body = message,
+                        Sound = UNNotificationSound.Default
+                    };
+
+                    // Add custom data if provided
+                    if (!string.IsNullOrEmpty(data))
+                    {
+                        var dataBytes = System.Text.Encoding.UTF8.GetBytes(data);
+                        var nsData = Foundation.NSData.FromArray(dataBytes);
+                        content.UserInfo = Foundation.NSDictionary.FromObjectAndKey(
+                            Foundation.NSString.FromData(nsData, Foundation.NSStringEncoding.UTF8),
+                            new Foundation.NSString("data")
+                        );
+                    }
+
+                    // Create a trigger for immediate or scheduled delivery
+                    UNNotificationTrigger trigger;
+                    if (fireAt.HasValue)
+                    {
+                        var timeInterval = (fireAt.Value - DateTime.Now).TotalSeconds;
+                        if (timeInterval <= 0) timeInterval = 0.1; // Minimum delay
+                        trigger = UNTimeIntervalNotificationTrigger.CreateTrigger(timeInterval, false);
+                    }
+                    else
+                    {
+                        trigger = UNTimeIntervalNotificationTrigger.CreateTrigger(0.1, false);
+                    }
+                    
+                    // Create the request
+                    var request = UNNotificationRequest.FromIdentifier(
+                        trackingId,
+                        content,
+                        trigger
+                    );
+
+                    // Schedule the notification
+                    var center = UNUserNotificationCenter.Current;
+                    await center.AddNotificationRequestAsync(request);
+                    
+                    // If this is an immediate notification, mark it as delivered
+                    if (!fireAt.HasValue)
+                    {
+                        await UpdateNotificationDeliveryStatusAsync(trackingId, true);
+                    }
+                    
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error showing Mac Catalyst notification");
+                    // Fall back to in-app notification
+                    await ShowLocalNotificationAsync(title, message, notificationType, data);
+                    return false;
+                }
 #endif
                 // For Windows, use in-app notification
                 await ShowLocalNotificationAsync(title, message, notificationType, data);
@@ -1013,7 +1093,7 @@ namespace TDFMAUI.Services
             try
             {
                 // Unregister event handlers
-#if !WINDOWS
+#if !WINDOWS && !MACCATALYST
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived -= OnNotificationReceived;
                 Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationActionTapped -= OnNotificationTapped;
 #endif

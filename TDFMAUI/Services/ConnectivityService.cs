@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.ApplicationModel;
+using Microsoft.Maui.Networking;
 using System;
 using System.Linq;
 using System.Threading.Tasks;

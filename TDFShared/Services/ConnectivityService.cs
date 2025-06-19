@@ -13,15 +13,38 @@ namespace TDFShared.Services
     /// </summary>
     public class ConnectivityService : IConnectivityService
     {
+        /// <summary>
+        /// Logger for connectivity events and errors.
+        /// </summary>
         protected readonly ILogger<ConnectivityService> _logger;
+        /// <summary>
+        /// Indicates whether network monitoring is active.
+        /// </summary>
         protected bool _isMonitoring = false;
+        /// <summary>
+        /// Stores the last known network connectivity state.
+        /// </summary>
         protected bool _lastKnownState = false;
+        /// <summary>
+        /// Lock object for thread-safe state changes.
+        /// </summary>
         protected readonly object _stateLock = new object();
+        /// <summary>
+        /// Timer for periodic connectivity checks.
+        /// </summary>
         protected Timer? _connectivityTimer;
 
-        // Events
+        /// <summary>
+        /// Occurs when network connectivity changes.
+        /// </summary>
         public event EventHandler<TDFConnectivityChangedEventArgs>? ConnectivityChanged;
+        /// <summary>
+        /// Occurs when network connectivity is restored.
+        /// </summary>
         public event EventHandler? NetworkRestored;
+        /// <summary>
+        /// Occurs when network connectivity is lost.
+        /// </summary>
         public event EventHandler? NetworkLost;
 
         public ConnectivityService(ILogger<ConnectivityService> logger)

@@ -14,6 +14,9 @@ using TDFShared.Enums;
 using System.Linq;
 using TDFMAUI.Helpers;
 using TDFMAUI.Features.Dashboard;
+using Microsoft.Maui.Controls;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Maui.ApplicationModel;
 #if ANDROID || IOS
 using Plugin.Firebase.CloudMessaging;
 using Plugin.Firebase.CloudMessaging.EventArgs;
@@ -69,6 +72,21 @@ namespace TDFMAUI
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine("[App] Constructor started");
+                System.Diagnostics.Debug.WriteLine("[App] App constructor called - MauiProgram completed successfully");
+
+                // Always set a visible fallback page immediately
+                MainPage = new ContentPage
+                {
+                    Content = new Label
+                    {
+                        Text = "App is starting...",
+                        VerticalOptions = LayoutOptions.Center,
+                        HorizontalOptions = LayoutOptions.Center,
+                        FontSize = 24
+                    }
+                };
+
                 // Logger will be initialized later via DI. Use Debug.WriteLine for early logs.
                 // _logger = Services?.GetService<ILogger<App>>() ??
                 //     throw new InvalidOperationException("Logger service not available");
@@ -82,17 +100,30 @@ namespace TDFMAUI
                     var exception = args.ExceptionObject as Exception;
                     System.Diagnostics.Debug.WriteLine($"UNHANDLED DOMAIN EXCEPTION: {exception?.GetType().Name}: {exception?.Message}");
                     System.Diagnostics.Debug.WriteLine($"STACK TRACE: {exception?.StackTrace}");
-
-                    // Try to log the exception
                     try
                     {
                         DebugService.LogError("AppDomain", $"UNHANDLED EXCEPTION: {exception?.Message}");
                         DebugService.LogError("AppDomain", $"Stack trace: {exception?.StackTrace}");
-
-                        // Record the crash for recovery tracking
                         ApiConfig.RecordCrash();
                     }
-                    catch { /* Ignore errors from logging errors */ }
+                    catch { }
+                    // Show error page
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        MainPage = new ContentPage
+                        {
+                            BackgroundColor = Colors.Red,
+                            Content = new VerticalStackLayout
+                            {
+                                Padding = new Thickness(20),
+                                Children = {
+                                    new Label { Text = "Critical Error", FontSize = 24, TextColor = Colors.White },
+                                    new Label { Text = exception?.Message, TextColor = Colors.White },
+                                    new Label { Text = exception?.StackTrace, TextColor = Colors.White, FontSize = 12 }
+                                }
+                            }
+                        };
+                    });
                 };
 
                 // Add handler for unhandled UI thread exceptions
@@ -100,20 +131,31 @@ namespace TDFMAUI
                 {
                     System.Diagnostics.Debug.WriteLine($"UNOBSERVED TASK EXCEPTION: {args.Exception?.GetType().Name}: {args.Exception?.Message}");
                     System.Diagnostics.Debug.WriteLine($"STACK TRACE: {args.Exception?.StackTrace}");
-
-                    // Mark as observed so it doesn't crash the app
                     args.SetObserved();
-
-                    // Try to log the exception
                     try
                     {
                         DebugService.LogError("TaskScheduler", $"UNOBSERVED EXCEPTION: {args.Exception?.Message}");
                         DebugService.LogError("TaskScheduler", $"Stack trace: {args.Exception?.StackTrace}");
-
-                        // Record the crash for recovery tracking
                         ApiConfig.RecordCrash();
                     }
-                    catch { /* Ignore errors from logging errors */ }
+                    catch { }
+                    // Show error page
+                    MainThread.BeginInvokeOnMainThread(() =>
+                    {
+                        MainPage = new ContentPage
+                        {
+                            BackgroundColor = Colors.Red,
+                            Content = new VerticalStackLayout
+                            {
+                                Padding = new Thickness(20),
+                                Children = {
+                                    new Label { Text = "Critical Error", FontSize = 24, TextColor = Colors.White },
+                                    new Label { Text = args.Exception?.Message, TextColor = Colors.White },
+                                    new Label { Text = args.Exception?.StackTrace, TextColor = Colors.White, FontSize = 12 }
+                                }
+                            }
+                        };
+                    });
                 };
 
                 // Replace Application.Current.UnhandledException with appropriate handlers
@@ -164,31 +206,30 @@ namespace TDFMAUI
 
                 // Wrap InitializeComponent in detailed error handling
                 try {
+                    System.Diagnostics.Debug.WriteLine("[App] About to call InitializeComponent");
                     InitializeComponent();
-                    System.Diagnostics.Debug.WriteLine("InitializeComponent completed successfully");
+                    System.Diagnostics.Debug.WriteLine("[App] InitializeComponent completed successfully");
 
                     // Initialize theme service for platform-aware theme adaptation
+                    System.Diagnostics.Debug.WriteLine("[App] About to initialize theme service");
                     var themeService = Services?.GetService<ThemeService>();
                     themeService?.Initialize();
+                    System.Diagnostics.Debug.WriteLine("[App] Theme service initialized");
                     
                     // Dynamically merge the correct theme dictionary
+                    System.Diagnostics.Debug.WriteLine("[App] About to call SetThemeColors");
                     SetThemeColors();
-                    // Set a temporary page to satisfy MainPage requirement
-                    MainPage = new ContentPage(); // This will be replaced in OnStart
+                    System.Diagnostics.Debug.WriteLine("[App] SetThemeColors completed");
                 }
                 catch (Exception initEx)
                 {
-                    // Capture detailed information about the XAML parsing error
-                    System.Diagnostics.Debug.WriteLine($"XAML INITIALIZATION ERROR: {initEx.GetType().Name}: {initEx.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[App] XAML INITIALIZATION ERROR: {initEx.GetType().Name}: {initEx.Message}");
                     System.Diagnostics.Debug.WriteLine($"STACK TRACE: {initEx.StackTrace}");
-
                     if (initEx.InnerException != null)
                     {
                         System.Diagnostics.Debug.WriteLine($"INNER EXCEPTION: {initEx.InnerException.GetType().Name}: {initEx.InnerException.Message}");
                         System.Diagnostics.Debug.WriteLine($"INNER STACK TRACE: {initEx.InnerException.StackTrace}");
                     }
-
-                    // Display error on screen instead of crashing
                     MainPage = new ContentPage
                     {
                         BackgroundColor = Colors.Red,
@@ -202,29 +243,14 @@ namespace TDFMAUI
                             }
                         }
                     };
-                    return; // Skip the rest of initialization
+                    return;
                 }
-
-                // DebugService is initialized in MauiProgram.cs before App constructor finishes.
-                // No need to initialize it here.
-
-                // Use standard console logging until DebugService is ready
-                System.Diagnostics.Debug.WriteLine("App constructor starting");
-
-                // Set up Firebase Cloud Messaging for push notifications
-#if ANDROID || IOS
-                SetupFirebaseCloudMessaging();
-#endif
-
-                System.Diagnostics.Debug.WriteLine("App constructor finished");
+                System.Diagnostics.Debug.WriteLine("[App] Constructor finished");
             }
             catch (Exception ex)
             {
-                // This outer catch block handles any errors that might occur before DebugService is initialized
-                System.Diagnostics.Debug.WriteLine($"CRITICAL ERROR: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[App] CRITICAL ERROR: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine(ex.StackTrace);
-
-                // Create a simple error page
                 MainPage = new ContentPage
                 {
                     BackgroundColor = Colors.Red,
@@ -259,10 +285,10 @@ namespace TDFMAUI
             services.AddTransient<MainPage>();
             services.AddTransient<ProfilePage>();
             services.AddTransient<MessagesPage>();
-            services.AddTransient<RequestsPage>(); // Commented out missing page
+            services.AddTransient<RequestsPage>();
             services.AddTransient<GlobalChatPage>();
             services.AddTransient<AdminPage>();
-            services.AddTransient<DashboardPage>(); // Add DashboardPage
+            services.AddTransient<DashboardPage>();
         }
 
         protected override async void OnStart()
@@ -270,6 +296,7 @@ namespace TDFMAUI
             try
             {
                 DebugService.LogInfo("App", "OnStart method entered.");
+                System.Diagnostics.Debug.WriteLine("[App] OnStart entered");
 
                 // Log important app state information
                 DebugService.LogInfo("App", $"Current MainPage type: {MainPage?.GetType().Name ?? "null"}");
@@ -294,117 +321,122 @@ namespace TDFMAUI
                 // MainPage is now set here instead of the constructor
                 DebugService.LogInfo("App", "Calling SetupInitialPageAsync...");
                 await SetupInitialPageAsync(); // Call the setup logic asynchronously
-                DebugService.LogInfo("App", "SetupInitialPageAsync completed.");
-
+                System.Diagnostics.Debug.WriteLine("[App] SetupInitialPageAsync completed");
                 DebugService.LogInfo("App", "OnStart finished");
             }
             catch (Exception ex)
             {
                 DebugService.LogError("App", $"ERROR in OnStart: {ex.Message}");
-                DebugService.LogError("App", $"Stack trace: {ex.StackTrace}");
-            }
-        }
-
-        /// <summary>
-        /// Check if we're starting in safe mode (from Android intent)
-        /// </summary>
-        private void CheckSafeMode()
-        {
-            try
-            {
-                // On Android, we can check the intent extras
-#if ANDROID
-                var context = Android.App.Application.Context;
-                var currentPackageName = context.PackageName;
-                if (context.PackageManager != null && !string.IsNullOrEmpty(currentPackageName))
+                System.Diagnostics.Debug.WriteLine($"[App] ERROR in OnStart: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[App] OnStart Exception Stack Trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
                 {
-                    var intent = context.PackageManager.GetLaunchIntentForPackage(currentPackageName);
-
-                    if (intent?.Extras != null && intent.Extras.ContainsKey("safe_mode"))
+                    System.Diagnostics.Debug.WriteLine($"[App] OnStart Inner Exception: {ex.InnerException.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[App] OnStart Inner Stack Trace: {ex.InnerException.StackTrace}");
+                }
+                
+                // Try to show an error page
+                try
                 {
-                    SafeMode = intent.Extras.GetBoolean("safe_mode", false);
-                    System.Diagnostics.Debug.WriteLine($"Safe mode from intent: {SafeMode}");
+                    DisplayFatalErrorPage("Error during app startup", ex);
+                }
+                catch (Exception displayEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[App] Failed to display error page: {displayEx.Message}");
                 }
             }
         }
-#endif
 
-                // Log the safe mode status
-                System.Diagnostics.Debug.WriteLine($"Application starting in {(SafeMode ? "SAFE MODE" : "NORMAL MODE")}");
-            }
-            catch (Exception ex)
-            {
-                // If there's an error, default to normal mode
-                System.Diagnostics.Debug.WriteLine($"Error checking safe mode: {ex.Message}");
-                SafeMode = false;
-            }
-        }
-
-        /// <summary>
-        /// Sets up the initial app page based on authentication status. Now async.
-        /// </summary>
         private async Task SetupInitialPageAsync()
         {
             DebugService.LogInfo("App", "SetupInitialPageAsync entered.");
+            System.Diagnostics.Debug.WriteLine("[App] SetupInitialPageAsync entered");
             try
             {
                 if (Services == null)
                 {
                     DebugService.LogError("App", "Services not initialized, cannot set up initial page");
+                    System.Diagnostics.Debug.WriteLine("[App] Services not initialized, cannot set up initial page");
                     DisplayFatalErrorPage("App services not initialized correctly.", null);
                     return;
                 }
-
                 ApiConfig.IsDevelopmentMode = true;
-
+                System.Diagnostics.Debug.WriteLine("[App] ApiConfig.IsDevelopmentMode set");
                 if (SafeMode)
                 {
                     DebugService.LogWarning("App", "*** STARTING IN SAFE MODE ***");
-                    DebugService.LogWarning("App", "Some features will be disabled for stability");
+                    System.Diagnostics.Debug.WriteLine("[App] Starting in SAFE MODE");
                     await Shell.Current.GoToAsync("DiagnosticsPage");
                     return;
                 }
-
                 try
                 {
                     var authService = Services.GetRequiredService<IAuthService>();
                     var secureStorage = Services.GetRequiredService<SecureStorageService>();
                     var logger = Services.GetRequiredService<ILogger<App>>();
-
+                    System.Diagnostics.Debug.WriteLine("[App] Got required services for SetupInitialPageAsync");
                     bool hasValidToken = await secureStorage.HandleTokenPersistenceAsync();
+                    System.Diagnostics.Debug.WriteLine($"[App] HandleTokenPersistenceAsync result: {hasValidToken}");
                     UserDto currentUser = hasValidToken ? await authService.GetCurrentUserAsync() : null;
+                    System.Diagnostics.Debug.WriteLine($"[App] GetCurrentUserAsync result: {currentUser != null}");
                     bool isAuthenticated = currentUser != null;
-
                     if (isAuthenticated)
                     {
                         logger.LogInformation("User is authenticated. Setting MainPage to AppShell.");
+                        System.Diagnostics.Debug.WriteLine("[App] User is authenticated. Setting MainPage to AppShell");
                         var shell = Services.GetRequiredService<AppShell>();
                         MainPage = shell;
+                        System.Diagnostics.Debug.WriteLine("[App] MainPage set to AppShell");
                         DebugService.LogInfo("App", "MainPage set to AppShell. Registering WebSocket event handlers.");
                         RegisterWebSocketEventHandlers();
                         DebugService.LogInfo("App", "Navigating to DashboardPage.");
                         await Shell.Current.GoToAsync("DashboardPage");
+                        System.Diagnostics.Debug.WriteLine("[App] Navigated to DashboardPage");
                         DebugService.LogInfo("App", "Navigation to DashboardPage completed.");
                     }
                     else
                     {
                         logger.LogInformation("User is not authenticated. Setting MainPage to LoginPage.");
+                        System.Diagnostics.Debug.WriteLine("[App] User is not authenticated. Setting MainPage to LoginPage");
                         var loginPage = Services.GetRequiredService<TDFMAUI.Features.Auth.LoginPage>();
                         MainPage = new NavigationPage(loginPage);
+                        System.Diagnostics.Debug.WriteLine("[App] MainPage set to LoginPage");
                         DebugService.LogInfo("App", "MainPage set to LoginPage.");
                     }
                 }
                 catch (Exception ex)
                 {
                     DebugService.LogError("App", $"Error preparing next page: {ex.Message}");
-                    DebugService.LogError("App", $"Stack trace: {ex.StackTrace}");
-                    await Shell.Current.GoToAsync("DiagnosticsPage");
+                    System.Diagnostics.Debug.WriteLine($"[App] Error preparing next page: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[App] Error preparing next page stack trace: {ex.StackTrace}");
+                    if (ex.InnerException != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[App] Inner exception: {ex.InnerException.Message}");
+                        System.Diagnostics.Debug.WriteLine($"[App] Inner stack trace: {ex.InnerException.StackTrace}");
+                    }
+                    
+                    // Try to show diagnostics page, but if that fails, show error page
+                    try
+                    {
+                        await Shell.Current.GoToAsync("DiagnosticsPage");
+                    }
+                    catch (Exception navEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[App] Failed to navigate to DiagnosticsPage: {navEx.Message}");
+                        DisplayFatalErrorPage("Failed to set up initial page", ex);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 DebugService.LogError("App", $"Error setting up initial page: {ex.Message}");
-                DebugService.LogError("App", $"Stack trace: {ex.StackTrace}");
+                System.Diagnostics.Debug.WriteLine($"[App] Error setting up initial page: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[App] Error setting up initial page stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[App] Inner exception: {ex.InnerException.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[App] Inner stack trace: {ex.InnerException.StackTrace}");
+                }
                 DisplayFatalErrorPage("Failed to initialize application.", ex);
             }
         }
@@ -1058,9 +1090,6 @@ namespace TDFMAUI
                 // Add adaptive theme bindings programmatically to ensure proper initialization order
                 AddAdaptiveThemeBindings();
 
-                // Ensure all necessary resource dictionaries are merged
-                EnsureAllResourceDictionariesMerged();
-
                 // Let ThemeHelper handle theme application
                 ThemeHelper.ApplyTheme();
 
@@ -1070,6 +1099,7 @@ namespace TDFMAUI
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error setting theme colors: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
             }
         }
         
@@ -1082,14 +1112,20 @@ namespace TDFMAUI
             {
                 var resources = Application.Current.Resources;
                 // Assign adaptive resources directly based on the current theme
-                resources["AdaptiveTextColor"] = resources.ContainsKey("TextColor") ? resources["TextColor"] : Colors.Black;
-                resources["AdaptiveBackgroundColor"] = resources.ContainsKey("BackgroundColor") ? resources["BackgroundColor"] : Colors.White;
-                resources["AdaptiveSurfaceColor"] = resources.ContainsKey("SurfaceColor") ? resources["SurfaceColor"] : Colors.White;
-                resources["AdaptiveBorderColor"] = resources.ContainsKey("BorderColor") ? resources["BorderColor"] : (resources.ContainsKey("TextSecondaryColor") ? resources["TextSecondaryColor"] : Colors.Gray);
+                // These resources are SolidColorBrush, not Color, so we need to extract the Color from them
+                if (resources["TextColor"] is SolidColorBrush textBrush)
+                    resources["AdaptiveTextColor"] = textBrush.Color;
+                if (resources["BackgroundColor"] is SolidColorBrush backgroundBrush)
+                    resources["AdaptiveBackgroundColor"] = backgroundBrush.Color;
+                if (resources["SurfaceColor"] is SolidColorBrush surfaceBrush)
+                    resources["AdaptiveSurfaceColor"] = surfaceBrush.Color;
+                if (resources["BorderColor"] is SolidColorBrush borderBrush)
+                    resources["AdaptiveBorderColor"] = borderBrush.Color;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error adding adaptive theme bindings: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
             }
         }
         
@@ -1158,8 +1194,6 @@ namespace TDFMAUI
                 }
             };
         }
-
-
 
         private void OnWebSocketError(object sender, WebSocketErrorEventArgs e)
         {
@@ -1251,7 +1285,7 @@ namespace TDFMAUI
                             await platformNotificationService.ShowLocalNotificationAsync(
                                  e.Notification?.Title ?? "Notification",
                                  e.Notification?.Body ?? "You have a new message",
-                                 NotificationType.General
+                                 NotificationType.Info
                              );
                         }
 #endif
@@ -1270,5 +1304,31 @@ namespace TDFMAUI
             }
         }
 #endif
+
+        private void CheckSafeMode()
+        {
+            try
+            {
+#if ANDROID
+                var context = Android.App.Application.Context;
+                var currentPackageName = context.PackageName;
+                if (context.PackageManager != null && !string.IsNullOrEmpty(currentPackageName))
+                {
+                    var intent = context.PackageManager.GetLaunchIntentForPackage(currentPackageName);
+                    if (intent?.Extras != null && intent.Extras.ContainsKey("safe_mode"))
+                    {
+                        SafeMode = intent.Extras.GetBoolean("safe_mode", false);
+                        System.Diagnostics.Debug.WriteLine($"Safe mode from intent: {SafeMode}");
+                    }
+                }
+#endif
+                System.Diagnostics.Debug.WriteLine($"Application starting in {(SafeMode ? "SAFE MODE" : "NORMAL MODE")}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error checking safe mode: {ex.Message}");
+                SafeMode = false;
+            }
+        }
     }
 }

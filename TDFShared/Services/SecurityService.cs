@@ -24,6 +24,10 @@ namespace TDFShared.Services
         private const int SALT_SIZE_BYTES = 32;       // 256 bits
         private const int HASH_SIZE_BYTES = 32;       // 256 bits
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SecurityService"/> class.
+        /// </summary>
+        /// <param name="roleService">The role service dependency.</param>
         public SecurityService(IRoleService roleService)
         {
             _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));

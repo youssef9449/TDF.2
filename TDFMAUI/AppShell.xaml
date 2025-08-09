@@ -209,4 +209,9 @@
         <ShellContent ContentTemplate="{DataTemplate auth:SignupPage}" />
     </ShellItem>
 
+    <!-- Hidden ShellContent for LoginPage to enable absolute route navigation -->
+    <ShellItem Route="LoginPage" FlyoutItemIsVisible="False">
+        <ShellContent ContentTemplate="{DataTemplate auth:LoginPage}" />
+    </ShellItem>
+
 </Shell>

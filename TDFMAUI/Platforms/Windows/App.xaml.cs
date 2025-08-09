@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿using Microsoft.UI.Xaml;
+﻿﻿using Microsoft.UI.Xaml;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -12,10 +12,8 @@ using Microsoft.Windows.AppLifecycle;
 using Windows.ApplicationModel.Activation;
 using Microsoft.UI.Dispatching;
 using WinRT;
-using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using System.Reflection;
-using System.Security.Principal;
 using System.Linq;
 using Microsoft.Maui.Hosting;
 using Microsoft.Maui;
@@ -31,13 +29,7 @@ namespace TDFMAUI.WinUI
     /// </summary>
     public partial class App : MauiWinUIApplication
     {
-        // Import RegSvr32 functions to manually register DLLs if needed
-        [DllImport("shell32.dll", SetLastError = true)]
-        static extern IntPtr ShellExecute(IntPtr hwnd, string lpOperation, string lpFile, string lpParameters, string lpDirectory, int nShowCmd);
-
-        // Constants for ShellExecute
-        private const int SW_HIDE = 0;
-        private const string OPERATION_OPEN = "open";
+        private bool _windowActivated = false;
 
         /// <summary>
         /// Initializes the singleton application object.  This is the first line of authored code
@@ -79,30 +71,9 @@ namespace TDFMAUI.WinUI
                 // Check for required Windows UI assemblies before initialization
                 CheckCriticalWindowsAssemblies();
 
-                // Initialize the component without any additional logic that could fail
-                try
-                {
-                    // Call InitializeComponent through reflection to avoid compile-time errors
-                    // This is a workaround for the missing method error
-                    var method = this.GetType().GetMethod("InitializeComponent", 
-                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-                    
-                    if (method != null)
-                    {
-                        method.Invoke(this, null);
-                        Debug.WriteLine("WinUI App initialization completed successfully via reflection");
-                    }
-                    else
-                    {
-                        // If the method doesn't exist, we'll just log it and continue
-                        Debug.WriteLine("InitializeComponent method not found, continuing without initialization");
-                    }
-                }
-                catch (Exception initEx)
-                {
-                    Debug.WriteLine($"Error calling InitializeComponent: {initEx.Message}");
-                    // Continue execution - the app might still work without proper initialization
-                }
+                // For MAUI WinUI applications, InitializeComponent is not needed in the constructor
+                // The base MauiWinUIApplication class handles initialization automatically
+                Debug.WriteLine("WinUI App initialization completed successfully");
             }
             catch (Exception ex)
             {
@@ -317,26 +288,14 @@ namespace TDFMAUI.WinUI
 
                         try
                         {
-                            // Force loading the assembly to assist with COM registration
+                            // Force loading the assembly to assist with initialization
                             var assembly = Assembly.LoadFrom(dllPath);
                             Debug.WriteLine($"Successfully loaded {dll}: {assembly.FullName}");
                             anyDllLoaded = true;
-
-                            // Try to register the DLL if running as admin
-                            if (IsRunningAsAdministrator())
-                            {
-                                RegisterDllWithRegsvr32(dllPath);
-                            }
                         }
                         catch (Exception ex)
                         {
                             Debug.WriteLine($"Failed to load {dll}: {ex.Message}");
-
-                            // Try to register the DLL even if loading failed
-                            if (IsRunningAsAdministrator())
-                            {
-                                RegisterDllWithRegsvr32(dllPath);
-                            }
                         }
                     }
                     else
@@ -368,12 +327,6 @@ namespace TDFMAUI.WinUI
                             // Try to load the assembly
                             var assembly = Assembly.LoadFrom(dll);
                             Debug.WriteLine($"Successfully loaded {Path.GetFileName(dll)}: {assembly.FullName}");
-
-                            // Try to register the DLL if running as admin
-                            if (IsRunningAsAdministrator())
-                            {
-                                RegisterDllWithRegsvr32(dll);
-                            }
                         }
                         catch (Exception ex)
                         {
@@ -395,25 +348,7 @@ namespace TDFMAUI.WinUI
             }
         }
 
-        /// <summary>
-        /// Attempts to register a DLL using regsvr32
-        /// </summary>
-        private void RegisterDllWithRegsvr32(string dllPath)
-        {
-            try
-            {
-                string regsvr32Path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "regsvr32.exe");
-                if (File.Exists(regsvr32Path))
-                {
-                    Debug.WriteLine($"Attempting to register {Path.GetFileName(dllPath)} using regsvr32");
-                    ShellExecute(IntPtr.Zero, OPERATION_OPEN, regsvr32Path, $"/s \"{dllPath}\"", string.Empty, SW_HIDE);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error registering DLL: {ex.Message}");
-            }
-        }
+
 
         private void Current_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
         {
@@ -506,6 +441,121 @@ namespace TDFMAUI.WinUI
                     base.OnLaunched(args);
                     Debug.WriteLine("OnLaunched: Base implementation completed successfully");
                     Debug.WriteLine("[Windows.App] base.OnLaunched completed - MAUI app should now be created");
+
+                    // Immediately activate the window so UI is visible even if startup navigation stalls
+                    try
+                    {
+                        Debug.WriteLine("[Windows.App] Attempting immediate window activation after base.OnLaunched");
+                        MainThread.BeginInvokeOnMainThread(() =>
+                        {
+                            try
+                            {
+                                var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows?.FirstOrDefault();
+                                if (mauiWindow != null)
+                                {
+                                    var platformWindow = mauiWindow.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
+                                    if (platformWindow != null)
+                                    {
+                                        platformWindow.Activate();
+                                        _windowActivated = true;
+                                        Debug.WriteLine("WinUI window activated immediately after OnLaunched.");
+                                    }
+                                    else
+                                    {
+                                        Debug.WriteLine("Platform window not available for immediate activation.");
+                                    }
+                                }
+                                else
+                                {
+                                    Debug.WriteLine("No MAUI window found for immediate activation after OnLaunched.");
+                                }
+                            }
+                            catch (Exception activateEx)
+                            {
+                                Debug.WriteLine($"Error during immediate window activation: {activateEx.Message}");
+                                LogException(activateEx, "WindowActivationImmediate");
+                            }
+                        });
+                    }
+                    catch (Exception immediateEx)
+                    {
+                        Debug.WriteLine($"Immediate window activation block failed: {immediateEx.Message}");
+                        LogException(immediateEx, "WindowActivationImmediateOuter");
+                    }
+                    
+                    // Initialize the main MAUI app after base.OnLaunched completes
+                    Debug.WriteLine("[Windows.App] About to call main app initialization");
+                    Debug.WriteLine($"[Windows.App] Application.Current type: {Microsoft.Maui.Controls.Application.Current?.GetType().FullName ?? "null"}");
+                    
+                    // Use fire-and-forget Task.Run to handle async initialization without blocking OnLaunched
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            Debug.WriteLine("[Windows.App] Task.Run started for main app initialization");
+                            
+                            // Wait a bit for the MAUI app to be fully initialized
+                            await Task.Delay(500); // Increased delay to ensure full initialization
+                            
+                            Debug.WriteLine("[Windows.App] About to check for TDFMAUI.App instance");
+                            if (Microsoft.Maui.Controls.Application.Current is TDFMAUI.App mainApp)
+                            {
+                                Debug.WriteLine("[Windows.App] Found main TDFMAUI.App instance, calling OnStartAsync");
+                                await mainApp.OnStartAsync();
+                                Debug.WriteLine("[Windows.App] Main app OnStartAsync completed successfully");
+                                
+                               // Only activate the window if it hasn't been activated already
+                                if (!_windowActivated)
+                                {
+                                    await MainThread.InvokeOnMainThreadAsync(() =>
+                                     {
+                                        try
+                                        {
+                                            var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows?.FirstOrDefault();
+                                            if (mauiWindow != null)
+                                            {
+                                                var platformWindow = mauiWindow.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
+                                                if (platformWindow != null)
+                                                {
+                                                    platformWindow.Activate();
+                                                    _windowActivated = true;
+                                                    Debug.WriteLine("WinUI window activated successfully after OnStartAsync.");
+                                                }
+                                                else
+                                                {
+                                                    Debug.WriteLine("Failed to get platform window for activation after OnStartAsync.");
+                                                }
+                                            }
+                                            else
+                                            {
+                                                Debug.WriteLine("No MAUI window found to activate after OnStartAsync.");
+                                            }
+                                        }
+                                        catch (Exception activateEx)
+                                        {
+                                            Debug.WriteLine($"Error activating WinUI window after OnStartAsync: {activateEx.Message}");
+                                            LogException(activateEx, "WindowActivationAfterOnStartAsync");
+                                        }
+                                    });
+                                }
+                                else
+                                {
+                                    Debug.WriteLine("Window already activated, skipping duplicate activation after OnStartAsync.");
+                                }
+                            }
+                            else
+                            {
+                                Debug.WriteLine("[Windows.App] WARNING: Could not find main TDFMAUI.App instance");
+                                Debug.WriteLine($"[Windows.App] Available app type: {Microsoft.Maui.Controls.Application.Current?.GetType().FullName ?? "null"}");
+                            }
+                        }
+                        catch (Exception taskEx)
+                        {
+                            Debug.WriteLine($"[Windows.App] Error in OnStartAsync task: {taskEx.Message}");
+                            Debug.WriteLine($"[Windows.App] OnStartAsync task stack trace: {taskEx.StackTrace}");
+                            LogException(taskEx, "OnStartAsyncTask");
+                        }
+                    });
                 }
                 catch (Exception baseEx)
                 {
@@ -725,22 +775,6 @@ namespace TDFMAUI.WinUI
             }
         }
 
-        /// <summary>
-        /// Checks if the application is running with administrator privileges
-        /// </summary>
-        private bool IsRunningAsAdministrator()
-        {
-            try
-            {
-                using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
-                var principal = new WindowsPrincipal(identity);
-                return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error checking admin privileges: {ex.Message}");
-                return false;
-            }
-        }
+
     }
 }

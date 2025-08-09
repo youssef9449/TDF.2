@@ -29,6 +29,7 @@ namespace TDFMAUI
     {
         private readonly ILogger<App> _logger;
         private static IUserSessionService? _userSessionService;
+        private static bool _exceptionHandlersRegistered = false;
 
         /// <summary>
         /// Gets the current user from the centralized session service
@@ -68,183 +69,17 @@ namespace TDFMAUI
         // Flag to indicate if we're in safe mode (passed from Android activity)
         public static bool SafeMode { get; private set; } = false;
 
-        public App()
+        public App(AppShell shell, ILogger<App> logger, IUserSessionService userSessionService)
         {
             try
             {
                 System.Diagnostics.Debug.WriteLine("[App] Constructor started");
-                System.Diagnostics.Debug.WriteLine("[App] App constructor called - MauiProgram completed successfully");
+                InitializeComponent();
 
-                // Always set a visible fallback page immediately
-                MainPage = new ContentPage
-                {
-                    Content = new Label
-                    {
-                        Text = "App is starting...",
-                        VerticalOptions = LayoutOptions.Center,
-                        HorizontalOptions = LayoutOptions.Center,
-                        FontSize = 24
-                    }
-                };
+                _logger = logger;
+                InitializeUserSession(userSessionService);
 
-                // Logger will be initialized later via DI. Use Debug.WriteLine for early logs.
-                // _logger = Services?.GetService<ILogger<App>>() ??
-                //     throw new InvalidOperationException("Logger service not available");
-
-                // Check if we're starting in safe mode (from intent)
-                CheckSafeMode();
-
-                // Set up global unhandled exception handler
-                AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
-                {
-                    var exception = args.ExceptionObject as Exception;
-                    System.Diagnostics.Debug.WriteLine($"UNHANDLED DOMAIN EXCEPTION: {exception?.GetType().Name}: {exception?.Message}");
-                    System.Diagnostics.Debug.WriteLine($"STACK TRACE: {exception?.StackTrace}");
-                    try
-                    {
-                        DebugService.LogError("AppDomain", $"UNHANDLED EXCEPTION: {exception?.Message}");
-                        DebugService.LogError("AppDomain", $"Stack trace: {exception?.StackTrace}");
-                        ApiConfig.RecordCrash();
-                    }
-                    catch { }
-                    // Show error page
-                    MainThread.BeginInvokeOnMainThread(() =>
-                    {
-                        MainPage = new ContentPage
-                        {
-                            BackgroundColor = Colors.Red,
-                            Content = new VerticalStackLayout
-                            {
-                                Padding = new Thickness(20),
-                                Children = {
-                                    new Label { Text = "Critical Error", FontSize = 24, TextColor = Colors.White },
-                                    new Label { Text = exception?.Message, TextColor = Colors.White },
-                                    new Label { Text = exception?.StackTrace, TextColor = Colors.White, FontSize = 12 }
-                                }
-                            }
-                        };
-                    });
-                };
-
-                // Add handler for unhandled UI thread exceptions
-                TaskScheduler.UnobservedTaskException += (sender, args) =>
-                {
-                    System.Diagnostics.Debug.WriteLine($"UNOBSERVED TASK EXCEPTION: {args.Exception?.GetType().Name}: {args.Exception?.Message}");
-                    System.Diagnostics.Debug.WriteLine($"STACK TRACE: {args.Exception?.StackTrace}");
-                    args.SetObserved();
-                    try
-                    {
-                        DebugService.LogError("TaskScheduler", $"UNOBSERVED EXCEPTION: {args.Exception?.Message}");
-                        DebugService.LogError("TaskScheduler", $"Stack trace: {args.Exception?.StackTrace}");
-                        ApiConfig.RecordCrash();
-                    }
-                    catch { }
-                    // Show error page
-                    MainThread.BeginInvokeOnMainThread(() =>
-                    {
-                        MainPage = new ContentPage
-                        {
-                            BackgroundColor = Colors.Red,
-                            Content = new VerticalStackLayout
-                            {
-                                Padding = new Thickness(20),
-                                Children = {
-                                    new Label { Text = "Critical Error", FontSize = 24, TextColor = Colors.White },
-                                    new Label { Text = args.Exception?.Message, TextColor = Colors.White },
-                                    new Label { Text = args.Exception?.StackTrace, TextColor = Colors.White, FontSize = 12 }
-                                }
-                            }
-                        };
-                    });
-                };
-
-                // Replace Application.Current.UnhandledException with appropriate handlers
-                // For MAUI, we need to register platform-specific exception handlers
-                // We'll handle this at a high level using AppDomain
-
-                // Set a global exception handler that will catch exceptions after Initialize
-#if DEBUG
-                // In debug mode, we want to see the exception in the debugger
-                // The debugger break will already be added by MAUI generated code
-#else
-                // In release mode, we want to log and handle the exception
-                AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
-                {
-                    var exception = args.ExceptionObject as Exception;
-                    try
-                    {
-                        // Log the exception
-                        System.Diagnostics.Debug.WriteLine($"CRITICAL UNHANDLED EXCEPTION: {exception?.GetType().Name}: {exception?.Message}");
-                        System.Diagnostics.Debug.WriteLine($"STACK TRACE: {exception?.StackTrace}");
-
-                        // Try to show a simple error UI if possible
-                        MainThread.BeginInvokeOnMainThread(() =>
-                        {
-                            try
-                            {
-                                // Set a very simple error page
-                                MainPage = new ContentPage
-                                {
-                                    BackgroundColor = Colors.Red,
-                                    Content = new VerticalStackLayout
-                                    {
-                                        Padding = new Thickness(20),
-                                        Children = {
-                                            new Label { Text = "Critical Error", FontSize = 24, TextColor = Colors.White },
-                                            new Label { Text = exception?.Message, TextColor = Colors.White },
-                                            new Label { Text = exception?.StackTrace, TextColor = Colors.White, FontSize = 12 }
-                                        }
-                                    }
-                                };
-                            }
-                            catch { /* Last resort - can't even show error page */ }
-                        });
-                    }
-                    catch { /* Ignore errors from logging errors */ }
-                };
-#endif
-
-                // Wrap InitializeComponent in detailed error handling
-                try {
-                    System.Diagnostics.Debug.WriteLine("[App] About to call InitializeComponent");
-                    InitializeComponent();
-                    System.Diagnostics.Debug.WriteLine("[App] InitializeComponent completed successfully");
-
-                    // Initialize theme service for platform-aware theme adaptation
-                    System.Diagnostics.Debug.WriteLine("[App] About to initialize theme service");
-                    var themeService = Services?.GetService<ThemeService>();
-                    themeService?.Initialize();
-                    System.Diagnostics.Debug.WriteLine("[App] Theme service initialized");
-                    
-                    // Dynamically merge the correct theme dictionary
-                    System.Diagnostics.Debug.WriteLine("[App] About to call SetThemeColors");
-                    SetThemeColors();
-                    System.Diagnostics.Debug.WriteLine("[App] SetThemeColors completed");
-                }
-                catch (Exception initEx)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[App] XAML INITIALIZATION ERROR: {initEx.GetType().Name}: {initEx.Message}");
-                    System.Diagnostics.Debug.WriteLine($"STACK TRACE: {initEx.StackTrace}");
-                    if (initEx.InnerException != null)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"INNER EXCEPTION: {initEx.InnerException.GetType().Name}: {initEx.InnerException.Message}");
-                        System.Diagnostics.Debug.WriteLine($"INNER STACK TRACE: {initEx.InnerException.StackTrace}");
-                    }
-                    MainPage = new ContentPage
-                    {
-                        BackgroundColor = Colors.Red,
-                        Content = new VerticalStackLayout
-                        {
-                            Padding = new Thickness(20),
-                            Children = {
-                                new Label { Text = "XAML Initialization Error", FontSize = 24, TextColor = Colors.White },
-                                new Label { Text = initEx.Message, TextColor = Colors.White },
-                                new Label { Text = initEx.StackTrace, TextColor = Colors.White, FontSize = 12 }
-                            }
-                        }
-                    };
-                    return;
-                }
+                System.Diagnostics.Debug.WriteLine("[App] App constructor with DI finished successfully");
                 System.Diagnostics.Debug.WriteLine("[App] Constructor finished");
             }
             catch (Exception ex)
@@ -267,45 +102,102 @@ namespace TDFMAUI
             }
         }
 
-        private void ConfigureServices(ServiceCollection services)
+        private void RegisterGlobalExceptionHandlersOnce()
         {
-            // Register services
-            services.AddSingleton<SecureStorageService>();
-            services.AddSingleton<ApiService>();
-            services.AddSingleton<LookupService>();
+            if (_exceptionHandlersRegistered)
+            {
+                return;
+            }
 
-            // Register ViewModels
-            services.AddTransient<LoginPageViewModel>();
-            services.AddTransient<SignupViewModel>();
-            services.AddTransient<DashboardViewModel>();
+            // AppDomain unhandled exceptions
+            AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
+            {
+                var exception = args.ExceptionObject as Exception;
+                System.Diagnostics.Debug.WriteLine($"UNHANDLED DOMAIN EXCEPTION: {exception?.GetType().Name}: {exception?.Message}");
+                System.Diagnostics.Debug.WriteLine($"STACK TRACE: {exception?.StackTrace}");
+                try
+                {
+                    DebugService.LogError("AppDomain", $"UNHANDLED EXCEPTION: {exception?.Message}");
+                    DebugService.LogError("AppDomain", $"Stack trace: {exception?.StackTrace}");
+                    ApiConfig.RecordCrash();
+                }
+                catch { }
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    MainPage = new ContentPage
+                    {
+                        BackgroundColor = Colors.Red,
+                        Content = new VerticalStackLayout
+                        {
+                            Padding = new Thickness(20),
+                            Children = {
+                                new Label { Text = "Critical Error", FontSize = 24, TextColor = Colors.White },
+                                new Label { Text = exception?.Message, TextColor = Colors.White },
+                                new Label { Text = exception?.StackTrace, TextColor = Colors.White, FontSize = 12 }
+                            }
+                        }
+                    };
+                });
+            };
 
-            // Register pages
-            services.AddTransient<LoginPage>();
-            services.AddTransient<SignupPage>();
-            services.AddTransient<MainPage>();
-            services.AddTransient<ProfilePage>();
-            services.AddTransient<MessagesPage>();
-            services.AddTransient<RequestsPage>();
-            services.AddTransient<GlobalChatPage>();
-            services.AddTransient<AdminPage>();
-            services.AddTransient<DashboardPage>();
+            // Unobserved task exceptions
+            TaskScheduler.UnobservedTaskException += (sender, args) =>
+            {
+                System.Diagnostics.Debug.WriteLine($"UNOBSERVED TASK EXCEPTION: {args.Exception?.GetType().Name}: {args.Exception?.Message}");
+                System.Diagnostics.Debug.WriteLine($"STACK TRACE: {args.Exception?.StackTrace}");
+                args.SetObserved();
+                try
+                {
+                    DebugService.LogError("TaskScheduler", $"UNOBSERVED EXCEPTION: {args.Exception?.Message}");
+                    DebugService.LogError("TaskScheduler", $"Stack trace: {args.Exception?.StackTrace}");
+                    ApiConfig.RecordCrash();
+                }
+                catch { }
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    MainPage = new ContentPage
+                    {
+                        BackgroundColor = Colors.Red,
+                        Content = new VerticalStackLayout
+                        {
+                            Padding = new Thickness(20),
+                            Children = {
+                                new Label { Text = "Critical Error", FontSize = 24, TextColor = Colors.White },
+                                new Label { Text = args.Exception?.Message, TextColor = Colors.White },
+                                new Label { Text = args.Exception?.StackTrace, TextColor = Colors.White, FontSize = 12 }
+                            }
+                        }
+                    };
+                });
+            };
+
+            _exceptionHandlersRegistered = true;
         }
 
-        protected override async void OnStart()
+        private async Task InitializeAndNavigateAsync()
         {
             try
             {
-                DebugService.LogInfo("App", "OnStart method entered.");
-                System.Diagnostics.Debug.WriteLine("[App] OnStart entered");
+                DebugService.LogInfo("App", "InitializeAndNavigateAsync entered.");
 
-                // Log important app state information
-                DebugService.LogInfo("App", $"Current MainPage type: {MainPage?.GetType().Name ?? "null"}");
-                DebugService.LogInfo("App", $"App.Services available: {Services != null}");
-                
+                RegisterGlobalExceptionHandlersOnce();
+                CheckSafeMode();
+
+                // Initialize theme service for platform-aware theme adaptation
+                DebugService.LogInfo("App", "About to initialize theme service");
+                var themeService = Services?.GetService<ThemeService>();
+                themeService?.Initialize();
+                DebugService.LogInfo("App", "Theme service initialized");
+
+                // Dynamically merge the correct theme dictionary
+                DebugService.LogInfo("App", "About to call SetThemeColors");
+                SetThemeColors();
+                DebugService.LogInfo("App", "SetThemeColors completed");
+
                 // Initialize theme helper
                 ThemeHelper.Initialize();
                 DebugService.LogInfo("App", $"Theme initialized: {ThemeHelper.CurrentTheme}");
-                
+
                 // Configure window size and properties for desktop platforms
                 if (DeviceHelper.IsDesktop && Application.Current?.Windows.Count > 0)
                 {
@@ -318,24 +210,23 @@ namespace TDFMAUI
                     DebugService.LogInfo("App", "Subscribed to Window.Destroying event.");
                 }
 
-                // MainPage is now set here instead of the constructor
+                // Set initial page and navigate
                 DebugService.LogInfo("App", "Calling SetupInitialPageAsync...");
-                await SetupInitialPageAsync(); // Call the setup logic asynchronously
+                await SetupInitialPageAsync();
                 System.Diagnostics.Debug.WriteLine("[App] SetupInitialPageAsync completed");
-                DebugService.LogInfo("App", "OnStart finished");
+                DebugService.LogInfo("App", "InitializeAndNavigateAsync finished");
             }
             catch (Exception ex)
             {
-                DebugService.LogError("App", $"ERROR in OnStart: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[App] ERROR in OnStart: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[App] OnStart Exception Stack Trace: {ex.StackTrace}");
+                DebugService.LogError("App", $"ERROR in InitializeAndNavigateAsync: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[App] ERROR in InitializeAndNavigateAsync: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[App] InitializeAndNavigateAsync Exception Stack Trace: {ex.StackTrace}");
                 if (ex.InnerException != null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[App] OnStart Inner Exception: {ex.InnerException.Message}");
-                    System.Diagnostics.Debug.WriteLine($"[App] OnStart Inner Stack Trace: {ex.InnerException.StackTrace}");
+                    System.Diagnostics.Debug.WriteLine($"[App] InitializeAndNavigateAsync Inner Exception: {ex.InnerException.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[App] InitializeAndNavigateAsync Inner Stack Trace: {ex.InnerException.StackTrace}");
                 }
-                
-                // Try to show an error page
+
                 try
                 {
                     DisplayFatalErrorPage("Error during app startup", ex);
@@ -345,6 +236,19 @@ namespace TDFMAUI
                     System.Diagnostics.Debug.WriteLine($"[App] Failed to display error page: {displayEx.Message}");
                 }
             }
+        }
+
+        protected override async void OnStart()
+        {
+            await InitializeAndNavigateAsync();
+        }
+
+        /// <summary>
+        /// Async version of OnStart for platform-specific initialization
+        /// </summary>
+        public async Task OnStartAsync()
+        {
+            await InitializeAndNavigateAsync();
         }
 
         private async Task SetupInitialPageAsync()
@@ -371,37 +275,70 @@ namespace TDFMAUI
                 }
                 try
                 {
+                    System.Diagnostics.Debug.WriteLine("[App] About to get required services");
                     var authService = Services.GetRequiredService<IAuthService>();
+                    System.Diagnostics.Debug.WriteLine("[App] Got IAuthService");
                     var secureStorage = Services.GetRequiredService<SecureStorageService>();
+                    System.Diagnostics.Debug.WriteLine("[App] Got SecureStorageService");
                     var logger = Services.GetRequiredService<ILogger<App>>();
+                    System.Diagnostics.Debug.WriteLine("[App] Got ILogger<App>");
                     System.Diagnostics.Debug.WriteLine("[App] Got required services for SetupInitialPageAsync");
+                    
+                    System.Diagnostics.Debug.WriteLine("[App] About to call HandleTokenPersistenceAsync");
                     bool hasValidToken = await secureStorage.HandleTokenPersistenceAsync();
                     System.Diagnostics.Debug.WriteLine($"[App] HandleTokenPersistenceAsync result: {hasValidToken}");
+                    
+                    System.Diagnostics.Debug.WriteLine("[App] About to call GetCurrentUserAsync");
                     UserDto currentUser = hasValidToken ? await authService.GetCurrentUserAsync() : null;
                     System.Diagnostics.Debug.WriteLine($"[App] GetCurrentUserAsync result: {currentUser != null}");
                     bool isAuthenticated = currentUser != null;
+                    System.Diagnostics.Debug.WriteLine($"[App] User authentication status: {isAuthenticated}");
                     if (isAuthenticated)
                     {
                         logger.LogInformation("User is authenticated. Setting MainPage to AppShell.");
-                        System.Diagnostics.Debug.WriteLine("[App] User is authenticated. Setting MainPage to AppShell");
+                        System.Diagnostics.Debug.WriteLine("[App] About to set MainPage to AppShell");
+                        
+                        System.Diagnostics.Debug.WriteLine("[App] About to get AppShell from services");
                         var shell = Services.GetRequiredService<AppShell>();
+                        System.Diagnostics.Debug.WriteLine($"[App] Got AppShell: {shell != null}");
+                        
+                        System.Diagnostics.Debug.WriteLine("[App] About to set MainPage");
                         MainPage = shell;
-                        System.Diagnostics.Debug.WriteLine("[App] MainPage set to AppShell");
+                        System.Diagnostics.Debug.WriteLine($"[App] MainPage set to AppShell. Current MainPage type: {MainPage?.GetType().Name}");
+                        
                         DebugService.LogInfo("App", "MainPage set to AppShell. Registering WebSocket event handlers.");
                         RegisterWebSocketEventHandlers();
+                        
                         DebugService.LogInfo("App", "Navigating to DashboardPage.");
+                        System.Diagnostics.Debug.WriteLine("[App] About to navigate to DashboardPage");
                         await Shell.Current.GoToAsync("DashboardPage");
                         System.Diagnostics.Debug.WriteLine("[App] Navigated to DashboardPage");
                         DebugService.LogInfo("App", "Navigation to DashboardPage completed.");
                     }
                     else
                     {
-                        logger.LogInformation("User is not authenticated. Setting MainPage to LoginPage.");
-                        System.Diagnostics.Debug.WriteLine("[App] User is not authenticated. Setting MainPage to LoginPage");
-                        var loginPage = Services.GetRequiredService<TDFMAUI.Features.Auth.LoginPage>();
-                        MainPage = new NavigationPage(loginPage);
-                        System.Diagnostics.Debug.WriteLine("[App] MainPage set to LoginPage");
-                        DebugService.LogInfo("App", "MainPage set to LoginPage.");
+                        logger.LogInformation("User is not authenticated. Navigating to LoginPage within AppShell.");
+                        System.Diagnostics.Debug.WriteLine("[App] User not authenticated - ensure AppShell is MainPage and navigate to //LoginPage");
+
+                        // Ensure Shell is the MainPage
+                        if (MainPage is not AppShell)
+                        {
+                            System.Diagnostics.Debug.WriteLine("[App] MainPage is not AppShell. Resolving AppShell and setting as MainPage.");
+                            var shell = Services.GetRequiredService<AppShell>();
+                            MainPage = shell;
+                        }
+
+                        // Navigate to LoginPage using absolute Shell route
+                        try
+                        {
+                            System.Diagnostics.Debug.WriteLine("[App] Navigating to //LoginPage");
+                            await Shell.Current.GoToAsync("//LoginPage");
+                        }
+                        catch (Exception navEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[App] Failed to navigate to //LoginPage: {navEx.Message}");
+                        }
+                        DebugService.LogInfo("App", "Navigated to LoginPage inside AppShell.");
                     }
                 }
                 catch (Exception ex)
@@ -1050,16 +987,16 @@ namespace TDFMAUI
                                                     _userSessionService?.SetCurrentUser(null);
                                                     await secureStorage.RemoveTokenAsync();
 
-                                                    // Navigate to login page
-                                                    var loginPage = Services?.GetService<LoginPage>();
-                                                    if (loginPage != null)
+                                                    // Navigate to login page within Shell
+                                                    if (MainPage is not AppShell)
                                                     {
-                                                        MainPage = loginPage;
+                                                        var shell = Services?.GetService<AppShell>();
+                                                        if (shell != null)
+                                                        {
+                                                            MainPage = shell;
+                                                        }
                                                     }
-                                                    else
-                                                    {
-                                                        await Shell.Current.GoToAsync("LoginPage");
-                                                    }
+                                                    try { await Shell.Current.GoToAsync("//LoginPage"); } catch { }
                                                 }
                                                 catch (Exception ex)
                                                 {
@@ -1199,37 +1136,28 @@ namespace TDFMAUI
         {
             _logger.LogWarning("WebSocket error received: {ErrorCode} - {ErrorMessage}", e.ErrorCode, e.ErrorMessage);
 
-            // Only redirect to login page on mobile platforms
-            if (e.ErrorCode == "401" && DeviceHelper.ShouldHandleAutoReconnect)
+            if (e.ErrorCode == "401")
             {
-                _logger.LogWarning("WebSocket authentication failed, redirecting to login page");
-                if (Services != null)
+                // Ensure Shell and navigate to LoginPage; only auto-redirect on mobile per original intent
+                if (DeviceHelper.ShouldHandleAutoReconnect)
                 {
-                    var loginPage = Services.GetService<LoginPage>();
-                    if (loginPage != null)
+                    if (MainPage is not AppShell)
                     {
-                        MainPage = loginPage;
+                        var shell = Services?.GetService<AppShell>();
+                        if (shell != null)
+                        {
+                            MainPage = shell;
+                        }
                     }
-                    else
-                    {
-                        _logger.LogError("Failed to get LoginPage from service provider");
-                    }
+                    try { MainThread.BeginInvokeOnMainThread(async () => await Shell.Current.GoToAsync("//LoginPage")); } catch { }
+                }
+                else
+                {
+                    _logger.LogInformation("WebSocket authentication failed on desktop platform - skipping automatic redirect");
                 }
             }
-            else if (e.ErrorCode == "401")
-            {
-                _logger.LogInformation("WebSocket authentication failed on desktop platform - skipping login redirect");
-            }
         }
-        public new Page MainPage
-        {
-            get => base.MainPage;
-            set
-            {
-                System.Diagnostics.Debug.WriteLine($"[App] MainPage setter called. Old: {base.MainPage?.GetType().Name ?? "null"}, New: {value?.GetType().Name ?? "null"}");
-                base.MainPage = value;
-            }
-        }
+        
         /// <summary>
         /// Ensures all necessary resource dictionaries are merged into the application's resources.
         /// This prevents issues with AppThemeBinding by keeping all theme dictionaries present.

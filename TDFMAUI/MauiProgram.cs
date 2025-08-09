@@ -119,7 +119,7 @@ namespace TDFMAUI
         {
             var builder = MauiApp.CreateBuilder();
 builder
-                .UseMauiApp<App>()
+                .UseMauiApp(serviceProvider => serviceProvider.GetRequiredService<App>())
                 .UseMauiCommunityToolkit()
 #if !WINDOWS && !MACCATALYST
                 .UseFirebasePushNotifications()
@@ -235,17 +235,7 @@ builder
                     options.DevelopmentMode = isDevelopment;
                 });
 
-                // Manually load into static class for easier access (consider singleton service instead)
-                // URLs are the same for dev and prod, load them directly.
-                // DevelopmentMode will be set by ApiConfig.Initialize to true to allow IP cert bypass.
-                string configSection = "ApiSettings:Development"; // Or "ApiSettings:Production", as they are the same
-
-                ApiConfig.BaseUrl = builder.Configuration[$"{configSection}:BaseUrl"];
-                ApiConfig.WebSocketUrl = builder.Configuration[$"{configSection}:WebSocketUrl"];
-                ApiConfig.Timeout = int.TryParse(builder.Configuration["ApiSettings:Timeout"], out int timeout) ? timeout : 30;
-
-                // Add some debug info
-                System.Diagnostics.Debug.WriteLine($"Config loaded for static ApiConfig: BaseUrl={ApiConfig.BaseUrl}, WebSocketUrl={ApiConfig.WebSocketUrl}");
+                // Prefer Options-based configuration; avoid duplicating into static ApiConfig here
             }
             catch (Exception ex)
             {
@@ -294,11 +284,8 @@ builder
                 sp.GetRequiredService<ILoggerFactory>().CreateLogger<NetworkService>());
             builder.Services.AddSingleton<ILogger<WebSocketService>>(sp => 
                 sp.GetRequiredService<ILoggerFactory>().CreateLogger<WebSocketService>());
-            Console.WriteLine("[MauiProgram] we are before the service");            // Register LookupService
-
             builder.Services.AddSingleton<ILogger<TDFMAUI.Services.ConnectivityService>>(sp => 
                 sp.GetRequiredService<ILoggerFactory>().CreateLogger<TDFMAUI.Services.ConnectivityService>());
-            Console.WriteLine("[MauiProgram] we are past the service");            // Register LookupService
             builder.Services.AddSingleton<LocalStorageService>();
             builder.Services.AddSingleton<ILocalStorageService, LocalStorageService>();
             builder.Services.AddSingleton<IUserPresenceService, UserPresenceService>();
@@ -352,6 +339,10 @@ builder
 
             // Register centralized user session service
             builder.Services.AddSingleton<IUserSessionService, UserSessionService>();
+
+            // Register App and AppShell
+            builder.Services.AddSingleton<App>();
+            builder.Services.AddSingleton<AppShell>();
 
             // Register AuthService with shared HTTP client service
             builder.Services.AddSingleton<AuthService>();
@@ -425,8 +416,7 @@ builder
             builder.Services.AddTransient<MyTeamPage>();
             builder.Services.AddTransient<GlobalChatPage>();
 
-            // Register AppShell
-            builder.Services.AddTransient<AppShell>();
+            // Register AppShell (already registered above)
 
             // HTTP client service already registered above with TDFShared.Services.IHttpClientService
             // ConnectivityService already registered above with TDFShared.Services.IConnectivityService
@@ -436,15 +426,13 @@ builder
             #endif
 
             MauiApp app = null; // Declare app outside try block
+            ILogger logger = null;
             try // Wrap builder.Build() and subsequent initialization
             {
-                // After building the app, initialize network monitoring
-                var logger = builder.Services.BuildServiceProvider().GetService<ILogger<MauiApp>>();
-                logger?.LogInformation("Building MauiApp from builder...");
-
                 try
                 {
                     app = builder.Build();
+                    logger = app.Services.GetService<ILogger<MauiApp>>();
                     logger?.LogInformation("MauiApp built successfully, initializing services...");
                 }
                 catch (Exception ex)
@@ -510,7 +498,8 @@ builder
 
                     if (appShell == null)
                     {
-                        logger?.LogError("CRITICAL: Failed to resolve AppShell from container.");
+                        System.Diagnostics.Debug.WriteLine("[MauiProgram] CRITICAL: AppShell is null after DI resolution!");
+                        throw new Exception("AppShell could not be resolved from DI container.");
                     }
                 }
                 catch (Exception shellEx)

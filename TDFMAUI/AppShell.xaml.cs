@@ -13,10 +13,11 @@ using Microsoft.Maui.Controls;
 using Microsoft.Maui.Devices;
 using TDFMAUI.Helpers;
 using TDFShared.Services;
+using System.Diagnostics;
 
 namespace TDFMAUI
 {
-    public partial class AppShell : Shell, INotifyPropertyChanged
+    public partial class AppShell : Shell
     {
         private readonly IAuthService _authService;
         private readonly ILogger<AppShell> _logger;
@@ -41,47 +42,45 @@ namespace TDFMAUI
 
         public AppShell(IAuthService authService, ILogger<AppShell> logger, IUserPresenceService userPresenceService)
         {
+            Debug.WriteLine("[AppShell] Constructor started");
+            _logger = logger;
+            _logger?.LogInformation("AppShell constructor started.");
+            _logger?.LogInformation("AuthService dependency resolved: {IsResolved}", authService != null);
+
             try
             {
-                _logger = logger;
-                _logger?.LogInformation("AppShell constructor started.");
-                _logger?.LogInformation("AuthService dependency resolved: {IsResolved}", authService != null);
-
-                try
-                {
-                    _logger?.LogInformation("Calling InitializeComponent...");
-                    InitializeComponent();
-                    _logger?.LogInformation("AppShell InitializeComponent successful.");
-                    Routing.RegisterRoute("users", typeof(UsersRightPanel));
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogCritical(ex, "AppShell InitializeComponent FAILED.");
-                    throw;
-                }
-
-                _authService = authService;
-                _userPresenceService = userPresenceService;
-
-                _logger?.LogInformation("AppShell registering routes.");
-                RegisterRoutes();
-                _logger?.LogInformation("Routes registered successfully.");
-
-                BindingContext = this;
-                _logger?.LogInformation("BindingContext set to self.");
-
-                App.UserChanged += OnUserChanged;
-                this.Navigated += OnShellNavigated; // Setup gestures on first navigation and subsequent ones
-                this.Navigating += OnShellNavigating; // Add navigation guard
-
-                _logger?.LogInformation("AppShell constructor completed successfully. Gestures will be set up in OnShellNavigated.");
-
+                _logger?.LogInformation("Calling InitializeComponent...");
+                Debug.WriteLine("[AppShell] Calling InitializeComponent...");
+                InitializeComponent();
+                _logger?.LogInformation("AppShell InitializeComponent successful.");
+                Debug.WriteLine("[AppShell] InitializeComponent successful.");
             }
             catch (Exception ex)
             {
-                _logger?.LogCritical(ex, "Error in AppShell constructor.");
+                _logger?.LogCritical(ex, "AppShell InitializeComponent FAILED.");
+                Debug.WriteLine($"[AppShell] InitializeComponent FAILED: {ex.Message}");
                 throw;
             }
+
+            _authService = authService;
+            _userPresenceService = userPresenceService;
+
+            _logger?.LogInformation("AppShell registering routes.");
+            Debug.WriteLine("[AppShell] Registering routes...");
+            RegisterRoutes();
+            _logger?.LogInformation("Routes registered successfully.");
+            Debug.WriteLine("[AppShell] Routes registered successfully.");
+
+            BindingContext = this;
+            _logger?.LogInformation("BindingContext set to self.");
+            Debug.WriteLine("[AppShell] BindingContext set to self.");
+
+            App.UserChanged += OnUserChanged;
+            this.Navigated += OnShellNavigated; // Setup gestures on first navigation and subsequent ones
+            this.Navigating += OnShellNavigating; // Add navigation guard
+
+            _logger?.LogInformation("AppShell constructor completed successfully. Gestures will be set up in OnShellNavigated.");
+            Debug.WriteLine("[AppShell] Constructor completed successfully.");
         }
 
         private void RegisterRoutes()
@@ -146,6 +145,7 @@ namespace TDFMAUI
             base.OnDisappearing();
             App.UserChanged -= OnUserChanged;
             this.Navigated -= OnShellNavigated;
+            this.Navigating -= OnShellNavigating;
         }
 
         private async void OnLogoutClicked(object sender, EventArgs e)
@@ -166,12 +166,7 @@ namespace TDFMAUI
             }
         }
 
-        public new event PropertyChangedEventHandler PropertyChanged;
-
-        protected new void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
+        
 
         private void OnShellNavigated(object sender, ShellNavigatedEventArgs e)
         {

@@ -58,11 +58,11 @@ namespace TDFMAUI.ViewModels
                     {
                         var messageModel = new MessageModel
                         {
-                            MessageId = dto.MessageId,
-                            SenderId = dto.SenderId,
-                            SenderName = dto.SenderName,
-                            MessageContent = dto.MessageText,
-                            Timestamp = dto.SentAt,
+                            Id = dto.MessageId,
+                            FromUserId = dto.SenderId,
+                            FromUserName = dto.SenderName,
+                            Content = dto.MessageText,
+                            SentAt = dto.SentAt,
                             MessageType = dto.MessageType
                         };
                         Messages.Add(messageModel);
@@ -101,11 +101,11 @@ namespace TDFMAUI.ViewModels
 
                 var messageModel = new MessageModel
                 {
-                    MessageId = sentMessageDto.MessageId,
-                    SenderId = sentMessageDto.SenderId,
-                    SenderName = sentMessageDto.SenderName,
-                    MessageContent = sentMessageDto.MessageText,
-                    Timestamp = sentMessageDto.SentAt,
+                    Id = sentMessageDto.MessageId,
+                    FromUserId = sentMessageDto.SenderId,
+                    FromUserName = sentMessageDto.SenderName,
+                    Content = sentMessageDto.MessageText,
+                    SentAt = sentMessageDto.SentAt,
                     MessageType = sentMessageDto.MessageType
                 };
 
@@ -130,8 +130,8 @@ namespace TDFMAUI.ViewModels
 
                 // Get all unread message IDs from this partner
                 var unreadMessageIds = Messages
-                    .Where(m => m.SenderId == partnerId && !m.IsRead)
-                    .Select(m => m.MessageId)
+                    .Where(m => m.FromUserId == partnerId && !m.IsRead)
+                    .Select(m => m.Id)
                     .ToList();
 
                 if (unreadMessageIds.Any())

@@ -318,15 +318,22 @@ namespace TDFMAUI.Helpers
                 var platformLightResources = DeviceHelper.GetPlatformThemeResources(AppTheme.Light);
                 var platformDarkResources = DeviceHelper.GetPlatformThemeResources(AppTheme.Dark);
                 
-                // Add platform-specific resources
+                // Add only missing platform-specific resources. This keeps XAML-defined
+                // resources authoritative and uses generated values strictly as fallbacks.
                 foreach (var key in platformLightResources.Keys)
                 {
-                    _platformLightThemeResources[key] = platformLightResources[key];
+                    if (!_lightThemeResources.ContainsKey(key))
+                    {
+                        _platformLightThemeResources[key] = platformLightResources[key];
+                    }
                 }
                 
                 foreach (var key in platformDarkResources.Keys)
                 {
-                    _platformDarkThemeResources[key] = platformDarkResources[key];
+                    if (!_darkThemeResources.ContainsKey(key))
+                    {
+                        _platformDarkThemeResources[key] = platformDarkResources[key];
+                    }
                 }
             }
             catch (Exception ex)
@@ -413,11 +420,16 @@ namespace TDFMAUI.Helpers
                 // We just need to ensure the UserAppTheme is set correctly
                 // The AppThemeBinding will handle the color switching automatically
                 
-                // Apply our enhanced theme resources (these will override any conflicts)
+                // Apply enhanced theme resources, but do not replace existing XAML-defined
+                // resources. This prevents C#-generated values from fighting with
+                // AppThemeBinding and merged dictionaries.
                 var themeResources = theme == AppTheme.Dark ? _darkThemeResources : _lightThemeResources;
                 foreach (var key in themeResources.Keys)
                 {
-                    Application.Current.Resources[key] = themeResources[key];
+                    if (!Application.Current.Resources.ContainsKey(key))
+                    {
+                        Application.Current.Resources[key] = themeResources[key];
+                    }
                 }
                 
                 // Apply platform-specific theme resources if enabled
@@ -429,7 +441,10 @@ namespace TDFMAUI.Helpers
                     
                     foreach (var key in platformResources.Keys)
                     {
-                        Application.Current.Resources[key] = platformResources[key];
+                        if (!Application.Current.Resources.ContainsKey(key))
+                        {
+                            Application.Current.Resources[key] = platformResources[key];
+                        }
                     }
                 }
                 

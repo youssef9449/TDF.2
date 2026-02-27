@@ -63,11 +63,13 @@ namespace TDFMAUI.WinUI
                 }
             };
 
+            // Ensure XAML resources are loaded before MAUI app initialization.
+            // If this fails we should fail fast instead of continuing with missing
+            // theme/style resources that cause hard-to-diagnose startup issues.
+            InitializeComponent();
+
             try
             {
-                // Ensure XAML resources are loaded before MAUI app initialization.
-                InitializeComponent();
-
                 // Ensure Windows App SDK components are properly initialized
                 EnsureWindowsAppSDKInitialized();
 
@@ -78,8 +80,8 @@ namespace TDFMAUI.WinUI
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error in WinUI initialization: {ex.Message}");
-                LogException(ex, "WinUI_Initialization");
+                Debug.WriteLine($"Error in WinUI post-XAML initialization: {ex.Message}");
+                LogException(ex, "WinUI_PostXamlInitialization");
 
                 // Try to recover from initialization failure
                 try {
@@ -638,6 +640,11 @@ namespace TDFMAUI.WinUI
                 {
                     // If recovery fails, we'll let the app crash naturally
                 }
+
+                // Do not swallow launch failures; allowing this exception to escape
+                // prevents a half-initialized window from remaining visible while the
+                // app is non-functional and provides reliable crash diagnostics.
+                throw;
             }
         }
 

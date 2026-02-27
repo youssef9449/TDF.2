@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using TDFMAUI.Services;
 using TDFShared.Enums;
+using TDFShared.DTOs.Users;
 using TDFShared.Constants;
 using Microsoft.Maui.Graphics;
 

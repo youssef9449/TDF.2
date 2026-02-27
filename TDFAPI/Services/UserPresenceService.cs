@@ -8,7 +8,6 @@ using TDFShared.Enums;
 using TDFShared.DTOs.Users;
 using TDFAPI.Repositories;
 using TDFAPI.Messaging.Interfaces;
-using TDFShared.DTOs.Messages;
 using TDFShared.Models.Message;
 using TDFShared.Models.User;
 
@@ -57,7 +56,7 @@ namespace TDFAPI.Services
                     throw new KeyNotFoundException($"User with ID {userId} not found");
                 }
 
-                _userPresence[userId] = new UserPresenceInfo
+                var info = new UserPresenceInfo
                 {
                     UserId = userId,
                     Username = user.UserName ?? string.Empty,
@@ -65,8 +64,13 @@ namespace TDFAPI.Services
                     Status = user.PresenceStatus,
                     StatusMessage = user.StatusMessage ?? string.Empty,
                     IsAvailableForChat = user.IsAvailableForChat ?? false,
-                    LastActivity = DateTime.UtcNow
+                    LastActivity = DateTime.UtcNow,
+                    Department = user.Department,
+                    IsOnline = user.IsConnected ?? false,
+                    LastSeen = user.LastActivityTime
                 };
+
+                _userPresence[userId] = info;
 
                 return user.PresenceStatus;
             }
@@ -121,7 +125,10 @@ namespace TDFAPI.Services
                         Status = status,
                         StatusMessage = statusMessage ?? user.StatusMessage ?? string.Empty,
                         IsAvailableForChat = user.IsAvailableForChat ?? false,
-                        LastActivity = DateTime.UtcNow
+                        LastActivity = DateTime.UtcNow,
+                        Department = user.Department,
+                        IsOnline = user.IsConnected ?? false,
+                        LastSeen = user.LastActivityTime
                     },
                     (id, existing) =>
                     {
@@ -259,7 +266,10 @@ namespace TDFAPI.Services
                         Status = user.PresenceStatus,
                         StatusMessage = user.StatusMessage ?? string.Empty,
                         IsAvailableForChat = isAvailable,
-                        LastActivity = DateTime.UtcNow
+                        LastActivity = DateTime.UtcNow,
+                        Department = user.Department,
+                        IsOnline = user.IsConnected ?? false,
+                        LastSeen = user.LastActivityTime
                     },
                     (id, existing) =>
                     {
@@ -289,11 +299,100 @@ namespace TDFAPI.Services
         /// <summary>
         /// Gets a list of all currently online users
         /// </summary>
-        public IEnumerable<UserPresenceInfo> GetOnlineUsers()
+        public Task<IEnumerable<UserPresenceInfo>> GetOnlineUsersAsync()
         {
-            return _userPresence.Values
+            return Task.FromResult<IEnumerable<UserPresenceInfo>>(_userPresence.Values
                 .Where(u => u.Status != UserPresenceStatus.Offline)
-                .ToList();
+                .ToList());
+        }
+
+        /// <summary>
+        /// Updates a user's connection status
+        /// </summary>
+        public async Task UpdateUserConnectionStatusAsync(int userId, bool isOnline, string? connectionId = null, string? deviceType = null)
+        {
+            try
+            {
+                var presence = await GetUserPresenceAsync(userId);
+
+                presence.IsOnline = isOnline;
+                presence.LastSeen = DateTime.UtcNow;
+                presence.Status = isOnline ? UserPresenceStatus.Online : UserPresenceStatus.Offline;
+
+                if (connectionId != null)
+                {
+                    presence.ConnectionId = connectionId;
+                }
+
+                if (deviceType != null)
+                {
+                    presence.DeviceType = deviceType;
+                }
+
+                _userPresence[userId] = presence;
+
+                _logger.LogInformation("Updated user {UserId} connection: {Status}", userId, isOnline ? "Online" : "Offline");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating user {UserId} connection status", userId);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Gets a user's current presence information
+        /// </summary>
+        public async Task<UserPresenceInfo> GetUserPresenceAsync(int userId)
+        {
+            if (_userPresence.TryGetValue(userId, out var presence))
+            {
+                return presence;
+            }
+
+            // Try to load from repository
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user != null)
+            {
+                var info = new UserPresenceInfo
+                {
+                    UserId = userId,
+                    Username = user.UserName ?? string.Empty,
+                    FullName = user.FullName ?? string.Empty,
+                    Status = user.PresenceStatus,
+                    StatusMessage = user.StatusMessage ?? string.Empty,
+                    IsAvailableForChat = user.IsAvailableForChat ?? false,
+                    LastActivity = DateTime.UtcNow,
+                    Department = user.Department,
+                    IsOnline = user.IsConnected ?? false,
+                    LastSeen = user.LastActivityTime
+                };
+                _userPresence[userId] = info;
+                return info;
+            }
+
+            return new UserPresenceInfo
+            {
+                UserId = userId,
+                IsOnline = false,
+                Status = UserPresenceStatus.Offline,
+                LastSeen = DateTime.MinValue
+            };
+        }
+
+        /// <summary>
+        /// Gets presence information for multiple users
+        /// </summary>
+        public async Task<Dictionary<int, UserPresenceInfo>> GetUsersPresenceAsync(IEnumerable<int> userIds)
+        {
+            var result = new Dictionary<int, UserPresenceInfo>();
+
+            foreach (var userId in userIds)
+            {
+                result[userId] = await GetUserPresenceAsync(userId);
+            }
+
+            return result;
         }
     }
     
@@ -304,18 +403,4 @@ namespace TDFAPI.Services
         public string? StatusMessage { get; set; }
         public bool? IsAvailableForChat { get; set; }
     }
-    
-    /// <summary>
-    /// Represents a user's presence information
-    /// </summary>
-    public class UserPresenceInfo
-    {
-        public int UserId { get; set; }
-        public string Username { get; set; } = string.Empty;
-        public string FullName { get; set; } = string.Empty;
-        public UserPresenceStatus Status { get; set; }
-        public string StatusMessage { get; set; } = string.Empty;
-        public bool IsAvailableForChat { get; set; }
-        public DateTime LastActivity { get; set; }
-    }
-} 
+}

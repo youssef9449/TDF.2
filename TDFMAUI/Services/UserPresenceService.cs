@@ -11,7 +11,7 @@ using TDFShared.Constants;
 
 namespace TDFMAUI.Services
 {
-    public class UserPresenceService : IUserPresenceService
+    public class UserPresenceService : IUserPresenceService, IDisposable
     {
         private readonly ApiService _apiService;
         private readonly WebSocketService _webSocketService;
@@ -19,11 +19,11 @@ namespace TDFMAUI.Services
         private readonly ConcurrentDictionary<int, UserPresenceInfo> _userStatuses;
         private readonly Timer _activityTimer;
 
-        public event EventHandler<UserStatusChangedEventArgs> UserStatusChanged;
-        public event EventHandler<UserAvailabilityChangedEventArgs> UserAvailabilityChanged;
-        public event EventHandler<AvailabilitySetEventArgs> AvailabilityConfirmed;
-        public event EventHandler<StatusUpdateConfirmedEventArgs> StatusUpdateConfirmed;
-        public event EventHandler<WebSocketErrorEventArgs> PresenceErrorReceived;
+        public event EventHandler<UserStatusChangedEventArgs>? UserStatusChanged;
+        public event EventHandler<UserAvailabilityChangedEventArgs>? UserAvailabilityChanged;
+        public event EventHandler<AvailabilitySetEventArgs>? AvailabilityConfirmed;
+        public event EventHandler<StatusUpdateConfirmedEventArgs>? StatusUpdateConfirmed;
+        public event EventHandler<WebSocketErrorEventArgs>? PresenceErrorReceived;
 
         public UserPresenceService(
             ApiService apiService,
@@ -102,7 +102,8 @@ namespace TDFMAUI.Services
                         Status = user.PresenceStatus,
                         StatusMessage = user.StatusMessage,
                         IsAvailableForChat = user.IsAvailableForChat ?? false,
-                        ProfilePictureData = user.Picture
+                        ProfilePictureData = user.Picture,
+                        LastActivityTime = user.LastActivityTime ?? DateTime.MinValue
                     };
                 }
 
@@ -123,13 +124,13 @@ namespace TDFMAUI.Services
             }
         }
 
-        private Dictionary<int, UserPresenceInfo> GetCachedUsers()
+        public Dictionary<int, UserPresenceInfo> GetCachedOnlineUsers()
         {
             _logger.LogInformation("Returning cached user statuses. Cache contains {Count} users", _userStatuses.Count);
             return _userStatuses.ToDictionary(kv => kv.Key, kv => kv.Value);
         }
 
-        public async Task UpdateStatusAsync(UserPresenceStatus status, string statusMessage, CancellationToken cancellationToken = default)
+        public async Task UpdateStatusAsync(UserPresenceStatus status, string? statusMessage = null, CancellationToken cancellationToken = default)
         {
             if (App.CurrentUser == null)
             {
@@ -162,7 +163,7 @@ namespace TDFMAUI.Services
                 // Send the status update via WebSocket, only if connected
                 if (_webSocketService.IsConnected)
                 {
-                    await _webSocketService.UpdatePresenceStatusAsync(status.ToString(), statusMessage);
+                    await _webSocketService.UpdatePresenceStatusAsync(status.ToString(), statusMessage ?? string.Empty);
                     _logger.LogInformation("Status update sent via WebSocket");
                 }
                 else
@@ -468,16 +469,6 @@ namespace TDFMAUI.Services
             {
                 _logger.LogError(ex, "Error updating status for user {UserId} to {Status}", userId, status);
             }
-        }
-
-        /// <summary>
-        /// Gets the currently cached online users information for offline usage
-        /// </summary>
-        /// <returns>Dictionary of user IDs mapped to their presence information</returns>
-        public Dictionary<int, UserPresenceInfo> GetCachedOnlineUsers()
-        {
-            _logger.LogInformation("Returning cached user statuses for offline mode");
-            return _userStatuses.ToDictionary(kv => kv.Key, kv => kv.Value);
         }
     }
 }

@@ -1,6 +1,5 @@
-using TDFMAUI.Services;
 using TDFShared.Enums;
-using TDFMAUI.Helpers;
+using TDFShared.DTOs.Users;
 
 namespace TDFMAUI.Services
 {
@@ -42,7 +41,7 @@ namespace TDFMAUI.Services
         /// <summary>
         /// Updates the current user's status and optional status message
         /// </summary>
-        Task UpdateStatusAsync(UserPresenceStatus status, string statusMessage = null, CancellationToken cancellationToken = default);
+        Task UpdateStatusAsync(UserPresenceStatus status, string? statusMessage = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Sets whether the current user is available for chat
@@ -79,63 +78,6 @@ namespace TDFMAUI.Services
         /// Fired when a presence-related error occurs
         /// </summary>
         event EventHandler<WebSocketErrorEventArgs> PresenceErrorReceived;
-    }
-
-    /// <summary>
-    /// Information about a user's presence in the system
-    /// </summary>
-    public class UserPresenceInfo
-    {
-        /// <summary>
-        /// Unique identifier of the user
-        /// </summary>
-        public int UserId { get; set; }
-
-        /// <summary>
-        /// User's full display name
-        /// </summary>
-        public string FullName { get; set; }
-
-        /// <summary>
-        /// User's login username
-        /// </summary>
-        public string Username { get; set; }
-
-        /// <summary>
-        /// Current presence status
-        /// </summary>
-        public UserPresenceStatus Status { get; set; }
-
-        /// <summary>
-        /// Optional custom status message set by the user
-        /// </summary>
-        public string StatusMessage { get; set; }
-
-        /// <summary>
-        /// Whether the user is available for chat
-        /// </summary>
-        public bool IsAvailableForChat { get; set; }
-
-        /// <summary>
-        /// User's department or team
-        /// </summary>
-        public string Department { get; set; }
-
-        /// <summary>
-        /// Timestamp of the user's last activity
-        /// </summary>
-        public DateTime LastActivityTime { get; set; }
-
-        /// <summary>
-        /// Binary data of the user's profile picture
-        /// </summary>
-        public byte[] ProfilePictureData { get; set; }
-
-        /// <summary>
-        /// ID property alias for backward compatibility
-        /// </summary>
-        [Obsolete("Use UserId property instead")]
-        public int Id => UserId;
     }
 
     /// <summary>

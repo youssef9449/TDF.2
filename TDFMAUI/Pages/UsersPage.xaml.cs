@@ -3,6 +3,7 @@ using System.Windows.Input;
 using TDFMAUI.Services;
 using TDFMAUI.ViewModels;
 using TDFShared.Enums;
+using TDFShared.DTOs.Users;
 using Microsoft.Extensions.Logging;
 using TDFMAUI.Helpers;
 

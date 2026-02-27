@@ -25,6 +25,7 @@ namespace TDFMAUI
         private ApiService _apiService;
         private ILogger<UsersRightPanel> _logger;
         private IConnectivityService _connectivityService;
+        private PanelStateService _panelStateService;
 
         private ObservableCollection<UserViewModel> _users = new ObservableCollection<UserViewModel>();
         public ObservableCollection<UserViewModel> Users => _users;
@@ -131,6 +132,7 @@ namespace TDFMAUI
                 _apiService = App.Services.GetService<ApiService>();
                 _logger = App.Services.GetService<ILogger<UsersRightPanel>>();
                 _connectivityService = App.Services.GetService<IConnectivityService>();
+                _panelStateService = App.Services.GetService<PanelStateService>();
 
                 if (_userPresenceService == null) _logger?.LogCritical("UsersRightPanel: IUserPresenceService could not be resolved.");
                 if (_apiService == null) _logger?.LogCritical("UsersRightPanel: ApiService could not be resolved.");
@@ -188,6 +190,9 @@ namespace TDFMAUI
                     _logger?.LogWarning("UserPresenceService is null, cannot subscribe to events");
                 }
 
+                // Register panel
+                _panelStateService?.RegisterPanel(this);
+
                 // Initial load of users
                 await RefreshUsersAsync();
             }
@@ -203,6 +208,9 @@ namespace TDFMAUI
             
             try
             {
+                // Unregister panel
+                _panelStateService?.UnregisterPanel(this);
+
                 // Unsubscribe from events
                 if (_userPresenceService != null)
                 {
@@ -341,41 +349,22 @@ namespace TDFMAUI
 
                 if (isConnected)
                 {
-                    // Get users from the paginated API endpoint
-                    var apiResponse = await _apiService.GetAsync<ApiResponse<PaginatedResult<UserDto>>>(
-                        $"{ApiRoutes.Users.GetAllWithStatus}?pageNumber={CurrentPage}&pageSize=10");
+                    // Get users from the paginated service endpoint
+                    var paginatedResult = await _userPresenceService.GetOnlineUsersAsync(CurrentPage, 10);
                     
-                    if (apiResponse?.Success == true && apiResponse.Data != null)
+                    onlineUsersDetails = new Dictionary<int, UserPresenceInfo>();
+                    foreach (var user in paginatedResult.Items)
                     {
-                        onlineUsersDetails = new Dictionary<int, UserPresenceInfo>();
-                        foreach (var user in apiResponse.Data.Items)
-                        {
-                            onlineUsersDetails[user.UserID] = new UserPresenceInfo
-                            {
-                                UserId = user.UserID,
-                                Username = user.UserName,
-                                FullName = user.FullName,
-                                Department = user.Department,
-                                Status = user.PresenceStatus,
-                                StatusMessage = user.StatusMessage,
-                                IsAvailableForChat = user.IsAvailableForChat ?? false,
-                                ProfilePictureData = user.Picture
-                            };
-                        }
-
-                        // Update pagination info
-                        TotalPages = apiResponse.Data.TotalPages;
-                        HasNextPage = CurrentPage < TotalPages;
-                        HasPreviousPage = CurrentPage > 1;
-                        HasPagination = TotalPages > 1;
-
-                        _logger?.LogInformation("UsersRightPanel: Retrieved {Count} users from service", onlineUsersDetails.Count);
+                        onlineUsersDetails[user.UserId] = user;
                     }
-                    else
-                    {
-                        _logger?.LogWarning("UsersRightPanel: API returned unsuccessful response");
-                        onlineUsersDetails = new Dictionary<int, UserPresenceInfo>();
-                    }
+
+                    // Update pagination info
+                    TotalPages = paginatedResult.TotalPages;
+                    HasNextPage = paginatedResult.HasNextPage;
+                    HasPreviousPage = paginatedResult.HasPreviousPage;
+                    HasPagination = paginatedResult.TotalPages > 1;
+
+                    _logger?.LogInformation("UsersRightPanel: Retrieved {Count} users from service", onlineUsersDetails.Count);
                 }
                 else
                 {

@@ -157,6 +157,17 @@ public partial class MessagesPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        // Unsubscribe first to avoid duplicate subscriptions
+        _webSocketService.ChatMessageReceived -= OnChatMessageReceived;
+        _webSocketService.MessageStatusChanged -= OnMessageStatusChanged;
+        _userPresenceService.UserStatusChanged -= OnUserStatusChanged;
+
+        // Register for real-time updates
+        _webSocketService.ChatMessageReceived += OnChatMessageReceived;
+        _webSocketService.MessageStatusChanged += OnMessageStatusChanged;
+        _userPresenceService.UserStatusChanged += OnUserStatusChanged;
+
         await LoadMessages();
         await LoadUserStatuses();
     }

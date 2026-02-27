@@ -176,9 +176,13 @@ namespace TDFMAUI
             
             try
             {
-                // Subscribe to presence events
+                // Unsubscribe first to avoid duplicate subscriptions
                 if (_userPresenceService != null)
                 {
+                    _userPresenceService.UserStatusChanged -= OnUserPresenceServiceStatusChanged;
+                    _userPresenceService.UserAvailabilityChanged -= OnUserAvailabilityChanged;
+
+                    // Subscribe to presence events
                     _userPresenceService.UserStatusChanged += OnUserPresenceServiceStatusChanged;
                     _userPresenceService.UserAvailabilityChanged += OnUserAvailabilityChanged;
                     _logger?.LogInformation("Subscribed to user presence events");

@@ -48,6 +48,13 @@ namespace TDFMAUI.Pages
         {
             base.OnAppearing();
 
+            // Unsubscribe first to avoid duplicate subscriptions
+            _userPresenceService.UserStatusChanged -= OnUserStatusChanged;
+            _userPresenceService.UserAvailabilityChanged -= OnUserAvailabilityChanged;
+            _userPresenceService.AvailabilityConfirmed -= OnAvailabilityConfirmed;
+            _userPresenceService.StatusUpdateConfirmed -= OnStatusUpdateConfirmed;
+            _userPresenceService.PresenceErrorReceived -= OnPresenceErrorReceived;
+
             // Subscribe to events
             _userPresenceService.UserStatusChanged += OnUserStatusChanged;
             _userPresenceService.UserAvailabilityChanged += OnUserAvailabilityChanged;

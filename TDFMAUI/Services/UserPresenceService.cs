@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using TDFMAUI.Helpers;
 using TDFShared.Enums;
 using TDFShared.DTOs.Users;
+using TDFShared.DTOs.Common;
 
 namespace TDFMAUI.Services
 {
@@ -29,10 +30,10 @@ namespace TDFMAUI.Services
             IUserPresenceCacheService cacheService,
             ILogger<UserPresenceService> logger)
         {
-            _apiService = apiService;
-            _eventsService = eventsService;
-            _cacheService = cacheService;
-            _logger = logger;
+            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _eventsService = eventsService ?? throw new ArgumentNullException(nameof(eventsService));
+            _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _eventsService.UserStatusChanged += OnUserStatusChanged;
             _eventsService.UserAvailabilityChanged += OnUserAvailabilityChanged;
@@ -84,23 +85,61 @@ namespace TDFMAUI.Services
 
         public async Task UpdateStatusAsync(UserPresenceStatus status, string? statusMessage = null, CancellationToken cancellationToken = default)
         {
-            if (App.CurrentUser == null || App.CurrentUser.UserID <= 0) return;
+            if (App.CurrentUser == null || App.CurrentUser.UserID <= 0)
+            {
+                _logger.LogWarning("Cannot update status: Current user is null or has invalid ID");
+                return;
+            }
 
             int userId = App.CurrentUser.UserID;
             try
             {
-                await _eventsService.UpdatePresenceStatusAsync(status.ToString(), statusMessage ?? string.Empty);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // WebSocket update
+                if (_eventsService.IsConnected)
+                {
+                    await _eventsService.UpdatePresenceStatusAsync(status.ToString(), statusMessage ?? string.Empty);
+                    _logger.LogInformation("Status update sent via WebSocket");
+                }
+                else
+                {
+                    _logger.LogWarning("WebSocket is not connected, status update skipped for WebSocket");
+                }
+
+                // API update
                 await _apiService.UpdateUserConnectionStatusAsync(userId, status != UserPresenceStatus.Offline);
 
+                // Local cache update
                 if (_cacheService.TryGetUserStatus(userId, out var userInfo))
                 {
                     userInfo.Status = status;
                     userInfo.StatusMessage = statusMessage;
                 }
+                else
+                {
+                    _cacheService.UpdateUserStatus(userId, new UserPresenceInfo
+                    {
+                        UserId = userId,
+                        Username = App.CurrentUser.UserName,
+                        FullName = App.CurrentUser.FullName,
+                        Status = status,
+                        StatusMessage = statusMessage,
+                        LastActivityTime = DateTime.UtcNow
+                    });
+                }
+
+                _logger.LogInformation("Successfully updated user status to {Status}", status);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Status update operation was cancelled");
+                throw;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating presence status");
+                _logger.LogError(ex, "Error updating presence status to {Status}", status);
+                throw;
             }
         }
 
@@ -128,14 +167,17 @@ namespace TDFMAUI.Services
             {
                 await UpdateStatusAsync(status, statusMessage);
             }
-            else if (_cacheService.TryGetUserStatus(userId, out var userInfo))
+            else
             {
-                userInfo.Status = status;
-                userInfo.StatusMessage = statusMessage;
+                if (_cacheService.TryGetUserStatus(userId, out var userInfo))
+                {
+                    userInfo.Status = status;
+                    userInfo.StatusMessage = statusMessage;
+                }
+
                 UserStatusChanged?.Invoke(this, new UserStatusChangedEventArgs
                 {
                     UserId = userId,
-                    Username = userInfo.Username,
                     Status = status,
                     StatusMessage = statusMessage
                 });
@@ -147,6 +189,11 @@ namespace TDFMAUI.Services
             if (App.CurrentUser != null && App.CurrentUser.UserID == userId)
             {
                 await _eventsService.SendActivityPingAsync();
+            }
+
+            if (_cacheService.TryGetUserStatus(userId, out var userInfo))
+            {
+                userInfo.LastActivityTime = DateTime.UtcNow;
             }
         }
 
@@ -184,7 +231,14 @@ namespace TDFMAUI.Services
         {
             if (App.CurrentUser != null && _eventsService.IsConnected)
             {
-                await _eventsService.SendActivityPingAsync();
+                try
+                {
+                    await _eventsService.SendActivityPingAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error sending activity ping");
+                }
             }
         }
 
@@ -195,6 +249,17 @@ namespace TDFMAUI.Services
                 userInfo.Status = e.Status;
                 userInfo.StatusMessage = e.StatusMessage;
             }
+            else
+            {
+                _cacheService.UpdateUserStatus(e.UserId, new UserPresenceInfo
+                {
+                    UserId = e.UserId,
+                    Username = e.Username,
+                    Status = e.Status,
+                    StatusMessage = e.StatusMessage,
+                    LastActivityTime = DateTime.UtcNow
+                });
+            }
             UserStatusChanged?.Invoke(this, e);
         }
 
@@ -204,16 +269,37 @@ namespace TDFMAUI.Services
             {
                 userInfo.IsAvailableForChat = e.IsAvailableForChat;
             }
+            else
+            {
+                 _cacheService.UpdateUserStatus(e.UserId, new UserPresenceInfo
+                {
+                    UserId = e.UserId,
+                    Username = e.Username,
+                    IsAvailableForChat = e.IsAvailableForChat,
+                    LastActivityTime = e.Timestamp
+                });
+            }
             UserAvailabilityChanged?.Invoke(this, e);
         }
 
         private void OnAvailabilitySet(object? sender, AvailabilitySetEventArgs e)
         {
+            _logger.LogInformation("Confirmation received: Availability set to {IsAvailable}", e.IsAvailable);
+            if (App.CurrentUser != null && _cacheService.TryGetUserStatus(App.CurrentUser.UserID, out var userInfo))
+            {
+                userInfo.IsAvailableForChat = e.IsAvailable;
+            }
             AvailabilityConfirmed?.Invoke(this, e);
         }
 
         private void OnStatusUpdateConfirmed(object? sender, StatusUpdateConfirmedEventArgs e)
         {
+            _logger.LogInformation("Confirmation received: Status updated to {Status} ({StatusMessage})", e.Status, e.StatusMessage ?? "null");
+            if (App.CurrentUser != null && _cacheService.TryGetUserStatus(App.CurrentUser.UserID, out var userInfo))
+            {
+                userInfo.Status = ParseStatus(e.Status);
+                userInfo.StatusMessage = e.StatusMessage;
+            }
             StatusUpdateConfirmed?.Invoke(this, e);
         }
 

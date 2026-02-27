@@ -16,11 +16,11 @@ namespace TDFMAUI.Services
 
         public UserPresenceApiService(ApiService apiService, ILogger<UserPresenceApiService> logger)
         {
-            _apiService = apiService;
-            _logger = logger;
+            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public async Task<UserPresenceInfo> GetUserStatusAsync(int userId)
+        public async Task<UserPresenceInfo?> GetUserStatusAsync(int userId)
         {
             try
             {
@@ -38,6 +38,7 @@ namespace TDFMAUI.Services
         {
             try
             {
+                _logger.LogInformation("Fetching paginated users with status from API: page={Page}, pageSize={PageSize}", page, pageSize);
                 var apiResponse = await _apiService.GetAsync<ApiResponse<PaginatedResult<UserDto>>>(
                     $"{ApiRoutes.Users.GetAllWithStatus}?pageNumber={page}&pageSize={pageSize}");
 
@@ -61,6 +62,8 @@ namespace TDFMAUI.Services
                     }
                     return new PaginatedResult<UserPresenceInfo>(items, page, pageSize, apiResponse.Data.TotalCount);
                 }
+
+                _logger.LogWarning("API returned unsuccessful response for users: {Message}", apiResponse?.Message);
             }
             catch (Exception ex)
             {
@@ -78,6 +81,11 @@ namespace TDFMAUI.Services
                     string.Format(ApiRoutes.Users.UpdateConnection, userId),
                     updateData,
                     false);
+                _logger.LogInformation("Successfully updated connection status via API for user {UserId}", userId);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("API status update was cancelled for user {UserId}", userId);
             }
             catch (Exception ex)
             {

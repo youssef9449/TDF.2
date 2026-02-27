@@ -32,6 +32,9 @@ namespace TDFMAUI
         private static IUserSessionService? _userSessionService;
         private static bool _exceptionHandlersRegistered = false;
         private bool _startupInitialized;
+        private static readonly TimeSpan SetupInitialPageTimeout = TimeSpan.FromSeconds(20);
+        private static readonly TimeSpan TokenValidationTimeout = TimeSpan.FromSeconds(8);
+        private static readonly TimeSpan CurrentUserLookupTimeout = TimeSpan.FromSeconds(10);
 
         /// <summary>
         /// Gets the current user from the centralized session service
@@ -230,7 +233,7 @@ namespace TDFMAUI
 
                 // Set initial page and navigate
                 DebugService.LogInfo("App", "Calling SetupInitialPageAsync...");
-                await SetupInitialPageAsync();
+                await SetupInitialPageAsync(cancellationToken);
                 System.Diagnostics.Debug.WriteLine("[App] SetupInitialPageAsync completed");
                 DebugService.LogInfo("App", "InitializeAndNavigateAsync finished");
                 _startupInitialized = true;
@@ -277,6 +280,8 @@ namespace TDFMAUI
 
         private async Task ApplyThemeWhenWindowReadyAsync(CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             // On desktop (especially WinUI), theme resources should be applied only after a
             // concrete window exists to avoid race conditions during startup.
             if (DeviceHelper.IsDesktop)
@@ -303,6 +308,7 @@ namespace TDFMAUI
                 throw new TimeoutException("Timed out waiting for a window before applying theme resources.");
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             ThemeHelper.Initialize();
             DebugService.LogInfo("App", $"Theme initialized: {ThemeHelper.CurrentTheme}");
             ThemeHelper.ApplyTheme();
@@ -322,10 +328,11 @@ namespace TDFMAUI
             await InitializeAndNavigateAsync(cancellationToken);
         }
 
-        private async Task SetupInitialPageAsync()
+        private async Task SetupInitialPageAsync(CancellationToken cancellationToken = default)
         {
             DebugService.LogInfo("App", "SetupInitialPageAsync entered.");
             System.Diagnostics.Debug.WriteLine("[App] SetupInitialPageAsync entered");
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 if (Services == null)
@@ -335,6 +342,9 @@ namespace TDFMAUI
                     DisplayFatalErrorPage("App services not initialized correctly.", null);
                     return;
                 }
+                using var setupTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                setupTimeout.CancelAfter(SetupInitialPageTimeout);
+
                 ApiConfig.IsDevelopmentMode = true;
                 System.Diagnostics.Debug.WriteLine("[App] ApiConfig.IsDevelopmentMode set");
                 if (SafeMode)
@@ -356,11 +366,21 @@ namespace TDFMAUI
                     System.Diagnostics.Debug.WriteLine("[App] Got required services for SetupInitialPageAsync");
                     
                     System.Diagnostics.Debug.WriteLine("[App] About to call HandleTokenPersistenceAsync");
-                    bool hasValidToken = await secureStorage.HandleTokenPersistenceAsync();
+                    bool hasValidToken = await ExecuteWithTimeoutAsync(
+                        () => secureStorage.HandleTokenPersistenceAsync(),
+                        TokenValidationTimeout,
+                        setupTimeout.Token,
+                        "HandleTokenPersistenceAsync");
                     System.Diagnostics.Debug.WriteLine($"[App] HandleTokenPersistenceAsync result: {hasValidToken}");
                     
                     System.Diagnostics.Debug.WriteLine("[App] About to call GetCurrentUserAsync");
-                    UserDto currentUser = hasValidToken ? await authService.GetCurrentUserAsync() : null;
+                    UserDto currentUser = hasValidToken
+                        ? await ExecuteWithTimeoutAsync(
+                            () => authService.GetCurrentUserAsync(),
+                            CurrentUserLookupTimeout,
+                            setupTimeout.Token,
+                            "GetCurrentUserAsync")
+                        : null;
                     System.Diagnostics.Debug.WriteLine($"[App] GetCurrentUserAsync result: {currentUser != null}");
                     bool isAuthenticated = currentUser != null;
                     System.Diagnostics.Debug.WriteLine($"[App] User authentication status: {isAuthenticated}");
@@ -446,6 +466,18 @@ namespace TDFMAUI
                     System.Diagnostics.Debug.WriteLine($"[App] Inner stack trace: {ex.InnerException.StackTrace}");
                 }
                 DisplayFatalErrorPage("Failed to initialize application.", ex);
+            }
+        }
+
+        private static async Task<T> ExecuteWithTimeoutAsync<T>(Func<Task<T>> operation, TimeSpan timeout, CancellationToken cancellationToken, string operationName)
+        {
+            try
+            {
+                return await operation().WaitAsync(timeout, cancellationToken);
+            }
+            catch (TimeoutException ex)
+            {
+                throw new TimeoutException($"Operation '{operationName}' exceeded timeout of {timeout.TotalSeconds:0.#} seconds.", ex);
             }
         }
 

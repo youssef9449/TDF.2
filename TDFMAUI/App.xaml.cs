@@ -248,26 +248,32 @@ namespace TDFMAUI
 
         private async Task ApplyThemeWhenWindowReadyAsync()
         {
-            const int maxAttempts = 25;
-            const int delayMs = 50;
-
-            for (var attempt = 0; attempt < maxAttempts; attempt++)
+            // On desktop (especially WinUI), theme resources should be applied only after a
+            // concrete window exists to avoid race conditions during startup.
+            if (DeviceHelper.IsDesktop)
             {
-                if (Application.Current?.Windows?.Count > 0)
+                const int maxAttempts = 200;
+                const int delayMs = 50;
+
+                for (var attempt = 0; attempt < maxAttempts; attempt++)
                 {
-                    ThemeHelper.Initialize();
-                    DebugService.LogInfo("App", $"Theme initialized: {ThemeHelper.CurrentTheme}");
-                    ThemeHelper.ApplyTheme();
-                    ThemeHelper.ApplyPlatformSpecificAdaptations();
-                    return;
+                    if (Application.Current?.Windows?.Count > 0)
+                    {
+                        ThemeHelper.Initialize();
+                        DebugService.LogInfo("App", $"Theme initialized: {ThemeHelper.CurrentTheme}");
+                        ThemeHelper.ApplyTheme();
+                        ThemeHelper.ApplyPlatformSpecificAdaptations();
+                        return;
+                    }
+
+                    await Task.Delay(delayMs);
                 }
 
-                await Task.Delay(delayMs);
+                throw new TimeoutException("Timed out waiting for a window before applying theme resources.");
             }
 
-            DebugService.LogInfo("App", "Window was not ready in time for deferred theme initialization; applying anyway.");
             ThemeHelper.Initialize();
-            DebugService.LogInfo("App", $"Theme initialized (fallback): {ThemeHelper.CurrentTheme}");
+            DebugService.LogInfo("App", $"Theme initialized: {ThemeHelper.CurrentTheme}");
             ThemeHelper.ApplyTheme();
             ThemeHelper.ApplyPlatformSpecificAdaptations();
         }

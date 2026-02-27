@@ -506,9 +506,10 @@ namespace TDFMAUI.WinUI
                         Debug.WriteLine("[Windows.App] About to check for TDFMAUI.App instance");
                         if (Microsoft.Maui.Controls.Application.Current is not TDFMAUI.App mainApp)
                         {
-                            Debug.WriteLine("[Windows.App] WARNING: Could not find main TDFMAUI.App instance");
-                            Debug.WriteLine($"[Windows.App] Available app type: {Microsoft.Maui.Controls.Application.Current?.GetType().FullName ?? "null"}");
-                            return;
+                            var appType = Microsoft.Maui.Controls.Application.Current?.GetType().FullName ?? "null";
+                            Debug.WriteLine("[Windows.App] ERROR: Could not find main TDFMAUI.App instance");
+                            Debug.WriteLine($"[Windows.App] Available app type: {appType}");
+                            throw new InvalidOperationException($"Expected TDFMAUI.App after launch, but found '{appType}'.");
                         }
 
                         Debug.WriteLine("[Windows.App] Found main TDFMAUI.App instance, calling OnStartAsync");

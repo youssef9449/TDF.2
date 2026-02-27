@@ -37,7 +37,7 @@ namespace TDFMAUI.Services
         public event EventHandler<UserStatusEventArgs>? UserStatusChanged;
         public event EventHandler<UserAvailabilityEventArgs>? UserAvailabilityChanged;
         // New Events Added:
-        public event EventHandler<AvailabilitySetEventArgs>? AvailabilitySet;
+        public event EventHandler<AvailabilitySetEventArgs>? AvailabilityConfirmed;
         public event EventHandler<StatusUpdateConfirmedEventArgs>? StatusUpdateConfirmed;
         public event EventHandler<WebSocketErrorEventArgs>? ErrorReceived;
 
@@ -457,7 +457,7 @@ namespace TDFMAUI.Services
                         break;
                     // New Handlers Added:
                     case "availability_set":
-                        HandleAvailabilitySet(root);
+                        HandleAvailabilityConfirmed(root);
                         break;
                     case "status_updated": // Handle confirmation if API sends it
                         HandleStatusUpdated(root);
@@ -1324,7 +1324,7 @@ namespace TDFMAUI.Services
             }
         }
 
-        private void HandleAvailabilitySet(JsonElement element)
+        private void HandleAvailabilityConfirmed(JsonElement element)
         {
             try
             {
@@ -1334,7 +1334,7 @@ namespace TDFMAUI.Services
                 MainThread.BeginInvokeOnMainThread(() => {
                     try
                     {
-                        AvailabilitySet?.Invoke(this, new TDFMAUI.Helpers.AvailabilitySetEventArgs
+                        AvailabilityConfirmed?.Invoke(this, new TDFMAUI.Helpers.AvailabilitySetEventArgs
                         {
                             IsAvailable = isAvailable,
                             Timestamp = timestamp
@@ -1342,7 +1342,7 @@ namespace TDFMAUI.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error invoking AvailabilitySet event");
+                        _logger.LogError(ex, "Error invoking AvailabilityConfirmed event");
                     }
                 });
             }

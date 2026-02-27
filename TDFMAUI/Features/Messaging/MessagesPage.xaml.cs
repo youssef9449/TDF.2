@@ -165,11 +165,15 @@ public partial class MessagesPage : ContentPage
     {
         try
         {
-            var onlineUsers = await _userPresenceService.GetOnlineUsersAsync();
+            // Fetch all online users (using a large page size since we want the full status cache)
+            var onlineUsersResult = await _userPresenceService.GetOnlineUsersAsync(1, 1000);
             
-            foreach (var user in onlineUsers.Values)
+            if (onlineUsersResult?.Items != null)
             {
-                _userStatuses[user.UserId] = user.Status;
+                foreach (var user in onlineUsersResult.Items)
+                {
+                    _userStatuses[user.UserId] = user.Status;
+                }
             }
             
             // Update message UI with status info

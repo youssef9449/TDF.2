@@ -83,26 +83,29 @@ namespace TDFMAUI.Pages
             
             try
             {
-                var onlineUsers = await _userPresenceService.GetOnlineUsersAsync();
+                var onlineUsersResult = await _userPresenceService.GetOnlineUsersAsync(1, 1000);
                 
                 // Update UI on main thread
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
                     _users.Clear();
                     
-                    foreach (var user in onlineUsers.Values.Where(u => u.UserId != App.CurrentUser.UserID))
+                    if (onlineUsersResult?.Items != null)
                     {
-                        _users.Add(new UserViewModel
+                        foreach (var user in onlineUsersResult.Items.Where(u => u.UserId != App.CurrentUser.UserID))
                         {
-                            UserId = user.UserId,
-                            Username = user.Username,
-                            FullName = user.FullName,
-                            Department = user.Department,
-                            Status = user.Status,
-                            StatusMessage = user.StatusMessage,
-                            IsAvailableForChat = user.IsAvailableForChat,
-                            ProfilePictureData = user.ProfilePictureData
-                        });
+                            _users.Add(new UserViewModel
+                            {
+                                UserId = user.UserId,
+                                Username = user.Username,
+                                FullName = user.FullName,
+                                Department = user.Department,
+                                Status = user.Status,
+                                StatusMessage = user.StatusMessage,
+                                IsAvailableForChat = user.IsAvailableForChat,
+                                ProfilePictureData = user.ProfilePictureData
+                            });
+                        }
                     }
                 });
             }

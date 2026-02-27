@@ -17,7 +17,7 @@ namespace TDFMAUI.Services
         event EventHandler<ConnectionStatusEventArgs> ConnectionStatusChanged;
         event EventHandler<UserStatusEventArgs> UserStatusChanged;
         event EventHandler<UserAvailabilityEventArgs> UserAvailabilityChanged;
-        event EventHandler<AvailabilitySetEventArgs> AvailabilitySet;
+        event EventHandler<AvailabilitySetEventArgs> AvailabilityConfirmed;
         event EventHandler<StatusUpdateConfirmedEventArgs> StatusUpdateConfirmed;
         event EventHandler<WebSocketErrorEventArgs> ErrorReceived;
         

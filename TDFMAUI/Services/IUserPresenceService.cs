@@ -29,9 +29,9 @@ namespace TDFMAUI.Services
         Task RecordUserActivityAsync(int userId);
 
         /// <summary>
-        /// Gets information about all currently online users
+        /// Gets information about all currently online users with optional pagination
         /// </summary>
-        Task<Dictionary<int, UserPresenceInfo>> GetOnlineUsersAsync();
+        Task<TDFShared.DTOs.Common.PaginatedResult<UserPresenceInfo>> GetOnlineUsersAsync(int page = 1, int pageSize = 10);
 
         /// <summary>
         /// Gets cached information about online users for offline usage

@@ -41,7 +41,7 @@ namespace TDFMAUI.Services
             // Listen for WebSocket events
             _webSocketService.UserStatusChanged += OnUserStatusChanged;
             _webSocketService.UserAvailabilityChanged += OnUserAvailabilityChanged;
-            _webSocketService.AvailabilitySet += OnAvailabilitySet;
+            _webSocketService.AvailabilityConfirmed += OnAvailabilitySet;
             _webSocketService.StatusUpdateConfirmed += OnStatusUpdateConfirmed;
             _webSocketService.ErrorReceived += OnErrorReceived;
 
@@ -77,44 +77,52 @@ namespace TDFMAUI.Services
             return UserPresenceStatus.Offline;
         }
 
-        public async Task<Dictionary<int, UserPresenceInfo>> GetOnlineUsersAsync()
+        public async Task<PaginatedResult<UserPresenceInfo>> GetOnlineUsersAsync(int page = 1, int pageSize = 10)
         {
             try
             {
-                _logger.LogInformation("Attempting to fetch all users with status from API endpoint: users/all");
-                // Get all users with their status from the API as a paginated result (wrapped in ApiResponse)
-                var apiResponse = await _apiService.GetAsync<ApiResponse<PaginatedResult<UserDto>>>(ApiRoutes.Users.GetAllWithStatus);
+                _logger.LogInformation("Attempting to fetch users with status from API endpoint: users/all. Page: {Page}, PageSize: {PageSize}", page, pageSize);
+                // Get users with their status from the API as a paginated result
+                var apiResponse = await _apiService.GetAsync<ApiResponse<PaginatedResult<UserDto>>>(
+                    $"{ApiRoutes.Users.GetAllWithStatus}?pageNumber={page}&pageSize={pageSize}");
+
                 if (apiResponse == null || !apiResponse.Success || apiResponse.Data == null || apiResponse.Data.Items == null)
                 {
                     _logger.LogWarning("API returned null or unsuccessful response for users");
-                    return new Dictionary<int, UserPresenceInfo>();
+                    return new PaginatedResult<UserPresenceInfo> { Items = new List<UserPresenceInfo>() };
                 }
 
-                var result = new Dictionary<int, UserPresenceInfo>();
-                foreach (var user in apiResponse.Data.Items)
+                var items = apiResponse.Data.Items.Select(user => new UserPresenceInfo
                 {
-                    result[user.UserID] = new UserPresenceInfo
-                    {
-                        UserId = user.UserID,
-                        Username = user.UserName,
-                        FullName = user.FullName,
-                        Department = user.Department,
-                        Status = user.PresenceStatus,
-                        StatusMessage = user.StatusMessage,
-                        IsAvailableForChat = user.IsAvailableForChat ?? false,
-                        ProfilePictureData = user.Picture,
-                        LastActivityTime = user.LastActivityTime ?? DateTime.MinValue
-                    };
-                }
+                    UserId = user.UserID,
+                    Username = user.UserName,
+                    FullName = user.FullName,
+                    Department = user.Department,
+                    Status = user.PresenceStatus,
+                    StatusMessage = user.StatusMessage,
+                    IsAvailableForChat = user.IsAvailableForChat ?? false,
+                    ProfilePictureData = user.Picture,
+                    LastActivityTime = user.LastActivityTime ?? DateTime.MinValue
+                }).ToList();
 
-                // Update the cache
-                _userStatuses.Clear();
-                foreach (var kvp in result)
+                var result = new PaginatedResult<UserPresenceInfo>
                 {
-                    _userStatuses[kvp.Key] = kvp.Value;
+                    Items = items,
+                    TotalCount = apiResponse.Data.TotalCount,
+                    PageNumber = apiResponse.Data.PageNumber,
+                    PageSize = apiResponse.Data.PageSize,
+                    TotalPages = apiResponse.Data.TotalPages,
+                    HasNextPage = apiResponse.Data.HasNextPage,
+                    HasPreviousPage = apiResponse.Data.HasPreviousPage
+                };
+
+                // Update the cache with the new items
+                foreach (var item in items)
+                {
+                    _userStatuses[item.UserId] = item;
                 }
 
-                _logger.LogInformation("Successfully fetched {Count} users with status", result.Count);
+                _logger.LogInformation("Successfully fetched {Count} users with status", items.Count);
                 return result;
             }
             catch (Exception ex)
@@ -368,7 +376,7 @@ namespace TDFMAUI.Services
         {
             _webSocketService.UserStatusChanged -= OnUserStatusChanged;
             _webSocketService.UserAvailabilityChanged -= OnUserAvailabilityChanged;
-            _webSocketService.AvailabilitySet -= OnAvailabilitySet;
+            _webSocketService.AvailabilityConfirmed -= OnAvailabilitySet;
             _webSocketService.StatusUpdateConfirmed -= OnStatusUpdateConfirmed;
             _webSocketService.ErrorReceived -= OnErrorReceived;
 

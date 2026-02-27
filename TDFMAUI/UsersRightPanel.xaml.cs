@@ -341,39 +341,24 @@ namespace TDFMAUI
 
                 if (isConnected)
                 {
-                    // Get users from the paginated API endpoint
-                    var apiResponse = await _apiService.GetAsync<ApiResponse<PaginatedResult<UserDto>>>(
-                        $"{ApiRoutes.Users.GetAllWithStatus}?pageNumber={CurrentPage}&pageSize=10");
+                    // Get users from the centralized presence service with pagination
+                    var paginatedResponse = await _userPresenceService.GetOnlineUsersAsync(CurrentPage, 10);
                     
-                    if (apiResponse?.Success == true && apiResponse.Data != null)
+                    if (paginatedResponse != null && paginatedResponse.Items != null)
                     {
-                        onlineUsersDetails = new Dictionary<int, UserPresenceInfo>();
-                        foreach (var user in apiResponse.Data.Items)
-                        {
-                            onlineUsersDetails[user.UserID] = new UserPresenceInfo
-                            {
-                                UserId = user.UserID,
-                                Username = user.UserName,
-                                FullName = user.FullName,
-                                Department = user.Department,
-                                Status = user.PresenceStatus,
-                                StatusMessage = user.StatusMessage,
-                                IsAvailableForChat = user.IsAvailableForChat ?? false,
-                                ProfilePictureData = user.Picture
-                            };
-                        }
+                        onlineUsersDetails = paginatedResponse.Items.ToDictionary(u => u.UserId);
 
                         // Update pagination info
-                        TotalPages = apiResponse.Data.TotalPages;
-                        HasNextPage = CurrentPage < TotalPages;
-                        HasPreviousPage = CurrentPage > 1;
+                        TotalPages = paginatedResponse.TotalPages;
+                        HasNextPage = paginatedResponse.HasNextPage;
+                        HasPreviousPage = paginatedResponse.HasPreviousPage;
                         HasPagination = TotalPages > 1;
 
                         _logger?.LogInformation("UsersRightPanel: Retrieved {Count} users from service", onlineUsersDetails.Count);
                     }
                     else
                     {
-                        _logger?.LogWarning("UsersRightPanel: API returned unsuccessful response");
+                        _logger?.LogWarning("UsersRightPanel: Presence service returned null or empty result");
                         onlineUsersDetails = new Dictionary<int, UserPresenceInfo>();
                     }
                 }

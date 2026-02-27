@@ -2,6 +2,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Maui.ApplicationModel;
 using TDFMAUI.Services;
@@ -31,6 +32,8 @@ namespace TDFMAUI.WinUI
     {
         private bool _uiThreadExceptionHandlersRegistered = false;
         private bool _fallbackWindowShown = false;
+        private static readonly TimeSpan LaunchInitializationTimeout = TimeSpan.FromSeconds(45);
+        private const int MauiReadyTimeoutMilliseconds = 30000;
 
         /// <summary>
         /// Initializes the singleton application object.  This is the first line of authored code
@@ -84,14 +87,17 @@ namespace TDFMAUI.WinUI
                 Debug.WriteLine($"Error in WinUI post-XAML initialization: {ex.Message}");
                 SafeLogException(ex, "WinUI_PostXamlInitialization");
 
-                // Try to recover from initialization failure
-                try {
-                    // Try to fix Windows App SDK registration
+                try
+                {
                     TryToFixWindowsAppSDKRegistration();
-                } catch (Exception fixEx) {
+                }
+                catch (Exception fixEx)
+                {
                     Debug.WriteLine($"Failed to fix Windows App SDK: {fixEx.Message}");
                     SafeLogException(fixEx, "WindowsAppSDK_Fix_Failed");
                 }
+
+                EnsureFallbackWindow(ex);
             }
 
             // Register for process exit (this is a more reliable approach)
@@ -130,56 +136,32 @@ namespace TDFMAUI.WinUI
             {
                 Debug.WriteLine("Ensuring Windows App SDK is properly initialized...");
 
-                // Check if Microsoft.UI.Xaml.dll exists in the application directory
                 string baseDir = AppContext.BaseDirectory;
-                string uiXamlDllPath = Path.Combine(baseDir, "Microsoft.UI.Xaml.dll");
+                var uiXamlVersion = ValidateCriticalAssembly(baseDir, "Microsoft.UI.Xaml.dll", new[] { "Microsoft.WinUI.dll" });
+                var winUiVersion = ValidateCriticalAssembly(baseDir, "Microsoft.WinUI.dll", Array.Empty<string>());
 
-                if (File.Exists(uiXamlDllPath))
+                if (uiXamlVersion != null && winUiVersion != null && (uiXamlVersion.Major != winUiVersion.Major || uiXamlVersion.Minor != winUiVersion.Minor))
                 {
-                    Debug.WriteLine($"Found Microsoft.UI.Xaml.dll at {uiXamlDllPath}");
-
-                    // Get version information
-                    FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(uiXamlDllPath);
-                    Debug.WriteLine($"Microsoft.UI.Xaml.dll version: {versionInfo.FileVersion}");
-
-                    //    // Try to load the assembly to ensure it's valid
-                    //    try
-                    //    {
-                    //        //var assembly = Assembly.LoadFrom(uiXamlDllPath);
-                    //     //   Debug.WriteLine($"Successfully loaded Microsoft.UI.Xaml.dll: {assembly.FullName}");
-                    //    }
-                    //    catch (Exception ex)
-                    //    {
-                    //        Debug.WriteLine($"Failed to load Microsoft.UI.Xaml.dll: {ex.Message}");
-                    //        // Don't throw here, we'll continue and try to initialize anyway
-                    //    }
-                }
-                else
-                {
-                    Debug.WriteLine($"WARNING: Microsoft.UI.Xaml.dll not found at {uiXamlDllPath}");
+                    throw new InvalidOperationException($"WinUI assembly version mismatch detected. Microsoft.UI.Xaml.dll={uiXamlVersion}, Microsoft.WinUI.dll={winUiVersion}.");
                 }
 
-                // Check for WindowsAppSDK DLLs
                 var windowsAppSDKDlls = Directory.GetFiles(baseDir, "Microsoft.WindowsAppRuntime.*.dll");
-                if (windowsAppSDKDlls.Length > 0)
+                if (windowsAppSDKDlls.Length == 0)
                 {
-                    Debug.WriteLine($"Found {windowsAppSDKDlls.Length} WindowsAppSDK DLLs:");
-                    foreach (var dll in windowsAppSDKDlls)
-                    {
-                        FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(dll);
-                        Debug.WriteLine($"  - {Path.GetFileName(dll)}: {versionInfo.FileVersion}");
-                    }
+                    throw new FileNotFoundException($"No WindowsAppSDK runtime DLLs were found in '{baseDir}'.");
                 }
-                else
+
+                foreach (var dll in windowsAppSDKDlls)
                 {
-                    Debug.WriteLine("WARNING: No WindowsAppSDK DLLs found in application directory");
+                    var versionInfo = FileVersionInfo.GetVersionInfo(dll);
+                    Debug.WriteLine($"WindowsAppSDK runtime: {Path.GetFileName(dll)} v{versionInfo.FileVersion}");
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error ensuring Windows App SDK initialization: {ex.Message}");
-                // Log but don't throw to allow initialization to continue
                 SafeLogException(ex, "WindowsAppSDK_Initialization");
+                throw;
             }
         }
 
@@ -190,7 +172,6 @@ namespace TDFMAUI.WinUI
         {
             try
             {
-                // Define critical assemblies to check
                 var criticalAssemblies = new[] {
                     "Microsoft.UI.Xaml.dll",
                     "Microsoft.WinUI.dll"
@@ -198,9 +179,8 @@ namespace TDFMAUI.WinUI
 
                 Debug.WriteLine("Checking critical Windows UI assemblies...");
 
-                // Examine loaded assemblies
                 var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => criticalAssemblies.Any(ca => a.FullName.Contains(ca.Replace(".dll", ""))))
+                    .Where(a => criticalAssemblies.Any(ca => a.FullName.Contains(ca.Replace(".dll", ""), StringComparison.OrdinalIgnoreCase)))
                     .ToList();
 
                 foreach (var assembly in loadedAssemblies)
@@ -209,37 +189,22 @@ namespace TDFMAUI.WinUI
                     Debug.WriteLine($"  Location: {(string.IsNullOrEmpty(assembly.Location) ? "Unknown/Dynamic" : assembly.Location)}");
                 }
 
-                // Check for DLLs in app directory
                 string baseDir = AppContext.BaseDirectory;
                 foreach (var dllName in criticalAssemblies)
                 {
-                    string dllPath = Path.Combine(baseDir, dllName);
-                    if (File.Exists(dllPath))
+                    var dllPath = Path.Combine(baseDir, dllName);
+                    if (!File.Exists(dllPath))
                     {
-                        Debug.WriteLine($"Found DLL file: {dllPath}");
-                        FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(dllPath);
-                        Debug.WriteLine($"  Version: {versionInfo.FileVersion}");
-                    }
-                    else
-                    {
-                        Debug.WriteLine($"Missing critical DLL: {dllPath}");
+                        throw new FileNotFoundException($"Missing critical Windows UI assembly: {dllPath}");
                     }
                 }
 
-                // For 80040154 (Class not registered) errors, check COM registration
                 try
                 {
-                    // Check registry entries for Microsoft.UI.Xaml
-                    using (RegistryKey key = Registry.ClassesRoot.OpenSubKey("CLSID\\{2D913B79-1558-5B8E-B16A-CB78973BBA47}"))
+                    using RegistryKey key = Registry.ClassesRoot.OpenSubKey("CLSID\\{2D913B79-1558-5B8E-B16A-CB78973BBA47}");
+                    if (key == null)
                     {
-                        if (key != null)
-                        {
-                            Debug.WriteLine("Microsoft.UI.Xaml COM registration found");
-                        }
-                        else
-                        {
-                            Debug.WriteLine("WARNING: Microsoft.UI.Xaml COM registration missing");
-                        }
+                        Debug.WriteLine("WARNING: Microsoft.UI.Xaml COM registration missing");
                     }
                 }
                 catch (Exception)
@@ -250,7 +215,44 @@ namespace TDFMAUI.WinUI
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error checking Windows assemblies: {ex.Message}");
+                SafeLogException(ex, "WindowsAssemblyValidation");
+                throw;
             }
+        }
+
+        private static Version? ValidateCriticalAssembly(string baseDir, string assemblyName, string[] dependencies)
+        {
+            var assemblyPath = Path.Combine(baseDir, assemblyName);
+            if (!File.Exists(assemblyPath))
+            {
+                throw new FileNotFoundException($"Missing required assembly '{assemblyName}' in output folder.", assemblyPath);
+            }
+
+            var versionInfo = FileVersionInfo.GetVersionInfo(assemblyPath);
+            Debug.WriteLine($"Found {assemblyName} at {assemblyPath} with version {versionInfo.FileVersion}");
+
+            Version? parsedVersion = null;
+            if (Version.TryParse(versionInfo.FileVersion?.Split(' ').FirstOrDefault(), out var fileVersion))
+            {
+                parsedVersion = fileVersion;
+            }
+            else
+            {
+                throw new InvalidOperationException($"Unable to parse file version for {assemblyName}. Reported version: {versionInfo.FileVersion}");
+            }
+
+            _ = AssemblyName.GetAssemblyName(assemblyPath);
+
+            foreach (var dependency in dependencies)
+            {
+                var dependencyPath = Path.Combine(baseDir, dependency);
+                if (!File.Exists(dependencyPath))
+                {
+                    throw new FileNotFoundException($"Dependency '{dependency}' for '{assemblyName}' is missing.", dependencyPath);
+                }
+            }
+
+            return parsedVersion;
         }
 
         /// <summary>
@@ -454,6 +456,8 @@ namespace TDFMAUI.WinUI
                 // Set up UI thread exception handling before calling base implementation
                 SetupUIThreadExceptionHandling();
 
+                using var launchCts = new CancellationTokenSource(LaunchInitializationTimeout);
+
                 // Call base implementation - this is critical
                 try
                 {
@@ -476,7 +480,7 @@ namespace TDFMAUI.WinUI
                     {
                         Debug.WriteLine("[Windows.App] UI-thread startup initialization started");
 
-                        var appReady = await WaitForMauiAppReadyAsync();
+                        var appReady = await WaitForMauiAppReadyAsync(MauiReadyTimeoutMilliseconds, 50, launchCts.Token);
                         if (!appReady)
                         {
                             throw new TimeoutException("Timed out waiting for MAUI application and window initialization.");
@@ -492,7 +496,7 @@ namespace TDFMAUI.WinUI
                         }
 
                         Debug.WriteLine("[Windows.App] Found main TDFMAUI.App instance, calling OnStartAsync");
-                        await mainApp.OnStartAsync();
+                        await mainApp.OnStartAsync().WaitAsync(launchCts.Token);
                         Debug.WriteLine("[Windows.App] Main app OnStartAsync completed successfully");
 
                         // Retry activation after startup initialization. Activate() is idempotent,
@@ -575,12 +579,13 @@ namespace TDFMAUI.WinUI
             }
         }
 
-        private static async Task<bool> WaitForMauiAppReadyAsync(int timeoutMilliseconds = 10000, int pollIntervalMilliseconds = 50)
+        private static async Task<bool> WaitForMauiAppReadyAsync(int timeoutMilliseconds = 10000, int pollIntervalMilliseconds = 50, CancellationToken cancellationToken = default)
         {
             var timeoutAt = DateTime.UtcNow.AddMilliseconds(timeoutMilliseconds);
 
             while (DateTime.UtcNow < timeoutAt)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var currentApp = Microsoft.Maui.Controls.Application.Current;
                 var hasWindow = currentApp?.Windows?.Count > 0;
 
@@ -589,7 +594,7 @@ namespace TDFMAUI.WinUI
                     return true;
                 }
 
-                await Task.Delay(pollIntervalMilliseconds);
+                await Task.Delay(pollIntervalMilliseconds, cancellationToken);
             }
 
             return false;
@@ -629,9 +634,6 @@ namespace TDFMAUI.WinUI
                                     // Update through the presence service which handles both WebSocket and API calls
                                     await userPresenceService.UpdateStatusAsync(UserPresenceStatus.Offline, "");
                                     
-                                    // Give it a moment to complete the request
-                                    await Task.Delay(500);
-                                    
                                     Debug.WriteLine("Successfully completed offline status update process");
                                 }
                                 catch (Exception ex)
@@ -642,7 +644,7 @@ namespace TDFMAUI.WinUI
                                         Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
                                     }
                                 }
-                            }).Wait(2000); // Wait up to 2 seconds for the status update to complete
+                            }).Wait(TimeSpan.FromSeconds(5)); // Wait up to 5 seconds for slower systems/network
                         }
                         else
                         {

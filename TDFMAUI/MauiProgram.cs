@@ -358,8 +358,12 @@ builder
             builder.Services.AddSingleton<Services.INotificationService>(sp => sp.GetRequiredService<IExtendedNotificationService>());
             
             // Register push notification service
+#if WINDOWS || MACCATALYST
+            builder.Services.AddSingleton<IPushNotificationService, NoOpPushNotificationService>();
+#else
             builder.Services.AddSingleton<PushNotificationService>();
             builder.Services.AddSingleton<IPushNotificationService>(sp => sp.GetRequiredService<PushNotificationService>());
+#endif
 
             // Register ViewModels
             builder.Services.AddTransient<UserProfileViewModel>();
@@ -452,6 +456,12 @@ builder
                 logger?.LogInformation("Assigning App.Services...");
                 App.Services = app.Services;
                 logger?.LogInformation("App.Services initialized with ServiceProvider.");
+
+                ValidateCriticalService<IUserSessionService>(app.Services, logger);
+                ValidateCriticalService<AppShell>(app.Services, logger);
+                ValidateCriticalService<ThemeService>(app.Services, logger);
+                ValidateCriticalService<IPlatformNotificationService>(app.Services, logger);
+                ValidateCriticalService<IPushNotificationService>(app.Services, logger);
 
                 // Initialize the centralized user session service
                 logger?.LogInformation("Attempting to get IUserSessionService from container...");
@@ -612,6 +622,20 @@ builder
             return app;
         }
 
+
+        private static void ValidateCriticalService<TService>(IServiceProvider services, ILogger? logger)
+        {
+            try
+            {
+                _ = services.GetRequiredService<TService>();
+            }
+            catch (Exception ex)
+            {
+                var message = $"Critical service resolution failed for {typeof(TService).FullName}: {ex.Message}";
+                logger?.LogCritical(ex, message);
+                throw new InvalidOperationException(message, ex);
+            }
+        }
         private static void HandleUnhandledException(string source, Exception exception)
         {
             // Log the exception

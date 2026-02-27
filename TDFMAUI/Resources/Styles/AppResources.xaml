@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                    xmlns:converters="clr-namespace:TDFMAUI.Converters"
+                    xmlns:helpers="clr-namespace:TDFMAUI.Helpers">
+    <x:String x:Key="OpenSansRegular">OpenSans-Regular</x:String>
+    <x:String x:Key="OpenSansSemibold">OpenSans-Semibold</x:String>
+    <x:String x:Key="MaterialDesignIcons">MaterialDesignIcons</x:String>
+
+    <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
+    <converters:BoolToThicknessConverter x:Key="BoolToThicknessConverter" />
+    <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    <helpers:BoolToStringConverter x:Key="BoolToStringConverter" />
+    <converters:BooleanInverter x:Key="BooleanInverter" />
+    <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
+    <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
+    <converters:ThemeToBackgroundColorConverter x:Key="ThemeToBackgroundColorConverter" />
+</ResourceDictionary>

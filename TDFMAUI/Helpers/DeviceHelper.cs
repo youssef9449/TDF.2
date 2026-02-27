@@ -19,7 +19,9 @@ namespace TDFMAUI.Helpers
     {
         // Event for display info changes
         private static readonly object _displayEventLock = new object();
+        private static readonly object _initializationLock = new object();
         private static event EventHandler<DisplayInfoChangedEventArgs>? _displayInfoChanged;
+        private static bool _isInitialized;
         
         public static event EventHandler<DisplayInfoChangedEventArgs> DisplayInfoChanged
         {
@@ -66,16 +68,34 @@ namespace TDFMAUI.Helpers
         /// <summary>
         /// Initialize device helper and register for system events
         /// </summary>
-        public static void Initialize()
+        public static bool Initialize(bool requireWindowForDesktop = false)
         {
             try
             {
+                lock (_initializationLock)
+                {
+                    if (_isInitialized)
+                    {
+                        return true;
+                    }
+
+                    if (requireWindowForDesktop && IsWindows && (Application.Current?.Windows?.Count ?? 0) == 0)
+                    {
+                        System.Diagnostics.Debug.WriteLine("DeviceHelper initialization deferred until a window exists on Windows.");
+                        return false;
+                    }
+
                 // Register for display info changes
-                DeviceDisplay.MainDisplayInfoChanged += OnDisplayInfoChanged;
+                    DeviceDisplay.MainDisplayInfoChanged += OnDisplayInfoChanged;
+                    _isInitialized = true;
+                }
+
+                return true;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error initializing DeviceHelper: {ex.Message}");
+                return false;
             }
         }
         

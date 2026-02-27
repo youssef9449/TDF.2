@@ -224,5 +224,21 @@
     </Compile>
   </ItemGroup>
 
+  <Target Name="EnsureCriticalWinUIAssembliesCopied" AfterTargets="Build" Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+    <ItemGroup>
+      <CriticalWinUIReference Include="@(ReferenceCopyLocalPaths)"
+                              Condition="'%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)' == 'Microsoft.UI.Xaml.dll' Or '%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)' == 'Microsoft.WinUI.dll'" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(CriticalWinUIReference)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(CriticalWinUIReference)' != ''" />
+
+    <Warning Text="Critical WinUI assemblies were not found in ReferenceCopyLocalPaths during build. Windows startup may fail if output is incomplete."
+             Condition="'@(CriticalWinUIReference)' == ''" />
+  </Target>
+
+
 </Project>
 

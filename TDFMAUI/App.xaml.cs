@@ -192,8 +192,16 @@ namespace TDFMAUI
                 // Ensure required theme dictionaries are available before reading theme resources.
                 EnsureAllResourceDictionariesMerged();
 
+                // On desktop platforms, wait for an actual window before theme/device initialization.
+                // This prevents early display probing from running before WinUI has created a window.
+                if (DeviceHelper.IsDesktop)
+                {
+                    await EnsureWindowReadyAsync();
+                }
+
                 // Initialize theme service for platform-aware theme adaptation
                 DebugService.LogInfo("App", "About to initialize theme service");
+                DeviceHelper.Initialize(requireWindowForDesktop: true);
                 var themeService = Services?.GetService<ThemeService>();
                 themeService?.Initialize();
                 DebugService.LogInfo("App", "Theme service initialized");
@@ -244,6 +252,22 @@ namespace TDFMAUI
                     System.Diagnostics.Debug.WriteLine($"[App] Failed to display error page: {displayEx.Message}");
                 }
             }
+        }
+
+        private static async Task EnsureWindowReadyAsync(int timeoutMilliseconds = 15000)
+        {
+            var timeoutAt = DateTime.UtcNow.AddMilliseconds(timeoutMilliseconds);
+            while (DateTime.UtcNow < timeoutAt)
+            {
+                if (Application.Current?.Windows?.Count > 0)
+                {
+                    return;
+                }
+
+                await Task.Delay(50);
+            }
+
+            throw new TimeoutException("Timed out waiting for a MAUI window before startup initialization.");
         }
 
         private async Task ApplyThemeWhenWindowReadyAsync()
@@ -1234,7 +1258,8 @@ namespace TDFMAUI
                 {
                     ("/Resources/Styles/Colors.xaml", "Primary"),
                     ("/Resources/Styles/PlatformColors.xaml", "WindowsControlHighlightColor"),
-                    ("/Resources/Styles/Styles.xaml", "Headline")
+                    ("/Resources/Styles/Styles.xaml", "Headline"),
+                    ("/Resources/Styles/AppResources.xaml", "OpenSansRegular")
                 };
 
                 foreach (var (path, validationKey) in expectedDictionaries)

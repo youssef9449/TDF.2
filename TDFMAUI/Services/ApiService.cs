@@ -1465,6 +1465,33 @@ namespace TDFMAUI.Services
             }
         }
 
+        // PUSH TOKEN
+        public async Task<ApiResponse<bool>> RegisterPushTokenAsync(PushTokenRegistrationDto registration)
+        {
+            try
+            {
+                return await PostAsync<PushTokenRegistrationDto, ApiResponse<bool>>(ApiRoutes.PushToken.Register, registration);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error registering push token: {Message}", ex.Message);
+                return new ApiResponse<bool> { Success = false, Message = ex.Message };
+            }
+        }
+
+        public async Task<ApiResponse<bool>> UnregisterPushTokenAsync(string token)
+        {
+            try
+            {
+                return await PostAsync<string, ApiResponse<bool>>(ApiRoutes.PushToken.Unregister, token);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error unregistering push token: {Message}", ex.Message);
+                return new ApiResponse<bool> { Success = false, Message = ex.Message };
+            }
+        }
+
         private async Task<T> ProcessResponseAsync<T>(HttpResponseMessage response, string endpoint)
         {
             var content = await response.Content.ReadAsStringAsync();

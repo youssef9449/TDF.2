@@ -44,6 +44,10 @@ namespace TDFMAUI.Services
         Task<ApiResponse<List<LookupItem>>> GetDepartmentsAsync(bool queueIfUnavailable = true);
         Task<List<LookupItem>> GetLeaveTypesAsync(bool queueIfUnavailable = true);
         
+        // Push Token
+        Task<ApiResponse<bool>> RegisterPushTokenAsync(PushTokenRegistrationDto registration);
+        Task<ApiResponse<bool>> UnregisterPushTokenAsync(string token);
+
         // Connectivity
         Task<bool> TestConnectivityAsync();
     }

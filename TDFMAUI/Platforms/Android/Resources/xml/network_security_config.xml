@@ -36,10 +36,6 @@
             <certificates src="@raw/development_ca" overridePins="true" />
         </trust-anchors>
 
-        <!-- Pin the expected certificate hash for extra security -->
-        <pin-set expiration="2099-12-31">
-            <!-- This is a placeholder hash - it will be ignored if the certificate doesn't match -->
-            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
-        </pin-set>
+        <!-- Pin-set removed to avoid issues with self-signed certificates in development -->
     </domain-config>
 </network-security-config>

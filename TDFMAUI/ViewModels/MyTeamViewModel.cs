@@ -54,7 +54,6 @@ namespace TDFMAUI.ViewModels
             _ = LoadTeamAsync();
         }
 
-        // Example command placeholder
         [RelayCommand]
         private async Task LoadTeamAsync()
         {

@@ -145,14 +145,8 @@ namespace TDFMAUI.Services
                         // Try to register the token
                         try
                         {
-                            // Since there's no direct method to send push tokens in IApiService,
-                            // we'll log this for now. In a real implementation, you would need to
-                            // add a specific method to IApiService for push token registration.
-                            _logger.LogInformation("Would register token: {Token} for platform: {Platform}", 
-                                registration.Token, registration.Platform);
-                            
-                            // For testing purposes, we'll consider this successful
-                            success = true;
+                            var response = await _apiService.RegisterPushTokenAsync(registration);
+                            success = response?.Success ?? false;
                         }
                         catch (Exception ex)
                         {
@@ -207,13 +201,8 @@ namespace TDFMAUI.Services
                 
                 try
                 {
-                    // Since there's no direct method to unregister push tokens in IApiService,
-                    // we'll log this for now. In a real implementation, you would need to
-                    // add a specific method to IApiService for push token unregistration.
-                    _logger.LogInformation("Would unregister token: {Token}", token);
-                    
-                    // For testing purposes, we'll consider this successful
-                    success = true;
+                    var response = await _apiService.UnregisterPushTokenAsync(token);
+                    success = response?.Success ?? false;
                 }
                 catch (Exception ex)
                 {

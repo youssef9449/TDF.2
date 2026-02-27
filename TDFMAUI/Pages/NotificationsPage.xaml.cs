@@ -102,7 +102,7 @@ namespace TDFMAUI.Pages
                         {
                             // Log error, but don't block loading other notifications
                             System.Diagnostics.Debug.WriteLine($"Error fetching user {senderId.Value}: {ex.Message}");
-                            // Optionally add a placeholder to cache to prevent re-fetching on error
+
                              if (!_userCache.ContainsKey(senderId.Value))
                              {
                                  _userCache.Add(senderId.Value, $"User {senderId.Value}");
@@ -234,7 +234,7 @@ namespace TDFMAUI.Pages
                                 senderName = $"User {e.SenderId.Value}"; // Fallback if user not found
                                 if (!_userCache.ContainsKey(e.SenderId.Value))
                                 {
-                                     _userCache.Add(e.SenderId.Value, senderName); // Cache placeholder
+                                     _userCache.Add(e.SenderId.Value, senderName);
                                 }
                             }
                         }
@@ -244,7 +244,7 @@ namespace TDFMAUI.Pages
                             senderName = $"User {e.SenderId.Value}"; // Fallback on error
                             if (!_userCache.ContainsKey(e.SenderId.Value))
                             {
-                                 _userCache.Add(e.SenderId.Value, senderName); // Cache placeholder
+                                 _userCache.Add(e.SenderId.Value, senderName);
                             }
                         }
                     }

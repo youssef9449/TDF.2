@@ -65,14 +65,15 @@ namespace TDFMAUI.WinUI
 
             try
             {
+                // Ensure XAML resources are loaded before MAUI app initialization.
+                InitializeComponent();
+
                 // Ensure Windows App SDK components are properly initialized
                 EnsureWindowsAppSDKInitialized();
 
                 // Check for required Windows UI assemblies before initialization
                 CheckCriticalWindowsAssemblies();
 
-                // For MAUI WinUI applications, InitializeComponent is not needed in the constructor
-                // The base MauiWinUIApplication class handles initialization automatically
                 Debug.WriteLine("WinUI App initialization completed successfully");
             }
             catch (Exception ex)
@@ -424,7 +425,7 @@ namespace TDFMAUI.WinUI
         }
 
         // Use Application.Current.Exit event instead of OnLaunched
-        protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+        protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
             try
             {
@@ -490,69 +491,59 @@ namespace TDFMAUI.WinUI
                     // Initialize the app on the UI thread.
                     // Running OnStartAsync via Task.Run causes cross-thread access during
                     // theme/resource initialization and window navigation on WinUI.
-                    _ = MainThread.InvokeOnMainThreadAsync(async () =>
+                    await MainThread.InvokeOnMainThreadAsync(async () =>
                     {
+                        Debug.WriteLine("[Windows.App] UI-thread startup initialization started");
+
+                        var appReady = await WaitForMauiAppReadyAsync();
+                        if (!appReady)
+                        {
+                            throw new TimeoutException("Timed out waiting for MAUI application and window initialization.");
+                        }
+
+                        Debug.WriteLine("[Windows.App] About to check for TDFMAUI.App instance");
+                        if (Microsoft.Maui.Controls.Application.Current is not TDFMAUI.App mainApp)
+                        {
+                            Debug.WriteLine("[Windows.App] WARNING: Could not find main TDFMAUI.App instance");
+                            Debug.WriteLine($"[Windows.App] Available app type: {Microsoft.Maui.Controls.Application.Current?.GetType().FullName ?? "null"}");
+                            return;
+                        }
+
+                        Debug.WriteLine("[Windows.App] Found main TDFMAUI.App instance, calling OnStartAsync");
+                        await mainApp.OnStartAsync();
+                        Debug.WriteLine("[Windows.App] Main app OnStartAsync completed successfully");
+
+                        // Only activate the window if it hasn't been activated already
+                        if (_windowActivated)
+                        {
+                            Debug.WriteLine("Window already activated, skipping duplicate activation after OnStartAsync.");
+                            return;
+                        }
+
                         try
                         {
-                            Debug.WriteLine("[Windows.App] UI-thread startup initialization started");
-
-                            // Wait a bit for the MAUI app to be fully initialized
-                            await Task.Delay(500);
-
-                            Debug.WriteLine("[Windows.App] About to check for TDFMAUI.App instance");
-                            if (Microsoft.Maui.Controls.Application.Current is TDFMAUI.App mainApp)
+                            var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows?.FirstOrDefault();
+                            if (mauiWindow == null)
                             {
-                                Debug.WriteLine("[Windows.App] Found main TDFMAUI.App instance, calling OnStartAsync");
-                                await mainApp.OnStartAsync();
-                                Debug.WriteLine("[Windows.App] Main app OnStartAsync completed successfully");
+                                Debug.WriteLine("No MAUI window found to activate after OnStartAsync.");
+                                return;
+                            }
 
-                                // Only activate the window if it hasn't been activated already
-                                if (!_windowActivated)
-                                {
-                                    try
-                                    {
-                                        var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows?.FirstOrDefault();
-                                        if (mauiWindow != null)
-                                        {
-                                            var platformWindow = mauiWindow.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
-                                            if (platformWindow != null)
-                                            {
-                                                platformWindow.Activate();
-                                                _windowActivated = true;
-                                                Debug.WriteLine("WinUI window activated successfully after OnStartAsync.");
-                                            }
-                                            else
-                                            {
-                                                Debug.WriteLine("Failed to get platform window for activation after OnStartAsync.");
-                                            }
-                                        }
-                                        else
-                                        {
-                                            Debug.WriteLine("No MAUI window found to activate after OnStartAsync.");
-                                        }
-                                    }
-                                    catch (Exception activateEx)
-                                    {
-                                        Debug.WriteLine($"Error activating WinUI window after OnStartAsync: {activateEx.Message}");
-                                        LogException(activateEx, "WindowActivationAfterOnStartAsync");
-                                    }
-                                }
-                                else
-                                {
-                                    Debug.WriteLine("Window already activated, skipping duplicate activation after OnStartAsync.");
-                                }
-                            }
-                            else
+                            var platformWindow = mauiWindow.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
+                            if (platformWindow == null)
                             {
-                                Debug.WriteLine("[Windows.App] WARNING: Could not find main TDFMAUI.App instance");
-                                Debug.WriteLine($"[Windows.App] Available app type: {Microsoft.Maui.Controls.Application.Current?.GetType().FullName ?? "null"}");
+                                Debug.WriteLine("Failed to get platform window for activation after OnStartAsync.");
+                                return;
                             }
+
+                            platformWindow.Activate();
+                            _windowActivated = true;
+                            Debug.WriteLine("WinUI window activated successfully after OnStartAsync.");
                         }
-                        catch (Exception startupEx)
+                        catch (Exception activateEx)
                         {
-                            Debug.WriteLine($"[Windows.App] Error during UI-thread startup initialization: {startupEx.Message}");
-                            Debug.WriteLine($"[Windows.App] UI-thread startup stack trace: {startupEx.StackTrace}");
-                            LogException(startupEx, "OnStartAsyncUIThread");
+                            Debug.WriteLine($"Error activating WinUI window after OnStartAsync: {activateEx.Message}");
+                            LogException(activateEx, "WindowActivationAfterOnStartAsync");
                         }
                     });
                 }
@@ -648,6 +639,26 @@ namespace TDFMAUI.WinUI
                     // If recovery fails, we'll let the app crash naturally
                 }
             }
+        }
+
+        private static async Task<bool> WaitForMauiAppReadyAsync(int timeoutMilliseconds = 10000, int pollIntervalMilliseconds = 50)
+        {
+            var timeoutAt = DateTime.UtcNow.AddMilliseconds(timeoutMilliseconds);
+
+            while (DateTime.UtcNow < timeoutAt)
+            {
+                var currentApp = Microsoft.Maui.Controls.Application.Current;
+                var hasWindow = currentApp?.Windows?.Count > 0;
+
+                if (currentApp is TDFMAUI.App && hasWindow)
+                {
+                    return true;
+                }
+
+                await Task.Delay(pollIntervalMilliseconds);
+            }
+
+            return false;
         }
 
         private void UpdateUserStatusToOffline()

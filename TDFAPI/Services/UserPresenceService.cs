@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using TDFShared.Enums;
 using TDFShared.DTOs.Users;
+using TDFShared.DTOs.Common;
 using TDFAPI.Repositories;
 using TDFAPI.Messaging.Interfaces;
 using TDFShared.Models.Message;
@@ -18,6 +19,9 @@ namespace TDFAPI.Services
     /// </summary>
     public class UserPresenceService : IUserPresenceService
     {
+        public event EventHandler<UserStatusChangedEventArgs>? UserStatusChanged;
+        public event EventHandler<UserAvailabilityChangedEventArgs>? UserAvailabilityChanged;
+
         private readonly IUserRepository _userRepository;
         private readonly ILogger<UserPresenceService> _logger;
         private readonly IEventMediator _eventMediator;
@@ -40,7 +44,7 @@ namespace TDFAPI.Services
         /// <summary>
         /// Gets the current presence status of a user
         /// </summary>
-        public async Task<UserPresenceStatus> GetStatusAsync(int userId)
+        public async Task<UserPresenceStatus> GetUserStatusAsync(int userId)
         {
             try
             {
@@ -81,6 +85,14 @@ namespace TDFAPI.Services
             }
         }
         
+        /// <summary>
+        /// Updates a user's presence status
+        /// </summary>
+        public async Task UpdateUserStatusAsync(int userId, UserPresenceStatus status, string? statusMessage = null)
+        {
+            await UpdateStatusAsync(userId, status, statusMessage);
+        }
+
         /// <summary>
         /// Updates a user's presence status and broadcasts the change to relevant users
         /// </summary>
@@ -158,6 +170,11 @@ namespace TDFAPI.Services
                 _logger.LogError(ex, "Error updating status for user {UserId}", userId);
                 return false;
             }
+        }
+
+        async Task TDFShared.Services.IUserPresenceService.SetAvailabilityForChatAsync(int userId, bool isAvailable)
+        {
+            await SetAvailabilityForChatAsync(userId, isAvailable);
         }
         
         /// <summary>
@@ -299,11 +316,22 @@ namespace TDFAPI.Services
         /// <summary>
         /// Gets a list of all currently online users
         /// </summary>
-        public Task<IEnumerable<UserPresenceInfo>> GetOnlineUsersAsync()
+        public Task<PaginatedResult<UserPresenceInfo>> GetOnlineUsersAsync(int page = 1, int pageSize = 100)
         {
-            return Task.FromResult<IEnumerable<UserPresenceInfo>>(_userPresence.Values
+            var totalCount = _userPresence.Values.Count(u => u.Status != UserPresenceStatus.Offline);
+            var onlineUsers = _userPresence.Values
                 .Where(u => u.Status != UserPresenceStatus.Offline)
-                .ToList());
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return Task.FromResult(new PaginatedResult<UserPresenceInfo>
+            {
+                Items = onlineUsers,
+                PageNumber = page,
+                PageSize = pageSize,
+                TotalCount = totalCount
+            });
         }
 
         /// <summary>

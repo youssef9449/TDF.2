@@ -288,8 +288,12 @@ builder
                 sp.GetRequiredService<ILoggerFactory>().CreateLogger<TDFMAUI.Services.ConnectivityService>());
             builder.Services.AddSingleton<LocalStorageService>();
             builder.Services.AddSingleton<ILocalStorageService, LocalStorageService>();
+            builder.Services.AddSingleton<IUserPresenceApiService, UserPresenceApiService>();
+            builder.Services.AddSingleton<IUserPresenceEventsService, UserPresenceEventsService>();
+            builder.Services.AddSingleton<IUserPresenceCacheService, UserPresenceCacheService>();
             builder.Services.AddSingleton<IUserPresenceService, UserPresenceService>();
             builder.Services.AddSingleton<IUserProfileService, UserProfileService>();
+            builder.Services.AddSingleton<PanelStateService>();
 
             // Register NetworkService and IConnectivity
             builder.Services.AddSingleton<LookupService>();

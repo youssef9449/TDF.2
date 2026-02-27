@@ -755,43 +755,31 @@ namespace TDFMAUI
                         {
                             DebugService.LogInfo("App", $"Updating user {username} status to {status} in UsersRightPanel");
 
-                            // Get the Users collection from the panel
-                            var usersProperty = usersRightPanel.GetType().GetProperty("Users");
-                            if (usersProperty != null)
+                            // Use the public Users collection directly
+                            var users = usersRightPanel.Users;
+                            if (users != null)
                             {
-                                var users = usersProperty.GetValue(usersRightPanel) as ObservableCollection<UserViewModel>;
-                                if (users != null)
+                                // Find the user in the collection
+                                var user = users.FirstOrDefault(u => u.UserId == userId);
+                                if (user != null)
                                 {
-                                    // Find the user in the collection
-                                    var user = users.FirstOrDefault(u => u.UserId == userId);
-                                    if (user != null)
+                                    // Update the user's status
+                                    user.Status = status;
+                                    if (!string.IsNullOrEmpty(statusMessage))
                                     {
-                                        // Update the user's status
-                                        user.Status = status;
-                                        if (!string.IsNullOrEmpty(statusMessage))
-                                        {
-                                            user.StatusMessage = statusMessage;
-                                        }
-
-                                        DebugService.LogInfo("App", $"Updated user {username} status in UsersRightPanel");
+                                        user.StatusMessage = statusMessage;
                                     }
-                                    else
+
+                                    DebugService.LogInfo("App", $"Updated user {username} status in UsersRightPanel");
+                                }
+                                else
+                                {
+                                    DebugService.LogInfo("App", $"User {username} not found in UsersRightPanel, refreshing panel");
+
+                                    // Refresh the panel (RefreshUsersCommand is public)
+                                    if (usersRightPanel.RefreshUsersCommand != null && usersRightPanel.RefreshUsersCommand.CanExecute(null))
                                     {
-                                        DebugService.LogInfo("App", $"User {username} not found in UsersRightPanel, refreshing panel");
-
-                                        // User not found in the collection, try to refresh the panel
-                                        var refreshMethod = usersRightPanel.GetType().GetMethod("RefreshUsersAsync",
-                                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                                        if (refreshMethod != null)
-                                        {
-                                            // Invoke the refresh method
-                                            var task = refreshMethod.Invoke(usersRightPanel, null) as Task;
-                                            if (task != null)
-                                            {
-                                                await task;
-                                            }
-                                        }
+                                        usersRightPanel.RefreshUsersCommand.Execute(null);
                                     }
                                 }
                             }
@@ -817,47 +805,12 @@ namespace TDFMAUI
         /// <summary>
         /// Finds the UsersRightPanel instance if it's currently loaded
         /// </summary>
-        private UsersRightPanel FindUsersRightPanel()
+        private UsersRightPanel? FindUsersRightPanel()
         {
             try
             {
-                // Check if we're currently on the users route
-                bool isOnUsersRoute = Shell.Current.CurrentState.Location?.OriginalString?.EndsWith("//users") ?? false;
-
-                if (isOnUsersRoute)
-                {
-                    // If we're on the users route, the current page should be the UsersRightPanel
-                    if (Shell.Current.CurrentPage is UsersRightPanel panel)
-                    {
-                        return panel;
-                    }
-                }
-
-                // Try to find the UsersRightPanel in the Shell items
-                foreach (var item in Shell.Current.Items)
-                {
-                    if (item is ShellItem shellItem && shellItem.Route == "users")
-                    {
-                        foreach (var section in shellItem.Items)
-                        {
-                            if (section is ShellSection shellSection)
-                            {
-                                foreach (var content in shellSection.Items)
-                                {
-                                    if (content is ShellContent shellContent)
-                                    {
-                                        if (shellContent.Content is UsersRightPanel panel)
-                                        {
-                                            return panel;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                return null;
+                var panelStateService = Services?.GetService<PanelStateService>();
+                return panelStateService?.GetActivePanel();
             }
             catch (Exception ex)
             {

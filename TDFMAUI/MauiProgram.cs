@@ -289,6 +289,7 @@ builder
             builder.Services.AddSingleton<LocalStorageService>();
             builder.Services.AddSingleton<ILocalStorageService, LocalStorageService>();
             builder.Services.AddSingleton<IUserPresenceService, UserPresenceService>();
+            builder.Services.AddSingleton<PresenceWebSocketHandler>();
             builder.Services.AddSingleton<IUserProfileService, UserProfileService>();
 
             // Register NetworkService and IConnectivity
@@ -459,6 +460,10 @@ builder
 
                 ValidateCriticalService<IUserSessionService>(app.Services, logger);
                 ValidateCriticalService<AppShell>(app.Services, logger);
+
+                // Initialize the Presence WebSocket Handler
+                logger?.LogInformation("Initializing PresenceWebSocketHandler...");
+                app.Services.GetRequiredService<PresenceWebSocketHandler>();
                 ValidateCriticalService<ThemeService>(app.Services, logger);
                 ValidateCriticalService<IPlatformNotificationService>(app.Services, logger);
                 ValidateCriticalService<IPushNotificationService>(app.Services, logger);

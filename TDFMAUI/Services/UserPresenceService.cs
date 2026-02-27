@@ -11,13 +11,12 @@ using TDFShared.Constants;
 
 namespace TDFMAUI.Services
 {
-    public class UserPresenceService : IUserPresenceService, IDisposable
+    public class UserPresenceService : IUserPresenceService
     {
         private readonly ApiService _apiService;
         private readonly WebSocketService _webSocketService;
         private readonly ILogger<UserPresenceService> _logger;
         private readonly ConcurrentDictionary<int, UserPresenceInfo> _userStatuses;
-        private readonly Timer _activityTimer;
 
         public event EventHandler<UserStatusChangedEventArgs>? UserStatusChanged;
         public event EventHandler<UserAvailabilityChangedEventArgs>? UserAvailabilityChanged;
@@ -37,16 +36,6 @@ namespace TDFMAUI.Services
             _webSocketService = webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _userStatuses = new ConcurrentDictionary<int, UserPresenceInfo>();
-
-            // Listen for WebSocket events
-            _webSocketService.UserStatusChanged += OnUserStatusChanged;
-            _webSocketService.UserAvailabilityChanged += OnUserAvailabilityChanged;
-            _webSocketService.AvailabilityConfirmed += OnAvailabilitySet;
-            _webSocketService.StatusUpdateConfirmed += OnStatusUpdateConfirmed;
-            _webSocketService.ErrorReceived += OnErrorReceived;
-
-            // Start activity tracking timer (send activity ping every 60 seconds)
-            _activityTimer = new Timer(SendActivityPing, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
 
             // Log constructor exit
             logger?.LogInformation("UserPresenceService constructor finished.");
@@ -265,22 +254,21 @@ namespace TDFMAUI.Services
             }
         }
 
-        private async void SendActivityPing(object? state)
+        public UserPresenceStatus ParseStatus(string status)
         {
-            if (App.CurrentUser != null && _webSocketService.IsConnected)
+            if (Enum.TryParse(status, true, out UserPresenceStatus result))
             {
-                try
-                {
-                    await _webSocketService.SendActivityPingAsync();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error sending activity ping");
-                }
+                return result;
             }
+
+            // Default to offline if string can't be parsed
+            _logger.LogWarning("Failed to parse status string: {Status}", status);
+            return UserPresenceStatus.Offline;
         }
 
-        private void OnUserStatusChanged(object? sender, UserStatusEventArgs e)
+        #region Internal State Handlers (Called by PresenceWebSocketHandler)
+
+        internal void HandleRemoteStatusChanged(UserStatusEventArgs e)
         {
             if (_userStatuses.TryGetValue(e.UserId, out var userInfo))
             {
@@ -289,7 +277,8 @@ namespace TDFMAUI.Services
             }
             else
             {
-                _userStatuses.TryAdd(e.UserId, new UserPresenceInfo {
+                _userStatuses.TryAdd(e.UserId, new UserPresenceInfo
+                {
                     UserId = e.UserId,
                     Username = e.Username,
                     Status = ParseStatus(e.PresenceStatus),
@@ -307,7 +296,7 @@ namespace TDFMAUI.Services
             UserStatusChanged?.Invoke(this, args);
         }
 
-        private void OnUserAvailabilityChanged(object? sender, UserAvailabilityEventArgs e)
+        internal void HandleRemoteAvailabilityChanged(UserAvailabilityEventArgs e)
         {
             if (_userStatuses.TryGetValue(e.UserId, out var userInfo))
             {
@@ -315,7 +304,8 @@ namespace TDFMAUI.Services
             }
             else
             {
-                _userStatuses.TryAdd(e.UserId, new UserPresenceInfo {
+                _userStatuses.TryAdd(e.UserId, new UserPresenceInfo
+                {
                     UserId = e.UserId,
                     Username = e.Username,
                     IsAvailableForChat = e.IsAvailableForChat,
@@ -333,7 +323,7 @@ namespace TDFMAUI.Services
             UserAvailabilityChanged?.Invoke(this, args);
         }
 
-        private void OnAvailabilitySet(object? sender, AvailabilitySetEventArgs e)
+        internal void HandleAvailabilityConfirmed(AvailabilitySetEventArgs e)
         {
             _logger.LogInformation("Confirmation received: Availability set to {IsAvailable}", e.IsAvailable);
             if (App.CurrentUser != null && _userStatuses.TryGetValue(App.CurrentUser.UserID, out var userInfo))
@@ -343,7 +333,7 @@ namespace TDFMAUI.Services
             AvailabilityConfirmed?.Invoke(this, e);
         }
 
-        private void OnStatusUpdateConfirmed(object? sender, StatusUpdateConfirmedEventArgs e)
+        internal void HandleStatusUpdateConfirmed(StatusUpdateConfirmedEventArgs e)
         {
             _logger.LogInformation("Confirmation received: Status updated to {Status} ({StatusMessage})", e.Status, e.StatusMessage ?? "null");
             if (App.CurrentUser != null && _userStatuses.TryGetValue(App.CurrentUser.UserID, out var userInfo))
@@ -354,34 +344,13 @@ namespace TDFMAUI.Services
             StatusUpdateConfirmed?.Invoke(this, e);
         }
 
-        private void OnErrorReceived(object? sender, WebSocketErrorEventArgs e)
+        internal void HandlePresenceError(WebSocketErrorEventArgs e)
         {
             // Forward to PresenceErrorReceived event
             PresenceErrorReceived?.Invoke(this, e);
         }
 
-        public UserPresenceStatus ParseStatus(string status)
-        {
-            if (Enum.TryParse(status, true, out UserPresenceStatus result))
-            {
-                return result;
-            }
-
-            // Default to offline if string can't be parsed
-            _logger.LogWarning("Failed to parse status string: {Status}", status);
-            return UserPresenceStatus.Offline;
-        }
-
-        public void Dispose()
-        {
-            _webSocketService.UserStatusChanged -= OnUserStatusChanged;
-            _webSocketService.UserAvailabilityChanged -= OnUserAvailabilityChanged;
-            _webSocketService.AvailabilityConfirmed -= OnAvailabilitySet;
-            _webSocketService.StatusUpdateConfirmed -= OnStatusUpdateConfirmed;
-            _webSocketService.ErrorReceived -= OnErrorReceived;
-
-            _activityTimer?.Dispose();
-        }
+        #endregion
 
         public async Task<Dictionary<int, UserPresenceStatus>> GetUsersStatusAsync(IEnumerable<int> userIds)
         {

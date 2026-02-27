@@ -82,7 +82,7 @@ namespace TDFMAUI.WinUI
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error in WinUI post-XAML initialization: {ex.Message}");
-                LogException(ex, "WinUI_PostXamlInitialization");
+                SafeLogException(ex, "WinUI_PostXamlInitialization");
 
                 // Try to recover from initialization failure
                 try {
@@ -90,7 +90,7 @@ namespace TDFMAUI.WinUI
                     TryToFixWindowsAppSDKRegistration();
                 } catch (Exception fixEx) {
                     Debug.WriteLine($"Failed to fix Windows App SDK: {fixEx.Message}");
-                    LogException(fixEx, "WindowsAppSDK_Fix_Failed");
+                    SafeLogException(fixEx, "WindowsAppSDK_Fix_Failed");
                 }
             }
 
@@ -116,7 +116,7 @@ namespace TDFMAUI.WinUI
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Error during process exit: {ex.Message}");
-                    LogException(ex, "ProcessExit");
+                    SafeLogException(ex, "ProcessExit");
                 }
             };
         }
@@ -179,7 +179,7 @@ namespace TDFMAUI.WinUI
             {
                 Debug.WriteLine($"Error ensuring Windows App SDK initialization: {ex.Message}");
                 // Log but don't throw to allow initialization to continue
-                LogException(ex, "WindowsAppSDK_Initialization");
+                SafeLogException(ex, "WindowsAppSDK_Initialization");
             }
         }
 
@@ -348,7 +348,7 @@ namespace TDFMAUI.WinUI
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error fixing Windows App SDK registration: {ex.Message}");
-                LogException(ex, "WindowsAppSDK_Fix");
+                SafeLogException(ex, "WindowsAppSDK_Fix");
             }
         }
 
@@ -357,7 +357,7 @@ namespace TDFMAUI.WinUI
         private void Current_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
         {
             // Log the UI exception
-            LogException(e.Exception, "WinUI_UnhandledException");
+            SafeLogException(e.Exception, "WinUI_UnhandledException");
             Debug.WriteLine($"WinUI XAML Exception: {e.Message}");
 
             // Look for the specific COM class not registered error
@@ -671,13 +671,13 @@ namespace TDFMAUI.WinUI
 
         private void TaskScheduler_UnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
         {
-            LogException(e.Exception, "TaskScheduler_UnobservedTaskException");
+            SafeLogException(e.Exception, "TaskScheduler_UnobservedTaskException");
             e.SetObserved(); // Mark as observed to prevent process termination if possible
         }
 
         private void CurrentDomain_UnhandledException(object sender, System.UnhandledExceptionEventArgs e)
         {
-            LogException(e.ExceptionObject as Exception, "CurrentDomain_UnhandledException");
+            SafeLogException(e.ExceptionObject as Exception, "CurrentDomain_UnhandledException");
             // Process may still terminate depending on e.IsTerminating
         }
 
@@ -692,7 +692,7 @@ namespace TDFMAUI.WinUI
             }
             catch (Exception ex)
             {
-                LogException(ex, "CreateMauiApp");
+                SafeLogException(ex, "CreateMauiApp");
                 // Optionally rethrow or handle as critical failure
                 throw;
             }

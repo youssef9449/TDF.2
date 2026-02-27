@@ -135,6 +135,14 @@ namespace TDFMAUI.Helpers
                     return;
                 }
 
+                // On Windows/desktop, defer initialization until a MAUI window exists.
+                // This avoids reading unspecified/null-like theme state too early.
+                if (DeviceHelper.IsDesktop && Application.Current.Windows.Count == 0)
+                {
+                    System.Diagnostics.Debug.WriteLine("ThemeHelper.Initialize deferred: window is not ready yet.");
+                    return;
+                }
+
                 _lastSystemTheme = NormalizeTheme(Application.Current.PlatformAppTheme);
 
                 // Initialize theme resources
@@ -379,6 +387,12 @@ namespace TDFMAUI.Helpers
             try
             {
                 if (Application.Current == null) return;
+
+                if (DeviceHelper.IsDesktop && Application.Current.Windows.Count == 0)
+                {
+                    System.Diagnostics.Debug.WriteLine("ThemeHelper.ApplyTheme skipped: window is not ready yet.");
+                    return;
+                }
                 
                 // Determine which theme to use
                 var newTheme = FollowSystemTheme

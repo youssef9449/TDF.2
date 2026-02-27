@@ -21,6 +21,7 @@ namespace TDFMAUI
     /// </summary>
     public partial class UsersRightPanel : ContentPage
     {
+        private const int DefaultPageSize = 10;
         private IUserPresenceService _userPresenceService;
         private ApiService _apiService;
         private ILogger<UsersRightPanel> _logger;
@@ -121,37 +122,15 @@ namespace TDFMAUI
         public ICommand PreviousPageCommand { get; private set; }
 
         // Parameterless constructor for XAML instantiation
-        public UsersRightPanel()
+        public UsersRightPanel() : this(
+            App.Services?.GetService<IUserPresenceService>(),
+            App.Services?.GetService<ApiService>(),
+            App.Services?.GetService<ILogger<UsersRightPanel>>(),
+            App.Services?.GetService<IConnectivityService>())
         {
-            InitializeComponent();
-            try
-            {
-                // Resolve services from the global service provider
-                _userPresenceService = App.Services.GetService<IUserPresenceService>();
-                _apiService = App.Services.GetService<ApiService>();
-                _logger = App.Services.GetService<ILogger<UsersRightPanel>>();
-                _connectivityService = App.Services.GetService<IConnectivityService>();
-
-                if (_userPresenceService == null) _logger?.LogCritical("UsersRightPanel: IUserPresenceService could not be resolved.");
-                if (_apiService == null) _logger?.LogCritical("UsersRightPanel: ApiService could not be resolved.");
-                if (_logger == null) System.Diagnostics.Debug.WriteLine("[CRITICAL] UsersRightPanel: ILogger could not be resolved.");
-                if (_connectivityService == null) _logger?.LogCritical("UsersRightPanel: IConnectivityService could not be resolved.");
-            }
-            catch (Exception ex)
-            {
-                // Log critical failure if services can't be resolved
-                _logger?.LogCritical(ex, "UsersRightPanel: Critical failure resolving services in parameterless constructor.");
-                // Or use System.Diagnostics.Debug if logger itself failed
-                System.Diagnostics.Debug.WriteLine($"[CRITICAL] UsersRightPanel: Failed to resolve services: {ex.Message}");
-            }
-
-            BindingContext = this;
-            RefreshUsersCommand = new Command(async () => await RefreshUsersAsync());
-            NextPageCommand = new Command(async () => await LoadNextPageAsync());
-            PreviousPageCommand = new Command(async () => await LoadPreviousPageAsync());
         }
 
-        // Constructor with dependency injection (can be kept for testing or direct instantiation)
+        // Constructor with dependency injection
         public UsersRightPanel(
             IUserPresenceService userPresenceService,
             ApiService apiService,
@@ -163,6 +142,16 @@ namespace TDFMAUI
             _apiService = apiService;
             _logger = logger;
             _connectivityService = connectivityService;
+
+            InitializePanel();
+        }
+
+        private void InitializePanel()
+        {
+            if (_userPresenceService == null) _logger?.LogCritical("UsersRightPanel: IUserPresenceService is null.");
+            if (_apiService == null) _logger?.LogCritical("UsersRightPanel: ApiService is null.");
+            if (_connectivityService == null) _logger?.LogCritical("UsersRightPanel: IConnectivityService is null.");
+            if (_logger == null) System.Diagnostics.Debug.WriteLine("[CRITICAL] UsersRightPanel: ILogger is null.");
 
             BindingContext = this;
             RefreshUsersCommand = new Command(async () => await RefreshUsersAsync());
@@ -346,7 +335,7 @@ namespace TDFMAUI
                 if (isConnected)
                 {
                     // Get users from the centralized presence service with pagination
-                    var paginatedResponse = await _userPresenceService.GetOnlineUsersAsync(CurrentPage, 10);
+                    var paginatedResponse = await _userPresenceService.GetOnlineUsersAsync(CurrentPage, DefaultPageSize);
                     
                     if (paginatedResponse != null && paginatedResponse.Items != null)
                     {

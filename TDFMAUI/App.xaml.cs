@@ -17,6 +17,7 @@ using TDFMAUI.Features.Dashboard;
 using Microsoft.Maui.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.ApplicationModel;
+using System.Threading;
 #if ANDROID || IOS
 using Plugin.Firebase.CloudMessaging;
 using Plugin.Firebase.CloudMessaging.EventArgs;
@@ -175,7 +176,7 @@ namespace TDFMAUI
             _exceptionHandlersRegistered = true;
         }
 
-        private async Task InitializeAndNavigateAsync()
+        private async Task InitializeAndNavigateAsync(CancellationToken cancellationToken = default)
         {
             try
             {
@@ -196,7 +197,21 @@ namespace TDFMAUI
                 // This prevents early display probing from running before WinUI has created a window.
                 if (DeviceHelper.IsDesktop)
                 {
-                    await EnsureWindowReadyAsync();
+                    await EnsureWindowReadyAsync(cancellationToken: cancellationToken);
+                }
+
+                // Configure the desktop window as soon as it exists so the visual tree is stable
+                // before theme resources are applied. This reduces startup flicker on Windows.
+                if (DeviceHelper.IsDesktop && Application.Current?.Windows.Count > 0)
+                {
+                    var mainWindow = Application.Current.Windows[0];
+                    WindowManager.ConfigureMainWindow(mainWindow);
+                    DebugService.LogInfo("App", "Window configured.");
+
+                    // Subscribe once for desktop cleanup; avoid duplicate handlers across retries.
+                    mainWindow.Destroying -= OnWindowDestroying;
+                    mainWindow.Destroying += OnWindowDestroying;
+                    DebugService.LogInfo("App", "Subscribed to Window.Destroying event.");
                 }
 
                 // Initialize theme service for platform-aware theme adaptation
@@ -211,19 +226,7 @@ namespace TDFMAUI
                 SetThemeColors();
                 DebugService.LogInfo("App", "SetThemeColors completed");
 
-                // Configure window size and properties for desktop platforms
-                if (DeviceHelper.IsDesktop && Application.Current?.Windows.Count > 0)
-                {
-                    var mainWindow = Application.Current.Windows[0];
-                    WindowManager.ConfigureMainWindow(mainWindow);
-                    DebugService.LogInfo("App", "Window configured.");
-
-                    // Subscribe to the Destroying event for desktop platforms
-                    mainWindow.Destroying += OnWindowDestroying;
-                    DebugService.LogInfo("App", "Subscribed to Window.Destroying event.");
-                }
-
-                await ApplyThemeWhenWindowReadyAsync();
+                await ApplyThemeWhenWindowReadyAsync(cancellationToken);
 
                 // Set initial page and navigate
                 DebugService.LogInfo("App", "Calling SetupInitialPageAsync...");
@@ -254,23 +257,25 @@ namespace TDFMAUI
             }
         }
 
-        private static async Task EnsureWindowReadyAsync(int timeoutMilliseconds = 15000)
+        private static async Task EnsureWindowReadyAsync(int timeoutMilliseconds = 15000, CancellationToken cancellationToken = default)
         {
             var timeoutAt = DateTime.UtcNow.AddMilliseconds(timeoutMilliseconds);
             while (DateTime.UtcNow < timeoutAt)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 if (Application.Current?.Windows?.Count > 0)
                 {
                     return;
                 }
 
-                await Task.Delay(50);
+                await Task.Delay(50, cancellationToken);
             }
 
             throw new TimeoutException("Timed out waiting for a MAUI window before startup initialization.");
         }
 
-        private async Task ApplyThemeWhenWindowReadyAsync()
+        private async Task ApplyThemeWhenWindowReadyAsync(CancellationToken cancellationToken = default)
         {
             // On desktop (especially WinUI), theme resources should be applied only after a
             // concrete window exists to avoid race conditions during startup.
@@ -281,6 +286,8 @@ namespace TDFMAUI
 
                 for (var attempt = 0; attempt < maxAttempts; attempt++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     if (Application.Current?.Windows?.Count > 0)
                     {
                         ThemeHelper.Initialize();
@@ -290,7 +297,7 @@ namespace TDFMAUI
                         return;
                     }
 
-                    await Task.Delay(delayMs);
+                    await Task.Delay(delayMs, cancellationToken);
                 }
 
                 throw new TimeoutException("Timed out waiting for a window before applying theme resources.");
@@ -310,9 +317,9 @@ namespace TDFMAUI
         /// <summary>
         /// Async version of OnStart for platform-specific initialization
         /// </summary>
-        public async Task OnStartAsync()
+        public async Task OnStartAsync(CancellationToken cancellationToken = default)
         {
-            await InitializeAndNavigateAsync();
+            await InitializeAndNavigateAsync(cancellationToken);
         }
 
         private async Task SetupInitialPageAsync()
@@ -1254,22 +1261,22 @@ namespace TDFMAUI
                     throw new InvalidOperationException("Application resources are not available while ensuring merged dictionaries.");
                 }
 
-                var expectedDictionaries = new List<(string Path, string ValidationKey)>
+                var expectedDictionaries = new List<(string Path, string ValidationKey, bool EnforceDuplicateCheck)>
                 {
-                    ("/Resources/Styles/Colors.xaml", "Primary"),
-                    ("/Resources/Styles/PlatformColors.xaml", "WindowsControlHighlightColor"),
-                    ("/Resources/Styles/Styles.xaml", "Headline"),
-                    ("/Resources/Styles/AppResources.xaml", "OpenSansRegular")
+                    ("/Resources/Styles/Colors.xaml", "Primary", true),
+                    ("/Resources/Styles/PlatformColors.xaml", "WindowsControlHighlightColor", true),
+                    ("/Resources/Styles/Styles.xaml", "Headline", false),
+                    ("/Resources/Styles/AppResources.xaml", "OpenSansRegular", false)
                 };
 
-                foreach (var (path, validationKey) in expectedDictionaries)
+                foreach (var (path, validationKey, enforceDuplicateCheck) in expectedDictionaries)
                 {
                     var existingDictionary = merged.FirstOrDefault(d =>
                         string.Equals(NormalizeDictionaryPath(d.Source?.OriginalString), NormalizeDictionaryPath(path), StringComparison.OrdinalIgnoreCase));
 
                     if (existingDictionary == null)
                     {
-                        var loadedDictionary = new ResourceDictionary { Source = new Uri(path, UriKind.RelativeOrAbsolute) };
+                        var loadedDictionary = new ResourceDictionary { Source = new Uri(path, UriKind.Absolute) };
                         merged.Add(loadedDictionary);
                         existingDictionary = loadedDictionary;
                         System.Diagnostics.Debug.WriteLine($"Added missing resource dictionary: {path}");
@@ -1279,6 +1286,11 @@ namespace TDFMAUI
                     {
                         throw new InvalidOperationException($"Resource dictionary '{path}' is loaded but missing expected key '{validationKey}'.");
                     }
+
+                    if (enforceDuplicateCheck)
+                    {
+                        ValidateNoDuplicateCriticalResourceKeys(merged, validationKey, path);
+                    }
                 }
             }
             catch (Exception ex)
@@ -1286,6 +1298,25 @@ namespace TDFMAUI
                 System.Diagnostics.Debug.WriteLine($"Error ensuring all resource dictionaries are merged: {ex.Message}");
                 throw;
             }
+        }
+
+        private static void ValidateNoDuplicateCriticalResourceKeys(IList<ResourceDictionary> mergedDictionaries, string key, string expectedSource)
+        {
+            var dictionariesContainingKey = mergedDictionaries
+                .Where(d => d.ContainsKey(key))
+                .Select(d => d.Source?.OriginalString ?? "<in-memory dictionary>")
+                .ToList();
+
+            if (dictionariesContainingKey.Count <= 1)
+            {
+                return;
+            }
+
+            var normalizedExpected = NormalizeDictionaryPath(expectedSource);
+            var duplicateSources = string.Join(", ", dictionariesContainingKey.Select(NormalizeDictionaryPath));
+            throw new InvalidOperationException(
+                $"Duplicate theme resource key '{key}' detected across merged dictionaries ({duplicateSources}). " +
+                $"Expected this key to be uniquely defined in '{normalizedExpected}'.");
         }
 
         private static string NormalizeDictionaryPath(string? path)

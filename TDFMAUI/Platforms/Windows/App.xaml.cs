@@ -151,10 +151,31 @@ namespace TDFMAUI.WinUI
                     throw new FileNotFoundException($"No WindowsAppSDK runtime DLLs were found in '{baseDir}'.");
                 }
 
+                Version? baselineRuntimeVersion = null;
                 foreach (var dll in windowsAppSDKDlls)
                 {
                     var versionInfo = FileVersionInfo.GetVersionInfo(dll);
+                    var parsedVersion = ParseFileVersionOrThrow(versionInfo.FileVersion, dll);
+                    _ = AssemblyName.GetAssemblyName(dll);
+
                     Debug.WriteLine($"WindowsAppSDK runtime: {Path.GetFileName(dll)} v{versionInfo.FileVersion}");
+
+                    baselineRuntimeVersion ??= parsedVersion;
+                    if (parsedVersion.Major != baselineRuntimeVersion.Major || parsedVersion.Minor != baselineRuntimeVersion.Minor)
+                    {
+                        throw new InvalidOperationException(
+                            $"WindowsAppSDK runtime DLL version mismatch detected. Baseline={baselineRuntimeVersion}, {Path.GetFileName(dll)}={parsedVersion}.");
+                    }
+                }
+
+                var bootstrapDllPath = Path.Combine(baseDir, "Microsoft.WindowsAppRuntime.Bootstrap.dll");
+                if (File.Exists(bootstrapDllPath))
+                {
+                    _ = AssemblyName.GetAssemblyName(bootstrapDllPath);
+                }
+                else
+                {
+                    Debug.WriteLine($"WARNING: Bootstrap assembly not found at {bootstrapDllPath}");
                 }
             }
             catch (Exception ex)
@@ -163,6 +184,17 @@ namespace TDFMAUI.WinUI
                 SafeLogException(ex, "WindowsAppSDK_Initialization");
                 throw;
             }
+        }
+
+        private static Version ParseFileVersionOrThrow(string? fileVersion, string assemblyPath)
+        {
+            var token = fileVersion?.Split(' ').FirstOrDefault();
+            if (Version.TryParse(token, out var parsedVersion))
+            {
+                return parsedVersion;
+            }
+
+            throw new InvalidOperationException($"Unable to parse file version '{fileVersion}' for assembly '{assemblyPath}'.");
         }
 
         /// <summary>
@@ -231,15 +263,7 @@ namespace TDFMAUI.WinUI
             var versionInfo = FileVersionInfo.GetVersionInfo(assemblyPath);
             Debug.WriteLine($"Found {assemblyName} at {assemblyPath} with version {versionInfo.FileVersion}");
 
-            Version? parsedVersion = null;
-            if (Version.TryParse(versionInfo.FileVersion?.Split(' ').FirstOrDefault(), out var fileVersion))
-            {
-                parsedVersion = fileVersion;
-            }
-            else
-            {
-                throw new InvalidOperationException($"Unable to parse file version for {assemblyName}. Reported version: {versionInfo.FileVersion}");
-            }
+            var parsedVersion = ParseFileVersionOrThrow(versionInfo.FileVersion, assemblyPath);
 
             _ = AssemblyName.GetAssemblyName(assemblyPath);
 
@@ -496,7 +520,7 @@ namespace TDFMAUI.WinUI
                         }
 
                         Debug.WriteLine("[Windows.App] Found main TDFMAUI.App instance, calling OnStartAsync");
-                        await mainApp.OnStartAsync().WaitAsync(launchCts.Token);
+                        await mainApp.OnStartAsync(launchCts.Token).WaitAsync(launchCts.Token);
                         Debug.WriteLine("[Windows.App] Main app OnStartAsync completed successfully");
 
                         // Retry activation after startup initialization. Activate() is idempotent,

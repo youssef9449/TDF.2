@@ -203,8 +203,6 @@ namespace TDFMAUI
                 SetThemeColors();
                 DebugService.LogInfo("App", "SetThemeColors completed");
 
-                await ApplyThemeWhenWindowReadyAsync();
-
                 // Configure window size and properties for desktop platforms
                 if (DeviceHelper.IsDesktop && Application.Current?.Windows.Count > 0)
                 {
@@ -216,6 +214,8 @@ namespace TDFMAUI
                     mainWindow.Destroying += OnWindowDestroying;
                     DebugService.LogInfo("App", "Subscribed to Window.Destroying event.");
                 }
+
+                await ApplyThemeWhenWindowReadyAsync();
 
                 // Set initial page and navigate
                 DebugService.LogInfo("App", "Calling SetupInitialPageAsync...");

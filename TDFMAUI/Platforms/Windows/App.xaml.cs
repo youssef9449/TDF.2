@@ -29,7 +29,8 @@ namespace TDFMAUI.WinUI
     /// </summary>
     public partial class App : MauiWinUIApplication
     {
-        private bool _windowActivated = false;
+        private bool _uiThreadExceptionHandlersRegistered = false;
+        private bool _fallbackWindowShown = false;
 
         /// <summary>
         /// Initializes the singleton application object.  This is the first line of authored code
@@ -389,6 +390,11 @@ namespace TDFMAUI.WinUI
 
         private void SetupUIThreadExceptionHandling()
         {
+            if (_uiThreadExceptionHandlersRegistered)
+            {
+                return;
+            }
+
             try
             {
                 // Get the dispatcher queue for the current thread (UI thread)
@@ -397,11 +403,24 @@ namespace TDFMAUI.WinUI
                 {
                     Debug.WriteLine("UI thread dispatcher queue obtained successfully");
                 }
+
+                if (Microsoft.UI.Xaml.Application.Current != null)
+                {
+                    Microsoft.UI.Xaml.Application.Current.UnhandledException -= Current_UnhandledException;
+                    Microsoft.UI.Xaml.Application.Current.UnhandledException += Current_UnhandledException;
+                    Debug.WriteLine("Registered UnhandledException handler for UI exceptions");
+                }
+                else
+                {
+                    Debug.WriteLine("WARNING: Microsoft.UI.Xaml.Application.Current is null, cannot register exception handler");
+                }
+
+                _uiThreadExceptionHandlersRegistered = true;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to set up UI thread exception handling: {ex.Message}");
-                LogException(ex, "UIThreadExceptionSetup");
+                SafeLogException(ex, "UIThreadExceptionSetup");
             }
         }
 
@@ -412,17 +431,15 @@ namespace TDFMAUI.WinUI
             try
             {
                 // Log detailed information about the failure
-                LogException(ex, "InitializationFailure_Recovery");
+                SafeLogException(ex, "InitializationFailure_Recovery");
 
-                // We won't throw here - we'll try to let the app continue
-                // The base MAUI initialization might still succeed
+                // Keep process alive long enough to render a fallback error UI.
+                EnsureFallbackWindow(ex);
             }
             catch (Exception recoveryEx)
             {
                 Debug.WriteLine($"Recovery attempt failed: {recoveryEx.Message}");
-                LogException(recoveryEx, "RecoveryFailure");
-                // At this point we have to let the app crash naturally
-                throw ex;
+                SafeLogException(recoveryEx, "RecoveryFailure");
             }
         }
 
@@ -446,45 +463,7 @@ namespace TDFMAUI.WinUI
                     Debug.WriteLine("[Windows.App] base.OnLaunched completed - MAUI app should now be created");
 
                     // Immediately activate the window so UI is visible even if startup navigation stalls
-                    try
-                    {
-                        Debug.WriteLine("[Windows.App] Attempting immediate window activation after base.OnLaunched");
-                        MainThread.BeginInvokeOnMainThread(() =>
-                        {
-                            try
-                            {
-                                var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows?.FirstOrDefault();
-                                if (mauiWindow != null)
-                                {
-                                    var platformWindow = mauiWindow.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
-                                    if (platformWindow != null)
-                                    {
-                                        platformWindow.Activate();
-                                        _windowActivated = true;
-                                        Debug.WriteLine("WinUI window activated immediately after OnLaunched.");
-                                    }
-                                    else
-                                    {
-                                        Debug.WriteLine("Platform window not available for immediate activation.");
-                                    }
-                                }
-                                else
-                                {
-                                    Debug.WriteLine("No MAUI window found for immediate activation after OnLaunched.");
-                                }
-                            }
-                            catch (Exception activateEx)
-                            {
-                                Debug.WriteLine($"Error during immediate window activation: {activateEx.Message}");
-                                LogException(activateEx, "WindowActivationImmediate");
-                            }
-                        });
-                    }
-                    catch (Exception immediateEx)
-                    {
-                        Debug.WriteLine($"Immediate window activation block failed: {immediateEx.Message}");
-                        LogException(immediateEx, "WindowActivationImmediateOuter");
-                    }
+                    TryActivateMainWindow("WindowActivationImmediate");
                     
                     // Initialize the main MAUI app after base.OnLaunched completes
                     Debug.WriteLine("[Windows.App] About to call main app initialization");
@@ -516,62 +495,21 @@ namespace TDFMAUI.WinUI
                         await mainApp.OnStartAsync();
                         Debug.WriteLine("[Windows.App] Main app OnStartAsync completed successfully");
 
-                        // Only activate the window if it hasn't been activated already
-                        if (_windowActivated)
-                        {
-                            Debug.WriteLine("Window already activated, skipping duplicate activation after OnStartAsync.");
-                            return;
-                        }
-
-                        try
-                        {
-                            var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows?.FirstOrDefault();
-                            if (mauiWindow == null)
-                            {
-                                Debug.WriteLine("No MAUI window found to activate after OnStartAsync.");
-                                return;
-                            }
-
-                            var platformWindow = mauiWindow.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
-                            if (platformWindow == null)
-                            {
-                                Debug.WriteLine("Failed to get platform window for activation after OnStartAsync.");
-                                return;
-                            }
-
-                            platformWindow.Activate();
-                            _windowActivated = true;
-                            Debug.WriteLine("WinUI window activated successfully after OnStartAsync.");
-                        }
-                        catch (Exception activateEx)
-                        {
-                            Debug.WriteLine($"Error activating WinUI window after OnStartAsync: {activateEx.Message}");
-                            LogException(activateEx, "WindowActivationAfterOnStartAsync");
-                        }
+                        // Retry activation after startup initialization. Activate() is idempotent,
+                        // and retrying protects against a first activation that did not make the
+                        // window visible.
+                        TryActivateMainWindow("WindowActivationAfterOnStartAsync");
                     });
                 }
                 catch (Exception baseEx)
                 {
                     Debug.WriteLine($"Error in base.OnLaunched: {baseEx.Message}");
-                    LogException(baseEx, "Base_OnLaunched");
+                    SafeLogException(baseEx, "Base_OnLaunched");
 
-                    // Try to fix Windows App SDK registration
+                    // Try to fix Windows App SDK registration and continue with fallback UI.
                     TryToFixWindowsAppSDKRegistration();
-
-                    // Rethrow to allow the app to handle the error
-                    throw;
+                    RecoverFromInitializationFailure(baseEx);
                 }
-
-               // Add specific UI exception handler for WinUI
-                if (Microsoft.UI.Xaml.Application.Current != null)
-                    {
-                        Microsoft.UI.Xaml.Application.Current.UnhandledException += Current_UnhandledException;
-                        Debug.WriteLine("Registered UnhandledException handler for UI exceptions");
-                    }
-                    else
-                    {
-                        Debug.WriteLine("WARNING: Microsoft.UI.Xaml.Application.Current is null, cannot register exception handler");
-                    }
 
                 // Register for window closed event
                 try
@@ -604,7 +542,7 @@ namespace TDFMAUI.WinUI
                                 catch (Exception ex)
                                 {
                                     Debug.WriteLine($"Error during window close: {ex.Message}");
-                                    LogException(ex, "WindowClosed");
+                                    SafeLogException(ex, "WindowClosed");
                                 }
                             };
                             Debug.WriteLine("Window.Closed event handler registered");
@@ -622,7 +560,7 @@ namespace TDFMAUI.WinUI
                 catch (Exception windowEx)
                 {
                     Debug.WriteLine($"Error setting up window event handlers: {windowEx.Message}");
-                    LogException(windowEx, "WindowSetup");
+                    SafeLogException(windowEx, "WindowSetup");
                 }
 
                 Debug.WriteLine("OnLaunched: Initialization completed");
@@ -630,22 +568,10 @@ namespace TDFMAUI.WinUI
             catch (Exception ex)
             {
                 Debug.WriteLine($"Critical error in OnLaunched: {ex.Message}");
-                LogException(ex, "OnLaunched_Critical");
+                SafeLogException(ex, "OnLaunched_Critical");
 
-                // Try to recover from the error
-                try
-                {
-                    RecoverFromInitializationFailure(ex);
-                }
-                catch
-                {
-                    // If recovery fails, we'll let the app crash naturally
-                }
-
-                // Do not swallow launch failures; allowing this exception to escape
-                // prevents a half-initialized window from remaining visible while the
-                // app is non-functional and provides reliable crash diagnostics.
-                throw;
+                // Keep process alive and surface a fallback UI if launch cannot complete.
+                RecoverFromInitializationFailure(ex);
             }
         }
 
@@ -769,6 +695,91 @@ namespace TDFMAUI.WinUI
                 LogException(ex, "CreateMauiApp");
                 // Optionally rethrow or handle as critical failure
                 throw;
+            }
+        }
+
+        private void TryActivateMainWindow(string context)
+        {
+            try
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    try
+                    {
+                        var mauiWindow = Microsoft.Maui.Controls.Application.Current?.Windows?.FirstOrDefault();
+                        if (mauiWindow == null)
+                        {
+                            Debug.WriteLine($"No MAUI window found for activation ({context}).");
+                            return;
+                        }
+
+                        var platformWindow = mauiWindow.Handler?.PlatformView as Microsoft.UI.Xaml.Window;
+                        if (platformWindow == null)
+                        {
+                            Debug.WriteLine($"Platform window unavailable for activation ({context}).");
+                            return;
+                        }
+
+                        platformWindow.Activate();
+                        Debug.WriteLine($"WinUI window activation attempted successfully ({context}).");
+                    }
+                    catch (Exception activateEx)
+                    {
+                        Debug.WriteLine($"Error during window activation ({context}): {activateEx.Message}");
+                        SafeLogException(activateEx, context);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to queue window activation ({context}): {ex.Message}");
+                SafeLogException(ex, $"{context}_Queue");
+            }
+        }
+
+        private void EnsureFallbackWindow(Exception ex)
+        {
+            if (_fallbackWindowShown)
+            {
+                return;
+            }
+
+            _fallbackWindowShown = true;
+
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                try
+                {
+                    var window = new Microsoft.UI.Xaml.Window
+                    {
+                        Content = new Microsoft.UI.Xaml.Controls.TextBlock
+                        {
+                            Text = $"The application encountered a startup error and attempted recovery. Please restart the app.\n\n{ex.Message}",
+                            TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
+                            Margin = new Microsoft.UI.Xaml.Thickness(24)
+                        }
+                    };
+
+                    window.Activate();
+                    Debug.WriteLine("Displayed fallback error window after initialization failure.");
+                }
+                catch (Exception fallbackEx)
+                {
+                    Debug.WriteLine($"Failed to show fallback window: {fallbackEx.Message}");
+                    SafeLogException(fallbackEx, "FallbackWindow");
+                }
+            });
+        }
+
+        private static void SafeLogException(Exception ex, string context)
+        {
+            try
+            {
+                LogException(ex, context);
+            }
+            catch
+            {
+                Debug.WriteLine($"SafeLogException fallback: [{context}] {ex?.Message}");
             }
         }
 

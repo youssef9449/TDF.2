@@ -27,9 +27,7 @@ namespace TDFMAUI.Services
                 // Initialize device helper
                 DeviceHelper.Initialize();
                 
-                // Initialize theme helper
-                ThemeHelper.Initialize();
-                
+                // ThemeHelper initialization is deferred until app resources and window are ready.
                 // Subscribe to theme changes
                 ThemeHelper.ThemeChanged += OnThemeChanged;
                 

@@ -3,6 +3,7 @@ using Microsoft.Maui.Controls;
 using Microsoft.Maui.Graphics;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace TDFMAUI.Helpers
@@ -36,12 +37,12 @@ namespace TDFMAUI.Helpers
         /// <summary>
         /// Gets the current app theme
         /// </summary>
-        public static AppTheme CurrentTheme => Application.Current?.UserAppTheme ?? AppTheme.Light;
+        public static AppTheme CurrentTheme => NormalizeTheme(Application.Current?.UserAppTheme ?? _lastSystemTheme);
 
         /// <summary>
         /// Gets the current system theme
         /// </summary>
-        public static AppTheme SystemTheme => Application.Current?.PlatformAppTheme ?? AppTheme.Light;
+        public static AppTheme SystemTheme => NormalizeTheme(Application.Current?.PlatformAppTheme ?? _lastSystemTheme);
 
         /// <summary>
         /// Gets whether the app is currently using dark theme
@@ -133,34 +134,29 @@ namespace TDFMAUI.Helpers
                     System.Diagnostics.Debug.WriteLine("Application.Current is null, cannot initialize theme helper");
                     return;
                 }
-                
+
+                _lastSystemTheme = NormalizeTheme(Application.Current.PlatformAppTheme);
+
                 // Initialize theme resources
                 InitializeThemeResources();
-                
+
                 // Unsubscribe existing handler if any
                 if (_systemThemeHandler != null)
                     Application.Current.RequestedThemeChanged -= _systemThemeHandler;
-                
+
                 // Register for system theme changes
                 _systemThemeHandler = (s, e) =>
                 {
-                    // Store the last detected system theme
-                    _lastSystemTheme = e.RequestedTheme;
-                    
+                    _lastSystemTheme = NormalizeTheme(e.RequestedTheme);
+
                     if (FollowSystemTheme)
                     {
-                        // If following system theme, update when system changes
                         ApplyTheme();
                     }
                 };
-                
-                // Register for system theme changes
+
                 Application.Current.RequestedThemeChanged += _systemThemeHandler;
-                
-                // Store initial system theme
-                _lastSystemTheme = Application.Current.PlatformAppTheme;
-                
-                // Apply the initial theme
+
                 ApplyTheme();
             }
             catch (Exception ex)
@@ -203,22 +199,19 @@ namespace TDFMAUI.Helpers
             {
                 if (Application.Current?.Resources?.MergedDictionaries == null)
                     return;
-                
+
                 var mergedDictionaries = Application.Current.Resources.MergedDictionaries;
-                
-                // Find the theme dictionaries
-                var colorsDict = mergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString?.Contains("Colors.xaml") == true && !d.Source?.OriginalString?.Contains("Colors.Light.xaml") == true && !d.Source?.OriginalString?.Contains("Colors.Dark.xaml") == true);
-                var platformDict = mergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString?.Contains("PlatformColors.xaml") == true);
-                var stylesDict = mergedDictionaries.FirstOrDefault(d => d.Source?.OriginalString?.Contains("Styles.xaml") == true);
-                
-                // Load theme resources from Colors.xaml (which now uses AppThemeBinding)
+
+                var colorsDict = FindMergedDictionary(mergedDictionaries, "Colors.xaml", "Primary");
+                var platformDict = FindMergedDictionary(mergedDictionaries, "PlatformColors.xaml", "WindowsControlHighlightColor");
+                var stylesDict = FindMergedDictionary(mergedDictionaries, "Styles.xaml", "Headline");
+
                 if (colorsDict != null)
                 {
                     foreach (var key in colorsDict.Keys)
                     {
                         if (key is string stringKey && colorsDict[key] != null)
                         {
-                            // Since Colors.xaml now uses AppThemeBinding, the resources will automatically adapt
                             _lightThemeResources[stringKey] = colorsDict[key];
                             _darkThemeResources[stringKey] = colorsDict[key];
                         }
@@ -226,40 +219,35 @@ namespace TDFMAUI.Helpers
                 }
                 else
                 {
-                    // Fallback theme resources if dictionary not found
                     _lightThemeResources["BackgroundColor"] = Colors.White;
                     _lightThemeResources["TextColor"] = Colors.Black;
                     _lightThemeResources["Primary"] = Color.FromArgb("#FF0078D7");
                     _lightThemeResources["SurfaceColor"] = Color.FromArgb("#FFF8F9FA");
                     _lightThemeResources["TextSecondaryColor"] = Color.FromArgb("#FF6C757D");
-                    
+
                     _darkThemeResources["BackgroundColor"] = Color.FromArgb("#FF121212");
                     _darkThemeResources["TextColor"] = Colors.White;
                     _darkThemeResources["Primary"] = Color.FromArgb("#FF0078D7");
                     _darkThemeResources["SurfaceColor"] = Color.FromArgb("#FF1E1E1E");
                     _darkThemeResources["TextSecondaryColor"] = Color.FromArgb("#FFB0B0B0");
                 }
-                
-                // Load platform-specific resources
+
                 if (platformDict != null)
                 {
                     foreach (var key in platformDict.Keys)
                     {
                         if (key is string stringKey && platformDict[key] != null)
                         {
-                            // AppThemeBinding is not accessible in C#; just add all resources
                             _lightThemeResources[stringKey] = platformDict[key];
                             _darkThemeResources[stringKey] = platformDict[key];
                         }
                     }
                 }
-                
-                // Load common styles
+
                 if (stylesDict != null)
                 {
-                    // Store style resources that should be applied to both themes
                     var styleKeys = new List<string>();
-                    
+
                     foreach (var key in stylesDict.Keys)
                     {
                         if (key is string stringKey && !stringKey.Contains("Color") && stylesDict[key] != null)
@@ -267,8 +255,7 @@ namespace TDFMAUI.Helpers
                             styleKeys.Add(stringKey);
                         }
                     }
-                    
-                    // Apply styles to both themes
+
                     foreach (var key in styleKeys)
                     {
                         _lightThemeResources[key] = stylesDict[key];
@@ -282,6 +269,40 @@ namespace TDFMAUI.Helpers
             }
         }
         
+
+        private static ResourceDictionary? FindMergedDictionary(IList<ResourceDictionary> mergedDictionaries, string expectedFileName, string requiredKey)
+        {
+            var normalizedFileName = expectedFileName.ToLowerInvariant();
+
+            var bySource = mergedDictionaries.FirstOrDefault(d =>
+            {
+                var source = NormalizeSource(d.Source?.OriginalString);
+                return source.EndsWith(normalizedFileName, StringComparison.OrdinalIgnoreCase);
+            });
+
+            if (bySource != null)
+            {
+                return bySource;
+            }
+
+            return mergedDictionaries.FirstOrDefault(d => d.ContainsKey(requiredKey));
+        }
+
+        private static string NormalizeSource(string? source)
+        {
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                return string.Empty;
+            }
+
+            return source.Replace('\\', '/').Trim().TrimStart('/').ToLowerInvariant();
+        }
+
+        private static AppTheme NormalizeTheme(AppTheme theme)
+        {
+            return theme == AppTheme.Unspecified ? _lastSystemTheme : theme;
+        }
+
         /// <summary>
         /// Update platform-specific theme resources
         /// </summary>
@@ -323,7 +344,7 @@ namespace TDFMAUI.Helpers
             {
                 if (Application.Current == null) return;
                 
-                var currentSystemTheme = Application.Current.PlatformAppTheme;
+                var currentSystemTheme = NormalizeTheme(Application.Current.PlatformAppTheme);
                 
                 // If system theme has changed
                 if (currentSystemTheme != _lastSystemTheme)
@@ -353,9 +374,9 @@ namespace TDFMAUI.Helpers
                 if (Application.Current == null) return;
                 
                 // Determine which theme to use
-                var newTheme = FollowSystemTheme 
-                    ? Application.Current.PlatformAppTheme 
-                    : UserTheme;
+                var newTheme = FollowSystemTheme
+                    ? NormalizeTheme(Application.Current.PlatformAppTheme)
+                    : NormalizeTheme(UserTheme);
 
                 // Apply the theme
                 Application.Current.UserAppTheme = newTheme;

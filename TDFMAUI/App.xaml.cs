@@ -30,6 +30,7 @@ namespace TDFMAUI
         private readonly ILogger<App> _logger;
         private static IUserSessionService? _userSessionService;
         private static bool _exceptionHandlersRegistered = false;
+        private bool _startupInitialized;
 
         /// <summary>
         /// Gets the current user from the centralized session service
@@ -178,10 +179,18 @@ namespace TDFMAUI
         {
             try
             {
+                if (_startupInitialized)
+                {
+                    return;
+                }
+
                 DebugService.LogInfo("App", "InitializeAndNavigateAsync entered.");
 
                 RegisterGlobalExceptionHandlersOnce();
                 CheckSafeMode();
+
+                // Ensure required theme dictionaries are available before reading theme resources.
+                EnsureAllResourceDictionariesMerged();
 
                 // Initialize theme service for platform-aware theme adaptation
                 DebugService.LogInfo("App", "About to initialize theme service");
@@ -194,9 +203,7 @@ namespace TDFMAUI
                 SetThemeColors();
                 DebugService.LogInfo("App", "SetThemeColors completed");
 
-                // Initialize theme helper
-                ThemeHelper.Initialize();
-                DebugService.LogInfo("App", $"Theme initialized: {ThemeHelper.CurrentTheme}");
+                await ApplyThemeWhenWindowReadyAsync();
 
                 // Configure window size and properties for desktop platforms
                 if (DeviceHelper.IsDesktop && Application.Current?.Windows.Count > 0)
@@ -215,6 +222,7 @@ namespace TDFMAUI
                 await SetupInitialPageAsync();
                 System.Diagnostics.Debug.WriteLine("[App] SetupInitialPageAsync completed");
                 DebugService.LogInfo("App", "InitializeAndNavigateAsync finished");
+                _startupInitialized = true;
             }
             catch (Exception ex)
             {
@@ -236,6 +244,32 @@ namespace TDFMAUI
                     System.Diagnostics.Debug.WriteLine($"[App] Failed to display error page: {displayEx.Message}");
                 }
             }
+        }
+
+        private async Task ApplyThemeWhenWindowReadyAsync()
+        {
+            const int maxAttempts = 25;
+            const int delayMs = 50;
+
+            for (var attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                if (Application.Current?.Windows?.Count > 0)
+                {
+                    ThemeHelper.Initialize();
+                    DebugService.LogInfo("App", $"Theme initialized: {ThemeHelper.CurrentTheme}");
+                    ThemeHelper.ApplyTheme();
+                    ThemeHelper.ApplyPlatformSpecificAdaptations();
+                    return;
+                }
+
+                await Task.Delay(delayMs);
+            }
+
+            DebugService.LogInfo("App", "Window was not ready in time for deferred theme initialization; applying anyway.");
+            ThemeHelper.Initialize();
+            DebugService.LogInfo("App", $"Theme initialized (fallback): {ThemeHelper.CurrentTheme}");
+            ThemeHelper.ApplyTheme();
+            ThemeHelper.ApplyPlatformSpecificAdaptations();
         }
 
         protected override async void OnStart()
@@ -1026,12 +1060,6 @@ namespace TDFMAUI
             {
                 // Add adaptive theme bindings programmatically to ensure proper initialization order
                 AddAdaptiveThemeBindings();
-
-                // Let ThemeHelper handle theme application
-                ThemeHelper.ApplyTheme();
-
-                // Apply platform-specific theme adaptations
-                ThemeHelper.ApplyPlatformSpecificAdaptations();
             }
             catch (Exception ex)
             {
@@ -1047,23 +1075,47 @@ namespace TDFMAUI
         {
             try
             {
-                var resources = Application.Current.Resources;
-                // Assign adaptive resources directly based on the current theme
-                // These resources are SolidColorBrush, not Color, so we need to extract the Color from them
-                if (resources["TextColor"] is SolidColorBrush textBrush)
-                    resources["AdaptiveTextColor"] = textBrush.Color;
-                if (resources["BackgroundColor"] is SolidColorBrush backgroundBrush)
-                    resources["AdaptiveBackgroundColor"] = backgroundBrush.Color;
-                if (resources["SurfaceColor"] is SolidColorBrush surfaceBrush)
-                    resources["AdaptiveSurfaceColor"] = surfaceBrush.Color;
-                if (resources["BorderColor"] is SolidColorBrush borderBrush)
-                    resources["AdaptiveBorderColor"] = borderBrush.Color;
+                var resources = Application.Current?.Resources;
+                if (resources == null)
+                {
+                    DebugService.LogInfo("App", "Skipping adaptive theme bindings because Application.Current.Resources is unavailable.");
+                    return;
+                }
+
+                TryAddAdaptiveColor(resources, "TextColor", "AdaptiveTextColor");
+                TryAddAdaptiveColor(resources, "BackgroundColor", "AdaptiveBackgroundColor");
+                TryAddAdaptiveColor(resources, "SurfaceColor", "AdaptiveSurfaceColor");
+                TryAddAdaptiveColor(resources, "BorderColor", "AdaptiveBorderColor");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error adding adaptive theme bindings: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
             }
+        }
+
+        private static void TryAddAdaptiveColor(ResourceDictionary resources, string sourceKey, string targetKey)
+        {
+            if (!resources.TryGetValue(sourceKey, out var sourceResource) || sourceResource == null)
+            {
+                DebugService.LogInfo("App", $"Theme resource '{sourceKey}' is not available yet. Skipping adaptive binding for '{targetKey}'.");
+                return;
+            }
+
+            var color = sourceResource switch
+            {
+                SolidColorBrush brush => brush.Color,
+                Color directColor => directColor,
+                _ => null
+            };
+
+            if (color == null)
+            {
+                DebugService.LogInfo("App", $"Theme resource '{sourceKey}' is not a color-compatible resource. Skipping '{targetKey}'.");
+                return;
+            }
+
+            resources[targetKey] = color;
         }
         
 
@@ -1167,30 +1219,52 @@ namespace TDFMAUI
             try
             {
                 var merged = Application.Current?.Resources?.MergedDictionaries;
-                if (merged == null) return;
-
-                // Define the expected resource dictionary sources
-                var expectedSources = new List<string>
+                if (merged == null)
                 {
-                    "Resources/Styles/Colors.xaml",
-                    "Resources/Styles/PlatformColors.xaml",
-                    "Resources/Styles/Styles.xaml"
+                    throw new InvalidOperationException("Application resources are not available while ensuring merged dictionaries.");
+                }
+
+                var expectedDictionaries = new List<(string Path, string ValidationKey)>
+                {
+                    ("/Resources/Styles/Colors.xaml", "Primary"),
+                    ("/Resources/Styles/PlatformColors.xaml", "WindowsControlHighlightColor"),
+                    ("/Resources/Styles/Styles.xaml", "Headline")
                 };
 
-                foreach (var source in expectedSources)
+                foreach (var (path, validationKey) in expectedDictionaries)
                 {
-                    if (!merged.Any(d => d.Source?.OriginalString?.Contains(source) == true))
+                    var existingDictionary = merged.FirstOrDefault(d =>
+                        string.Equals(NormalizeDictionaryPath(d.Source?.OriginalString), NormalizeDictionaryPath(path), StringComparison.OrdinalIgnoreCase));
+
+                    if (existingDictionary == null)
                     {
-                        // If a dictionary is missing, add it
-                        merged.Add(new ResourceDictionary { Source = new Uri(source, UriKind.Relative) });
-                        System.Diagnostics.Debug.WriteLine($"Added missing resource dictionary: {source}");
+                        var loadedDictionary = new ResourceDictionary { Source = new Uri(path, UriKind.RelativeOrAbsolute) };
+                        merged.Add(loadedDictionary);
+                        existingDictionary = loadedDictionary;
+                        System.Diagnostics.Debug.WriteLine($"Added missing resource dictionary: {path}");
+                    }
+
+                    if (!existingDictionary.ContainsKey(validationKey))
+                    {
+                        throw new InvalidOperationException($"Resource dictionary '{path}' is loaded but missing expected key '{validationKey}'.");
                     }
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error ensuring all resource dictionaries are merged: {ex.Message}");
+                throw;
             }
+        }
+
+        private static string NormalizeDictionaryPath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            return path.Replace('\\', '/').TrimStart('/');
         }
 
 #if ANDROID || IOS

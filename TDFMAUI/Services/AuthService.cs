@@ -887,14 +887,12 @@ public class AuthService : IAuthService
             }
 
             // Call your token refresh endpoint
-            // This is a placeholder - implement according to your authentication system
             var newToken = await RefreshTokenFromServerAsync(refreshToken);
             if (!string.IsNullOrEmpty(newToken))
             {
-                // Store the new token
-                await _secureStorageService.SaveTokenAsync(newToken, DateTime.UtcNow.AddHours(1));
-                _currentToken = newToken;
-                _tokenExpiration = DateTime.UtcNow.AddHours(1); // Adjust based on your token lifetime
+                // RefreshTokenFromServerAsync already handles storage and in-memory updates
+                _currentToken = ApiConfig.CurrentToken;
+                _tokenExpiration = ApiConfig.TokenExpiration;
                 return newToken;
             }
 

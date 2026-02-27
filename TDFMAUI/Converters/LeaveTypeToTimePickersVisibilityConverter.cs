@@ -17,8 +17,8 @@ namespace TDFMAUI.Converters
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            // Not needed for one-way binding
-            throw new NotImplementedException();
+            // Not supported for one-way binding
+            throw new NotSupportedException();
         }
     }
 }

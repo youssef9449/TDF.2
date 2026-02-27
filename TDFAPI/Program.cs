@@ -602,7 +602,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
 builder.Services.AddScoped<ILookupService, LookupService>();
 builder.Services.AddScoped<IRequestService, RequestService>();
-builder.Services.AddScoped<IUserPresenceService, UserPresenceService>();
+builder.Services.AddScoped<TDFAPI.Services.IUserPresenceService, TDFAPI.Services.UserPresenceService>();
 // Register both notification services
 builder.Services.AddScoped<TDFAPI.Services.INotificationService, TDFAPI.Services.NotificationService>();
 // For shared interface, create an adapter that implements TDFShared.Services.INotificationService

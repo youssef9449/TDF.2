@@ -55,34 +55,4 @@ namespace TDFShared.DTOs.Users
         }
     }
 
-    /// <summary>
-    /// Represents the online status and presence information for a user
-    /// </summary>
-    public class UserPresence
-    {
-        /// <summary>
-        /// The ID of the user
-        /// </summary>
-        public int UserId { get; set; }
-
-        /// <summary>
-        /// Whether the user is currently online
-        /// </summary>
-        public bool IsOnline { get; set; }
-
-        /// <summary>
-        /// The last time the user was seen online
-        /// </summary>
-        public DateTime? LastSeen { get; set; }
-
-        /// <summary>
-        /// The connection ID for the user's current WebSocket connection (if any)
-        /// </summary>
-        public string? ConnectionId { get; set; }
-
-        /// <summary>
-        /// The type of device the user is connected from (e.g., "Mobile", "Desktop")
-        /// </summary>
-        public string? DeviceType { get; set; }
-    }
 }

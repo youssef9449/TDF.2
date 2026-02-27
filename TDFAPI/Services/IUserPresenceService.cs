@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using TDFShared.Enums;
 using System.Collections.Generic;
+using TDFShared.DTOs.Users;
 
 namespace TDFAPI.Services
 {
@@ -34,6 +35,21 @@ namespace TDFAPI.Services
         /// <summary>
         /// Gets a list of all currently online users
         /// </summary>
-        IEnumerable<UserPresenceInfo> GetOnlineUsers();
+        Task<IEnumerable<UserPresenceInfo>> GetOnlineUsersAsync();
+
+        /// <summary>
+        /// Updates a user's connection status
+        /// </summary>
+        Task UpdateUserConnectionStatusAsync(int userId, bool isOnline, string? connectionId = null, string? deviceType = null);
+
+        /// <summary>
+        /// Gets a user's current presence information
+        /// </summary>
+        Task<UserPresenceInfo> GetUserPresenceAsync(int userId);
+
+        /// <summary>
+        /// Gets presence information for multiple users
+        /// </summary>
+        Task<Dictionary<int, UserPresenceInfo>> GetUsersPresenceAsync(IEnumerable<int> userIds);
     }
-} 
+}

@@ -266,8 +266,21 @@ namespace TDFAPI.Services
             {
                 var messages = await _messageRepository.GetRecentMessagesAsync(count);
 
-                // Map to DTOs
-                return messages.Select(m => MapToChatMessageDto(m)).ToList();
+                // Fetch unique sender IDs to avoid N+1 query issue
+                var senderIds = messages.Select(m => m.SenderID).Distinct().ToList();
+                var senderCache = new Dictionary<int, string>();
+
+                foreach (var senderId in senderIds)
+                {
+                    var sender = await _userRepository.GetByIdAsync(senderId);
+                    senderCache[senderId] = sender?.FullName ?? "Unknown";
+                }
+
+                var chatMessageDtos = messages.Select(m =>
+                    MapToChatMessageDto(m, senderCache.TryGetValue(m.SenderID, out var name) ? name : "Unknown")
+                ).ToList();
+
+                return chatMessageDtos;
             }
             catch (Exception ex)
             {
@@ -385,9 +398,6 @@ namespace TDFAPI.Services
 
         private ChatMessageDto MapToChatMessageDto(MessageEntity message, string? senderName = null)
         {
-            // If sender name not provided, use placeholder
-            senderName ??= "Unknown";
-
             return new ChatMessageDto
             {
                 Id = message.MessageID,

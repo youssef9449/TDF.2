@@ -52,7 +52,7 @@ namespace TDFMAUI.Converters
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             // Not intended to be used for two-way binding
-            throw new NotImplementedException();
+            throw new NotSupportedException();
         }
     }
 } 

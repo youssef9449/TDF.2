@@ -49,7 +49,7 @@ namespace TDFMAUI.Converters
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException(); // Not needed for one-way binding
+            throw new NotSupportedException(); // Not supported for one-way binding
         }
     }
 } 

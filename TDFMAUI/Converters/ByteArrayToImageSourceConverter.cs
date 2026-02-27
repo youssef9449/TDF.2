@@ -30,8 +30,8 @@ namespace TDFMAUI.Converters
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            // ConvertBack not implemented as we don't need to convert from ImageSource to byte[]
-            throw new NotImplementedException();
+            // ConvertBack not supported as we don't need to convert from ImageSource to byte[]
+            throw new NotSupportedException();
         }
     }
 } 

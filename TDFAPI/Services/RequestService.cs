@@ -633,10 +633,13 @@ namespace TDFAPI.Services
                 throw new EntityNotFoundException("Request", id);
             if (request.RequestManagerStatus != RequestStatusEnum.Pending)
                 throw new BusinessRuleException("Request is not pending manager approval.");
+
             request.RequestManagerStatus = RequestStatusEnum.ManagerApproved;
+            request.RequestHRStatus = RequestStatusEnum.Pending; // Ensure HR status is pending
             request.ManagerApproverId = approverId;
             request.ManagerRemarks = approvalDto.ManagerRemarks;
             request.UpdatedAt = DateTime.UtcNow;
+
             await _requestRepository.UpdateAsync(request);
             await NotifyHR($"Request from {request.RequestUserFullName} approved by manager.", approverId);
             return true;
@@ -649,10 +652,13 @@ namespace TDFAPI.Services
                 throw new EntityNotFoundException("Request", id);
             if (request.RequestManagerStatus != RequestStatusEnum.ManagerApproved)
                 throw new BusinessRuleException("Request must be manager approved before HR approval.");
+
             request.RequestManagerStatus = RequestStatusEnum.HRApproved;
+            request.RequestHRStatus = RequestStatusEnum.HRApproved; // HR approved means final approval
             request.HRApproverId = approverId;
             request.HRRemarks = approvalDto.HRRemarks;
             request.UpdatedAt = DateTime.UtcNow;
+
             await _requestRepository.UpdateAsync(request);
             await _notificationService.CreateNotificationAsync(request.RequestUserID, $"Your {request.RequestType} request has been fully approved.");
             return true;
@@ -665,10 +671,13 @@ namespace TDFAPI.Services
                 throw new EntityNotFoundException("Request", id);
             if (request.RequestManagerStatus != RequestStatusEnum.Pending)
                 throw new BusinessRuleException("Request is not pending manager approval.");
+
             request.RequestManagerStatus = RequestStatusEnum.Rejected;
+            request.RequestHRStatus = RequestStatusEnum.Rejected;
             request.ManagerApproverId = rejecterId;
             request.ManagerRemarks = rejectDto.ManagerRemarks;
             request.UpdatedAt = DateTime.UtcNow;
+
             await _requestRepository.UpdateAsync(request);
             await NotifyHR($"Request from {request.RequestUserFullName} rejected by manager.", rejecterId);
             await _notificationService.CreateNotificationAsync(request.RequestUserID, $"Your {request.RequestType} request was rejected by your manager. Reason: {rejectDto.ManagerRemarks}");
@@ -682,10 +691,13 @@ namespace TDFAPI.Services
                 throw new EntityNotFoundException("Request", id);
             if (request.RequestManagerStatus != RequestStatusEnum.ManagerApproved)
                 throw new BusinessRuleException("Request must be manager approved before HR rejection.");
+
             request.RequestManagerStatus = RequestStatusEnum.Rejected;
+            request.RequestHRStatus = RequestStatusEnum.Rejected;
             request.HRApproverId = rejecterId;
             request.HRRemarks = rejectDto.HRRemarks;
             request.UpdatedAt = DateTime.UtcNow;
+
             await _requestRepository.UpdateAsync(request);
             await _notificationService.CreateNotificationAsync(request.RequestUserID, $"Your {request.RequestType} request was rejected by HR. Reason: {rejectDto.HRRemarks}");
             await NotifyDepartmentManagers(request.RequestDepartment, $"Request from {request.RequestUserFullName} rejected by HR.", rejecterId);

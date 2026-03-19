@@ -1337,9 +1337,9 @@ namespace TDFMAUI.Services
                     queryParams.Add($"pageSize={pagination.PageSize}");
                     if (!string.IsNullOrEmpty(pagination.SortBy))
                         queryParams.Add($"sortBy={Uri.EscapeDataString(pagination.SortBy)}");
-                    queryParams.Add($"ascending={!pagination.Ascending}");
+                    queryParams.Add($"ascending={pagination.Ascending}");
                     if (pagination.FilterStatus.HasValue)
-                        queryParams.Add($"status={pagination.FilterStatus.Value}");
+                        queryParams.Add($"filterStatus={pagination.FilterStatus.Value}");
                     if (pagination.CountOnly)
                         queryParams.Add($"countOnly=true");
                 }

@@ -322,25 +322,8 @@ namespace TDFMAUI.ViewModels
                         
                         foreach (var request in response.Data.Items)
                         {
-                            // Apply client-side filtering for managers if "All" departments is selected
-                            if (accessLevel == RequestAccessLevel.Department && SelectedDepartment?.Id == "0")
-                            {
-                                var currentUser = await GetCurrentUserDtoAsync();
-                                if (currentUser != null && AuthorizationUtilities.CanViewRequest(currentUser, request))
-                                {
-                                    Requests.Add(request);
-                                    _logger.LogDebug("Added request {RequestId} for user {UserName}", request.RequestID, request.UserName);
-                                }
-                                else
-                                {
-                                    _logger.LogDebug("Filtered out request {RequestId} for user {UserName}", request.RequestID, request.UserName);
-                                }
-                            }
-                            else
-                            {
-                                Requests.Add(request);
-                                _logger.LogDebug("Added request {RequestId} for user {UserName}", request.RequestID, request.UserName);
-                            }
+                            Requests.Add(request);
+                            _logger.LogDebug("Added request {RequestId} for user {UserName}", request.RequestID, request.UserName);
                         }
                         _logger.LogInformation("Successfully loaded {Count} requests after filtering.", Requests.Count);
                     }

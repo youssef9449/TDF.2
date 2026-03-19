@@ -540,7 +540,7 @@ namespace TDFAPI.Repositories
                 { "StartDate", "RequestFromDay" },
                 { "EndDate", "RequestToDay" },
                 { "Type", "RequestType" },
-                { "Status", "RequestStatus" },
+                { "Status", "RequestManagerStatus" },
                 { "Department", "RequestDepartment" },
                 { "UserID", "RequestUserID" },
                 { "CreatedAt", "CreatedAt" },

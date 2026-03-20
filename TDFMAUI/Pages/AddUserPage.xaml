@@ -4,7 +4,8 @@
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              xmlns:viewmodels="clr-namespace:TDFMAUI.ViewModels"
              x:Class="TDFMAUI.Pages.AddUserPage"
-             Title="Add User"
+             x:DataType="viewmodels:AddUserViewModel"
+             Title="{Binding Title}"
              BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <Grid RowDefinitions="Auto,*,Auto">
@@ -16,7 +17,7 @@
                     TextColor="{StaticResource Primary}"
                     FontSize="20"
                     WidthRequest="50"/>
-            <Label Text="Add User"
+            <Label Text="{Binding Title}"
                    FontSize="24"
                    FontAttributes="Bold"
                    HorizontalOptions="CenterAndExpand"/>
@@ -36,33 +37,34 @@
                 <Frame BackgroundColor="White" Padding="15">
                     <VerticalStackLayout Spacing="15">
                         <Label Text="Username" FontAttributes="Bold"/>
-                        <Entry x:Name="usernameEntry" Placeholder="Enter username"/>
+                        <Entry Text="{Binding Username}" Placeholder="Enter username"/>
 
                         <Label Text="Password" FontAttributes="Bold"/>
-                        <Entry x:Name="passwordEntry" Placeholder="Enter password" IsPassword="True"/>
+                        <Entry Text="{Binding Password}" Placeholder="Enter password" IsPassword="True"/>
 
                         <Label Text="Full Name" FontAttributes="Bold"/>
-                        <Entry x:Name="fullNameEntry" Placeholder="Enter full name"/>
+                        <Entry Text="{Binding FullName}" Placeholder="Enter full name"/>
 
                         <Label Text="Department" FontAttributes="Bold"/>
-                        <Picker x:Name="departmentPicker" 
-                                Title="Select department"
+                        <Picker Title="Select department"
                                 ItemsSource="{Binding Departments}"
                                 ItemDisplayBinding="{Binding Name}"
-                                SelectedIndexChanged="OnDepartmentSelectedIndexChanged"/>
+                                SelectedItem="{Binding SelectedDepartment}"/>
 
                         <Label Text="Title" FontAttributes="Bold"/>
-                        <Picker x:Name="titlePicker" 
-                                Title="Select title"
-                                ItemsSource="{Binding Titles}"/>
+                        <Picker Title="Select title"
+                                ItemsSource="{Binding Titles}"
+                                SelectedItem="{Binding SelectedTitle}"/>
 
                         <HorizontalStackLayout>
-                            <CheckBox x:Name="adminCheckBox"/>
+                            <CheckBox IsChecked="{Binding IsAdmin}"/>
                             <Label Text="Admin" VerticalOptions="Center"/>
                         </HorizontalStackLayout>
 
+                        <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextColor="Red" />
+
                         <Button Text="Add User"
-                                Clicked="OnAddUserClicked"
+                                Command="{Binding AddUserCommand}"
                                 BackgroundColor="{StaticResource Primary}"
                                 TextColor="White"
                                 FontAttributes="Bold"/>
@@ -72,20 +74,11 @@
         </ScrollView>
 
         <!-- Loading Indicator -->
-        <ActivityIndicator x:Name="loadingIndicator"
-                          Grid.Row="2"
-                          IsVisible="False"
-                          IsRunning="False"
+        <ActivityIndicator IsVisible="{Binding IsBusy}"
+                          IsRunning="{Binding IsBusy}"
+                          Grid.Row="1"
                           Color="{StaticResource Primary}"
                           HorizontalOptions="Center"
                           VerticalOptions="Center"/>
-
-        <!-- Debug layout indicators -->
-        <Label Grid.Row="0" Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}" 
-               VerticalOptions="Start" HorizontalOptions="End" 
-               BackgroundColor="LightBlue" Padding="5" Margin="5"/>
-        <Label Grid.Row="0" Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"
-               VerticalOptions="Start" HorizontalOptions="End" 
-               BackgroundColor="LightGreen" Padding="5" Margin="5"/>
     </Grid>
 </ContentPage>

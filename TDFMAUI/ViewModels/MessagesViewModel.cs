@@ -1,126 +1,81 @@
 using System.Collections.ObjectModel;
-using System.Windows.Input;
 using TDFMAUI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Threading.Tasks;
-using System.Net.Http;
 using System;
 using TDFShared.DTOs.Messages;
-using TDFMAUI.Helpers;
-using Color = Microsoft.Maui.Graphics.Color;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace TDFMAUI.ViewModels
 {
-    public partial class MessagesViewModel : ObservableObject
+    public partial class MessagesViewModel : BaseViewModel
     {
-        [ObservableProperty]
-        private bool _isLoading;
-
         private readonly ApiService _apiService;
+        private readonly ILogger<MessagesViewModel> _logger;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
-        private string _newMessageText;
+        private string _newMessageText = string.Empty;
 
         [ObservableProperty]
-        private Color senderStatusColor = Application.Current.Resources.TryGetValue("TextSecondaryColor", out var resourceValue) && resourceValue is Color colorValue ? colorValue : Colors.Gray;
+        private ObservableCollection<ChatMessageDto> _messages = new();
 
-        [ObservableProperty]
-        private bool showSenderStatus;
-
-        [ObservableProperty]
-        private string senderName = string.Empty;
-
-        [ObservableProperty]
-        ObservableCollection<ChatMessageDto> messages = new ObservableCollection<ChatMessageDto>();
-
-        [ObservableProperty]
-        ChatMessageDto? selectedMessage;
-
-        public MessagesViewModel(ApiService? apiService = null, ILogger<MessagesViewModel>? logger = null)
+        public MessagesViewModel(ApiService apiService, ILogger<MessagesViewModel> logger)
         {
-            _newMessageText = string.Empty;
-            if (apiService == null)
-            {
-                // Use App.Current.Services to get the ApiService
-                _apiService = App.Current?.Handler?.MauiContext?.Services?.GetService<ApiService>();
-                if (_apiService == null)
-                {
-                    throw new InvalidOperationException("ApiService could not be resolved from dependency injection.");
-                }
-            }
-            else
-            {
-                _apiService = apiService;
-            }
-
-            Messages = new ObservableCollection<ChatMessageDto>();
-            Task.Run(async () => await LoadMessagesAsync());
-            LoadMessagesCommand = new RelayCommand(async () => await LoadMessagesAsync());
+            _apiService = apiService;
+            _logger = logger;
+            Title = "Messages";
+            _ = LoadMessagesAsync();
         }
 
-        public ICommand LoadMessagesCommand { get; }
-
-        private async Task LoadMessagesAsync()
+        [RelayCommand]
+        public async Task LoadMessagesAsync()
         {
+            IsBusy = true;
             try
             {
-                IsLoading = true;
-                Messages.Clear();
                 var result = await _apiService.GetRecentChatMessagesAsync(50);
+                Messages.Clear();
                 if (result != null)
                 {
-                    foreach (var message in result)
-                    {
-                        Messages.Add(message);
-                    }
+                    foreach (var message in result) Messages.Add(message);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading messages: {ex.Message}");
+                _logger.LogError(ex, "Error loading messages");
+                ErrorMessage = "Failed to load messages.";
             }
-            finally
-            {
-                IsLoading = false;
-            }
+            finally { IsBusy = false; }
         }
+
+        private bool CanSendMessage() => !string.IsNullOrWhiteSpace(NewMessageText) && !IsBusy;
 
         [RelayCommand(CanExecute = nameof(CanSendMessage))]
         private async Task SendMessageAsync()
         {
-            if (!CanSendMessage()) return;
-
             var messageContent = NewMessageText;
             NewMessageText = string.Empty;
 
             var newMessage = new MessageCreateDto
             {
                 MessageText = messageContent,
-                ReceiverID = 0, // For global chat
+                ReceiverID = 0,
                 MessageType = TDFShared.Enums.MessageType.Chat
             };
 
             try
             {
                 var createdMessage = await _apiService.CreateMessageAsync(newMessage);
-                if (createdMessage != null)
-                {
-                    Messages.Add(createdMessage);
-                }
+                if (createdMessage != null) Messages.Add(createdMessage);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error sending message: {ex.Message}");
+                _logger.LogError(ex, "Error sending message");
+                ErrorMessage = "Failed to send message.";
             }
-        }
-
-        private bool CanSendMessage()
-        {
-            return !string.IsNullOrWhiteSpace(NewMessageText);
         }
     }
 }

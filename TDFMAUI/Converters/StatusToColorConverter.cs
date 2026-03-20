@@ -8,21 +8,24 @@ namespace TDFMAUI.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is string status)
+            if (value == null) return Application.Current.Resources["TextSecondaryColor"] as Color ?? Color.FromArgb("#90A4AE");
+
+            string status = value.ToString().ToLowerInvariant();
+
+            switch (status)
             {
-                switch (status.ToLowerInvariant())
-                {
-                    case "pending":
-                        return Color.FromArgb("#FFB300"); // Amber
-                    case "approved":
-                        return Color.FromArgb("#43A047"); // Green
-                    case "rejected":
-                        return Color.FromArgb("#E53935"); // Red
-                    default:
-                        return Application.Current.Resources["TextSecondaryColor"] as Color ?? Color.FromArgb("#90A4AE");
-                }
+                case "pending":
+                    return Color.FromArgb("#FFB300"); // Amber
+                case "approved":
+                case "managerapproved":
+                case "hrapproved":
+                    return Color.FromArgb("#43A047"); // Green
+                case "rejected":
+                case "managerrejected":
+                    return Color.FromArgb("#E53935"); // Red
+                default:
+                    return Application.Current.Resources["TextSecondaryColor"] as Color ?? Color.FromArgb("#90A4AE");
             }
-            return Application.Current.Resources["TextSecondaryColor"] as Color ?? Color.FromArgb("#90A4AE");
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

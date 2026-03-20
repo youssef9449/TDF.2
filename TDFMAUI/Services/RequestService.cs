@@ -186,47 +186,22 @@ namespace TDFMAUI.Services
 
         public async Task<ApiResponse<RequestResponseDto>> ManagerApproveRequestAsync(int requestId, ManagerApprovalDto approvalDto)
         {
-            var response = await _apiService.ManagerApproveRequestAsync(requestId, approvalDto);
-            if (response.Success)
-            {
-                // Fetch updated request details if needed
-                var details = await GetRequestByIdAsync(requestId);
-                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
-            }
-            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+            return await _apiService.ManagerApproveRequestAsync(requestId, approvalDto);
         }
 
         public async Task<ApiResponse<RequestResponseDto>> HRApproveRequestAsync(int requestId, HRApprovalDto approvalDto)
         {
-            var response = await _apiService.HRApproveRequestAsync(requestId, approvalDto);
-            if (response.Success)
-            {
-                var details = await GetRequestByIdAsync(requestId);
-                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
-            }
-            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+            return await _apiService.HRApproveRequestAsync(requestId, approvalDto);
         }
 
         public async Task<ApiResponse<RequestResponseDto>> ManagerRejectRequestAsync(int requestId, ManagerRejectDto rejectDto)
         {
-            var response = await _apiService.ManagerRejectRequestAsync(requestId, rejectDto);
-            if (response.Success)
-            {
-                var details = await GetRequestByIdAsync(requestId);
-                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
-            }
-            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+            return await _apiService.ManagerRejectRequestAsync(requestId, rejectDto);
         }
 
         public async Task<ApiResponse<RequestResponseDto>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto)
         {
-            var response = await _apiService.HRRejectRequestAsync(requestId, rejectDto);
-            if (response.Success)
-            {
-                var details = await GetRequestByIdAsync(requestId);
-                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
-            }
-            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+            return await _apiService.HRRejectRequestAsync(requestId, rejectDto);
         }
 
         public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetRequestsForApprovalAsync(
@@ -236,26 +211,29 @@ namespace TDFMAUI.Services
             string? type = null,
             DateTime? fromDate = null,
             DateTime? toDate = null,
-            string? department = null)
+            string? department = null,
+            int? userId = null)
         {
             try
             {
                 var queryParams = new List<string>
                 {
-                    $"pageNumber={pageNumber}",
+                    $"page={pageNumber}",
                     $"pageSize={pageSize}"
                 };
 
                 if (!string.IsNullOrEmpty(status) && status != "All")
-                    queryParams.Add($"status={status}");
+                    queryParams.Add($"filterStatus={status}");
                 if (!string.IsNullOrEmpty(type) && type != "All")
-                    queryParams.Add($"type={type}");
+                    queryParams.Add($"filterType={type}");
                 if (fromDate.HasValue)
                     queryParams.Add($"fromDate={fromDate.Value:yyyy-MM-dd}");
                 if (toDate.HasValue)
                     queryParams.Add($"toDate={toDate.Value:yyyy-MM-dd}");
                 if (!string.IsNullOrEmpty(department))
                     queryParams.Add($"department={Uri.EscapeDataString(department)}");
+                if (userId.HasValue)
+                    queryParams.Add($"userId={userId.Value}");
 
                 var queryString = string.Join("&", queryParams);
                 var response = await _apiService.GetAsync<ApiResponse<PaginatedResult<RequestResponseDto>>>($"{TDFShared.Constants.ApiRoutes.Requests.GetForApproval}?{queryString}");

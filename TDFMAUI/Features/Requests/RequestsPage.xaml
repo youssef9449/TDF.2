@@ -14,8 +14,6 @@
     <ContentPage.Resources>
         <ResourceDictionary>
             <converters:RequestButtonVisibilityConverter x:Key="RequestButtonVisibilityConverter" />
-            <converters:CanEditDeleteConverter x:Key="CanEditDeleteConverter" />
-            <converters:CanApproveRejectConverter x:Key="CanApproveRejectConverter" />
             <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
@@ -73,7 +71,14 @@
          <StackLayout Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
              <Label Text="Show Pending Only:" VerticalOptions="Center"/>
              <Switch IsToggled="{Binding ShowPendingOnly}" VerticalOptions="Center"/>
-             <!-- Add more filters here if needed (e.g., Type Picker) -->
+
+             <Label Text="Department:" VerticalOptions="Center" IsVisible="{Binding CanFilterByDepartment}"/>
+             <Picker ItemsSource="{Binding Departments}"
+                     SelectedItem="{Binding SelectedDepartment}"
+                     ItemDisplayBinding="{Binding Name}"
+                     IsVisible="{Binding CanFilterByDepartment}"
+                     WidthRequest="200"
+                     VerticalOptions="Center"/>
          </StackLayout>
 
         <!-- Row 2: Requests List -->
@@ -114,9 +119,10 @@
                                          <Label Text="{Binding RequestStartDate, StringFormat='From: {0:d}'}" FontSize="Small" />
                                          <Label Text="{Binding RequestEndDate, StringFormat='To: {0:d}'}" IsVisible="{Binding RequestEndDate.HasValue}" FontSize="Small" />
                                          <Label Text="{Binding RequestReason, StringFormat='Reason: {0}'}" FontSize="Small" LineBreakMode="WordWrap" IsVisible="{Binding RequestReason, Converter={StaticResource StringNotEmptyConverter}}"/>
-                                         <Label Text="{Binding Status, StringFormat='Status: {0}'}" FontAttributes="Bold" FontSize="Small" />
-                                         <!-- Remarks property doesn't exist in RequestResponseDto -->
-                                         <Label Text="{Binding RequestReason, StringFormat='Remarks: {0}'}" FontSize="Small" IsVisible="{Binding RequestReason, Converter={StaticResource StringNotEmptyConverter}}"/>
+                                         <Label Text="{Binding Status, StringFormat='Status: {0}'}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}" FontAttributes="Bold" FontSize="Small" />
+                                         <Label Text="{Binding HRStatus, StringFormat='HR Status: {0}'}" TextColor="{Binding HRStatus, Converter={StaticResource StatusToColorConverter}}" FontAttributes="Bold" FontSize="Small" />
+                                         <Label Text="{Binding ManagerRemarks, StringFormat='Manager Remarks: {0}'}" FontSize="Small" IsVisible="{Binding ManagerRemarks, Converter={StaticResource StringNotEmptyConverter}}"/>
+                                         <Label Text="{Binding HRRemarks, StringFormat='HR Remarks: {0}'}" FontSize="Small" IsVisible="{Binding HRRemarks, Converter={StaticResource StringNotEmptyConverter}}"/>
 
                                         <!-- Action Buttons -->
                                         <HorizontalStackLayout Spacing="5" Margin="0,5,0,0">

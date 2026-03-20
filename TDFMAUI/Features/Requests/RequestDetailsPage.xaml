@@ -2,9 +2,16 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pages="clr-namespace:TDFMAUI.Features.Requests"
+             xmlns:converters="clr-namespace:TDFMAUI.Converters"
              x:Class="TDFMAUI.Features.Requests.RequestDetailsPage"
              Title="Request Details"
              BackgroundColor="{StaticResource Gray100}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->
@@ -34,23 +41,35 @@
 
                 <Frame BackgroundColor="White" Padding="15">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="{Binding Request.RequestType, StringFormat='Type: {0}'}"
+                        <Label Text="{Binding Request.LeaveType, StringFormat='Type: {0}'}"
                                FontSize="20"
                                FontAttributes="Bold"/>
                         <Label Text="{Binding Request.RequestReason, StringFormat='Reason: {0}'}"
                                TextColor="Gray"/>
-                        <Label Text="{Binding Request.RequestStatus, StringFormat='Status: {0}'}"
+                        <Label Text="{Binding Request.Status, StringFormat='Manager Status: {0}'}"
+                               FontAttributes="Bold"/>
+                        <Label Text="{Binding Request.HRStatus, StringFormat='HR Status: {0}'}"
                                FontAttributes="Bold"/>
                     </VerticalStackLayout>
                 </Frame>
 
                 <Frame BackgroundColor="White" Padding="15">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="Request Details"
+                        <Label Text="Remarks"
                                FontSize="18"
                                FontAttributes="Bold"/>
-                        <Label Text="{Binding Request.RequestReason}"
-                               TextColor="Gray"/>
+                        <Label Text="{Binding Request.ManagerRemarks, StringFormat='Manager Remarks: {0}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.ManagerRemarks, Converter={StaticResource StringNotEmptyConverter}}"/>
+                        <Label Text="{Binding Request.HRRemarks, StringFormat='HR Remarks: {0}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.HRRemarks, Converter={StaticResource StringNotEmptyConverter}}"/>
+                        <Label Text="{Binding Request.ManagerName, StringFormat='Manager: {0}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.ManagerName, Converter={StaticResource StringNotEmptyConverter}}"/>
+                        <Label Text="{Binding Request.HRName, StringFormat='HR: {0}'}"
+                               TextColor="Gray"
+                               IsVisible="{Binding Request.HRName, Converter={StaticResource StringNotEmptyConverter}}"/>
                     </VerticalStackLayout>
                 </Frame>
 
@@ -59,17 +78,11 @@
                         <Label Text="Timeline"
                                FontSize="18"
                                FontAttributes="Bold"/>
-                        <Label Text="{Binding Request.CreatedAt, StringFormat='Submitted On: {0:g}'}"
+                        <Label Text="{Binding Request.CreatedDate, StringFormat='Submitted On: {0:g}'}"
                                TextColor="Gray"/>
-                        <Label Text="{Binding Request.ApprovedAt, StringFormat='Approved/Rejected On: {0:g}'}"
+                        <Label Text="{Binding Request.LastModifiedDate, StringFormat='Last Modified: {0:g}'}"
                                TextColor="Gray"
-                               IsVisible="{Binding Request.ApprovedAt.HasValue}"/>
-                        <Label Text="{Binding Request.RequestCloser, StringFormat='Approved/Rejected By: {0}'}"
-                               TextColor="Gray"
-                               IsVisible="{Binding Request.RequestCloser, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
-                        <Label Text="{Binding Request.RequestRejectReason, StringFormat='Rejection Reason: {0}'}"
-                               TextColor="Gray"
-                               IsVisible="{Binding Request.RequestRejectReason, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
+                               IsVisible="{Binding Request.LastModifiedDate.HasValue}"/>
                     </VerticalStackLayout>
                 </Frame>
 
@@ -78,11 +91,11 @@
                         <Label Text="Request Dates"
                                FontSize="18"
                                FontAttributes="Bold"/>
-                        <Label Text="{Binding Request.RequestFromDay, StringFormat='From: {0:d}'}"
+                        <Label Text="{Binding Request.RequestStartDate, StringFormat='From: {0:d}'}"
                                TextColor="Gray"/>
-                        <Label Text="{Binding Request.RequestToDay, StringFormat='To: {0:d}'}"
+                        <Label Text="{Binding Request.RequestEndDate, StringFormat='To: {0:d}'}"
                                TextColor="Gray"
-                               IsVisible="{Binding Request.RequestToDay.HasValue}"/>
+                               IsVisible="{Binding Request.RequestEndDate.HasValue}"/>
                         <Label Text="{Binding Request.RequestBeginningTime, StringFormat='Start Time: {0:hh\:mm}'}"
                                TextColor="Gray"
                                IsVisible="{Binding Request.RequestBeginningTime.HasValue}"/>
@@ -91,19 +104,6 @@
                                IsVisible="{Binding Request.RequestEndingTime.HasValue}"/>
                         <Label Text="{Binding Request.RequestNumberOfDays, StringFormat='Number of Days: {0}'}"
                                TextColor="Gray"/>
-                    </VerticalStackLayout>
-                </Frame>
-
-                <Frame BackgroundColor="White" Padding="15">
-                    <VerticalStackLayout Spacing="10">
-                        <Label Text="HR Status"
-                               FontSize="18"
-                               FontAttributes="Bold"/>
-                        <Label Text="{Binding Request.RequestHRStatus, StringFormat='HR Status: {0}'}"
-                               TextColor="Gray"/>
-                        <Label Text="{Binding Request.RequestHRCloser, StringFormat='HR Approved/Rejected By: {0}'}"
-                               TextColor="Gray"
-                               IsVisible="{Binding Request.RequestHRCloser, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
                     </VerticalStackLayout>
                 </Frame>
             </VerticalStackLayout>

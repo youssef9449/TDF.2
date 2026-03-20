@@ -774,7 +774,11 @@ namespace TDFAPI.Controllers
                 {
                     // HR: Get requests that are manager-approved and pending HR approval
                     pagination.FilterStatus = RequestStatus.ManagerApproved;
-                    result = await _requestService.GetAllAsync(pagination);
+
+                    if (pagination.UserId.HasValue)
+                        result = await _requestService.GetByUserIdAsync(pagination.UserId.Value, pagination);
+                    else
+                        result = await _requestService.GetAllAsync(pagination);
                     
                     // Filter to only show requests where HRStatus is Pending
                     if (result?.Items != null)
@@ -793,12 +797,32 @@ namespace TDFAPI.Controllers
                 {
                     // Admin: Get all pending requests (both manager and HR approval)
                     pagination.FilterStatus = RequestStatus.Pending;
-                    result = await _requestService.GetAllAsync(pagination);
+
+                    if (pagination.UserId.HasValue)
+                        result = await _requestService.GetByUserIdAsync(pagination.UserId.Value, pagination);
+                    else
+                        result = await _requestService.GetAllAsync(pagination);
                 }
                 else if (currentUser.IsManager ?? false)
                 {
                     // Manager: Get pending requests from departments they manage
-                    result = await _requestService.GetRequestsForManagerAsync(currentUserId, currentUser.Department, pagination);
+                    if (pagination.UserId.HasValue)
+                    {
+                        // Validate manager can see this user
+                        var targetUser = await _userService.GetUserByIdAsync(pagination.UserId.Value);
+                        if (targetUser != null && RequestStateManager.CanManageDepartment(currentUser, targetUser.Department))
+                        {
+                            result = await _requestService.GetByUserIdAsync(pagination.UserId.Value, pagination);
+                        }
+                        else
+                        {
+                            result = new PaginatedResult<RequestResponseDto> { Items = new List<RequestResponseDto>() };
+                        }
+                    }
+                    else
+                    {
+                        result = await _requestService.GetRequestsForManagerAsync(currentUserId, currentUser.Department, pagination);
+                    }
                     
                     // Filter to only pending requests
                     if (result?.Items != null)
@@ -836,13 +860,13 @@ namespace TDFAPI.Controllers
         // POST: api/requests/{id}/manager/approve
         [HttpPost(ApiRoutes.Requests.ManagerApproveTemplate)]
         [Authorize(Roles = "Manager,Admin")]
-        public async Task<ActionResult<bool>> ManagerApproveRequest(int id, [FromBody] ManagerApprovalDto approvalDto)
+        public async Task<ActionResult<ApiResponse<RequestResponseDto>>> ManagerApproveRequest(int id, [FromBody] ManagerApprovalDto approvalDto)
         {
             try
             {
                 int currentUserId = GetCurrentUserId();
                 var currentUser = await GetCachedUserAsync(currentUserId);
-                if (currentUser == null) return Unauthorized("User not found.");
+                if (currentUser == null) return Unauthorized(ApiResponse<RequestResponseDto>.ErrorResponse("User not found."));
 
                 // Verify the user has manager permissions
                 if (!(currentUser.IsManager ?? false) && !(currentUser.IsAdmin ?? false))
@@ -855,7 +879,7 @@ namespace TDFAPI.Controllers
                 var request = await _requestService.GetByIdAsync(id);
                 if (request == null)
                 {
-                    return NotFound($"Request with ID {id} not found.");
+                    return NotFound(ApiResponse<RequestResponseDto>.ErrorResponse($"Request with ID {id} not found."));
                 }
 
                 // For managers (non-admin), verify they can manage this department
@@ -874,13 +898,13 @@ namespace TDFAPI.Controllers
                 
                 var result = await _requestService.ManagerApproveRequestAsync(id, approvalDto, currentUserId, currentUser.FullName ?? "Unknown");
                 
-                if (result)
+                if (result != null)
                 {
-                    return Ok(true);
+                    return Ok(ApiResponse<RequestResponseDto>.SuccessResponse(result, "Request approved by manager successfully."));
                 }
                 else
                 {
-                    return BadRequest("Failed to approve request. It may have already been processed or is not in a valid state for approval.");
+                    return BadRequest(ApiResponse<RequestResponseDto>.ErrorResponse("Failed to approve request. It may have already been processed or is not in a valid state for approval."));
                 }
             }
             catch (EntityNotFoundException ex)
@@ -903,13 +927,13 @@ namespace TDFAPI.Controllers
         // POST: api/requests/{id}/hr/approve
         [HttpPost(ApiRoutes.Requests.HRApproveTemplate)]
         [Authorize(Roles = "HR,Admin")]
-        public async Task<ActionResult<bool>> HRApproveRequest(int id, [FromBody] HRApprovalDto approvalDto)
+        public async Task<ActionResult<ApiResponse<RequestResponseDto>>> HRApproveRequest(int id, [FromBody] HRApprovalDto approvalDto)
         {
             try
             {
                 int currentUserId = GetCurrentUserId();
                 var currentUser = await GetCachedUserAsync(currentUserId);
-                if (currentUser == null) return Unauthorized("User not found.");
+                if (currentUser == null) return Unauthorized(ApiResponse<RequestResponseDto>.ErrorResponse("User not found."));
 
                 // Verify the user has HR permissions
                 if (!(currentUser.IsHR ?? false) && !(currentUser.IsAdmin ?? false))
@@ -922,13 +946,13 @@ namespace TDFAPI.Controllers
                 
                 var result = await _requestService.HRApproveRequestAsync(id, approvalDto, currentUserId, currentUser.FullName ?? "Unknown");
                 
-                if (result)
+                if (result != null)
                 {
-                    return Ok(true);
+                    return Ok(ApiResponse<RequestResponseDto>.SuccessResponse(result, "Request approved by HR successfully."));
                 }
                 else
                 {
-                    return BadRequest("Failed to approve request. It may not be manager-approved yet or is not in a valid state for HR approval.");
+                    return BadRequest(ApiResponse<RequestResponseDto>.ErrorResponse("Failed to approve request. It may not be manager-approved yet or is not in a valid state for HR approval."));
                 }
             }
             catch (EntityNotFoundException ex)
@@ -951,13 +975,13 @@ namespace TDFAPI.Controllers
         // POST: api/requests/{id}/manager/reject
         [HttpPost(ApiRoutes.Requests.ManagerRejectTemplate)]
         [Authorize(Roles = "Manager,Admin")]
-        public async Task<ActionResult<bool>> ManagerRejectRequest(int id, [FromBody] ManagerRejectDto rejectDto)
+        public async Task<ActionResult<ApiResponse<RequestResponseDto>>> ManagerRejectRequest(int id, [FromBody] ManagerRejectDto rejectDto)
         {
             try
             {
                 int currentUserId = GetCurrentUserId();
                 var currentUser = await GetCachedUserAsync(currentUserId);
-                if (currentUser == null) return Unauthorized("User not found.");
+                if (currentUser == null) return Unauthorized(ApiResponse<RequestResponseDto>.ErrorResponse("User not found."));
 
                 // Verify the user has manager permissions
                 if (!(currentUser.IsManager ?? false) && !(currentUser.IsAdmin ?? false))
@@ -970,7 +994,7 @@ namespace TDFAPI.Controllers
                 var request = await _requestService.GetByIdAsync(id);
                 if (request == null)
                 {
-                    return NotFound($"Request with ID {id} not found.");
+                    return NotFound(ApiResponse<RequestResponseDto>.ErrorResponse($"Request with ID {id} not found."));
                 }
 
                 // For managers (non-admin), verify they can manage this department
@@ -989,13 +1013,13 @@ namespace TDFAPI.Controllers
                 
                 var result = await _requestService.ManagerRejectRequestAsync(id, rejectDto, currentUserId, currentUser.FullName ?? "Unknown");
                 
-                if (result)
+                if (result != null)
                 {
-                    return Ok(true);
+                    return Ok(ApiResponse<RequestResponseDto>.SuccessResponse(result, "Request rejected by manager successfully."));
                 }
                 else
                 {
-                    return BadRequest("Failed to reject request. It may have already been processed or is not in a valid state for rejection.");
+                    return BadRequest(ApiResponse<RequestResponseDto>.ErrorResponse("Failed to reject request. It may have already been processed or is not in a valid state for rejection."));
                 }
             }
             catch (EntityNotFoundException ex)
@@ -1018,13 +1042,13 @@ namespace TDFAPI.Controllers
         // POST: api/requests/{id}/hr/reject
         [HttpPost(ApiRoutes.Requests.HRRejectTemplate)]
         [Authorize(Roles = "HR,Admin")]
-        public async Task<ActionResult<bool>> HRRejectRequest(int id, [FromBody] HRRejectDto rejectDto)
+        public async Task<ActionResult<ApiResponse<RequestResponseDto>>> HRRejectRequest(int id, [FromBody] HRRejectDto rejectDto)
         {
             try
             {
                 int currentUserId = GetCurrentUserId();
                 var currentUser = await GetCachedUserAsync(currentUserId);
-                if (currentUser == null) return Unauthorized("User not found.");
+                if (currentUser == null) return Unauthorized(ApiResponse<RequestResponseDto>.ErrorResponse("User not found."));
 
                 // Verify the user has HR permissions
                 if (!(currentUser.IsHR ?? false) && !(currentUser.IsAdmin ?? false))
@@ -1037,13 +1061,13 @@ namespace TDFAPI.Controllers
                 
                 var result = await _requestService.HRRejectRequestAsync(id, rejectDto, currentUserId, currentUser.FullName ?? "Unknown");
                 
-                if (result)
+                if (result != null)
                 {
-                    return Ok(true);
+                    return Ok(ApiResponse<RequestResponseDto>.SuccessResponse(result, "Request rejected by HR successfully."));
                 }
                 else
                 {
-                    return BadRequest("Failed to reject request. It may not be manager-approved yet or is not in a valid state for HR rejection.");
+                    return BadRequest(ApiResponse<RequestResponseDto>.ErrorResponse("Failed to reject request. It may not be manager-approved yet or is not in a valid state for HR rejection."));
                 }
             }
             catch (EntityNotFoundException ex)

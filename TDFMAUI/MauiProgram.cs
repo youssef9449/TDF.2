@@ -413,6 +413,7 @@ builder
             builder.Services.AddTransient<NotificationTestPage>();
             builder.Services.AddTransient<SignupPage>();
             builder.Services.AddTransient<RequestDetailsPage>();
+            builder.Services.AddTransient<RequestApprovalPage>();
             builder.Services.AddTransient<LoginPage>();
             builder.Services.AddTransient<DashboardPage>(); // Add DashboardPage
 

@@ -18,15 +18,10 @@ public partial class AddRequestPage : ContentPage
         set
         {
             _existingRequestDto = value;
-            // The ViewModel should handle initialization based on this DTO
-            // when it's passed during construction or via a method.
-            // Re-evaluate if explicit ViewModel update is needed here if DI setup changes.
-             if (BindingContext is AddRequestViewModel vm)
-             {
-                  // Example: Consider adding an Initialize method to the ViewModel
-                  // if the existingRequest needs processing *after* construction.
-                  // vm.InitializeWithRequest(_existingRequestDto);
-             }
+            if (BindingContext is AddRequestViewModel vm && value != null)
+            {
+                vm.Initialize(value);
+            }
             OnPropertyChanged(); 
         }
     }

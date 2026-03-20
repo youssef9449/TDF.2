@@ -102,6 +102,7 @@ namespace TDFMAUI
             // Request related pages
             Routing.RegisterRoute(nameof(Features.Requests.AddRequestPage), typeof(Features.Requests.AddRequestPage));
             Routing.RegisterRoute(nameof(Features.Requests.RequestDetailsPage), typeof(Features.Requests.RequestDetailsPage));
+            Routing.RegisterRoute(nameof(Features.Requests.RequestApprovalPage), typeof(Features.Requests.RequestApprovalPage));
             Routing.RegisterRoute(nameof(Pages.RequestsPage), typeof(Pages.RequestsPage));
             Routing.RegisterRoute(nameof(Pages.MyTeamPage), typeof(Pages.MyTeamPage));
             // Message related pages

@@ -514,12 +514,68 @@ namespace TDFAPI.Services
         }
 
         // ----- Mappers -----
+         private async Task<PaginatedResult<RequestResponseDto>> MapToPaginatedResponseDto(PaginatedResult<RequestEntity> paginatedRequests)
+        {
+            if (paginatedRequests == null) throw new EntityNotFoundException("Request", "null");
+
+            if (paginatedRequests.Items == null || !paginatedRequests.Items.Any())
+            {
+                return new PaginatedResult<RequestResponseDto>
+                {
+                    Items = new List<RequestResponseDto>(),
+                    TotalCount = paginatedRequests.TotalCount,
+                    PageNumber = paginatedRequests.PageNumber,
+                    PageSize = paginatedRequests.PageSize
+                };
+            }
+
+            // Optimization: Pre-fetch all manager and HR user names to avoid N+1 queries
+            var approverIds = paginatedRequests.Items
+                .Select(r => r.ManagerApproverId)
+                .Concat(paginatedRequests.Items.Select(r => r.HRApproverId))
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value)
+                .Distinct()
+                .ToList();
+
+            var approversMap = new Dictionary<int, string>();
+            if (approverIds.Any())
+            {
+                var users = await _userRepository.GetUsersByIdsAsync(approverIds);
+                foreach (var user in users)
+                {
+                    if (user.FullName != null)
+                        approversMap[user.UserID] = user.FullName;
+                }
+            }
+
+            var mappedItems = new List<RequestResponseDto>();
+            foreach (var item in paginatedRequests.Items)
+            {
+                var dto = await MapToResponseDtoInternal(item, approversMap);
+                mappedItems.Add(dto);
+            }
+
+            return new PaginatedResult<RequestResponseDto>
+            {
+                Items = mappedItems,
+                TotalCount = paginatedRequests.TotalCount,
+                PageNumber = paginatedRequests.PageNumber,
+                PageSize = paginatedRequests.PageSize
+            };
+        }
+
         private async Task<RequestResponseDto> MapToResponseDto(RequestEntity? request)
+        {
+            return await MapToResponseDtoInternal(request, null);
+        }
+
+        private async Task<RequestResponseDto> MapToResponseDtoInternal(RequestEntity? request, Dictionary<int, string>? approversMap)
         {
             if (request == null)
                 throw new EntityNotFoundException("Request", "null");
 
-            // Fetch balances using the potentially updated method returning int dictionary
+            // Fetch balances
             Dictionary<string, int> balances = await GetLeaveBalancesAsync(request.RequestUserID);
             string? balanceType = GetBalanceType(request.RequestType);
             int? remainingBalance = null;
@@ -529,6 +585,33 @@ namespace TDFAPI.Services
                 remainingBalance = balanceValue;
             }
 
+            string? managerName = null;
+            if (request.ManagerApproverId.HasValue)
+            {
+                if (approversMap != null && approversMap.TryGetValue(request.ManagerApproverId.Value, out var name))
+                {
+                    managerName = name;
+                }
+                else
+                {
+                    var manager = await _userRepository.GetByIdAsync(request.ManagerApproverId.Value);
+                    managerName = manager?.FullName;
+                }
+            }
+
+            string? hrName = null;
+            if (request.HRApproverId.HasValue)
+            {
+                if (approversMap != null && approversMap.TryGetValue(request.HRApproverId.Value, out var name))
+                {
+                    hrName = name;
+                }
+                else
+                {
+                    var hr = await _userRepository.GetByIdAsync(request.HRApproverId.Value);
+                    hrName = hr?.FullName;
+                }
+            }
 
             return new RequestResponseDto
             {
@@ -542,36 +625,17 @@ namespace TDFAPI.Services
                 RequestBeginningTime = request.RequestBeginningTime,
                 RequestEndingTime = request.RequestEndingTime,
                 RequestDepartment = request.RequestDepartment,
-                Status = request.RequestManagerStatus, // Manager status as primary status
-                HRStatus = request.RequestHRStatus,     // HR status as separate field
+                Status = request.RequestManagerStatus,
+                HRStatus = request.RequestHRStatus,
+                ManagerRemarks = request.ManagerRemarks,
+                HRRemarks = request.HRRemarks,
+                ManagerName = managerName,
+                HRName = hrName,
                 CreatedDate = request.CreatedAt.GetValueOrDefault(DateTime.MinValue),
                 LastModifiedDate = request.UpdatedAt,
                 RequestNumberOfDays = request.RequestNumberOfDays,
                 RemainingBalance = remainingBalance,
                 RowVersion = request.RowVersion
-            };
-        }
-
-         private async Task<PaginatedResult<RequestResponseDto>> MapToPaginatedResponseDto(PaginatedResult<RequestEntity> paginatedRequests)
-        {
-            if (paginatedRequests == null) throw new EntityNotFoundException("Request", "null");
-
-            // Map items asynchronously if MapToResponseDto becomes async (due to balance fetch)
-            var mappedItems = new List<RequestResponseDto>();
-            if (paginatedRequests.Items != null)
-            {
-                 foreach(var item in paginatedRequests.Items)
-                 {
-                     mappedItems.Add(await MapToResponseDto(item));
-                 }
-            }
-
-            return new PaginatedResult<RequestResponseDto>
-            {
-                Items = mappedItems,
-                TotalCount = paginatedRequests.TotalCount,
-                PageNumber = paginatedRequests.PageNumber,
-                PageSize = paginatedRequests.PageSize
             };
         }
 
@@ -626,7 +690,7 @@ namespace TDFAPI.Services
         }
         #endregion
 
-        public async Task<bool> ManagerApproveRequestAsync(int id, ManagerApprovalDto approvalDto, int approverId, string approverName)
+        public async Task<RequestResponseDto> ManagerApproveRequestAsync(int id, ManagerApprovalDto approvalDto, int approverId, string approverName)
         {
             var request = await _requestRepository.GetByIdAsync(id);
             if (request == null)
@@ -642,10 +706,10 @@ namespace TDFAPI.Services
 
             await _requestRepository.UpdateAsync(request);
             await NotifyHR($"Request from {request.RequestUserFullName} approved by manager.", approverId);
-            return true;
+            return await MapToResponseDto(request);
         }
 
-        public async Task<bool> HRApproveRequestAsync(int id, HRApprovalDto approvalDto, int approverId, string approverName)
+        public async Task<RequestResponseDto> HRApproveRequestAsync(int id, HRApprovalDto approvalDto, int approverId, string approverName)
         {
             var request = await _requestRepository.GetByIdAsync(id);
             if (request == null)
@@ -661,10 +725,10 @@ namespace TDFAPI.Services
 
             await _requestRepository.UpdateAsync(request);
             await _notificationService.CreateNotificationAsync(request.RequestUserID, $"Your {request.RequestType} request has been fully approved.");
-            return true;
+            return await MapToResponseDto(request);
         }
 
-        public async Task<bool> ManagerRejectRequestAsync(int id, ManagerRejectDto rejectDto, int rejecterId, string rejecterName)
+        public async Task<RequestResponseDto> ManagerRejectRequestAsync(int id, ManagerRejectDto rejectDto, int rejecterId, string rejecterName)
         {
             var request = await _requestRepository.GetByIdAsync(id);
             if (request == null)
@@ -681,10 +745,10 @@ namespace TDFAPI.Services
             await _requestRepository.UpdateAsync(request);
             await NotifyHR($"Request from {request.RequestUserFullName} rejected by manager.", rejecterId);
             await _notificationService.CreateNotificationAsync(request.RequestUserID, $"Your {request.RequestType} request was rejected by your manager. Reason: {rejectDto.ManagerRemarks}");
-            return true;
+            return await MapToResponseDto(request);
         }
 
-        public async Task<bool> HRRejectRequestAsync(int id, HRRejectDto rejectDto, int rejecterId, string rejecterName)
+        public async Task<RequestResponseDto> HRRejectRequestAsync(int id, HRRejectDto rejectDto, int rejecterId, string rejecterName)
         {
             var request = await _requestRepository.GetByIdAsync(id);
             if (request == null)
@@ -701,7 +765,7 @@ namespace TDFAPI.Services
             await _requestRepository.UpdateAsync(request);
             await _notificationService.CreateNotificationAsync(request.RequestUserID, $"Your {request.RequestType} request was rejected by HR. Reason: {rejectDto.HRRemarks}");
             await NotifyDepartmentManagers(request.RequestDepartment, $"Request from {request.RequestUserFullName} rejected by HR.", rejecterId);
-            return true;
+            return await MapToResponseDto(request);
         }
 
         public async Task<Dictionary<string, int>> GetLeaveBalancesAsync(int userId)

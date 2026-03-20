@@ -123,44 +123,5 @@ namespace TDFShared.DTOs.Common
             };
         }
 
-        /// <summary>
-        /// Creates an error response from a ModelStateDictionary
-        /// </summary>
-        /// <param name="modelState">The ModelState containing validation errors</param>
-        /// <param name="message">Optional error message</param>
-        /// <param name="statusCode">HTTP status code</param>
-        /// <returns>An ApiResponse with validation errors</returns>
-        public static ApiResponse<T> FromModelState(
-            Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary modelState,
-            string message = "Validation failed",
-            HttpStatusCode statusCode = HttpStatusCode.BadRequest)
-        {
-            var errors = new Dictionary<string, List<string>>();
-            if (modelState != null)
-            {
-                foreach (var keyModelStatePair in modelState)
-                {
-                    var key = keyModelStatePair.Key;
-                    var errorMessages = keyModelStatePair.Value.Errors?
-                        .Select(error => error.ErrorMessage)
-                        .Where(msg => !string.IsNullOrEmpty(msg))
-                        .ToList();
-
-                    if (errorMessages != null && errorMessages.Any())
-                    {
-                        errors.Add(key, errorMessages);
-                    }
-                }
-            }
-
-            return new ApiResponse<T>
-            {
-                Success = false,
-                Message = message,
-                StatusCode = (int)statusCode,
-                Errors = errors.Any() ? errors : null,
-                Data = default
-            };
-        }
     }
 } 

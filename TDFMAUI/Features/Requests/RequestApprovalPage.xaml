@@ -24,9 +24,6 @@
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <ContentPage.BindingContext>
-        <vm:RequestApprovalViewModel />
-    </ContentPage.BindingContext>
 
     <Grid RowDefinitions="Auto, Auto, *, Auto" ColumnDefinitions="*, Auto" Padding="10" RowSpacing="10">
         <Label Grid.Row="0" Grid.Column="0" Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/>
@@ -80,7 +77,7 @@
                 </VisualStateGroup>
             </VisualStateManager.VisualStateGroups>
 
-            <Grid ColumnDefinitions="*,*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="10">
+            <Grid ColumnDefinitions="*,*,*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="10">
                  <Label Grid.Row="0" Grid.Column="0" Text="From Date:" VerticalOptions="Center"/>
                 <DatePicker Grid.Row="1" Grid.Column="0" Date="{Binding FromDate}" />
 
@@ -130,17 +127,18 @@
                     <Frame Padding="10" Margin="5" CornerRadius="5" BorderColor="LightGray">
                         <Grid>
                             <!-- Desktop View -->
-                            <Grid ColumnDefinitions="*,*,*,*,Auto,Auto,Auto"
+                            <Grid ColumnDefinitions="*,*,*,*,*,Auto,Auto,Auto"
                                   RowDefinitions="Auto,Auto"
                                   ColumnSpacing="10"
                                   IsVisible="{OnIdiom Desktop=true, Phone=false, Tablet=true, Default=true}">
                                 <Label Grid.Column="0" Text="{Binding UserName}" VerticalOptions="Center"/>
                                 <Label Grid.Column="1" Text="{Binding LeaveType}" VerticalOptions="Center"/>
                                 <Label Grid.Column="2" Text="{Binding RequestStartDate, StringFormat='{0:d}'}" VerticalOptions="Center"/>
-                                <Label Grid.Column="3" Text="{Binding Status}" VerticalOptions="Center" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}"/>
-                                <Button Grid.Column="4" Text="Approve" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ApproveRequestCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
-                                <Button Grid.Column="5" Text="Reject" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=RejectRequestCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
-                                <Button Grid.Column="6" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding RequestID}"/>
+                                <Label Grid.Column="3" Text="{Binding Status, StringFormat='M: {0}'}" VerticalOptions="Center" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}"/>
+                                <Label Grid.Column="4" Text="{Binding HRStatus, StringFormat='H: {0}'}" VerticalOptions="Center" TextColor="{Binding HRStatus, Converter={StaticResource StatusToColorConverter}}"/>
+                                <Button Grid.Column="5" Text="Approve" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ApproveRequestCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
+                                <Button Grid.Column="6" Text="Reject" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=RejectRequestCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
+                                <Button Grid.Column="7" Text="View" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ViewRequestCommand}" CommandParameter="{Binding RequestID}"/>
                             </Grid>
 
                             <!-- Mobile View -->
@@ -148,7 +146,8 @@
                                 <Label Text="{Binding UserName}" FontAttributes="Bold"/>
                                 <Label Text="{Binding LeaveType}"/>
                                 <Label Text="{Binding RequestStartDate, StringFormat='From: {0:d}'}"/>
-                                <Label Text="{Binding Status}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}"/>
+                                <Label Text="{Binding Status, StringFormat='M Status: {0}'}" TextColor="{Binding Status, Converter={StaticResource StatusToColorConverter}}"/>
+                                <Label Text="{Binding HRStatus, StringFormat='H Status: {0}'}" TextColor="{Binding HRStatus, Converter={StaticResource StatusToColorConverter}}"/>
                                 <HorizontalStackLayout Spacing="5" Margin="0,5,0,0">
                                     <Button Text="Approve" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=ApproveRequestCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>
                                     <Button Text="Reject" Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RequestApprovalViewModel}}, Path=RejectRequestCommand}" CommandParameter="{Binding RequestID}" IsEnabled="{Binding Status, Converter={StaticResource IsPendingConverter}}"/>

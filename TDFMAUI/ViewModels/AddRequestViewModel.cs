@@ -32,6 +32,7 @@ namespace TDFMAUI.ViewModels
         private DateTime? _requestToDay = DateTime.Today;
         private TimeSpan? _requestBeginningTime;
         private TimeSpan? _requestEndingTime;
+        private byte[]? _rowVersion;
         private List<string> _validationErrors = new List<string>();
 
         // New private fields
@@ -232,7 +233,8 @@ namespace TDFMAUI.ViewModels
                     RequestEndDate = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartDate : EndDate ?? StartDate,
                     RequestBeginningTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? StartTime : null,
                     RequestEndingTime = (leaveType == LeaveType.Permission || leaveType == LeaveType.ExternalAssignment) ? EndTime : null,
-                    RequestReason = RequestReason ?? string.Empty
+                    RequestReason = RequestReason ?? string.Empty,
+                    RowVersion = _rowVersion
                 };
             }
         }
@@ -240,7 +242,7 @@ namespace TDFMAUI.ViewModels
         public ICommand SubmitRequestCommand { get; }
         public ICommand CancelCommand { get; }
 
-        public AddRequestViewModel(IRequestService requestService, IAuthService authService, ILogger<AddRequestViewModel> logger, TDFShared.Validation.IValidationService validationService, RequestResponseDto? existingRequest = null)
+        public AddRequestViewModel(IRequestService requestService, IAuthService authService, ILogger<AddRequestViewModel> logger, TDFShared.Validation.IValidationService validationService)
         {
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
@@ -252,14 +254,34 @@ namespace TDFMAUI.ViewModels
 
             LoadLeaveTypes();
 
+            // Default initialization
+            IsEditMode = false;
+            RequestId = 0;
+            StartDate = DateTime.Today;
+            EndDate = DateTime.Today;
+            StartTime = null;
+            EndTime = null;
+        }
+
+        public void Initialize(RequestResponseDto? existingRequest)
+        {
             if (existingRequest != null)
             {
                 IsEditMode = true;
                 RequestId = existingRequest.RequestID;
-                SelectedLeaveType = existingRequest.LeaveType.ToString();
-                RequestReason = existingRequest.RequestReason;
+
+                // Format specific leave types with spaces if needed
+                string typeName = existingRequest.LeaveType.ToString();
+                if (existingRequest.LeaveType == LeaveType.WorkFromHome)
+                    typeName = "Work From Home";
+                else if (existingRequest.LeaveType == LeaveType.ExternalAssignment)
+                    typeName = "External Assignment";
+
+                SelectedLeaveType = typeName;
+                RequestReason = existingRequest.RequestReason ?? string.Empty;
                 StartDate = existingRequest.RequestStartDate;
                 EndDate = existingRequest.RequestEndDate;
+                _rowVersion = existingRequest.RowVersion;
 
                 // If it's a type that uses time, populate StartTime and EndTime
                 if (existingRequest.LeaveType == LeaveType.Permission || existingRequest.LeaveType == LeaveType.ExternalAssignment)
@@ -273,22 +295,12 @@ namespace TDFMAUI.ViewModels
                     EndTime = null;
                 }
 
-                _requestType = existingRequest.LeaveType.ToString();
+                _requestType = typeName;
                 _requestFromDay = existingRequest.RequestStartDate;
                 _requestToDay = existingRequest.RequestEndDate;
-                // _requestBeginningTime and _requestEndingTime are directly bound to StartTime and EndTime properties
 
                 // Validate access control for editing using RequestStateManager
                 _ = ValidateEditAccessAsync(existingRequest);
-            }
-            else
-            {
-                IsEditMode = false;
-                RequestId = 0;
-                StartDate = DateTime.Today;
-                EndDate = DateTime.Today;
-                StartTime = null; // Initialize to null for new requests
-                EndTime = null;   // Initialize to null for new requests
             }
         }
 

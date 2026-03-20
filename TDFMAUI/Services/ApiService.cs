@@ -1261,63 +1261,63 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<ApiResponse<bool>> ManagerApproveRequestAsync(int requestId, ManagerApprovalDto approvalDto)
+        public async Task<ApiResponse<RequestResponseDto>> ManagerApproveRequestAsync(int requestId, ManagerApprovalDto approvalDto)
         {
             try
             {
                 string endpoint = string.Format(TDFShared.Constants.ApiRoutes.Requests.ManagerApprove, requestId);
-                var response = await PostAsync<ManagerApprovalDto, ApiResponse<bool>>(endpoint, approvalDto);
-                return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to approve request" };
+                var response = await PostAsync<ManagerApprovalDto, ApiResponse<RequestResponseDto>>(endpoint, approvalDto);
+                return response ?? new ApiResponse<RequestResponseDto> { Success = false, Message = "Failed to approve request" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error approving request {RequestId} as manager: {Message}", requestId, ex.Message);
-                return new ApiResponse<bool> { Success = false, Message = ex.Message };
+                return new ApiResponse<RequestResponseDto> { Success = false, Message = ex.Message };
             }
         }
 
-        public async Task<ApiResponse<bool>> HRApproveRequestAsync(int requestId, HRApprovalDto approvalDto)
+        public async Task<ApiResponse<RequestResponseDto>> HRApproveRequestAsync(int requestId, HRApprovalDto approvalDto)
         {
             try
             {
                 string endpoint = string.Format(TDFShared.Constants.ApiRoutes.Requests.HRApprove, requestId);
-                var response = await PostAsync<HRApprovalDto, ApiResponse<bool>>(endpoint, approvalDto);
-                return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to approve request" };
+                var response = await PostAsync<HRApprovalDto, ApiResponse<RequestResponseDto>>(endpoint, approvalDto);
+                return response ?? new ApiResponse<RequestResponseDto> { Success = false, Message = "Failed to approve request" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error approving request {RequestId} as HR: {Message}", requestId, ex.Message);
-                return new ApiResponse<bool> { Success = false, Message = ex.Message };
+                return new ApiResponse<RequestResponseDto> { Success = false, Message = ex.Message };
             }
         }
 
-        public async Task<ApiResponse<bool>> ManagerRejectRequestAsync(int requestId, ManagerRejectDto rejectDto)
+        public async Task<ApiResponse<RequestResponseDto>> ManagerRejectRequestAsync(int requestId, ManagerRejectDto rejectDto)
         {
             try
             {
                 string endpoint = string.Format(TDFShared.Constants.ApiRoutes.Requests.ManagerReject, requestId);
-                var response = await PostAsync<ManagerRejectDto, ApiResponse<bool>>(endpoint, rejectDto);
-                return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to reject request" };
+                var response = await PostAsync<ManagerRejectDto, ApiResponse<RequestResponseDto>>(endpoint, rejectDto);
+                return response ?? new ApiResponse<RequestResponseDto> { Success = false, Message = "Failed to reject request" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error rejecting request {RequestId} as manager: {Message}", requestId, ex.Message);
-                return new ApiResponse<bool> { Success = false, Message = ex.Message };
+                return new ApiResponse<RequestResponseDto> { Success = false, Message = ex.Message };
             }
         }
 
-        public async Task<ApiResponse<bool>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto)
+        public async Task<ApiResponse<RequestResponseDto>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto)
         {
             try
             {
                 string endpoint = string.Format(TDFShared.Constants.ApiRoutes.Requests.HRReject, requestId);
-                var response = await PostAsync<HRRejectDto, ApiResponse<bool>>(endpoint, rejectDto);
-                return response ?? new ApiResponse<bool> { Success = false, Message = "Failed to reject request" };
+                var response = await PostAsync<HRRejectDto, ApiResponse<RequestResponseDto>>(endpoint, rejectDto);
+                return response ?? new ApiResponse<RequestResponseDto> { Success = false, Message = "Failed to reject request" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error rejecting request {RequestId} as HR: {Message}", requestId, ex.Message);
-                return new ApiResponse<bool> { Success = false, Message = ex.Message };
+                return new ApiResponse<RequestResponseDto> { Success = false, Message = ex.Message };
             }
         }
 

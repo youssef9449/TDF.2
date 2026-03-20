@@ -7,11 +7,10 @@ namespace TDFMAUI.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is string status)
-            {
-                return status.Equals("Pending", StringComparison.OrdinalIgnoreCase);
-            }
-            return false;
+            if (value == null) return false;
+
+            string status = value.ToString();
+            return status.Equals("Pending", StringComparison.OrdinalIgnoreCase);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

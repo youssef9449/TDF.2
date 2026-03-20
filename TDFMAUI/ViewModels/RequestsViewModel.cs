@@ -53,37 +53,31 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private bool? _isHR;
 
-        // Computed Properties - Use TDFShared RequestStateManager for consistency
-        public async Task<bool> CanManageRequestsAsync()
-        {
-            var user = await GetCurrentUserDtoAsync();
-            return user != null && RequestStateManager.CanManageRequests(user);
-        }
+        // Authorization Properties
+        [ObservableProperty]
+        private bool _canManageRequests;
 
-        public async Task<bool> CanApproveRejectAsync()
-        {
-            var user = await GetCurrentUserDtoAsync();
-            return user != null && RequestStateManager.CanManageRequests(user);
-        }
+        [ObservableProperty]
+        private bool _canApproveReject;
 
-        public async Task<bool> CanEditDeleteAnyAsync()
-        {
-            var user = await GetCurrentUserDtoAsync();
-            return user?.IsAdmin == true;
-        }
-
-        public async Task<bool> CanFilterByDepartmentAsync()
-        {
-            var user = await GetCurrentUserDtoAsync();
-            return user?.IsManager == true;
-        }
+        [ObservableProperty]
+        private bool _canEditDeleteAny;
 
         // Remove broken DepartmentOptions property and replace with dynamic department loading
         // public List<string> DepartmentOptions => RequestOptions.DepartmentOptions;
         [ObservableProperty]
         private ObservableCollection<LookupItem> _departments = new();
+
+        [ObservableProperty]
+        private bool _canFilterByDepartment;
         [ObservableProperty]
         private LookupItem? _selectedDepartment;
+
+        partial void OnSelectedDepartmentChanged(LookupItem? value)
+        {
+            _logger.LogInformation("Selected department changed to: {Department}. Reloading requests.", value?.Name);
+            _ = LoadRequestsAsync();
+        }
 
         public RequestsViewModel(
             IRequestService requestService,
@@ -104,6 +98,15 @@ namespace TDFMAUI.ViewModels
         public async Task InitializeAsync()
         {
             await LoadUserRolesAsync();
+
+            var user = await GetCurrentUserDtoAsync();
+            if (user != null)
+            {
+                CanManageRequests = RequestStateManager.CanManageRequests(user);
+                CanApproveReject = CanManageRequests;
+                CanEditDeleteAny = user.IsAdmin ?? false;
+                CanFilterByDepartment = user.IsManager ?? false;
+            }
 
             // Get and store the current user ID to avoid repeated async calls
             _currentUserId = await _authService.GetCurrentUserIdAsync();
@@ -379,8 +382,7 @@ namespace TDFMAUI.ViewModels
         {
             if (request == null) return;
             _logger.LogInformation("Navigating to details for request {RequestId}", request.RequestID);
-            await Shell.Current.GoToAsync($"{nameof(RequestDetailsPage)}", new Dictionary<string, object>
-            { {"RequestId", request.RequestID} });
+            await Shell.Current.GoToAsync($"{nameof(RequestDetailsPage)}?RequestId={request.RequestID}");
         }
 
         // Also refresh permissions after refresh

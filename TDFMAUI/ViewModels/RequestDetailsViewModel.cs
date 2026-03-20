@@ -20,7 +20,7 @@ namespace TDFMAUI.ViewModels
     [QueryProperty(nameof(RequestId), "RequestId")]
     public partial class RequestDetailsViewModel : ObservableObject
     {
-        private readonly IApiService _apiService;
+        private readonly IRequestService _requestService;
         private readonly IAuthService _authService;
         private readonly ILogger<RequestDetailsViewModel> _logger;
 
@@ -41,9 +41,9 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty] private bool _canEdit;
         [ObservableProperty] private bool _canDelete;
 
-        public RequestDetailsViewModel(IApiService apiService, IAuthService authService, ILogger<RequestDetailsViewModel> logger)
+        public RequestDetailsViewModel(IRequestService requestService, IAuthService authService, ILogger<RequestDetailsViewModel> logger)
         {
-            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
@@ -69,7 +69,7 @@ namespace TDFMAUI.ViewModels
             IsLoading = true;
             try
             {
-                var response = await _apiService.GetRequestByIdAsync(RequestId);
+                var response = await _requestService.GetRequestByIdAsync(RequestId);
                 if (response?.Data != null)
                 {
                     Request = response.Data;
@@ -172,7 +172,7 @@ namespace TDFMAUI.ViewModels
                 IsLoading = true;
                 try
                 {
-                    await _apiService.DeleteRequestAsync(Request.RequestID);
+                    await _requestService.DeleteRequestAsync(Request.RequestID);
                     await Shell.Current.DisplayAlert("Success", "Request deleted successfully.", "OK");
                     await Shell.Current.GoToAsync("..");
                 }
@@ -201,17 +201,17 @@ namespace TDFMAUI.ViewModels
             {
                 // Determine which approval DTO to use based on user role
                 var currentUser = await _authService.GetCurrentUserAsync();
-                ApiResponse<bool>? response = null;
+                ApiResponse<RequestResponseDto>? response = null;
                 
                 if (currentUser?.IsManager == true)
                 {
                     var approvalDto = new ManagerApprovalDto { ManagerRemarks = comment };
-                    response = await _apiService.ManagerApproveRequestAsync(Request.RequestID, approvalDto);
+                    response = await _requestService.ManagerApproveRequestAsync(Request.RequestID, approvalDto);
                 }
-                else if (currentUser?.IsHR == true)
+                else if (currentUser?.IsHR == true || currentUser?.IsAdmin == true)
                 {
                     var approvalDto = new HRApprovalDto { HRRemarks = comment };
-                    response = await _apiService.HRApproveRequestAsync(Request.RequestID, approvalDto);
+                    response = await _requestService.HRApproveRequestAsync(Request.RequestID, approvalDto);
                 }
                 else
                 {
@@ -226,7 +226,7 @@ namespace TDFMAUI.ViewModels
                 }
                 else
                 {
-                    await Shell.Current.DisplayAlert("Error", "Failed to approve request.", "OK");
+                    await Shell.Current.DisplayAlert("Error", response?.Message ?? "Failed to approve request.", "OK");
                 }
             }
             catch (Exception ex)
@@ -258,17 +258,17 @@ namespace TDFMAUI.ViewModels
             {
                 // Determine which reject DTO to use based on user role
                 var currentUser = await _authService.GetCurrentUserAsync();
-                ApiResponse<bool>? response = null;
+                ApiResponse<RequestResponseDto>? response = null;
                 
                 if (currentUser?.IsManager == true)
                 {
                     var rejectDto = new ManagerRejectDto { ManagerRemarks = reason };
-                    response = await _apiService.ManagerRejectRequestAsync(Request.RequestID, rejectDto);
+                    response = await _requestService.ManagerRejectRequestAsync(Request.RequestID, rejectDto);
                 }
-                else if (currentUser?.IsHR == true)
+                else if (currentUser?.IsHR == true || currentUser?.IsAdmin == true)
                 {
                     var rejectDto = new HRRejectDto { HRRemarks = reason };
-                    response = await _apiService.HRRejectRequestAsync(Request.RequestID, rejectDto);
+                    response = await _requestService.HRRejectRequestAsync(Request.RequestID, rejectDto);
                 }
                 else
                 {
@@ -283,7 +283,7 @@ namespace TDFMAUI.ViewModels
                 }
                 else
                 {
-                    await Shell.Current.DisplayAlert("Error", "Failed to reject request.", "OK");
+                    await Shell.Current.DisplayAlert("Error", response?.Message ?? "Failed to reject request.", "OK");
                 }
             }
             catch (Exception ex)

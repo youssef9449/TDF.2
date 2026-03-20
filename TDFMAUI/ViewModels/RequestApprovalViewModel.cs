@@ -25,6 +25,7 @@ namespace TDFMAUI.ViewModels
         public static readonly List<string> TypeOptions = new List<string> { "All" }.Concat(Enum.GetNames(typeof(LeaveType))).ToList();
     }
 
+    [QueryProperty(nameof(UserId), "userId")]
     public partial class RequestApprovalViewModel : ObservableObject, IDisposable
     {
         private readonly IRequestService? _requestService;
@@ -76,6 +77,14 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private LookupItem? _selectedDepartment;
 
+        partial void OnFromDateChanged(DateTime value) => _ = LoadRequestsInternalAsync();
+        partial void OnToDateChanged(DateTime value) => _ = LoadRequestsInternalAsync();
+        partial void OnSelectedStatusChanged(string value) => _ = LoadRequestsInternalAsync();
+        partial void OnSelectedTypeChanged(string value) => _ = LoadRequestsInternalAsync();
+        partial void OnSelectedDepartmentChanged(LookupItem? value) => _ = LoadRequestsInternalAsync();
+        partial void OnPageSizeChanged(int value) => _ = LoadRequestsInternalAsync();
+        partial void OnUserIdChanged(int? value) => _ = LoadRequestsInternalAsync();
+
         // Role properties using nullable bool
         [ObservableProperty]
         private bool? _isAdmin;
@@ -125,6 +134,9 @@ namespace TDFMAUI.ViewModels
 
         [ObservableProperty]
         private ObservableCollection<int> _pageSizeOptions;
+
+        [ObservableProperty]
+        private int? _userId;
 
         [ObservableProperty]
         private bool _hasRequests;
@@ -642,7 +654,8 @@ namespace TDFMAUI.ViewModels
                     SelectedType == "All" ? null : SelectedType,
                     FromDate,
                     ToDate,
-                    SelectedDepartment?.Name == "All" ? null : SelectedDepartment?.Name
+                    SelectedDepartment?.Name == "All" ? null : SelectedDepartment?.Name,
+                    UserId
                 ) : null;
 
                 if (result?.Data?.Items != null)

@@ -167,7 +167,7 @@
                             <Frame Padding="15" Margin="0,5" CornerRadius="10" BorderColor="LightGray" HasShadow="True">
                                 <Frame.GestureRecognizers>
                                      <TapGestureRecognizer 
-                                         Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:ReportsViewModel}}, Path=NavigateToDetailsAsyncCommand}"
+                                         Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:ReportsViewModel}}, Path=NavigateToDetailsCommand}"
                                          CommandParameter="{Binding .}" />
                                 </Frame.GestureRecognizers>
                                 <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">

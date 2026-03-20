@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Maui.Graphics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -21,7 +22,21 @@ namespace TDFMAUI.ViewModels
         private ObservableCollection<UserViewModel> _users = new();
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(StatusColor))]
+        [NotifyPropertyChangedFor(nameof(StatusDisplay))]
         private UserPresenceStatus _currentStatus = UserPresenceStatus.Online;
+
+        public Color StatusColor => UserViewModel.GetColorForStatus(CurrentStatus);
+
+        public string StatusDisplay => CurrentStatus switch
+        {
+            UserPresenceStatus.Online => "Online",
+            UserPresenceStatus.Away => "Away",
+            UserPresenceStatus.Busy => "Busy",
+            UserPresenceStatus.DoNotDisturb => "Do Not Disturb",
+            UserPresenceStatus.Offline => "Offline",
+            _ => "Unknown"
+        };
 
         public UsersViewModel(
             IUserPresenceService userPresenceService,

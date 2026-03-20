@@ -132,7 +132,7 @@ namespace TDFMAUI.ViewModels
         }
 
         [RelayCommand]
-        private async Task NavigateToDetailsAsync(RequestResponseDto request)
+        private async Task NavigateToDetails(RequestResponseDto request)
         {
             if (request == null) return;
             var user = await _authService.GetCurrentUserAsync();

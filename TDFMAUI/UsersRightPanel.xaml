@@ -35,9 +35,9 @@
 
         <!-- Pagination -->
         <HorizontalStackLayout Grid.Row="2" HorizontalOptions="Center" Spacing="20" Margin="0,15,0,0" IsVisible="{Binding HasPagination}">
-            <Button Text="◀" Command="{Binding PreviousPageCommand}" IsEnabled="{Binding HasPreviousPage}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" />
+            <Button Text="◀" Command="{Binding LoadPreviousPageCommand}" IsEnabled="{Binding HasPreviousPage}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" />
             <Label Text="{Binding CurrentPage}" VerticalOptions="Center" FontAttributes="Bold" />
-            <Button Text="▶" Command="{Binding NextPageCommand}" IsEnabled="{Binding HasNextPage}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" />
+            <Button Text="▶" Command="{Binding LoadNextPageCommand}" IsEnabled="{Binding HasNextPage}" BackgroundColor="Transparent" TextColor="{StaticResource Primary}" />
         </HorizontalStackLayout>
         
         <ActivityIndicator Grid.Row="1" IsVisible="{Binding IsBusy}" IsRunning="{Binding IsBusy}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" />

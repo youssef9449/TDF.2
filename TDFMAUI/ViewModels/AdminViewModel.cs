@@ -9,7 +9,7 @@ namespace TDFMAUI.ViewModels
         private async Task AddUserAsync() => await Shell.Current.Navigation.PushAsync(App.Services.GetRequiredService<AddUserPage>());
 
         [RelayCommand]
-        private async Task ManageRequestsAsync() => await Shell.Current.DisplayAlert("Not Implemented", "Manage Requests is not fully implemented yet.", "OK");
+        private async Task ManageRequestsAsync() => await Shell.Current.Navigation.PushAsync(App.Services.GetRequiredService<TDFMAUI.Pages.RequestApprovalPage>());
 
         [RelayCommand]
         private async Task BackAsync() => await Shell.Current.GoToAsync("..");

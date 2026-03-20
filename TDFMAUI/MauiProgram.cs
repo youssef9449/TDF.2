@@ -235,6 +235,7 @@ namespace TDFMAUI
             builder.Services.AddTransient<DiagnosticsPage>();
             builder.Services.AddTransient<UsersPage>();
             builder.Services.AddTransient<UserProfilePage>();
+            builder.Services.AddTransient<ProfilePage>();
             builder.Services.AddTransient<NotificationsPage>();
             builder.Services.AddTransient<NotificationTestPage>();
             builder.Services.AddTransient<SignupPage>();
@@ -249,6 +250,7 @@ namespace TDFMAUI
             builder.Services.AddTransient<GlobalChatPage>();
             builder.Services.AddTransient<AddUserPage>();
             builder.Services.AddTransient<EditUserPage>();
+            builder.Services.AddTransient<RequestApprovalPage>();
 
             #if IOS
             builder.Services.AddSingleton<INotificationPermissionPlatformService, TDFMAUI.Platforms.iOS.NotificationPermissionPlatformService>();

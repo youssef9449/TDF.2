@@ -38,7 +38,7 @@
                     <Label Text="Full Name:" 
                            FontAttributes="Bold"
                            TextColor="White"/>
-                    <Entry x:Name="fullNameEntry" 
+                    <Entry Text="{Binding EditingUser.FullName}"
                            TextColor="{StaticResource OnPrimaryColor}"
                            BackgroundColor="White"
                            Placeholder="Enter your full name"/>
@@ -46,7 +46,7 @@
                     <Label Text="Department:" 
                            FontAttributes="Bold"
                            TextColor="White"/>
-                    <Entry x:Name="departmentEntry" 
+                    <Entry Text="{Binding EditingUser.Department}"
                            TextColor="{StaticResource OnPrimaryColor}"
                            BackgroundColor="White"
                            Placeholder="Enter your department"/>
@@ -54,7 +54,7 @@
                     <Label Text="Title:" 
                            FontAttributes="Bold"
                            TextColor="White"/>
-                    <Entry x:Name="titleEntry" 
+                    <Entry Text="{Binding EditingUser.Title}"
                            TextColor="{StaticResource OnPrimaryColor}"
                            BackgroundColor="White"
                            Placeholder="Enter your title"/>
@@ -83,7 +83,7 @@
             <!-- Actions -->
             <Button Grid.Row="2"
                     Text="Save Changes"
-                    Clicked="OnSaveClicked"
+                    Command="{Binding SaveProfileCommand}"
                     BackgroundColor="{StaticResource PrimaryLight}"
                     TextColor="White"
                     FontAttributes="Bold"

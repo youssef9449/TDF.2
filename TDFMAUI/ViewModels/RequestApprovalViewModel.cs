@@ -61,6 +61,20 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty] private bool? _isManager;
         [ObservableProperty] private bool? _isHR;
 
+        [ObservableProperty] private int _currentPage = 1;
+        [ObservableProperty] private int _pageSize = 10;
+        [ObservableProperty] private int _totalItems;
+        [ObservableProperty] private int _totalPages;
+        [ObservableProperty] private bool _canGoToFirstPage;
+        [ObservableProperty] private bool _canGoToPreviousPage;
+        [ObservableProperty] private bool _canGoToNextPage;
+        [ObservableProperty] private bool _canGoToLastPage;
+        [ObservableProperty] private ObservableCollection<int> _pageNumbers = new();
+        [ObservableProperty] private ObservableCollection<int> _pageSizeOptions = new() { 5, 10, 20, 50 };
+        [ObservableProperty] private bool _hasRequests;
+
+        public string PageInfo => $"Page {CurrentPage} of {TotalPages}";
+
         public List<string> StatusOptions => RequestOptions.StatusOptions;
         public List<string> TypeOptions => RequestOptions.TypeOptions;
 
@@ -106,7 +120,6 @@ namespace TDFMAUI.ViewModels
             try
             {
                 var allDepartments = await _lookupService.GetDepartmentsAsync();
-                var user = _userSessionService.CurrentUser;
                 var departmentsList = allDepartments.ToList();
                 departmentsList.Insert(0, new LookupItem { Name = "All", Id = "0" });
                 Departments = new ObservableCollection<LookupItem>(departmentsList);
@@ -116,7 +129,7 @@ namespace TDFMAUI.ViewModels
         }
 
         [RelayCommand]
-        private async Task LoadRequestsAsync()
+        public async Task LoadRequestsAsync()
         {
             if (IsBusy) return;
             IsBusy = true;
@@ -126,7 +139,7 @@ namespace TDFMAUI.ViewModels
                 if (user == null || !RequestStateManager.CanManageRequests(user)) return;
 
                 var result = await _requestService.GetRequestsForApprovalAsync(
-                    1, 50,
+                    CurrentPage, PageSize,
                     SelectedStatus == "All" ? null : SelectedStatus,
                     SelectedType == "All" ? null : SelectedType,
                     FromDate, ToDate,
@@ -139,6 +152,12 @@ namespace TDFMAUI.ViewModels
                     var filtered = result.Data.Items.Where(r => RequestStateManager.CanViewRequest(r, user)).ToList();
                     foreach (var req in filtered) Requests.Add(req);
 
+                    TotalItems = result.Data.TotalCount;
+                    TotalPages = (int)Math.Ceiling((double)TotalItems / PageSize);
+                    HasRequests = Requests.Any();
+
+                    UpdatePaginationMetadata();
+
                     PendingCount = filtered.Count(r => r.Status == RequestStatus.Pending);
                     ApprovedCount = filtered.Count(r => r.Status == RequestStatus.ManagerApproved || r.Status == RequestStatus.HRApproved);
                     RejectedCount = filtered.Count(r => r.Status == RequestStatus.Rejected || r.Status == RequestStatus.ManagerRejected);
@@ -146,6 +165,40 @@ namespace TDFMAUI.ViewModels
             }
             catch (Exception ex) { _logger.LogError(ex, "Error loading requests"); }
             finally { IsBusy = false; }
+        }
+
+        private void UpdatePaginationMetadata()
+        {
+            CanGoToFirstPage = CurrentPage > 1;
+            CanGoToPreviousPage = CurrentPage > 1;
+            CanGoToNextPage = CurrentPage < TotalPages;
+            CanGoToLastPage = CurrentPage < TotalPages;
+
+            PageNumbers.Clear();
+            for (int i = 1; i <= TotalPages; i++) PageNumbers.Add(i);
+
+            OnPropertyChanged(nameof(PageInfo));
+        }
+
+        [RelayCommand]
+        private async Task FirstPageAsync() { CurrentPage = 1; await LoadRequestsAsync(); }
+
+        [RelayCommand]
+        private async Task PreviousPageAsync() { if (CurrentPage > 1) { CurrentPage--; await LoadRequestsAsync(); } }
+
+        [RelayCommand]
+        private async Task NextPageAsync() { if (CurrentPage < TotalPages) { CurrentPage++; await LoadRequestsAsync(); } }
+
+        [RelayCommand]
+        private async Task LastPageAsync() { CurrentPage = TotalPages; await LoadRequestsAsync(); }
+
+        [RelayCommand]
+        private async Task GoToPageAsync(int page) { CurrentPage = page; await LoadRequestsAsync(); }
+
+        [RelayCommand]
+        private async Task ViewRequestAsync(int requestId)
+        {
+            await Shell.Current.GoToAsync($"RequestDetailsPage?RequestId={requestId}");
         }
 
         [RelayCommand]

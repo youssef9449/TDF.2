@@ -7,6 +7,7 @@ using System;
 using TDFShared.DTOs.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using TDFShared.Enums;
 
 namespace TDFMAUI.ViewModels
 {
@@ -14,33 +15,59 @@ namespace TDFMAUI.ViewModels
     {
         private readonly ApiService _apiService;
         private readonly ILogger<MessagesViewModel> _logger;
+        private readonly WebSocketService _webSocketService;
+        private readonly IUserPresenceService _userPresenceService;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
         private string _newMessageText = string.Empty;
 
         [ObservableProperty]
-        private ObservableCollection<ChatMessageDto> _messages = new();
+        private ObservableCollection<MessageItemViewModel> _messages = new();
 
-        public MessagesViewModel(ApiService apiService, ILogger<MessagesViewModel> logger)
+        public MessagesViewModel(
+            ApiService apiService,
+            ILogger<MessagesViewModel> logger,
+            WebSocketService webSocketService,
+            IUserPresenceService userPresenceService)
         {
             _apiService = apiService;
             _logger = logger;
+            _webSocketService = webSocketService;
+            _userPresenceService = userPresenceService;
             Title = "Messages";
-            _ = LoadMessagesAsync();
         }
 
         [RelayCommand]
         public async Task LoadMessagesAsync()
         {
+            if (App.CurrentUser == null) return;
             IsBusy = true;
             try
             {
-                var result = await _apiService.GetRecentChatMessagesAsync(50);
+                var pagination = new MessagePaginationDto { PageNumber = 1, PageSize = 50, SortDescending = true };
+                var result = await _apiService.GetUserMessagesAsync(App.CurrentUser.UserID, pagination);
+
                 Messages.Clear();
-                if (result != null)
+                if (result?.Items != null)
                 {
-                    foreach (var message in result) Messages.Add(message);
+                    var deliveredIds = new List<int>();
+                    foreach (var m in result.Items)
+                    {
+                        var vm = new MessageItemViewModel
+                        {
+                            Id = m.MessageId,
+                            Content = m.MessageText,
+                            Timestamp = m.Timestamp,
+                            SenderId = m.SenderId,
+                            SenderName = m.SenderName,
+                            IsRead = m.IsRead,
+                            IsDelivered = m.IsDelivered
+                        };
+                        Messages.Add(vm);
+                        if (!m.IsRead && !m.IsDelivered && m.SenderId != App.CurrentUser.UserID) deliveredIds.Add(m.MessageId);
+                    }
+                    if (deliveredIds.Any()) await _webSocketService.MarkMessagesAsDeliveredAsync(deliveredIds);
                 }
             }
             catch (Exception ex)
@@ -56,26 +83,48 @@ namespace TDFMAUI.ViewModels
         [RelayCommand(CanExecute = nameof(CanSendMessage))]
         private async Task SendMessageAsync()
         {
-            var messageContent = NewMessageText;
+            var content = NewMessageText;
             NewMessageText = string.Empty;
-
-            var newMessage = new MessageCreateDto
-            {
-                MessageText = messageContent,
-                ReceiverID = 0,
-                MessageType = TDFShared.Enums.MessageType.Chat
-            };
-
             try
             {
-                var createdMessage = await _apiService.CreateMessageAsync(newMessage);
-                if (createdMessage != null) Messages.Add(createdMessage);
+                var dto = new MessageCreateDto { MessageText = content, ReceiverID = 0, MessageType = MessageType.Chat };
+                var created = await _apiService.CreateMessageAsync(dto);
+                if (created != null) await LoadMessagesAsync();
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending message");
-                ErrorMessage = "Failed to send message.";
-            }
+            catch (Exception ex) { ErrorMessage = "Failed to send message."; }
         }
+
+        public void HandleMessageReceived(ChatMessageEventArgs e)
+        {
+            if (Messages.Any(m => m.Id == e.MessageId)) return;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                Messages.Insert(0, new MessageItemViewModel
+                {
+                    Id = e.MessageId,
+                    Content = e.Message,
+                    Timestamp = e.Timestamp,
+                    SenderId = e.SenderId,
+                    SenderName = e.SenderName,
+                    IsRead = false
+                });
+            });
+        }
+    }
+
+    public partial class MessageItemViewModel : ObservableObject
+    {
+        public int Id { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; }
+        public int SenderId { get; set; }
+        public string SenderName { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(BackgroundColor))]
+        private bool _isRead;
+
+        public bool IsDelivered { get; set; }
+        public Color BackgroundColor => IsRead ? (Color)Application.Current.Resources["SurfaceColor"] : (Color)Application.Current.Resources["BlueCardColor"];
     }
 }

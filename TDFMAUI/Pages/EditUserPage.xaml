@@ -4,8 +4,8 @@
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              xmlns:viewmodels="clr-namespace:TDFMAUI.ViewModels"
              x:Class="TDFMAUI.Pages.EditUserPage"
-             Title="Edit User"
-             x:DataType="viewmodels:UserViewModel"
+             x:DataType="viewmodels:EditUserViewModel"
+             Title="{Binding Title}"
              BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <Grid RowDefinitions="Auto,*,Auto">
@@ -17,69 +17,70 @@
                     TextColor="{StaticResource Primary}"
                     FontSize="20"
                     WidthRequest="50"/>
-            <Label Text="Edit User"
+            <Label Text="{Binding Title}"
                    FontSize="24"
                    FontAttributes="Bold"
                    HorizontalOptions="CenterAndExpand"/>
         </HorizontalStackLayout>
 
-        <!-- User Form -->
+        <!-- Edit Form -->
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="20" Spacing="15">
-                 <!-- Constrain width on Desktop/Tablet -->
                 <VerticalStackLayout.MaximumWidthRequest>
                     <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="700" Desktop="600" />
                 </VerticalStackLayout.MaximumWidthRequest>
                 <VerticalStackLayout.HorizontalOptions>
-                     <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
+                    <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
                 </VerticalStackLayout.HorizontalOptions>
 
                 <Frame BackgroundColor="White" Padding="15">
                     <VerticalStackLayout Spacing="15">
                         <Label Text="Username" FontAttributes="Bold"/>
-                        <Entry x:Name="usernameEntry" Placeholder="Enter username"/>
+                        <Entry Text="{Binding Username}" Placeholder="Enter username"/>
 
                         <Label Text="Full Name" FontAttributes="Bold"/>
-                        <Entry x:Name="fullNameEntry" Placeholder="Enter full name"/>
+                        <Entry Text="{Binding FullName}" Placeholder="Enter full name"/>
 
                         <Label Text="Department" FontAttributes="Bold"/>
-                        <Picker x:Name="departmentPicker" Title="Select department"/>
+                        <Picker Title="Select department"
+                                ItemsSource="{Binding DepartmentOptions}"
+                                SelectedItem="{Binding Department}"/>
 
                         <Label Text="Title" FontAttributes="Bold"/>
-                        <Picker x:Name="titlePicker" Title="Select title"/>
+                        <Picker Title="Select title"
+                                ItemsSource="{Binding TitleOptions}"
+                                SelectedItem="{Binding TitleName}"/>
 
                         <HorizontalStackLayout>
-                            <CheckBox x:Name="adminCheckBox"/>
+                            <CheckBox IsChecked="{Binding IsAdmin}"/>
                             <Label Text="Admin" VerticalOptions="Center"/>
                         </HorizontalStackLayout>
 
+                        <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextColor="Red" />
+
                         <Button Text="Save Changes"
-                                Clicked="OnSaveClicked"
+                                Command="{Binding SaveCommand}"
                                 BackgroundColor="{StaticResource Primary}"
                                 TextColor="White"
                                 FontAttributes="Bold"/>
 
                         <Button Text="Delete User"
-                                Clicked="OnDeleteClicked"
+                                Command="{Binding DeleteCommand}"
                                 BackgroundColor="Red"
                                 TextColor="White"
-                                FontAttributes="Bold"/>
+                                FontAttributes="Bold"
+                                Margin="0,10,0,0"/>
                     </VerticalStackLayout>
                 </Frame>
             </VerticalStackLayout>
         </ScrollView>
 
         <!-- Loading Indicator -->
-        <ActivityIndicator x:Name="loadingIndicator"
-                          Grid.Row="2"
-                          IsVisible="False"
-                          IsRunning="False"
+        <ActivityIndicator IsVisible="{Binding IsBusy}"
+                          IsRunning="{Binding IsBusy}"
+                          Grid.Row="1"
                           Color="{StaticResource Primary}"
                           HorizontalOptions="Center"
                           VerticalOptions="Center"/>
-
-        <!-- Remove these debug labels for production or position them correctly -->
-        <!-- <Label Grid.Row="2" Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/> -->
-        <!-- <Label Grid.Row="2" Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"/> -->
     </Grid>
 </ContentPage>

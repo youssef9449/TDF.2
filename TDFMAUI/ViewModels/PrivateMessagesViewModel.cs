@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows.Input;
 using TDFMAUI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,19 +10,19 @@ using TDFShared.DTOs.Messages;
 
 namespace TDFMAUI.ViewModels
 {
-    public partial class PrivateMessagesViewModel : ObservableObject
+    public partial class PrivateMessagesViewModel : BaseViewModel
     {
         private readonly ApiService _apiService;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
-        private string _newMessageText;
+        private string _newMessageText = string.Empty;
 
         [ObservableProperty]
-        ObservableCollection<MessageModel> messages = new ObservableCollection<MessageModel>();
+        private ObservableCollection<MessageModel> _messages = new();
 
         [ObservableProperty]
-        MessageModel selectedMessage;
+        private MessageModel? _selectedMessage;
 
         [ObservableProperty]
         private int _partnerId;
@@ -31,17 +30,16 @@ namespace TDFMAUI.ViewModels
         public PrivateMessagesViewModel(ApiService apiService)
         {
             _apiService = apiService;
-            Task.Run(async () => await LoadMessagesAsync());
+            Title = "Private Messages";
         }
 
+        [RelayCommand]
         public async Task LoadMessagesAsync()
         {
             if (PartnerId <= 0) return;
-
+            IsBusy = true;
             try
             {
-                Messages.Clear();
-
                 var pagination = new MessagePaginationDto
                 {
                     PageNumber = 1,
@@ -50,13 +48,13 @@ namespace TDFMAUI.ViewModels
                     FromUserId = PartnerId
                 };
 
-                var messagesResult = await _apiService.GetPrivateMessagesAsync(App.CurrentUser?.UserID ?? 0, pagination);
-
-                if (messagesResult?.Items != null)
+                var result = await _apiService.GetPrivateMessagesAsync(App.CurrentUser?.UserID ?? 0, pagination);
+                Messages.Clear();
+                if (result?.Items != null)
                 {
-                    foreach (var dto in messagesResult.Items)
+                    foreach (var dto in result.Items)
                     {
-                        var messageModel = new MessageModel
+                        Messages.Add(new MessageModel
                         {
                             Id = dto.MessageId,
                             FromUserId = dto.SenderId,
@@ -64,31 +62,29 @@ namespace TDFMAUI.ViewModels
                             Content = dto.MessageText,
                             SentAt = dto.SentAt,
                             MessageType = dto.MessageType
-                        };
-                        Messages.Add(messageModel);
+                        });
                     }
-
-                    // Mark incoming messages as read
-                    await MarkMessagesAsRead(PartnerId);
+                    await MarkMessagesAsReadAsync(PartnerId);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading private messages: {ex.Message}");
+                ErrorMessage = "Failed to load private messages.";
             }
+            finally { IsBusy = false; }
         }
+
+        private bool CanSendMessage() => !string.IsNullOrWhiteSpace(NewMessageText) && PartnerId > 0 && !IsBusy;
 
         [RelayCommand(CanExecute = nameof(CanSendMessage))]
         private async Task SendMessageAsync()
         {
-            var messageContent = NewMessageText?.Trim();
-            if (string.IsNullOrEmpty(messageContent) || PartnerId <= 0) return;
-
+            var content = NewMessageText.Trim();
             NewMessageText = string.Empty;
 
-            var newMessage = new MessageCreateDto
+            var dto = new MessageCreateDto
             {
-                MessageText = messageContent,
+                MessageText = content,
                 SentAt = DateTime.Now,
                 SenderID = App.CurrentUser?.UserID ?? 0,
                 ReceiverID = PartnerId,
@@ -97,68 +93,31 @@ namespace TDFMAUI.ViewModels
 
             try
             {
-                var sentMessageDto = await _apiService.CreatePrivateMessageAsync(newMessage);
-
-                var messageModel = new MessageModel
+                var sent = await _apiService.CreatePrivateMessageAsync(dto);
+                Messages.Add(new MessageModel
                 {
-                    Id = sentMessageDto.MessageId,
-                    FromUserId = sentMessageDto.SenderId,
-                    FromUserName = sentMessageDto.SenderName,
-                    Content = sentMessageDto.MessageText,
-                    SentAt = sentMessageDto.SentAt,
-                    MessageType = sentMessageDto.MessageType
-                };
-
-                Messages.Add(messageModel);
+                    Id = sent.MessageId,
+                    FromUserId = sent.SenderId,
+                    FromUserName = sent.SenderName,
+                    Content = sent.MessageText,
+                    SentAt = sent.SentAt,
+                    MessageType = sent.MessageType
+                });
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error sending private message: {ex.Message}");
+                ErrorMessage = "Failed to send private message.";
             }
         }
 
-        private bool CanSendMessage()
-        {
-            return !string.IsNullOrWhiteSpace(NewMessageText);
-        }
-
-        private async Task MarkMessagesAsRead(int partnerId)
+        private async Task MarkMessagesAsReadAsync(int partnerId)
         {
             try
             {
-                if (App.CurrentUser == null) return;
-
-                // Get all unread message IDs from this partner
-                var unreadMessageIds = Messages
-                    .Where(m => m.FromUserId == partnerId && !m.IsRead)
-                    .Select(m => m.Id)
-                    .ToList();
-
-                if (unreadMessageIds.Any())
-                {
-                    await _apiService.MarkMessagesAsReadAsync(unreadMessageIds);
-
-                    // Update the local messages as read
-                    foreach (var message in Messages.Where(m => unreadMessageIds.Contains(m.MessageId)))
-                    {
-                        // Safely handle read-only IsRead property
-                        if (message is IReadStatusAware readStatusAware)
-                        {
-                            readStatusAware.SetAsRead();
-                        }
-                    }
-                }
+                var unreadIds = Messages.Where(m => m.FromUserId == partnerId && !m.IsRead).Select(m => m.Id).ToList();
+                if (unreadIds.Any()) await _apiService.MarkMessagesAsReadAsync(unreadIds);
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error marking messages as read: {ex.Message}");
-            }
+            catch (Exception ex) { }
         }
-    }
-
-    // Interface to safely update read status if available
-    public interface IReadStatusAware
-    {
-        void SetAsRead();
     }
 }

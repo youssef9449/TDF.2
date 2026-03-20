@@ -1,126 +1,130 @@
 using System.Collections.ObjectModel;
-using System.Windows.Input;
 using TDFMAUI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Threading.Tasks;
-using System.Net.Http;
 using System;
 using TDFShared.DTOs.Messages;
-using TDFMAUI.Helpers;
-using Color = Microsoft.Maui.Graphics.Color;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using TDFShared.Enums;
 
 namespace TDFMAUI.ViewModels
 {
-    public partial class MessagesViewModel : ObservableObject
+    public partial class MessagesViewModel : BaseViewModel
     {
-        [ObservableProperty]
-        private bool _isLoading;
-
         private readonly ApiService _apiService;
+        private readonly ILogger<MessagesViewModel> _logger;
+        private readonly WebSocketService _webSocketService;
+        private readonly IUserPresenceService _userPresenceService;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
-        private string _newMessageText;
+        private string _newMessageText = string.Empty;
 
         [ObservableProperty]
-        private Color senderStatusColor = Application.Current.Resources.TryGetValue("TextSecondaryColor", out var resourceValue) && resourceValue is Color colorValue ? colorValue : Colors.Gray;
+        private ObservableCollection<MessageItemViewModel> _messages = new();
 
-        [ObservableProperty]
-        private bool showSenderStatus;
-
-        [ObservableProperty]
-        private string senderName = string.Empty;
-
-        [ObservableProperty]
-        ObservableCollection<ChatMessageDto> messages = new ObservableCollection<ChatMessageDto>();
-
-        [ObservableProperty]
-        ChatMessageDto? selectedMessage;
-
-        public MessagesViewModel(ApiService? apiService = null, ILogger<MessagesViewModel>? logger = null)
+        public MessagesViewModel(
+            ApiService apiService,
+            ILogger<MessagesViewModel> logger,
+            WebSocketService webSocketService,
+            IUserPresenceService userPresenceService)
         {
-            _newMessageText = string.Empty;
-            if (apiService == null)
-            {
-                // Use App.Current.Services to get the ApiService
-                _apiService = App.Current?.Handler?.MauiContext?.Services?.GetService<ApiService>();
-                if (_apiService == null)
-                {
-                    throw new InvalidOperationException("ApiService could not be resolved from dependency injection.");
-                }
-            }
-            else
-            {
-                _apiService = apiService;
-            }
-
-            Messages = new ObservableCollection<ChatMessageDto>();
-            Task.Run(async () => await LoadMessagesAsync());
-            LoadMessagesCommand = new RelayCommand(async () => await LoadMessagesAsync());
+            _apiService = apiService;
+            _logger = logger;
+            _webSocketService = webSocketService;
+            _userPresenceService = userPresenceService;
+            Title = "Messages";
         }
 
-        public ICommand LoadMessagesCommand { get; }
-
-        private async Task LoadMessagesAsync()
+        [RelayCommand]
+        public async Task LoadMessagesAsync()
         {
+            if (App.CurrentUser == null) return;
+            IsBusy = true;
             try
             {
-                IsLoading = true;
+                var pagination = new MessagePaginationDto { PageNumber = 1, PageSize = 50, SortDescending = true };
+                var result = await _apiService.GetUserMessagesAsync(App.CurrentUser.UserID, pagination);
+
                 Messages.Clear();
-                var result = await _apiService.GetRecentChatMessagesAsync(50);
-                if (result != null)
+                if (result?.Items != null)
                 {
-                    foreach (var message in result)
+                    var deliveredIds = new List<int>();
+                    foreach (var m in result.Items)
                     {
-                        Messages.Add(message);
+                        var vm = new MessageItemViewModel
+                        {
+                            Id = m.MessageId,
+                            Content = m.MessageText,
+                            Timestamp = m.Timestamp,
+                            SenderId = m.SenderId,
+                            SenderName = m.SenderName,
+                            IsRead = m.IsRead,
+                            IsDelivered = m.IsDelivered
+                        };
+                        Messages.Add(vm);
+                        if (!m.IsRead && !m.IsDelivered && m.SenderId != App.CurrentUser.UserID) deliveredIds.Add(m.MessageId);
                     }
+                    if (deliveredIds.Any()) await _webSocketService.MarkMessagesAsDeliveredAsync(deliveredIds);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading messages: {ex.Message}");
+                _logger.LogError(ex, "Error loading messages");
+                ErrorMessage = "Failed to load messages.";
             }
-            finally
-            {
-                IsLoading = false;
-            }
+            finally { IsBusy = false; }
         }
+
+        private bool CanSendMessage() => !string.IsNullOrWhiteSpace(NewMessageText) && !IsBusy;
 
         [RelayCommand(CanExecute = nameof(CanSendMessage))]
         private async Task SendMessageAsync()
         {
-            if (!CanSendMessage()) return;
-
-            var messageContent = NewMessageText;
+            var content = NewMessageText;
             NewMessageText = string.Empty;
-
-            var newMessage = new MessageCreateDto
-            {
-                MessageText = messageContent,
-                ReceiverID = 0, // For global chat
-                MessageType = TDFShared.Enums.MessageType.Chat
-            };
-
             try
             {
-                var createdMessage = await _apiService.CreateMessageAsync(newMessage);
-                if (createdMessage != null)
-                {
-                    Messages.Add(createdMessage);
-                }
+                var dto = new MessageCreateDto { MessageText = content, ReceiverID = 0, MessageType = MessageType.Chat };
+                var created = await _apiService.CreateMessageAsync(dto);
+                if (created != null) await LoadMessagesAsync();
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error sending message: {ex.Message}");
-            }
+            catch (Exception ex) { ErrorMessage = "Failed to send message."; }
         }
 
-        private bool CanSendMessage()
+        public void HandleMessageReceived(ChatMessageEventArgs e)
         {
-            return !string.IsNullOrWhiteSpace(NewMessageText);
+            if (Messages.Any(m => m.Id == e.MessageId)) return;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                Messages.Insert(0, new MessageItemViewModel
+                {
+                    Id = e.MessageId,
+                    Content = e.Message,
+                    Timestamp = e.Timestamp,
+                    SenderId = e.SenderId,
+                    SenderName = e.SenderName,
+                    IsRead = false
+                });
+            });
         }
+    }
+
+    public partial class MessageItemViewModel : ObservableObject
+    {
+        public int Id { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; }
+        public int SenderId { get; set; }
+        public string SenderName { get; set; } = string.Empty;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(BackgroundColor))]
+        private bool _isRead;
+
+        public bool IsDelivered { get; set; }
+        public Color BackgroundColor => IsRead ? (Color)Application.Current.Resources["SurfaceColor"] : (Color)Application.Current.Resources["BlueCardColor"];
     }
 }

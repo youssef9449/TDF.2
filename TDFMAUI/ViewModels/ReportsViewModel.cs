@@ -6,9 +6,8 @@ using TDFMAUI.Services;
 using System;
 using System.Linq;
 using System.Collections.Generic;
-using Microsoft.Maui.Controls; // For INavigation or Shell navigation
-using TDFShared.DTOs.Requests; // Added
-using TDFShared.DTOs.Common; // Added for pagination
+using TDFShared.DTOs.Requests;
+using TDFShared.DTOs.Common;
 using TDFShared.Enums;
 using TDFMAUI.Features.Requests;
 using TDFShared.Services;
@@ -17,15 +16,11 @@ using TDFShared.DTOs.Users;
 
 namespace TDFMAUI.ViewModels
 {
-    public partial class ReportsViewModel : ObservableObject
+    public partial class ReportsViewModel : BaseViewModel
     {
         private readonly IRequestService _requestService;
-        private readonly INavigation _navigation; // Assuming navigation is passed from the page
         private readonly IErrorHandlingService _errorHandlingService;
         private readonly IAuthService _authService;
-
-        [ObservableProperty]
-        private bool _isLoading;
 
         [ObservableProperty]
         private ObservableCollection<RequestResponseDto> _requests = new();
@@ -34,72 +29,49 @@ namespace TDFMAUI.ViewModels
         private List<string> _statusOptions = new List<string> { "All" }.Concat(Enum.GetNames(typeof(RequestStatus))).ToList();
 
         [ObservableProperty]
-        private string _selectedStatus = "All"; // Default filter
+        private string _selectedStatus = "All";
 
         [ObservableProperty]
-        private DateTime? _fromDate;
+        private DateTime? _fromDate = DateTime.Today;
 
         [ObservableProperty]
-        private DateTime? _toDate;
+        private DateTime? _toDate = DateTime.Today;
 
         [ObservableProperty]
-        private string _requestCountText;
+        private string _requestCountText = string.Empty;
 
         [ObservableProperty]
-        private RequestResponseDto _selectedRequest;
+        private RequestResponseDto? _selectedRequest;
 
-        // Authorization properties
-        [ObservableProperty]
-        private bool _canViewReports;
-
-        [ObservableProperty]
-        private bool _canExportReports;
+        [ObservableProperty] private bool _canViewReports;
+        [ObservableProperty] private bool _canExportReports;
 
         public ReportsViewModel(
             IRequestService requestService, 
-            INavigation navigation, 
             IErrorHandlingService errorHandlingService,
             IAuthService authService)
         {
-            _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
-            _navigation = navigation ?? throw new ArgumentNullException(nameof(navigation));
-            _errorHandlingService = errorHandlingService ?? throw new ArgumentNullException(nameof(errorHandlingService));
-            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+            _requestService = requestService;
+            _errorHandlingService = errorHandlingService;
+            _authService = authService;
+            Title = "Reports";
         }
 
         public async Task InitializeAsync()
         {
-            // Set default dates
-            FromDate = DateTime.Today;
-            ToDate = FromDate;
-
-            // Check authorization before loading data
-            var currentUser = await _authService.GetCurrentUserAsync();
-            if (currentUser == null)
+            var user = await _authService.GetCurrentUserAsync();
+            if (user == null)
             {
-                await Shell.Current.DisplayAlert("Access Denied", "You must be logged in to view reports.", "OK");
                 await Shell.Current.GoToAsync("//Login");
                 return;
             }
 
-            var userDto = new UserDto
-            {
-                UserID = currentUser.UserID,
-                IsAdmin = currentUser.IsAdmin,
-                IsHR = currentUser.IsHR,
-                IsManager = currentUser.IsManager,
-                Department = currentUser.Department
-            };
-
-            // Use RequestStateManager for state-based checks
-            CanViewReports = RequestStateManager.CanManageRequests(userDto);
-            
-            // Use AuthorizationUtilities for action-specific checks
-            CanExportReports = AuthorizationUtilities.CanPerformRequestAction(userDto, null, RequestAction.View);
+            CanViewReports = RequestStateManager.CanManageRequests(user);
+            CanExportReports = AuthorizationUtilities.CanPerformRequestAction(user, null, RequestAction.View);
 
             if (!CanViewReports)
             {
-                await Shell.Current.DisplayAlert("Access Denied", "You don't have permission to view reports.", "OK");
+                await Shell.Current.DisplayAlert("Access Denied", "No permission.", "OK");
                 await Shell.Current.GoToAsync("//Home");
                 return;
             }
@@ -107,30 +79,18 @@ namespace TDFMAUI.ViewModels
             await LoadRequestsAsync();
         }
 
-        // Command to load/refresh data based on filters
         [RelayCommand]
-        private async Task LoadRequestsAsync()
+        public async Task LoadRequestsAsync()
         {
-            if (IsLoading) return;
-
-            IsLoading = true;
+            if (IsBusy) return;
+            IsBusy = true;
             Requests.Clear();
 
             try
             {
-                var currentUser = await _authService.GetCurrentUserAsync();
-                if (currentUser == null) return;
+                var user = await _authService.GetCurrentUserAsync();
+                if (user == null) return;
 
-                var userDto = new UserDto
-                {
-                    UserID = currentUser.UserID,
-                    IsAdmin = currentUser.IsAdmin,
-                    IsHR = currentUser.IsHR,
-                    IsManager = currentUser.IsManager,
-                    Department = currentUser.Department
-                };
-
-                // Create pagination DTO
                 var pagination = new RequestPaginationDto
                 {
                     FilterStatus = SelectedStatus == "All" ? null : 
@@ -145,14 +105,8 @@ namespace TDFMAUI.ViewModels
 
                 if (result?.Data?.Items != null)
                 {
-                    // Filter requests based on user permissions using RequestStateManager
-                    var filteredRequests = result.Data.Items.Where(request =>
-                        RequestStateManager.CanViewRequest(request, userDto)).ToList();
-
-                    foreach (var req in filteredRequests)
-                    {
-                        Requests.Add(req);
-                    }
+                    var filtered = result.Data.Items.Where(r => RequestStateManager.CanViewRequest(r, user)).ToList();
+                    foreach (var req in filtered) Requests.Add(req);
                 }
                 RequestCountText = $"Total: {Requests.Count} requests";
             }
@@ -161,75 +115,31 @@ namespace TDFMAUI.ViewModels
                 await _errorHandlingService.ShowErrorAsync(ex, "loading requests");
                 RequestCountText = "Error loading requests";
             }
-            finally
-            {
-                IsLoading = false;
-            }
+            finally { IsBusy = false; }
         }
 
-        // Command triggered by pull-to-refresh
         [RelayCommand]
-        private Task RefreshRequestsAsync()
-        {
-            // Simply call LoadRequestsAsync again
-            return LoadRequestsAsync();
-        }
+        private Task RefreshRequestsAsync() => LoadRequestsAsync();
 
-        // Command to navigate to the Add Request page
         [RelayCommand]
         private async Task NavigateToAddRequestAsync()
         {
-            var currentUser = await _authService.GetCurrentUserAsync();
-            if (currentUser == null) return;
-
-            var userDto = new UserDto
+            var user = await _authService.GetCurrentUserAsync();
+            if (user != null && AuthorizationUtilities.CanPerformRequestAction(user, null, RequestAction.View))
             {
-                UserID = currentUser.UserID,
-                IsAdmin = currentUser.IsAdmin,
-                IsHR = currentUser.IsHR,
-                IsManager = currentUser.IsManager,
-                Department = currentUser.Department
-            };
-
-            // Check if user can create requests using AuthorizationUtilities
-            if (!AuthorizationUtilities.CanPerformRequestAction(userDto, null, RequestAction.View))
-            {
-                await Shell.Current.DisplayAlert("Access Denied", "You don't have permission to create requests.", "OK");
-                return;
+                await Shell.Current.GoToAsync(nameof(AddRequestPage));
             }
-
-            await Shell.Current.GoToAsync(nameof(AddRequestPage));
         }
 
-        // Command to navigate to the Request Details page
         [RelayCommand]
-        private async Task NavigateToDetailsAsync(RequestResponseDto request)
+        private async Task NavigateToDetails(RequestResponseDto request)
         {
             if (request == null) return;
-
-            var currentUser = await _authService.GetCurrentUserAsync();
-            if (currentUser == null) return;
-
-            var userDto = new UserDto
+            var user = await _authService.GetCurrentUserAsync();
+            if (user != null && RequestStateManager.CanViewRequest(request, user))
             {
-                UserID = currentUser.UserID,
-                IsAdmin = currentUser.IsAdmin,
-                IsHR = currentUser.IsHR,
-                IsManager = currentUser.IsManager,
-                Department = currentUser.Department
-            };
-
-            // Check if user can view this request using RequestStateManager
-            if (!RequestStateManager.CanViewRequest(request, userDto))
-            {
-                await Shell.Current.DisplayAlert("Access Denied", "You don't have permission to view this request.", "OK");
-                return;
+                await Shell.Current.GoToAsync($"{nameof(RequestDetailsPage)}", new Dictionary<string, object> { {"RequestId", request.RequestID} });
             }
-
-            await Shell.Current.GoToAsync($"{nameof(RequestDetailsPage)}", new Dictionary<string, object>
-            {
-                {"RequestId", request.RequestID}
-            });
         }
     }
 }

@@ -5,30 +5,15 @@ using System.ComponentModel;
 
 namespace TDFMAUI.Pages;
 
-public partial class ProfilePage : ContentPage, INotifyPropertyChanged
+public partial class ProfilePage : ContentPage
 {
-    private readonly ApiService _apiService;
+    private readonly UserProfileViewModel _viewModel;
 
-    public ProfilePage(ApiService apiService)
+    public ProfilePage(UserProfileViewModel viewModel)
     {
         InitializeComponent();
-        _apiService = apiService;
-        BindingContext = this;
-        LoadUserInfo();
-    }
-
-    private void LoadUserInfo()
-    {
-        if (App.CurrentUser != null)
-        {
-            var fullNameEntry = this.FindByName("fullNameEntry") as Entry;
-            var departmentEntry = this.FindByName("departmentEntry") as Entry;
-            var titleEntry = this.FindByName("titleEntry") as Entry;
-
-            if (fullNameEntry != null) fullNameEntry.Text = App.CurrentUser.FullName;
-            if (departmentEntry != null) departmentEntry.Text = App.CurrentUser.Department;
-            if (titleEntry != null) titleEntry.Text = App.CurrentUser.Title;
-        }
+        _viewModel = viewModel;
+        BindingContext = _viewModel;
     }
 
     // Added for XAML event handler fix

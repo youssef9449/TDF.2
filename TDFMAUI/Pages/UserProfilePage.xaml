@@ -5,194 +5,55 @@
              xmlns:converters="clr-namespace:TDFMAUI.Converters"
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              x:Class="TDFMAUI.Pages.UserProfilePage"
-             Title="User Profile"
+             Title="{Binding Title}"
              x:DataType="viewmodels:UserProfileViewModel"
              BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
 
     <ContentPage.Resources>
         <ResourceDictionary>
-            <SolidColorBrush x:Key="PrimaryBackgroundColor" Color="{StaticResource SurfaceVariantColor}" />
-            <SolidColorBrush x:Key="SecondaryBackgroundColor" Color="{StaticResource SurfaceColor}" />
-            <SolidColorBrush x:Key="PrimaryTextColor" Color="{StaticResource TextColor}" />
-            <SolidColorBrush x:Key="SecondaryTextColor" Color="{StaticResource TextSecondaryColor}" />
-            <SolidColorBrush x:Key="AccentColor" Color="{StaticResource Primary}" />
-            <SolidColorBrush x:Key="BorderColor" Color="{StaticResource BorderColor}" />
-            
-            <Style x:Key="CardStyle" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource CardColor}" />
-                <Setter Property="Stroke" Value="{StaticResource BorderColor}" />
-                <Setter Property="StrokeThickness" Value="1" />
-                <Setter Property="StrokeShape" Value="RoundRectangle 8,8,8,8" />
-                <Setter Property="Padding" Value="15" />
-                <Setter Property="Margin" Value="0,5" />
-                <Setter Property="Shadow">
-                    <Shadow Brush="{StaticResource ShadowColor}"
-                            Offset="0,2"
-                            Radius="4" />
-                </Setter>
-            </Style>
-            
-            <Style x:Key="SectionTitleStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="18" />
-                <Setter Property="FontAttributes" Value="Bold" />
-                <Setter Property="TextColor" Value="{StaticResource PrimaryTextColor}" />
-                <Setter Property="Margin" Value="0,10,0,5" />
-            </Style>
-            
-            <Style x:Key="FieldLabelStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="14" />
-                <Setter Property="TextColor" Value="{StaticResource SecondaryTextColor}" />
-                <Setter Property="Margin" Value="0,5,0,2" />
-            </Style>
-            
-            <Style x:Key="FieldValueStyle" TargetType="Label">
-                <Setter Property="FontSize" Value="16" />
-                <Setter Property="TextColor" Value="{StaticResource PrimaryTextColor}" />
-                <Setter Property="Margin" Value="0,0,0,10" />
-            </Style>
-            
-            <Style x:Key="EntryStyle" TargetType="Entry">
-                <Setter Property="FontSize" Value="16" />
-                <Setter Property="TextColor" Value="{StaticResource PrimaryTextColor}" />
-                <Setter Property="BackgroundColor" Value="Transparent" />
-                <Setter Property="Margin" Value="0,0,0,10" />
-            </Style>
-            
-            <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-                <Setter Property="BackgroundColor" Value="{StaticResource AccentColor}" />
-                <Setter Property="TextColor" Value="White" />
-                <Setter Property="FontSize" Value="16" />
-                <Setter Property="CornerRadius" Value="5" />
-                <Setter Property="Padding" Value="15,10" />
-                <Setter Property="Margin" Value="5" />
-                <Setter Property="MinimumWidthRequest" Value="120" />
-            </Style>
-            
-            <Style x:Key="SecondaryButtonStyle" TargetType="Button">
-                <Setter Property="BackgroundColor" Value="Transparent" />
-                <Setter Property="TextColor" Value="{StaticResource AccentColor}" />
-                <Setter Property="BorderColor" Value="{StaticResource AccentColor}" />
-                <Setter Property="BorderWidth" Value="1" />
-                <Setter Property="FontSize" Value="16" />
-                <Setter Property="CornerRadius" Value="5" />
-                <Setter Property="Padding" Value="15,10" />
-                <Setter Property="Margin" Value="5" />
-                <Setter Property="MinimumWidthRequest" Value="120" />
-            </Style>
-            
             <converters:BooleanInverter x:Key="BooleanInverter" />
-            <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <Grid BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+    <Grid>
         <ScrollView>
-            <VerticalStackLayout Padding="15" Spacing="15" HorizontalOptions="Center">
+            <VerticalStackLayout Padding="20" Spacing="20" HorizontalOptions="Center">
                 <VerticalStackLayout.MaximumWidthRequest>
                     <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="800" Desktop="700" />
                 </VerticalStackLayout.MaximumWidthRequest>
-                <Label Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/>
-                <Label Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"/>
 
-                <!-- Error message display -->
-                <Border IsVisible="{Binding HasError}"
-                        Background="{StaticResource ErrorLightColor}"
-                        Stroke="{StaticResource ErrorColor}"
-                        StrokeThickness="1"
-                        StrokeShape="RoundRectangle 5,5,5,5"
-                        Padding="10">
-                    <Label Text="{Binding ErrorMessage}"
-                           TextColor="{StaticResource ErrorColor}"
-                           FontSize="14" />
-                </Border>
+                <Frame CornerRadius="100" HeightRequest="200" WidthRequest="200" Padding="0" IsClippedToBounds="True" HorizontalOptions="Center">
+                    <Image Aspect="AspectFill" Source="{Binding ProfileImage}" />
+                </Frame>
                 
-                <!-- Loading indicator -->
-                <ActivityIndicator IsRunning="{Binding IsLoading}"
-                                  IsVisible="{Binding IsLoading}"
-                                  HorizontalOptions="Center"
-                                  VerticalOptions="Center"
-                                  Color="{StaticResource AccentColor}"
-                                  HeightRequest="50"
-                                  WidthRequest="50" />
-                
-                <!-- Main profile content -->
-                <Grid x:Name="MainGrid" IsVisible="{Binding IsLoading, Converter={StaticResource BooleanInverter}}">
-                    <FlexLayout Direction="{OnIdiom Default=Column, Desktop=Row, Tablet=Row}" 
-                                Wrap="Wrap" 
-                                AlignItems="Start" 
-                                JustifyContent="Center">
-                        
-                        <!-- Profile image section -->
-                        <Border x:Name="ProfileImageContainer" Style="{StaticResource CardStyle}" 
-                                FlexLayout.Basis="{OnIdiom Default=100%, Desktop=30%, Tablet=40%}" 
-                                Margin="{OnIdiom Default='0,5', Desktop='0,5,15,5', Tablet='0,5,15,5'}">
-                            <VerticalStackLayout HorizontalOptions="Center" Spacing="15">
-                                <Frame CornerRadius="{OnIdiom Default=80, Desktop=100, Tablet=90}" 
-                                       HeightRequest="{OnIdiom Default=160, Desktop=200, Tablet=180}"
-                                       WidthRequest="{OnIdiom Default=160, Desktop=200, Tablet=180}"
-                                       Padding="0"
-                                       IsClippedToBounds="True"
-                                       BorderColor="{StaticResource BorderColor}"
-                                       HorizontalOptions="Center">
-                                    <Image Aspect="AspectFill" 
-                                           Source="{Binding ProfileImage, TargetNullValue='default_profile.png'}" 
-                                           HeightRequest="{OnIdiom Default=160, Desktop=200, Tablet=180}"
-                                           WidthRequest="{OnIdiom Default=160, Desktop=200, Tablet=180}"/>
-                                </Frame>
-                                <Button Text="Change Photo" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding ChangeImageCommand}" IsVisible="{Binding IsEditing}" HorizontalOptions="Center" />
-                            </VerticalStackLayout>
-                        </Border>
-                        
-                        <!-- Details and Actions combined for better flow -->
-                        <VerticalStackLayout FlexLayout.Basis="{OnIdiom Default=100%, Desktop=65%, Tablet=55%}" Spacing="15">
-                            <!-- Profile details section -->
-                            <Border x:Name="ProfileDetailsContainer" Style="{StaticResource CardStyle}">
-                                <VerticalStackLayout>
-                                    <Label Text="Profile Information" Style="{StaticResource SectionTitleStyle}" />
-                                    
-                                    <!-- View mode -->
-                                    <VerticalStackLayout IsVisible="{Binding IsEditing, Converter={StaticResource BooleanInverter}}">
-                                        <Label Text="Full Name" Style="{StaticResource FieldLabelStyle}" />
-                                        <Label Text="{Binding CurrentUser.FullName}" Style="{StaticResource FieldValueStyle}" />
+                <Button Text="Change Photo" Command="{Binding ChangeImageCommand}" IsVisible="{Binding IsEditing}" HorizontalOptions="Center" />
 
-                                        <Label Text="Department" Style="{StaticResource FieldLabelStyle}" />
-                                        <Label Text="{Binding CurrentUser.Department}" Style="{StaticResource FieldValueStyle}" />
-                                        <Label Text="Title" Style="{StaticResource FieldLabelStyle}" />
-                                        <Label Text="{Binding CurrentUser.Title}" Style="{StaticResource FieldValueStyle}" />
-                                        <Label Text="User ID" Style="{StaticResource FieldLabelStyle}" />
-                                        <Label Text="{Binding CurrentUser.UserID}" Style="{StaticResource FieldValueStyle}" />
-                                        <Label Text="Username" Style="{StaticResource FieldLabelStyle}" />
-                                        <Label Text="{Binding CurrentUser.UserName}" Style="{StaticResource FieldValueStyle}" />
-                                    </VerticalStackLayout>
-                                    
-                                    <!-- Edit mode -->
-                                    <VerticalStackLayout IsVisible="{Binding IsEditing}">
-                                        <Label Text="Full Name" Style="{StaticResource FieldLabelStyle}" />
-                                        <Entry Text="{Binding EditingUser.FullName}" Style="{StaticResource EntryStyle}" />
+                <Frame BackgroundColor="White" Padding="20">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Full Name" FontAttributes="Bold" />
+                        <Label Text="{Binding CurrentUser.FullName}" IsVisible="{Binding IsEditing, Converter={StaticResource BooleanInverter}}" />
+                        <Entry Text="{Binding EditingUser.FullName}" IsVisible="{Binding IsEditing}" />
 
-                                        <Label Text="Department" Style="{StaticResource FieldLabelStyle}" />
-                                        <Entry Text="{Binding EditingUser.Department}" Style="{StaticResource EntryStyle}" />
-                                        <Label Text="Title" Style="{StaticResource FieldLabelStyle}" />
-                                        <Entry Text="{Binding EditingUser.Title}" Style="{StaticResource EntryStyle}" />
-                                    </VerticalStackLayout>
-                                </VerticalStackLayout>
-                            </Border>
-                            
-                            <!-- Action buttons section -->
-                            <Border x:Name="ActionButtonsContainer" Style="{StaticResource CardStyle}">
-                                <FlexLayout JustifyContent="Center" Wrap="Wrap">
-                                    <!-- View mode buttons -->
-                                    <Button Text="Edit Profile" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding EditProfileCommand}" IsVisible="{Binding IsEditing, Converter={StaticResource BooleanInverter}}" />
-                                    
-                                    <!-- Edit mode buttons -->
-                                    <Button Text="Save Changes" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding SaveProfileCommand}" IsVisible="{Binding IsEditing}" />
-                                    <Button Text="Cancel" Style="{StaticResource SecondaryButtonStyle}" Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}" />
-                                </FlexLayout>
-                            </Border>
-                        </VerticalStackLayout>
-                    </FlexLayout>
-                </Grid>
+                        <Label Text="Department" FontAttributes="Bold" />
+                        <Label Text="{Binding CurrentUser.Department}" IsVisible="{Binding IsEditing, Converter={StaticResource BooleanInverter}}" />
+                        <Entry Text="{Binding EditingUser.Department}" IsVisible="{Binding IsEditing}" />
+
+                        <Label Text="Title" FontAttributes="Bold" />
+                        <Label Text="{Binding CurrentUser.Title}" IsVisible="{Binding IsEditing, Converter={StaticResource BooleanInverter}}" />
+                        <Entry Text="{Binding EditingUser.Title}" IsVisible="{Binding IsEditing}" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                    <Button Text="Edit Profile" Command="{Binding EditProfileCommand}" IsVisible="{Binding IsEditing, Converter={StaticResource BooleanInverter}}" />
+                    <Button Text="Save" Command="{Binding SaveProfileCommand}" IsVisible="{Binding IsEditing}" BackgroundColor="Green" TextColor="White" />
+                    <Button Text="Cancel" Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}" BackgroundColor="Red" TextColor="White" />
+                </HorizontalStackLayout>
+
+                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextColor="Red" HorizontalOptions="Center" />
             </VerticalStackLayout>
         </ScrollView>
+
+        <ActivityIndicator IsVisible="{Binding IsBusy}" IsRunning="{Binding IsBusy}" HorizontalOptions="Center" VerticalOptions="Center" />
     </Grid>
 </ContentPage>

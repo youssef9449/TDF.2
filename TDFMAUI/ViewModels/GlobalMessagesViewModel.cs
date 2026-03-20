@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows.Input;
 using TDFMAUI.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,80 +9,72 @@ using TDFShared.Models.Message;
 
 namespace TDFMAUI.ViewModels
 {
-    public partial class GlobalMessagesViewModel : ObservableObject
+    public partial class GlobalMessagesViewModel : BaseViewModel
     {
-        [ObservableProperty]
-        private string _senderName;
-
         private readonly ApiService _apiService;
-        private readonly WebSocketService _webSocketService;
+        private readonly IWebSocketService _webSocketService;
 
         [ObservableProperty]
         private ObservableCollection<ChatMessageModel> _messages = new();
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
-        private string _newMessageText;
+        private string _newMessageText = string.Empty;
 
-        [ObservableProperty]
-        private DateTime _timestamp = DateTime.Now;
-
-        public GlobalMessagesViewModel(ApiService apiService, WebSocketService webSocketService)
+        public GlobalMessagesViewModel(ApiService apiService, IWebSocketService webSocketService)
         {
             _apiService = apiService;
             _webSocketService = webSocketService;
-
-            Task.Run(async () => await LoadMessagesAsync());
-            RefreshCommand = new RelayCommand(async () => await LoadMessagesAsync());
+            Title = "Global Messages";
+            _ = LoadMessagesAsync();
         }
 
-        public ICommand RefreshCommand { get; }
-
-        private async Task LoadMessagesAsync()
+        [RelayCommand]
+        public async Task LoadMessagesAsync()
         {
-            var messages = await _apiService.GetRecentChatMessagesAsync(100);
-            Messages.Clear();
-            foreach (var messageDto in messages.OrderBy(m => m.SentAt))
+            IsBusy = true;
+            try
             {
-                var chatMessage = new ChatMessageModel
+                var messages = await _apiService.GetRecentChatMessagesAsync(100);
+                Messages.Clear();
+                foreach (var dto in messages.OrderBy(m => m.SentAt))
                 {
-                    MessageId = messageDto.MessageId,
-                    FromUserName = messageDto.SenderName,
-                    SenderId = messageDto.SenderId,
-                    Content = messageDto.MessageText,
-                    SentAt = messageDto.SentAt
-                };
-                Messages.Add(chatMessage);
+                    Messages.Add(new ChatMessageModel
+                    {
+                        MessageId = dto.MessageId,
+                        FromUserName = dto.SenderName,
+                        SenderId = dto.SenderId,
+                        Content = dto.MessageText,
+                        SentAt = dto.SentAt
+                    });
+                }
             }
+            catch (Exception ex) { ErrorMessage = "Failed to load messages."; }
+            finally { IsBusy = false; }
         }
+
+        private bool CanSendMessage() => !string.IsNullOrWhiteSpace(NewMessageText) && !IsBusy;
 
         [RelayCommand(CanExecute = nameof(CanSendMessage))]
         private async Task SendMessageAsync()
         {
-            if (!CanSendMessage()) return;
-
-            var messageContent = NewMessageText;
+            var content = NewMessageText;
             NewMessageText = string.Empty;
 
             try
             {
-                var newMessage = new ChatMessageModel
+                var chatMessage = new ChatMessageModel
                 {
                     FromUserName = "Me",
-                    Content = messageContent,
+                    Content = content,
                     SentAt = DateTime.Now
                 };
-                await _webSocketService.SendMessageAsync(newMessage);
+                await _webSocketService.SendMessageAsync(chatMessage);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error sending global message via WebSocket: {ex.Message}");
+                ErrorMessage = "Failed to send message.";
             }
-        }
-
-        private bool CanSendMessage()
-        {
-            return !string.IsNullOrWhiteSpace(NewMessageText);
         }
     }
 }

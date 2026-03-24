@@ -66,10 +66,6 @@ namespace TDFMAUI.ViewModels
                     var token = await _authService.GetCurrentTokenAsync();
                     if (!string.IsNullOrEmpty(token))
                     {
-                        await _authService.SetAuthenticationTokenAsync(token);
-                        TDFMAUI.Config.ApiConfig.CurrentToken = token;
-                        TDFMAUI.Config.ApiConfig.TokenExpiration = userDetails.Expiration;
-
                         await _webSocketService.ConnectAsync(token);
                     }
 

@@ -40,7 +40,6 @@ namespace TDFAPI.Controllers
 
         [EnableRateLimiting("auth")]
         [HttpPost("login")]
-        [Route(ApiRoutes.Auth.Login)]
         public async Task<ActionResult<ApiResponse<TokenResponse>>> Login([FromBody] LoginRequestDto request)
         {
             try
@@ -101,7 +100,6 @@ namespace TDFAPI.Controllers
 
         [EnableRateLimiting("auth")]
         [HttpPost("refresh-token")]
-        [Route(ApiRoutes.Auth.RefreshToken)]
         public async Task<ActionResult<ApiResponse<TokenResponse>>> RefreshToken([FromBody] RefreshTokenRequest request)
         {
             try
@@ -136,7 +134,6 @@ namespace TDFAPI.Controllers
 
         [EnableRateLimiting("auth")]
         [HttpPost("register")]
-        [Route(ApiRoutes.Auth.Register)]
         public async Task<ActionResult<ApiResponse<RegisterResponseDto>>> Register([FromBody] RegisterRequestDto request)
         {
             try
@@ -242,44 +239,26 @@ namespace TDFAPI.Controllers
 
         [Authorize]
         [HttpPost("logout")]
-        [Route(ApiRoutes.Auth.Logout)]
         public async Task<ActionResult<ApiResponse<object>>> Logout()
         {
             try
             {
                 // Get client information for security logging
                 var ipAddress = HttpContext.GetRealIpAddress();
-
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 var username = User.Identity?.Name;
 
-                if (!string.IsNullOrEmpty(userId) && int.TryParse(userId, out var id))
+                _logger.LogInformation("Logout attempt for user {Username} (ID: {UserId}) from {IpAddress}",
+                    username, userId, ipAddress);
+
+                // Perform logout via service which handles token revocation and clearing refresh tokens
+                var success = await _authService.LogoutAsync();
+
+                if (success && !string.IsNullOrEmpty(userId) && int.TryParse(userId, out var id))
                 {
-                    // Invalidate the refresh token by setting it to null
-                    await _userService.InvalidateRefreshTokenAsync(id);
-
-                    // Revoke the current access token
-                    var jti = User.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
-                    var expiryClaim = User.FindFirst(JwtRegisteredClaimNames.Exp)?.Value;
-                    if (!string.IsNullOrEmpty(jti) && long.TryParse(expiryClaim, out var expiryUnixTime))
-                    {
-                        var expiryDateTime = DateTimeOffset.FromUnixTimeSeconds(expiryUnixTime).UtcDateTime;
-                        await _authService.RevokeTokenAsync(jti, expiryDateTime, id);
-                        _logger.LogInformation("Revoked access token {Jti} for user {UserId}", jti, id);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Could not revoke access token for user {UserId}: JTI or Expiry claim missing/invalid.", id);
-                    }
-
                     // Update user's offline status
                     await _userService.UpdateUserPresenceAsync(id, false);
-
-                    _logger.LogInformation("User {UserId} ({Username}) logged out from {IpAddress}", id, username, ipAddress);
-                }
-                else
-                {
-                    _logger.LogWarning("Logout attempted with invalid user identity from {IpAddress}", ipAddress);
+                    _logger.LogInformation("User {UserId} logged out successfully", id);
                 }
 
                 return Ok(ApiResponse<object>.SuccessResponse(new { }, "Logout successful"));

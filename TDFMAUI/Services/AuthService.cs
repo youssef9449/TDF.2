@@ -43,6 +43,8 @@ public class AuthService : IAuthService
     private readonly IApiService _apiService;
     private readonly ISecureStorage _secureStorage;
     private readonly IUserSessionService _userSessionService;
+    private readonly IUserPresenceService _userPresenceService;
+    private readonly IWebSocketService _webSocketService;
     private string? _currentToken;
     private DateTime _tokenExpiration = DateTime.MinValue;
 
@@ -55,7 +57,9 @@ public class AuthService : IAuthService
         IRoleService roleService,
         IApiService apiService,
         ISecureStorage secureStorage,
-        IUserSessionService userSessionService)
+        IUserSessionService userSessionService,
+        IUserPresenceService userPresenceService,
+        IWebSocketService webSocketService)
     {
         try
         {
@@ -95,6 +99,14 @@ public class AuthService : IAuthService
             _userSessionService = userSessionService ?? throw new ArgumentNullException(nameof(userSessionService));
             logger?.LogInformation("UserSessionService resolved successfully.");
 
+            logger?.LogInformation("Checking UserPresenceService...");
+            _userPresenceService = userPresenceService ?? throw new ArgumentNullException(nameof(userPresenceService));
+            logger?.LogInformation("UserPresenceService resolved successfully.");
+
+            logger?.LogInformation("Checking WebSocketService...");
+            _webSocketService = webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
+            logger?.LogInformation("WebSocketService resolved successfully.");
+
             logger?.LogInformation("Saving logger reference...");
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -128,324 +140,75 @@ public class AuthService : IAuthService
 
         try
         {
-            // Use shared service to post the login request and get raw response
-            var apiResponseContent = await _httpClientService.PostAsync<LoginRequestDto, string>(endpoint, loginRequest);
-            _logger.LogDebug("Login API response: {Content}", apiResponseContent);
+            // Use the API service directly for login
+            var apiResponse = await _apiService.LoginAsync(loginRequest);
 
-            // Log the raw response for debugging
-            _logger.LogInformation("Raw login response: {Response}", apiResponseContent);
-            
-            // Try multiple JSON options to handle potential serialization issues
-            try
+            if (apiResponse?.Success == true && apiResponse.Data != null && !string.IsNullOrEmpty(apiResponse.Data.Token))
             {
-                // First try with DefaultOptions which has more complete configuration
-                var options = TDFShared.Helpers.JsonSerializationHelper.DefaultOptions;
-                
-                // Try to deserialize as ApiResponse<TokenResponse> first (standard format)
-                var apiResponse = JsonSerializer.Deserialize<ApiResponse<TokenResponse>>(apiResponseContent, options);
+                var tokenData = apiResponse.Data;
+                _logger.LogInformation("Login successful for user {Username}", username);
 
-                if (apiResponse?.Data != null && !string.IsNullOrEmpty(apiResponse.Data.Token))
+                // Create UserDetailsDto from TokenResponse data
+                var userDetails = new UserDetailsDto
                 {
-                    _logger.LogInformation("Login successful for user {Username} using ApiResponse<TokenResponse> format", username);
+                    UserId = tokenData.UserId,
+                    FullName = tokenData.FullName ?? string.Empty,
+                    UserName = tokenData.Username ?? string.Empty,
+                    Department = tokenData.User?.Department,
+                    IsAdmin = tokenData.IsAdmin,
+                    IsManager = tokenData.IsManager,
+                    IsHR = tokenData.IsHR,
+                    Roles = tokenData.Roles?.ToList() ?? new List<string>()
+                };
 
-                    // Create UserDetailsDto from TokenResponse data
-                    var userDetails = new UserDetailsDto
-                    {
-                        UserId = apiResponse.Data.UserId,
-                        FullName = apiResponse.Data.FullName ?? string.Empty,
-                        UserName = apiResponse.Data.Username ?? string.Empty,
-                        Department = apiResponse.Data.User?.Department,
-                        IsAdmin = apiResponse.Data.IsAdmin,
-                        IsManager = apiResponse.Data.IsManager,
-                        IsHR = apiResponse.Data.IsHR,
-                        Roles = new()
-                    };
-
-                    // Add roles based on bit fields
-                    if (apiResponse.Data.IsAdmin) userDetails.Roles.Add("Admin");
-                    if (apiResponse.Data.IsManager) userDetails.Roles.Add("Manager");
-                    if (apiResponse.Data.IsHR) userDetails.Roles.Add("HR");
-
-                    // Add User role by default if no other roles are present
-                    if (userDetails.Roles.Count == 0)
-                    {
-                        userDetails.Roles.Add("User");
-                    }
-
-                    // Store the token and user details
-                    await _secureStorageService.SaveTokenAsync(apiResponse.Data.Token, apiResponse.Data.Expiration);
-                    _userProfileService.SetUserDetails(userDetails);
-                    await _httpClientService.SetAuthenticationTokenAsync(apiResponse.Data.Token);
-
-                    // Create and set current user via UserSessionService
-                    var currentUser = new TDFShared.DTOs.Users.UserDto
-                    {
-                        UserID = userDetails.UserId,
-                        UserName = userDetails.UserName ?? string.Empty,
-                        FullName = userDetails.FullName ?? string.Empty,
-                        Department = userDetails.Department,
-                        Roles = userDetails.Roles
-                    };
-                    _userSessionService.SetCurrentUser(currentUser);
-                    _userSessionService.SetTokens(apiResponse.Data.Token, apiResponse.Data.Expiration);
-
-                    _logger.LogInformation("User {Username} logged in with roles: {Roles}",
-                        username, string.Join(", ", userDetails.Roles));
-
-                    return apiResponse.Data;
+                // Add roles based on bit fields if Roles list is empty
+                if (userDetails.Roles.Count == 0)
+                {
+                    if (tokenData.IsAdmin) userDetails.Roles.Add("Admin");
+                    if (tokenData.IsManager) userDetails.Roles.Add("Manager");
+                    if (tokenData.IsHR) userDetails.Roles.Add("HR");
+                    if (userDetails.Roles.Count == 0) userDetails.Roles.Add("User");
                 }
 
-                // Check for specific error messages in the API response
-                if (!apiResponse?.Success ?? true)
+                // Token storage and HttpClient setting is already partially handled by ApiService.LoginAsync
+                // But we ensure consistency here across all services
+                await _secureStorageService.SaveTokenAsync(tokenData.Token, tokenData.Expiration, tokenData.RefreshToken, tokenData.RefreshTokenExpiration);
+                _userProfileService.SetUserDetails(userDetails);
+                await _httpClientService.SetAuthenticationTokenAsync(tokenData.Token);
+
+                // Create and set current user via UserSessionService
+                var currentUser = new TDFShared.DTOs.Users.UserDto
                 {
-                    var errorMessage = !string.IsNullOrEmpty(apiResponse?.ErrorMessage) 
-                        ? apiResponse.ErrorMessage 
-                        : apiResponse?.Message ?? "Invalid username or password";
-                    _logger.LogWarning("Login failed with API error: {Error}", errorMessage);
-                    throw new InvalidOperationException(errorMessage);
+                    UserID = userDetails.UserId,
+                    UserName = userDetails.UserName ?? string.Empty,
+                    FullName = userDetails.FullName ?? string.Empty,
+                    Department = userDetails.Department,
+                    Roles = userDetails.Roles,
+                    IsAdmin = userDetails.IsAdmin,
+                    IsManager = userDetails.IsManager,
+                    IsHR = userDetails.IsHR
+                };
+
+                _userSessionService.SetCurrentUser(currentUser);
+                _userSessionService.SetTokens(tokenData.Token, tokenData.Expiration, tokenData.RefreshToken, tokenData.RefreshTokenExpiration);
+
+                // Update ApiConfig for desktop fallback
+                if (DeviceHelper.IsDesktop)
+                {
+                    ApiConfig.CurrentToken = tokenData.Token;
+                    ApiConfig.TokenExpiration = tokenData.Expiration;
                 }
 
-                _logger.LogWarning("ApiResponse<TokenResponse> format succeeded but data or token was null/empty. Raw response: {Raw}", apiResponseContent);
-            }
-            catch (JsonException jsonEx)
-            {
-                _logger.LogWarning(jsonEx, "Failed to deserialize as ApiResponse<TokenResponse>, trying direct LoginResponseDto format. Raw response: {Raw}", apiResponseContent);
+                _logger.LogInformation("User {Username} session initialized with roles: {Roles}",
+                    username, string.Join(", ", userDetails.Roles));
 
-                try
-                {
-                    // Try with different JSON options
-                    var fallbackOptions = TDFShared.Helpers.JsonSerializationHelper.BasicOptions;
-                    _logger.LogInformation("Trying fallback deserialization with BasicOptions");
-                    
-                    // Try to deserialize directly as TokenResponse first
-                    var directTokenResponse = JsonSerializer.Deserialize<TokenResponse>(apiResponseContent, fallbackOptions);
-                    if (directTokenResponse != null && !string.IsNullOrEmpty(directTokenResponse.Token))
-                    {
-                        _logger.LogInformation("Login successful for user {Username} using direct TokenResponse format", username);
-                        
-                        // Create UserDetailsDto from TokenResponse data
-                        var userDetails = new UserDetailsDto
-                        {
-                            UserId = directTokenResponse.UserId,
-                            FullName = directTokenResponse.FullName ?? string.Empty,
-                            UserName = directTokenResponse.Username ?? string.Empty,
-                            Department = directTokenResponse.User?.Department,
-                            IsAdmin = directTokenResponse.IsAdmin,
-                            IsManager = directTokenResponse.IsManager,
-                            IsHR = directTokenResponse.IsHR,
-                            Roles = new()
-                        };
-                        
-                        // Add roles based on bit fields
-                        if (directTokenResponse.IsAdmin) userDetails.Roles.Add("Admin");
-                        if (directTokenResponse.IsManager) userDetails.Roles.Add("Manager");
-                        if (directTokenResponse.IsHR) userDetails.Roles.Add("HR");
-                        
-                        // Add User role by default if no other roles are present
-                        if (userDetails.Roles.Count == 0)
-                        {
-                            userDetails.Roles.Add("User");
-                        }
-                        
-                        // Store the token and user details
-                        await _secureStorageService.SaveTokenAsync(directTokenResponse.Token, directTokenResponse.Expiration);
-                        _userProfileService.SetUserDetails(userDetails);
-                        
-                        // Create and set current user via UserSessionService
-                        var currentUser = new TDFShared.DTOs.Users.UserDto
-                        {
-                            UserID = userDetails.UserId,
-                            UserName = userDetails.UserName ?? string.Empty,
-                            FullName = userDetails.FullName ?? string.Empty,
-                            Department = userDetails.Department,
-                            Roles = userDetails.Roles
-                        };
-                        _userSessionService.SetCurrentUser(currentUser);
-                        _userSessionService.SetTokens(directTokenResponse.Token, directTokenResponse.Expiration);
-                        
-                        _logger.LogInformation("User {Username} logged in with roles: {Roles}",
-                            username, string.Join(", ", userDetails.Roles));
-                            
-                        return directTokenResponse;
-                    }
-                    
-                    // If direct TokenResponse fails, try LoginResponseDto format
-                    _logger.LogInformation("Direct TokenResponse deserialization failed, trying LoginResponseDto format");
-                    var loginResponse = JsonSerializer.Deserialize<LoginResponseDto>(apiResponseContent, fallbackOptions);
-
-                    if (loginResponse?.UserDetails != null && !string.IsNullOrEmpty(loginResponse.Token))
-                    {
-                        _logger.LogInformation("Login successful for user {Username} using LoginResponseDto format", username);
-
-                        // Ensure all properties are properly initialized
-                        loginResponse.UserDetails.FullName ??= string.Empty;
-                        loginResponse.UserDetails.UserName ??= string.Empty;
-                        loginResponse.UserDetails.Roles ??= new();
-
-                        // Add User role by default if no roles are present
-                        if (loginResponse.UserDetails.Roles.Count == 0)
-                        {
-                            loginResponse.UserDetails.Roles.Add("User");
-                        }
-
-                        DateTime expiration = DateTime.UtcNow.AddHours(24); // Default expiration
-                        await _secureStorageService.SaveTokenAsync(loginResponse.Token, expiration);
-                        _userProfileService.SetUserDetails(loginResponse.UserDetails);
-
-                        // Create and set current user via UserSessionService
-                        var currentUser = new TDFShared.DTOs.Users.UserDto
-                        {
-                            UserID = loginResponse.UserDetails.UserId,
-                            UserName = loginResponse.UserDetails.UserName ?? string.Empty,
-                            FullName = loginResponse.UserDetails.FullName ?? string.Empty,
-                            Department = loginResponse.UserDetails.Department,
-                            Roles = loginResponse.UserDetails.Roles
-                        };
-                        _userSessionService.SetCurrentUser(currentUser);
-                        _userSessionService.SetTokens(loginResponse.Token, DateTime.UtcNow.AddHours(24));
-
-                        // Create and return TokenResponse
-                        return new TokenResponse
-                        {
-                            Token = loginResponse.Token,
-                            Expiration = DateTime.UtcNow.AddHours(24), // Default expiration
-                            UserId = loginResponse.UserDetails.UserId,
-                            Username = loginResponse.UserDetails.UserName,
-                            FullName = loginResponse.UserDetails.FullName,
-                            IsAdmin = loginResponse.UserDetails.IsAdmin,
-                            IsManager = loginResponse.UserDetails.IsManager,
-                            IsHR = loginResponse.UserDetails.IsHR,
-                            User = new UserDto
-                            {
-                                UserID = loginResponse.UserDetails.UserId,
-                                UserName = loginResponse.UserDetails.UserName,
-                                FullName = loginResponse.UserDetails.FullName,
-                                Department = loginResponse.UserDetails.Department
-                            }
-                        };
-                    }
-                    
-                    // Last resort - try to parse the JSON manually to extract the token
-                    _logger.LogInformation("Standard deserialization failed, attempting manual JSON parsing");
-                    try {
-                        using var document = JsonDocument.Parse(apiResponseContent);
-                        var root = document.RootElement;
-                        
-                        // Try to find token in various locations in the JSON structure
-                        string? token = null;
-                        
-                        // Check if token is directly in the root
-                        if (root.TryGetProperty("token", out var tokenElement))
-                        {
-                            token = tokenElement.GetString();
-                        }
-                        // Check if token is in data property
-                        else if (root.TryGetProperty("data", out var dataElement) && 
-                                dataElement.TryGetProperty("token", out tokenElement))
-                        {
-                            token = tokenElement.GetString();
-                        }
-                        
-                        if (!string.IsNullOrEmpty(token))
-                        {
-                            _logger.LogInformation("Successfully extracted token using manual JSON parsing");
-                            
-                            // Extract other properties if possible
-                            int userId = 0;
-                            string userName = username;
-                            string fullName = username;
-                            bool isAdmin = false;
-                            bool isManager = false;
-                            bool isHR = false;
-                            
-                            // Try to extract userId
-                            if (root.TryGetProperty("userId", out var userIdElement))
-                            {
-                                userId = userIdElement.TryGetInt32(out int id) ? id : 0;
-                            }
-                            // Check if userId is in data property
-                            else if (root.TryGetProperty("data", out var dataElement2) && 
-                                    dataElement2.TryGetProperty("userId", out userIdElement))
-                            {
-                                userId = userIdElement.TryGetInt32(out int id) ? id : 0;
-                            }
-                            
-                            // Create a minimal TokenResponse
-                            var manualTokenResponse = new TokenResponse
-                            {
-                                Token = token,
-                                Expiration = DateTime.UtcNow.AddHours(24), // Default expiration
-                                UserId = userId,
-                                Username = userName,
-                                FullName = fullName,
-                                IsAdmin = isAdmin,
-                                IsManager = isManager,
-                                IsHR = isHR
-                            };
-                            
-                            // Create UserDetailsDto
-                            var userDetails = new UserDetailsDto
-                            {
-                                UserId = userId,
-                                UserName = userName,
-                                FullName = fullName,
-                                IsAdmin = isAdmin,
-                                IsManager = isManager,
-                                IsHR = isHR,
-                                Roles = new() { "User" } // Default role
-                            };
-                            
-                            // Store the token and user details
-                            await _secureStorageService.SaveTokenAsync(token, manualTokenResponse.Expiration);
-                            _userProfileService.SetUserDetails(userDetails);
-                            
-                            return manualTokenResponse;
-                        }
-                    }
-                    catch (Exception jsonDocEx)
-                    {
-                        _logger.LogError(jsonDocEx, "Manual JSON parsing failed");
-                    }
-                }
-                catch (JsonException innerEx)
-                {
-                    _logger.LogError(innerEx, "Failed to deserialize login response in all fallback formats. Raw response: {Raw}", apiResponseContent);
-                    throw new InvalidOperationException($"Login failed: Unexpected response format from server. Please contact support. Raw response: {apiResponseContent}");
-                }
+                return tokenData;
             }
 
             // If we get here, login failed
-            _logger.LogWarning("Login failed for user {Username}: Invalid credentials or unexpected response. Raw response: {Raw}", username, apiResponseContent);
-            
-            // Try to extract a meaningful error message from the response
-            try
-            {
-                using var document = JsonDocument.Parse(apiResponseContent);
-                var root = document.RootElement;
-                
-                string errorMessage = "Login failed: Invalid credentials or unexpected response from server";
-                
-                // Check for error message in various locations
-                if (root.TryGetProperty("message", out var messageElement) && messageElement.ValueKind == JsonValueKind.String)
-                {
-                    errorMessage = messageElement.GetString() ?? errorMessage;
-                }
-                else if (root.TryGetProperty("errorMessage", out var errorMsgElement) && errorMsgElement.ValueKind == JsonValueKind.String)
-                {
-                    errorMessage = errorMsgElement.GetString() ?? errorMessage;
-                }
-                else if (root.TryGetProperty("error", out var errorElement) && errorElement.ValueKind == JsonValueKind.String)
-                {
-                    errorMessage = errorElement.GetString() ?? errorMessage;
-                }
-                
-                throw new InvalidOperationException(errorMessage);
-            }
-            catch (Exception)
-            {
-                // If JSON parsing fails, use a generic error message
-                throw new InvalidOperationException("Login failed: Invalid credentials or unexpected response from server");
-            }
+            string errorMessage = apiResponse?.Message ?? "Login failed: Invalid credentials or unexpected response from server";
+            _logger.LogWarning("Login failed for user {Username}: {Error}", username, errorMessage);
+            throw new InvalidOperationException(errorMessage);
         }
         catch (Exception ex)
         {
@@ -462,70 +225,82 @@ public class AuthService : IAuthService
 
         try
         {
-            // Try to update user status to Offline before clearing credentials
-            var currentUser = _userSessionService.CurrentUser;
-            if (currentUser != null && currentUser.UserID > 0)
-            {
-                try
-                {
-                    // Get the UserPresenceService from DI
-                    var serviceProvider = IPlatformApplication.Current?.Services;
-                    if (serviceProvider != null)
-                    {
-                        var userPresenceService = serviceProvider.GetService<IUserPresenceService>();
-                        if (userPresenceService != null)
-                        {
-                            _logger.LogInformation("Setting user {UserName} (ID: {UserId}) status to Offline before logout", 
-                                App.CurrentUser.UserName, App.CurrentUser.UserID);
-                            await userPresenceService.UpdateStatusAsync(UserPresenceStatus.Offline, "");
-                        }
-                    }
-                }
-                catch (Exception statusEx)
-                {
-                    _logger.LogError(statusEx, "Failed to update user status to Offline during logout");
-                    success = false;
-                    // Continue with logout even if status update fails
-                }
-            }
-            else if (currentUser != null && currentUser.UserID <= 0)
-            {
-                _logger.LogWarning("Invalid user ID ({UserId}), skipping status update during logout", currentUser.UserID);
-            }
-
-            // Call the API to logout (which will also update status on server-side)
+            // 1. Try to update user status to Offline via the presence service
             try
             {
-                var apiService = IPlatformApplication.Current?.Services?.GetService<ApiService>();
-                if (apiService != null)
+                if (_userPresenceService != null)
                 {
-                    await apiService.LogoutAsync();
+                    await _userPresenceService.UpdateStatusAsync(UserPresenceStatus.Offline, "Logging out");
                 }
+            }
+            catch (Exception statusEx)
+            {
+                _logger.LogWarning("Failed to update user status to Offline during logout: {Message}", statusEx.Message);
+            }
+
+            // 2. Call the API to logout (server-side cleanup)
+            try
+            {
+                await _apiService.LogoutAsync();
             }
             catch (Exception apiEx)
             {
-                _logger.LogError(apiEx, "Failed to call logout API endpoint");
-                success = false;
-                // Continue with local logout even if API call fails
+                _logger.LogWarning("Failed to call logout API endpoint: {Message}", apiEx.Message);
             }
 
+            // 3. Clear all local state
             try
             {
-                // Clear local user data
+                // Clear user details in profile service
                 _userProfileService.ClearUserDetails();
+
+                // Clear all token data from secure storage
                 await _secureStorageService.RemoveTokenAsync();
                 
-                // Clear user session including persistent storage
-                await _userSessionService.ClearSessionAsync();
-                _logger.LogInformation("User session and persistent storage cleared during logout");
+                // Clear the HttpClient authentication token
+                await _httpClientService.ClearAuthenticationTokenAsync();
 
-                // Navigate back to the login page after logout
-                await Shell.Current.GoToAsync("//LoginPage");
-                _logger.LogInformation("Navigated to LoginPage after logout.");
+                // Clear session service (this also clears secure storage as backup)
+                await _userSessionService.ClearSessionAsync();
+
+                // Clear local in-memory cache
+                _currentToken = null;
+                _tokenExpiration = DateTime.MinValue;
+
+                // Reset ApiConfig
+                ApiConfig.CurrentToken = null;
+                ApiConfig.TokenExpiration = DateTime.MinValue;
+
+                _logger.LogInformation("All local user session state cleared during logout.");
             }
-            catch (Exception ex)
+            catch (Exception clearEx)
             {
-                _logger.LogError(ex, "Failed to navigate to LoginPage after logout.");
+                _logger.LogError(clearEx, "Error clearing local state during logout.");
+                success = false;
+            }
+
+            // 4. Disconnect WebSocket
+            try
+            {
+                await _webSocketService.DisconnectAsync();
+            }
+            catch (Exception wsEx)
+            {
+                _logger.LogWarning("Failed to disconnect WebSocket during logout: {Message}", wsEx.Message);
+            }
+
+            // 5. Navigate back to the login page
+            try
+            {
+                if (Shell.Current != null)
+                {
+                    await Shell.Current.GoToAsync("//LoginPage");
+                    _logger.LogInformation("Navigated to LoginPage after logout.");
+                }
+            }
+            catch (Exception navEx)
+            {
+                _logger.LogError(navEx, "Failed to navigate to LoginPage after logout.");
                 success = false;
             }
 
@@ -533,7 +308,7 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error during logout");
+            _logger.LogError(ex, "Unexpected error during logout process.");
             return false;
         }
     }
@@ -723,29 +498,33 @@ public class AuthService : IAuthService
 
         try
         {
-            var refreshRequest = new { Token = token, RefreshToken = refreshToken };
-            var endpoint = "auth/refresh-token";
+            var refreshRequest = new RefreshTokenRequest { Token = token, RefreshToken = refreshToken };
+            var response = await _httpClientService.PostAsync<RefreshTokenRequest, ApiResponse<TokenResponse>>(
+                ApiRoutes.Auth.RefreshToken, refreshRequest);
 
-            var apiResponseContent = await _httpClientService.PostAsync<object, string>(endpoint, refreshRequest);
-            _logger.LogInformation("Raw refresh token API response: {Content}", apiResponseContent);
-            var tokenResponse = JsonSerializer.Deserialize<ApiResponse<TokenResponse>>(apiResponseContent, _serializerOptions);
-
-            if (tokenResponse?.Data != null)
+            if (response?.Success == true && response.Data != null)
             {
-                await _secureStorageService.SaveTokenAsync(tokenResponse.Data.Token, tokenResponse.Data.Expiration);
+                var tokenData = response.Data;
+                await _secureStorageService.SaveTokenAsync(tokenData.Token, tokenData.Expiration, tokenData.RefreshToken, tokenData.RefreshTokenExpiration);
+
+                // Update HttpClient
+                await _httpClientService.SetAuthenticationTokenAsync(tokenData.Token);
 
                 // Update ApiConfig for in-memory token on desktop
                 if (DeviceHelper.IsDesktop)
                 {
-                    ApiConfig.CurrentToken = tokenResponse.Data.Token;
-                    ApiConfig.TokenExpiration = tokenResponse.Data.Expiration;
+                    ApiConfig.CurrentToken = tokenData.Token;
+                    ApiConfig.TokenExpiration = tokenData.Expiration;
                 }
 
+                // Update session service
+                _userSessionService.SetTokens(tokenData.Token, tokenData.Expiration, tokenData.RefreshToken, tokenData.RefreshTokenExpiration);
+
                 _logger.LogInformation("Token refreshed successfully");
-                return tokenResponse.Data;
+                return tokenData;
             }
 
-            _logger.LogWarning("Token refresh response did not contain valid data");
+            _logger.LogWarning("Token refresh failed: {Message}", response?.Message ?? "No error message provided");
             return null;
         }
         catch (Exception ex)

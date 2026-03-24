@@ -486,7 +486,7 @@ namespace TDFMAUI.Services
         #endregion
 
         #region Authentication
-        public async Task<ApiResponse<LoginResponseDto>> LoginAsync(LoginRequestDto loginRequest)
+        public async Task<ApiResponse<TokenResponse>> LoginAsync(LoginRequestDto loginRequest)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
             string endpoint = ApiRoutes.Auth.Login;
@@ -494,19 +494,19 @@ namespace TDFMAUI.Services
                 throw new NetworkUnavailableException();
             try
             {
-                var response = await PostAsync<LoginRequestDto, ApiResponse<LoginResponseDto>>(endpoint, loginRequest);
+                var response = await PostAsync<LoginRequestDto, ApiResponse<TokenResponse>>(endpoint, loginRequest);
                 if (response?.Success == true && response.Data != null)
                 {
-                    DateTime expiration = DateTime.UtcNow.AddHours(24); // fallback
-                    await _secureStorage.SaveTokenAsync(response.Data.Token, expiration);
-                    await _httpClientService.SetAuthenticationTokenAsync(response.Data.Token);
+                    var tokenData = response.Data;
+                    await _secureStorage.SaveTokenAsync(tokenData.Token, tokenData.Expiration, tokenData.RefreshToken, tokenData.RefreshTokenExpiration);
+                    await _httpClientService.SetAuthenticationTokenAsync(tokenData.Token);
                 }
-                return response ?? new ApiResponse<LoginResponseDto> { Success = false, Message = "Login failed" };
+                return response ?? new ApiResponse<TokenResponse> { Success = false, Message = "Login failed" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "ApiService: Login failed: {Message}", ex.Message);
-                return new ApiResponse<LoginResponseDto> { Success = false, Message = ex.Message };
+                return new ApiResponse<TokenResponse> { Success = false, Message = ex.Message };
             }
         }
 

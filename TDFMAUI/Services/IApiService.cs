@@ -16,7 +16,7 @@ namespace TDFMAUI.Services
         Task<T> GetAsync<T>(string endpoint, bool queueIfUnavailable = false);
         
         // Auth
-        Task<ApiResponse<LoginResponseDto>> LoginAsync(LoginRequestDto loginRequest);
+        Task<ApiResponse<TokenResponse>> LoginAsync(LoginRequestDto loginRequest);
         Task<ApiResponse<bool>> LogoutAsync();
         Task<ApiResponse<RegisterResponseDto>> RegisterAsync(RegisterRequestDto registerRequest);
         

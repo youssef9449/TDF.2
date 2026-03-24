@@ -218,14 +218,22 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             var tokenId = jwtToken.Id;
             var userIdClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
 
-            if (string.IsNullOrEmpty(tokenId) || userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
             {
                 _logger.LogWarning("Logout failed: Invalid token claims");
                 return false;
             }
 
-            // Clear the refresh token by setting it to empty values
+            // Clear the refresh token
             await _userRepository.UpdateRefreshTokenAsync(userId, string.Empty, DateTime.MinValue);
+
+            // Revoke the access token if JTI is available
+            if (!string.IsNullOrEmpty(tokenId))
+            {
+                var expiration = jwtToken.ValidTo;
+                await RevokeTokenAsync(tokenId, expiration, userId);
+                _logger.LogInformation("Access token {Jti} revoked during logout for user {UserId}", tokenId, userId);
+            }
 
             _logger.LogInformation("Logout successful for user {UserId}", userId);
             return true;

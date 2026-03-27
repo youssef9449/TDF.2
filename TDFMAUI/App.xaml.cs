@@ -1078,66 +1078,7 @@ namespace TDFMAUI
         /// </summary>
         private void SetThemeColors()
         {
-            try
-            {
-                // Add adaptive theme bindings programmatically to ensure proper initialization order
-                AddAdaptiveThemeBindings();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error setting theme colors: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-            }
-        }
-        
-        /// <summary>
-        /// Add adaptive theme bindings programmatically to ensure proper initialization order
-        /// </summary>
-        private void AddAdaptiveThemeBindings()
-        {
-            try
-            {
-                var resources = Application.Current?.Resources;
-                if (resources == null)
-                {
-                    DebugService.LogInfo("App", "Skipping adaptive theme bindings because Application.Current.Resources is unavailable.");
-                    return;
-                }
-
-                TryAddAdaptiveColor(resources, "TextColor", "AdaptiveTextColor");
-                TryAddAdaptiveColor(resources, "BackgroundColor", "AdaptiveBackgroundColor");
-                TryAddAdaptiveColor(resources, "SurfaceColor", "AdaptiveSurfaceColor");
-                TryAddAdaptiveColor(resources, "BorderColor", "AdaptiveBorderColor");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error adding adaptive theme bindings: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-            }
-        }
-
-        private static void TryAddAdaptiveColor(ResourceDictionary resources, string sourceKey, string targetKey)
-        {
-            if (!resources.TryGetValue(sourceKey, out var sourceResource) || sourceResource == null)
-            {
-                DebugService.LogInfo("App", $"Theme resource '{sourceKey}' is not available yet. Skipping adaptive binding for '{targetKey}'.");
-                return;
-            }
-
-            var color = sourceResource switch
-            {
-                SolidColorBrush brush => brush.Color,
-                Color directColor => directColor,
-                _ => null
-            };
-
-            if (color == null)
-            {
-                DebugService.LogInfo("App", $"Theme resource '{sourceKey}' is not a color-compatible resource. Skipping '{targetKey}'.");
-                return;
-            }
-
-            resources[targetKey] = color;
+            // Theme colors are now handled primarily by AppThemeBinding in Colors.xaml
         }
         
 

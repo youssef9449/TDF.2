@@ -87,25 +87,39 @@ namespace TDFMAUI.Services
         {
             try
             {
-                // Platform-specific status bar color updates
-                if (DeviceHelper.IsAndroid)
+                // Use CommunityToolkit.Maui to handle status bar changes cross-platform
+                // This requires adding StatusBarBehavior to pages, or we can use the
+                // CommunityToolkit.Maui.Core platform methods if available.
+
+                MainThread.BeginInvokeOnMainThread(() =>
                 {
-                    // For Android, we would set the status bar color
-                    // This would typically be done using platform-specific code
-                    var statusBarColor = theme == AppTheme.Dark 
-                        ? ThemeHelper.GetThemeResource<Color>("StatusBarColor", AppTheme.Dark)
-                        : ThemeHelper.GetThemeResource<Color>("StatusBarColor", AppTheme.Light);
-                    
-                    // Apply the color (platform-specific implementation)
-                }
-                else if (DeviceHelper.IsIOS)
-                {
-                    // For iOS, we would set the status bar style (light or dark)
-                    // This would typically be done using platform-specific code
-                    var useLightStatusBar = theme == AppTheme.Dark;
-                    
-                    // Apply the style (platform-specific implementation)
-                }
+                    try
+                    {
+                        var statusBarColor = theme == AppTheme.Dark
+                            ? ThemeHelper.GetThemeResource<Color>("AndroidStatusBarColor", AppTheme.Dark)
+                            : ThemeHelper.GetThemeResource<Color>("AndroidStatusBarColor", AppTheme.Light);
+
+                        if (statusBarColor == null)
+                        {
+                            statusBarColor = theme == AppTheme.Dark ? Color.FromArgb("#121212") : Color.FromArgb("#F5F5F5");
+                        }
+
+                        var statusBarStyle = theme == AppTheme.Dark
+                            ? CommunityToolkit.Maui.Core.StatusBarStyle.LightContent
+                            : CommunityToolkit.Maui.Core.StatusBarStyle.DarkContent;
+
+#if ANDROID
+                        CommunityToolkit.Maui.Core.Platform.StatusBar.SetColor(statusBarColor);
+                        CommunityToolkit.Maui.Core.Platform.StatusBar.SetStyle(statusBarStyle);
+#elif IOS
+                        CommunityToolkit.Maui.Core.Platform.StatusBar.SetStyle(statusBarStyle);
+#endif
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error applying status bar color: {ex.Message}");
+                    }
+                });
             }
             catch (Exception ex)
             {

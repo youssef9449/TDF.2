@@ -61,7 +61,6 @@ namespace TDFShared.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<HttpClientService> _logger;
         private readonly IConnectivityService _connectivityService;
-        private readonly IAuthService _authService;
         private readonly SemaphoreSlim _semaphore = new(1, 1);
         private readonly Dictionary<string, string> _defaultHeaders = new();
         private readonly Dictionary<string, string> _defaultQueryParams = new();
@@ -139,13 +138,11 @@ namespace TDFShared.Services
         public HttpClientService(
             HttpClient httpClient, 
             ILogger<HttpClientService> logger,
-            IConnectivityService connectivityService,
-            IAuthService authService)
+            IConnectivityService connectivityService)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _connectivityService = connectivityService ?? throw new ArgumentNullException(nameof(connectivityService));
-            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
 
             _statistics = new HttpClientStatistics();
             _defaultHeaders = new Dictionary<string, string>();

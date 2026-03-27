@@ -11,11 +11,11 @@
     xmlns:settings="clr-namespace:TDFMAUI.Features.Settings"
     xmlns:auth="clr-namespace:TDFMAUI.Features.Auth"
     Shell.FlyoutBehavior="Flyout"
-    FlyoutBackgroundColor="{StaticResource Primary}"
-    Shell.BackgroundColor="{StaticResource BackgroundColor}"
-    Shell.TitleColor="{StaticResource TextColor}"
-    Shell.ForegroundColor="{StaticResource TextColor}"
-    Shell.UnselectedColor="{StaticResource TextSecondaryColor}">
+    FlyoutBackgroundColor="{DynamicResource Primary}"
+    Shell.BackgroundColor="{DynamicResource BackgroundColor}"
+    Shell.TitleColor="{DynamicResource TextColor}"
+    Shell.ForegroundColor="{DynamicResource TextColor}"
+    Shell.UnselectedColor="{DynamicResource TextSecondaryColor}">
 
     <Shell.TitleView>
         <Grid ColumnDefinitions="*,Auto,Auto">

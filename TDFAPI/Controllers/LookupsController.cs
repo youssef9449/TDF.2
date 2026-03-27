@@ -24,7 +24,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet("all")]
-        [Route(ApiRoutes.Lookups.GetAll)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
         public async Task<ActionResult<ApiResponse<LookupResponseDto>>> GetAllLookups()
         {
@@ -43,7 +42,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet("departments")]
-        [Route(ApiRoutes.Lookups.GetDepartments)]
         [ResponseCache(Duration = 3600)] // Cache for 1 hour
         public async Task<ActionResult<ApiResponse<List<LookupItem>>>> GetDepartments()
         {

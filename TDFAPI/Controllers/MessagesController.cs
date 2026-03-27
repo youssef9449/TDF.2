@@ -79,7 +79,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpPost("chat")]
-        [Route(ApiRoutes.Messages.Chat)]
         [ProducesResponseType(typeof(ApiResponse<ChatMessageDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<ChatMessageDto>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<ChatMessageDto>), StatusCodes.Status409Conflict)]

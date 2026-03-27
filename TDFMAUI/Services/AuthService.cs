@@ -47,6 +47,7 @@ public class AuthService : IAuthService
     private readonly IWebSocketService _webSocketService;
     private string? _currentToken;
     private DateTime _tokenExpiration = DateTime.MinValue;
+    private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
 
     public AuthService(
         SecureStorageService secureStorageService,
@@ -120,6 +121,9 @@ public class AuthService : IAuthService
             _serializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
             _logger?.LogInformation("AuthService constructor finished successfully.");
+
+            // Subscribe to token refresh events from the HTTP client
+            _httpClientService.TokenRefreshNeeded += OnTokenRefreshNeeded;
         }
         catch (Exception ex)
         {
@@ -777,6 +781,55 @@ public class AuthService : IAuthService
         {
             _logger.LogError(ex, "Error calling RefreshTokenFromServerAsync");
             return null;
+        }
+    }
+
+    private async void OnTokenRefreshNeeded(object? sender, TokenRefreshEventArgs e)
+    {
+        _logger.LogInformation("Token refresh needed event received.");
+
+        try
+        {
+            // Use a semaphore to ensure only one refresh happens at a time
+            if (!await _refreshSemaphore.WaitAsync(0))
+            {
+                _logger.LogInformation("Token refresh already in progress, skipping duplicate request.");
+                return;
+            }
+
+            try
+            {
+                var (refreshToken, _) = await _secureStorageService.GetRefreshTokenAsync();
+                var (token, _) = await _secureStorageService.GetTokenAsync();
+
+                if (!string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(refreshToken))
+                {
+                    _logger.LogInformation("Attempting automatic token refresh...");
+                    var result = await RefreshTokenAsync(token, refreshToken);
+                    if (result != null)
+                    {
+                        _logger.LogInformation("Automatic token refresh successful.");
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Automatic token refresh failed.");
+                        // Optional: If refresh fails, we might want to force logout
+                        // await LogoutAsync();
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Cannot refresh token: Token or RefreshToken is missing.");
+                }
+            }
+            finally
+            {
+                _refreshSemaphore.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during automatic token refresh");
         }
     }
 }

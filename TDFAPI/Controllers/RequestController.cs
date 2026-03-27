@@ -114,7 +114,6 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests/department/{department}
         [HttpGet("department/{department}")]
-        [Route(ApiRoutes.Requests.GetByDepartment)]
         [Authorize(Roles = "Admin,Manager,HR")]
         public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetRequestsByDepartment(string department, [FromQuery] RequestPaginationDto pagination)
         {
@@ -156,7 +155,6 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests/my
         [HttpGet("my")]
-        [Route(ApiRoutes.Requests.GetMy)]
         public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetMyRequests([FromQuery] RequestPaginationDto pagination)
         {
             try
@@ -180,7 +178,6 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests/user/{userId}
         [HttpGet("user/{userId:int}")]
-        [Route(ApiRoutes.Requests.GetByUserId)]
         [Authorize(Roles = "Admin,HR,Manager")]
         public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetRequestsByUserId(int userId, [FromQuery] RequestPaginationDto pagination)
         {
@@ -229,7 +226,6 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests/{id}
         [HttpGet("{id:int}")]
-        [Route(ApiRoutes.Requests.GetById)]
         public async Task<ActionResult<RequestResponseDto>> GetRequestById(int id)
         {
             try
@@ -415,7 +411,6 @@ namespace TDFAPI.Controllers
 
         // DELETE: api/requests/{id}
         [HttpDelete("{id:int}")]
-        [Route(ApiRoutes.Requests.Delete)]
         public async Task<IActionResult> DeleteRequest(int id)
         {
             try

@@ -501,11 +501,22 @@ namespace TDFMAUI.Services
                     await _secureStorage.SaveTokenAsync(tokenData.Token, tokenData.Expiration, tokenData.RefreshToken, tokenData.RefreshTokenExpiration);
                     await _httpClientService.SetAuthenticationTokenAsync(tokenData.Token);
                 }
+                else
+                {
+                    // Ensure local state is cleared on failed login attempt
+                    await _httpClientService.ClearAuthenticationTokenAsync();
+                    await _secureStorage.ClearTokenAsync();
+                }
                 return response ?? new ApiResponse<TokenResponse> { Success = false, Message = "Login failed" };
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "ApiService: Login failed: {Message}", ex.Message);
+
+                // Clear state on exception too
+                await _httpClientService.ClearAuthenticationTokenAsync();
+                await _secureStorage.ClearTokenAsync();
+
                 return new ApiResponse<TokenResponse> { Success = false, Message = ex.Message };
             }
         }

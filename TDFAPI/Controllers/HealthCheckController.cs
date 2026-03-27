@@ -28,7 +28,6 @@ namespace TDFAPI.Controllers
         /// Simple health check endpoint that doesn't require authentication
         /// </summary>
         [HttpGet]
-        [Route(ApiRoutes.Health.GetDefault)]
         [AllowAnonymous]
         public IActionResult Get()
         {
@@ -51,7 +50,6 @@ namespace TDFAPI.Controllers
         /// Simple ping endpoint that doesn't require authentication
         /// </summary>
         [HttpGet("ping")]
-        [Route(ApiRoutes.Health.Ping)]
         [AllowAnonymous]
         public IActionResult Ping()
         {
@@ -70,7 +68,6 @@ namespace TDFAPI.Controllers
         /// Detailed health check that requires authentication
         /// </summary>
         [HttpGet("detailed")]
-        [Route(ApiRoutes.Health.Detailed)]
         [Authorize]
         public IActionResult GetDetailed()
         {

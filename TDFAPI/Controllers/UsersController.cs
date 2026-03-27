@@ -28,7 +28,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet]
-        [Route(ApiRoutes.Users.GetAll)]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<ApiResponse<PaginatedResult<UserDto>>>> GetUsers(
             [FromQuery] int page = 1,
@@ -54,7 +53,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet("{id}")]
-        [Route(ApiRoutes.Users.GetById)]
         public async Task<ActionResult<ApiResponse<UserDto>>> GetUser(int id)
         {
             try
@@ -91,7 +89,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet("department/{department}")]
-        [Route(ApiRoutes.Users.GetByDepartment)]
         [Authorize(Roles = "Admin,HR,Manager")] // Or adjust roles as needed
         public async Task<ActionResult<ApiResponse<IEnumerable<UserDto>>>> GetUsersByDepartment(string department)
         {
@@ -142,7 +139,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpPut("{id}")]
-        [Route(ApiRoutes.Users.Update)]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<ApiResponse<bool>>> UpdateUser(int id, [FromBody] UpdateUserRequest userDto)
         {
@@ -182,7 +178,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpDelete("{id}")]
-        [Route(ApiRoutes.Users.Delete)]
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<ApiResponse<bool>>> DeleteUser(int id)
         {
@@ -218,7 +213,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpPost("change-password")]
-        [Route(ApiRoutes.Users.ChangePassword)]
         [EnableRateLimiting("auth")]
         public async Task<ActionResult<ApiResponse<bool>>> ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
         {
@@ -302,7 +296,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpPost("profile/image")]
-        [Route(ApiRoutes.Users.UploadProfilePicture)]
         [RequestSizeLimit(5 * 1024 * 1024)] // Limit request size to 5MB
         [RequestFormLimits(MultipartBodyLengthLimit = 5 * 1024 * 1024)] // Limit form body size
         public async Task<ActionResult<ApiResponse<bool>>> UploadProfilePicture(IFormFile file)
@@ -362,7 +355,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet("online")]
-        [Route(ApiRoutes.Users.GetOnline)]
         [Authorize] // All authenticated users can see who is online, or adjust roles if needed
         public async Task<ActionResult<ApiResponse<IEnumerable<UserDto>>>> GetOnlineUsers()
         {
@@ -379,7 +371,6 @@ namespace TDFAPI.Controllers
         }
 
         [HttpGet("all")] // Route: api/users/all
-        [Route(ApiRoutes.Users.GetAllWithStatus)]
         [Authorize] // All authenticated users should be able to get this list for presence.
         public async Task<ActionResult<ApiResponse<PaginatedResult<UserDto>>>> GetAllUsersWithStatus([FromQuery] int page = 1, [FromQuery] int pageSize = 1000)
         {

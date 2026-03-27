@@ -39,13 +39,13 @@
             <Style x:Key="iOSCardStyle" TargetType="Border" BasedOn="{StaticResource CardBorderStyle}">
                 <Setter Property="StrokeShape" Value="RoundRectangle 10" />
                 <Setter Property="Stroke" Value="Transparent" />
-                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource iOSSystemBackgroundColor}, Dark={StaticResource iOSSystemBackgroundColor}}" />
+                <Setter Property="Background" Value="{DynamicResource iOSSystemBackgroundColor}" />
                 <Setter Property="Shadow">
                     <Setter.Value>
-                        <Shadow Brush="{AppThemeBinding Light=Black, Dark=#40000000}" 
+                        <Shadow Brush="{AppThemeBinding Light=Black, Dark=Transparent}"
                                 Offset="0,2" 
                                 Radius="8" 
-                                Opacity="{AppThemeBinding Light=0.15, Dark=0.3}" />
+                                Opacity="{AppThemeBinding Light=0.15, Dark=0}" />
                     </Setter.Value>
                 </Setter>
             </Style>
@@ -53,13 +53,13 @@
             <Style x:Key="AndroidCardStyle" TargetType="Border" BasedOn="{StaticResource CardBorderStyle}">
                 <Setter Property="StrokeShape" Value="RoundRectangle 8" />
                 <Setter Property="Stroke" Value="Transparent" />
-                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource AndroidCardViewColor}, Dark={StaticResource AndroidCardViewColor}}" />
+                <Setter Property="Background" Value="{DynamicResource AndroidCardViewColor}" />
                 <Setter Property="Shadow">
                     <Setter.Value>
-                        <Shadow Brush="{AppThemeBinding Light=Black, Dark=#40000000}" 
+                        <Shadow Brush="{AppThemeBinding Light=Black, Dark=Transparent}"
                                 Offset="0,1" 
                                 Radius="4" 
-                                Opacity="{AppThemeBinding Light=0.2, Dark=0.4}" />
+                                Opacity="{AppThemeBinding Light=0.2, Dark=0}" />
                     </Setter.Value>
                 </Setter>
             </Style>

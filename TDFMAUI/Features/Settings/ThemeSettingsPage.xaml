@@ -82,7 +82,7 @@
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                             <Button Grid.Column="0" Text="Primary" Style="{StaticResource ButtonPrimary}" />
                             <Button Grid.Column="1" Text="Secondary" 
-                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray800}}" 
+                                    BackgroundColor="{AppThemeBinding Light={StaticResource SurfaceVariantColor}, Dark={StaticResource SurfaceVariantColor}}"
                                     TextColor="{AppThemeBinding Light={StaticResource TextColor}, Dark={StaticResource TextColor}}" />
                         </Grid>
                         

@@ -8,7 +8,7 @@
              x:DataType="viewmodels:ReportsViewModel" 
              x:Class="TDFMAUI.Pages.ReportsPage"
              Title="Leave Reports"
-             BackgroundColor="{StaticResource Gray100}">
+             BackgroundColor="{StaticResource BackgroundColor}">
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -185,7 +185,7 @@
                                     <Label Grid.Row="2" 
                                            Grid.Column="0"
                                            FontSize="14" 
-                                           TextColor="Gray">
+                                           TextColor="{StaticResource TextSecondaryColor}">
                                         <Label.FormattedText>
                                             <FormattedString>
                                                 <Span Text="From: "/>
@@ -208,7 +208,7 @@
                                            Grid.Column="1"
                                            Grid.RowSpan="2"
                                            FontSize="12" 
-                                           TextColor="Gray"
+                                           TextColor="{StaticResource TextSecondaryColor}"
                                            VerticalOptions="End"
                                            HorizontalOptions="End"/> 
                                 </Grid>
@@ -218,7 +218,7 @@
                     <CollectionView.EmptyView>
                         <Label Text="No leave requests to display" 
                                FontSize="16"
-                               TextColor="Gray"
+                               TextColor="{StaticResource TextSecondaryColor}"
                                HorizontalOptions="Center" 
                                VerticalOptions="Center"/>
                     </CollectionView.EmptyView>

@@ -32,31 +32,31 @@
                     <Label Text="User Profile" 
                            FontSize="20" 
                            FontAttributes="Bold"
-                           TextColor="White"
+                           TextColor="{StaticResource OnPrimaryColor}"
                            HorizontalOptions="Center"/>
                     
                     <Label Text="Full Name:" 
                            FontAttributes="Bold"
-                           TextColor="White"/>
+                           TextColor="{StaticResource OnPrimaryColor}"/>
                     <Entry Text="{Binding EditingUser.FullName}"
                            TextColor="{StaticResource OnPrimaryColor}"
-                           BackgroundColor="White"
+                           BackgroundColor="{StaticResource SurfaceColor}"
                            Placeholder="Enter your full name"/>
                     
                     <Label Text="Department:" 
                            FontAttributes="Bold"
-                           TextColor="White"/>
+                           TextColor="{StaticResource OnPrimaryColor}"/>
                     <Entry Text="{Binding EditingUser.Department}"
                            TextColor="{StaticResource OnPrimaryColor}"
-                           BackgroundColor="White"
+                           BackgroundColor="{StaticResource SurfaceColor}"
                            Placeholder="Enter your department"/>
                     
                     <Label Text="Title:" 
                            FontAttributes="Bold"
-                           TextColor="White"/>
+                           TextColor="{StaticResource OnPrimaryColor}"/>
                     <Entry Text="{Binding EditingUser.Title}"
                            TextColor="{StaticResource OnPrimaryColor}"
-                           BackgroundColor="White"
+                           BackgroundColor="{StaticResource SurfaceColor}"
                            Placeholder="Enter your title"/>
                     
                     <!-- Other profile fields with same styling -->
@@ -73,7 +73,7 @@
                     <Label Text="Change Password" 
                            FontSize="20" 
                            FontAttributes="Bold"
-                           TextColor="White"
+                           TextColor="{StaticResource OnPrimaryColor}"
                            HorizontalOptions="Center"/>
                     
                     <!-- Password fields with same styling as login page -->
@@ -85,7 +85,7 @@
                     Text="Save Changes"
                     Command="{Binding SaveProfileCommand}"
                     BackgroundColor="{StaticResource PrimaryLight}"
-                    TextColor="White"
+                    TextColor="{StaticResource OnPrimaryColor}"
                     FontAttributes="Bold"
                     CornerRadius="10"
                     HeightRequest="50"/>

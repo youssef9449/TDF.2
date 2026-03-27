@@ -166,7 +166,7 @@
                     <Button Text="Sign Up"
                             Command="{Binding SignupCommand}"
                             BackgroundColor="{StaticResource InfoColor}"
-                            TextColor="White"
+                            TextColor="{StaticResource OnPrimaryColor}"
                             FontSize="16"
                             HeightRequest="50"
                             CornerRadius="25"

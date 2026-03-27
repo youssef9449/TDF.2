@@ -6,7 +6,7 @@
              x:Class="TDFMAUI.Pages.GlobalMessagesPage"
              x:DataType="vm:GlobalMessagesViewModel"
              Title="Global Messages"
-             BackgroundColor="{StaticResource Gray100}">
+             BackgroundColor="{StaticResource BackgroundColor}">
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->
@@ -16,12 +16,12 @@
                         Text="Back" 
                         Clicked="OnBackClicked"
                         BackgroundColor="Transparent"
-                        TextColor="White"
+                        TextColor="{StaticResource OnPrimaryColor}"
                         FontSize="{OnIdiom Phone=14, Default=16}"
                         FontAttributes="Bold"/>
                 <Label Grid.Column="1" 
                        Text="Global Messages" 
-                       TextColor="White"
+                       TextColor="{StaticResource OnPrimaryColor}"
                        FontSize="{OnIdiom Phone=20, Default=24}"
                        HorizontalOptions="Center"
                        VerticalOptions="Center"/>
@@ -31,7 +31,7 @@
                         Text="↻"
                         Command="{Binding RefreshCommand}"
                         BackgroundColor="Transparent"
-                        TextColor="White"
+                        TextColor="{StaticResource OnPrimaryColor}"
                         HeightRequest="40"
                         WidthRequest="40"
                         FontSize="{OnIdiom Phone=16, Default=20}"
@@ -59,8 +59,8 @@
                         <DataTemplate x:DataType="msgModels:ChatMessageModel">
                             <Frame Margin="0,5" 
                                    Padding="{OnIdiom Phone='10', Default='15'}"
-                                   BorderColor="{StaticResource Gray300}"
-                                   BackgroundColor="White"
+                                   BorderColor="{StaticResource BorderColor}"
+                                   BackgroundColor="{StaticResource SurfaceColor}"
                                    CornerRadius="10">
                                 <Grid>
                                     <!-- Desktop/Tablet Layout -->
@@ -72,7 +72,7 @@
                                                        FontSize="16"/>
                                                 <Label Grid.Column="1" 
                                                        Text="{Binding SentAt, StringFormat='{0:MM/dd/yyyy HH:mm}'}" 
-                                                       TextColor="{StaticResource Gray500}"
+                                                       TextColor="{StaticResource TextTertiaryColor}"
                                                        FontSize="12"/>
                                             </Grid>
                                             <Label Text="{Binding Content}" 
@@ -90,7 +90,7 @@
                                                FontSize="14"/>
                                         <Label Grid.Row="0" Grid.Column="1" 
                                                Text="{Binding SentAt, StringFormat='{0:MM/dd HH:mm}'}" 
-                                               TextColor="{StaticResource Gray500}"
+                                               TextColor="{StaticResource TextTertiaryColor}"
                                                FontSize="10"
                                                HorizontalOptions="End"/>
                                         <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
@@ -109,7 +109,7 @@
         <Grid Grid.Row="2" 
               ColumnDefinitions="*, Auto" 
               Padding="{OnIdiom Phone='10,5', Default='20,10'}"
-              BackgroundColor="White"
+              BackgroundColor="{StaticResource SurfaceColor}"
               ColumnSpacing="10">
             <Entry Grid.Column="0"
                    Placeholder="Type your message here..."
@@ -120,7 +120,7 @@
                     Text="Send"
                     Command="{Binding SendMessageCommand}"
                     BackgroundColor="{StaticResource Primary}"
-                    TextColor="White"
+                    TextColor="{StaticResource OnPrimaryColor}"
                     HeightRequest="{OnIdiom Phone=40, Default=50}"
                     WidthRequest="{OnIdiom Phone=60, Default=80}"
                     FontSize="{OnIdiom Phone=12, Default=14}"

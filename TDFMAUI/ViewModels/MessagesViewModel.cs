@@ -125,6 +125,8 @@ namespace TDFMAUI.ViewModels
         private bool _isRead;
 
         public bool IsDelivered { get; set; }
-        public Color BackgroundColor => IsRead ? (Color)Application.Current.Resources["SurfaceColor"] : (Color)Application.Current.Resources["BlueCardColor"];
+        public Color BackgroundColor => IsRead
+            ? TDFMAUI.Helpers.ThemeHelper.GetThemeResource<Color>("SurfaceColor")
+            : TDFMAUI.Helpers.ThemeHelper.GetThemeResource<Color>("BlueCardColor");
     }
 }

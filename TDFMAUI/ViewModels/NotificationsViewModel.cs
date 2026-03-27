@@ -139,6 +139,8 @@ namespace TDFMAUI.ViewModels
 
         public string SenderName { get; set; } = string.Empty;
         public string TimestampFormatted => Timestamp.ToString("g");
-        public Color BackgroundColor => IsSeen ? Colors.White : Color.FromArgb("#E3F2FD");
+        public Color BackgroundColor => IsSeen
+            ? TDFMAUI.Helpers.ThemeHelper.GetThemeResource<Color>("SurfaceColor")
+            : TDFMAUI.Helpers.ThemeHelper.GetThemeResource<Color>("BlueCardColor");
     }
 }

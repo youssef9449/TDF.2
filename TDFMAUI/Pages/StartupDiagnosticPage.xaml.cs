@@ -73,7 +73,7 @@ namespace TDFMAUI.Pages
                         errors.AppendLine($"• {error}");
                     }
                     ErrorsLabel.Text = errors.ToString();
-                    ErrorsLabel.TextColor = Colors.Red;
+                    ErrorsLabel.TextColor = Helpers.ThemeHelper.GetThemeResource<Color>("ErrorColor");
                 }
                 else
                 {
@@ -83,7 +83,7 @@ namespace TDFMAUI.Pages
             catch (Exception ex)
             {
                 ErrorsLabel.Text = $"Error loading diagnostic information: {ex.Message}";
-                ErrorsLabel.TextColor = Colors.Red;
+                ErrorsLabel.TextColor = Helpers.ThemeHelper.GetThemeResource<Color>("ErrorColor");
                 DebugService.LogError("StartupDiagnosticPage", ex);
             }
         }
@@ -110,7 +110,7 @@ namespace TDFMAUI.Pages
 
             // Update color based on status
             NetworkStatusLabel.TextColor = status == NetworkAccess.Internet ?
-                Colors.Green : Colors.Red;
+                Helpers.ThemeHelper.GetThemeResource<Color>("SuccessColor") : Helpers.ThemeHelper.GetThemeResource<Color>("ErrorColor");
         }
 
         private async void TestApiButton_Clicked(object sender, EventArgs e)
@@ -126,7 +126,7 @@ namespace TDFMAUI.Pages
                     ? "✓ Connected to API successfully"
                     : "✗ Failed to connect to API";
 
-                ApiStatusLabel.TextColor = isConnected ? Colors.Green : Colors.Red;
+                ApiStatusLabel.TextColor = isConnected ? Helpers.ThemeHelper.GetThemeResource<Color>("SuccessColor") : Helpers.ThemeHelper.GetThemeResource<Color>("ErrorColor");
 
                 // Log the result
                 DebugService.LogInfo("StartupDiagnosticPage", $"API connection test result: {isConnected}");
@@ -134,7 +134,7 @@ namespace TDFMAUI.Pages
             catch (Exception ex)
             {
                 ApiStatusLabel.Text = $"Error testing API: {ex.Message}";
-                ApiStatusLabel.TextColor = Colors.Red;
+                ApiStatusLabel.TextColor = Helpers.ThemeHelper.GetThemeResource<Color>("ErrorColor");
                 DebugService.LogError("StartupDiagnosticPage", $"API test error: {ex.Message}");
             }
             finally

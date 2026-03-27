@@ -9,7 +9,7 @@
              x:DataType="vm:MyTeamViewModel"
              x:Class="TDFMAUI.Pages.MyTeamPage"
              Title="My Team"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{StaticResource BackgroundColor}">
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -73,7 +73,7 @@
                                   EmptyView="No team members to display">
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="dtos:UserDto">
-                                <Frame BackgroundColor="White"
+                                <Frame BackgroundColor="{StaticResource SurfaceColor}"
                                        Padding="{OnIdiom Phone='5,3', Default='10,5'}"
                                        CornerRadius="10"
                                        Margin="5">
@@ -101,7 +101,7 @@
                                                        FontSize="16"/>
                                                 <Label Text="{Binding Department}"
                                                        FontSize="14"
-                                                       TextColor="{StaticResource Gray600}"/>
+                                                       TextColor="{StaticResource TextSecondaryColor}"/>
                                             </VerticalStackLayout>
 
                                             <!-- Leave Balances -->
@@ -111,7 +111,7 @@
                                                 <VerticalStackLayout Grid.Column="0" Spacing="2">
                                                     <Label Text="Annual"
                                                            FontSize="12"
-                                                           TextColor="{StaticResource Gray600}"/>
+                                                           TextColor="{StaticResource TextSecondaryColor}"/>
                                                     <Label Text="{Binding AnnualLeaveBalance, StringFormat='{0} days'}"
                                                            FontSize="14"
                                                            FontAttributes="Bold"/>
@@ -119,7 +119,7 @@
                                                 <VerticalStackLayout Grid.Column="1" Spacing="2">
                                                     <Label Text="Emergency"
                                                            FontSize="12"
-                                                           TextColor="{StaticResource Gray600}"/>
+                                                           TextColor="{StaticResource TextSecondaryColor}"/>
                                                     <Label Text="{Binding EmergencyLeaveBalance, StringFormat='{0} days'}"
                                                            FontSize="14"
                                                            FontAttributes="Bold"/>
@@ -127,7 +127,7 @@
                                                 <VerticalStackLayout Grid.Column="2" Spacing="2">
                                                     <Label Text="Unpaid"
                                                            FontSize="12"
-                                                           TextColor="{StaticResource Gray600}"/>
+                                                           TextColor="{StaticResource TextSecondaryColor}"/>
                                                     <Label Text="{Binding UnpaidLeaveUsed, StringFormat='{0} days'}"
                                                            FontSize="14"
                                                            FontAttributes="Bold"/>
@@ -180,7 +180,7 @@
                                                        FontSize="16"/>
                                                 <Label Text="{Binding Department}"
                                                        FontSize="12"
-                                                       TextColor="Gray"/>
+                                                       TextColor="{StaticResource TextSecondaryColor}"/>
                                             </VerticalStackLayout>
                                             
                                             <!-- Leave Summary -->

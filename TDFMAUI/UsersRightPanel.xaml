@@ -5,7 +5,7 @@
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              x:Class="TDFMAUI.UsersRightPanel"
              x:DataType="viewmodels:UsersRightPanelViewModel"
-             BackgroundColor="White">
+             BackgroundColor="{StaticResource SurfaceColor}">
     <Grid RowDefinitions="Auto, *, Auto" Padding="15">
         <!-- Header -->
         <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,15">
@@ -14,7 +14,7 @@
         </Grid>
 
         <!-- Offline indicator -->
-        <Label Grid.Row="1" Text="Device is offline. Showing cached users." IsVisible="{Binding IsOffline}" TextColor="Red" FontSize="12" HorizontalOptions="Center" Margin="0,0,0,10" />
+        <Label Grid.Row="1" Text="Device is offline. Showing cached users." IsVisible="{Binding IsOffline}" TextColor="{StaticResource ErrorColor}" FontSize="12" HorizontalOptions="Center" Margin="0,0,0,10" />
 
         <!-- User List -->
         <RefreshView Grid.Row="1" Command="{Binding RefreshUsersCommand}" IsRefreshing="{Binding IsRefreshing}">
@@ -25,7 +25,7 @@
                             <Frame BackgroundColor="{Binding StatusColor}" WidthRequest="12" HeightRequest="12" CornerRadius="6" Padding="0" VerticalOptions="Center" Margin="0,0,10,0" />
                             <VerticalStackLayout Grid.Column="1">
                                 <Label Text="{Binding FullName}" FontSize="14" FontAttributes="Bold" />
-                                <Label Text="{Binding Department}" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                <Label Text="{Binding Department}" FontSize="12" TextColor="{StaticResource TextSecondaryColor}" />
                             </VerticalStackLayout>
                         </Grid>
                     </DataTemplate>

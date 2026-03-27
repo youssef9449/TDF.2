@@ -12,10 +12,10 @@
     xmlns:auth="clr-namespace:TDFMAUI.Features.Auth"
     Shell.FlyoutBehavior="Flyout"
     FlyoutBackgroundColor="{StaticResource Primary}"
-    Shell.BackgroundColor="White"
-    Shell.TitleColor="Black"
-    Shell.ForegroundColor="Black"
-    Shell.UnselectedColor="#696969">
+    Shell.BackgroundColor="{StaticResource BackgroundColor}"
+    Shell.TitleColor="{StaticResource TextColor}"
+    Shell.ForegroundColor="{StaticResource TextColor}"
+    Shell.UnselectedColor="{StaticResource TextSecondaryColor}">
 
     <Shell.TitleView>
         <Grid ColumnDefinitions="*,Auto,Auto">
@@ -58,7 +58,7 @@
                    VerticalOptions="Center"
                    Margin="0,0,0,10"/>
             <Label Text="TDF Internal System"
-                   TextColor="White"
+                   TextColor="{StaticResource OnPrimaryColor}"
                    FontSize="20"
                    FontAttributes="Bold"
                    HorizontalOptions="Center"

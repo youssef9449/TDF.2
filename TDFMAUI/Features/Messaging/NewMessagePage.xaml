@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="TDFMAUI.Pages.NewMessagePage"
              Title="New Message"
-             BackgroundColor="{StaticResource Gray100}">
+             BackgroundColor="{StaticResource BackgroundColor}">
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="20">
@@ -32,8 +32,8 @@
 
             <!-- Message Form -->
             <Frame Padding="20" 
-                   BorderColor="{StaticResource Gray300}"
-                   BackgroundColor="White"
+                   BorderColor="{StaticResource BorderColor}"
+                   BackgroundColor="{StaticResource SurfaceColor}"
                    CornerRadius="10">
                 <VerticalStackLayout Spacing="15">
                     <!-- Recipient -->
@@ -61,7 +61,7 @@
                     <Button Text="Send Message"
                             Clicked="OnSendClicked"
                             BackgroundColor="{StaticResource Primary}"
-                            TextColor="White"
+                            TextColor="{StaticResource OnPrimaryColor}"
                             FontAttributes="Bold"
                             HeightRequest="50"
                             CornerRadius="25"/>

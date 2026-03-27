@@ -17,16 +17,16 @@ namespace TDFMAUI.Controls
             BindableProperty.Create(nameof(Message), typeof(string), typeof(NotificationToast), string.Empty);
 
         public static readonly new BindableProperty BackgroundColorProperty =
-            BindableProperty.Create(nameof(BackgroundColor), typeof(Color), typeof(NotificationToast), Colors.White);
+            BindableProperty.Create(nameof(BackgroundColor), typeof(Color), typeof(NotificationToast), Colors.Transparent);
 
         public static readonly BindableProperty TextColorProperty =
-            BindableProperty.Create(nameof(TextColor), typeof(Color), typeof(NotificationToast), Colors.Black);
+            BindableProperty.Create(nameof(TextColor), typeof(Color), typeof(NotificationToast), null);
 
         public static readonly BindableProperty TitleColorProperty =
-            BindableProperty.Create(nameof(TitleColor), typeof(Color), typeof(NotificationToast), Colors.Black);
+            BindableProperty.Create(nameof(TitleColor), typeof(Color), typeof(NotificationToast), null);
 
         public static readonly BindableProperty CloseButtonColorProperty =
-            BindableProperty.Create(nameof(CloseButtonColor), typeof(Color), typeof(NotificationToast), Application.Current?.Resources["TextSecondaryColor"] as Color ?? Colors.DarkGray);
+            BindableProperty.Create(nameof(CloseButtonColor), typeof(Color), typeof(NotificationToast), null);
 
         public static readonly BindableProperty IconSourceProperty =
             BindableProperty.Create(nameof(IconSource), typeof(ImageSource), typeof(NotificationToast));
@@ -227,44 +227,47 @@ namespace TDFMAUI.Controls
         /// </summary>
         private void ApplyNotificationTypeStyling()
         {
-            if (BackgroundColor != Colors.White || TextColor != Colors.Black)
-                return; // Colors have been explicitly set
-
             // Use the Tag property to determine the notification type
             if (Tag is NotificationType notificationType)
             {
                 switch (notificationType)
                 {
                     case NotificationType.Success:
-                        BackgroundColor = Color.FromArgb("#E7F9ED");
-                        TextColor = Color.FromArgb("#1F7B4D");
-                        TitleColor = Color.FromArgb("#1F7B4D");
-                        CloseButtonColor = Color.FromArgb("#1F7B4D");
+                        if (BackgroundColor == Colors.Transparent) BackgroundColor = Color.FromArgb("#E7F9ED");
+                        if (TextColor == null) TextColor = Color.FromArgb("#1F7B4D");
+                        if (TitleColor == null) TitleColor = Color.FromArgb("#1F7B4D");
+                        if (CloseButtonColor == null) CloseButtonColor = Color.FromArgb("#1F7B4D");
                         break;
 
                     case NotificationType.Warning:
-                        BackgroundColor = Color.FromArgb("#FFF8E6");
-                        TextColor = Color.FromArgb("#B76E00");
-                        TitleColor = Color.FromArgb("#B76E00");
-                        CloseButtonColor = Color.FromArgb("#B76E00");
+                        if (BackgroundColor == Colors.Transparent) BackgroundColor = Color.FromArgb("#FFF8E6");
+                        if (TextColor == null) TextColor = Color.FromArgb("#B76E00");
+                        if (TitleColor == null) TitleColor = Color.FromArgb("#B76E00");
+                        if (CloseButtonColor == null) CloseButtonColor = Color.FromArgb("#B76E00");
                         break;
 
                     case NotificationType.Error:
-                        BackgroundColor = Color.FromArgb("#FEECEB");
-                        TextColor = Color.FromArgb("#B42318");
-                        TitleColor = Color.FromArgb("#B42318");
-                        CloseButtonColor = Color.FromArgb("#B42318");
+                        if (BackgroundColor == Colors.Transparent) BackgroundColor = Color.FromArgb("#FEECEB");
+                        if (TextColor == null) TextColor = Color.FromArgb("#B42318");
+                        if (TitleColor == null) TitleColor = Color.FromArgb("#B42318");
+                        if (CloseButtonColor == null) CloseButtonColor = Color.FromArgb("#B42318");
                         break;
 
                     case NotificationType.Info:
                     default:
-                        BackgroundColor = Color.FromArgb("#EFF8FF");
-                        TextColor = Color.FromArgb("#175CD3");
-                        TitleColor = Color.FromArgb("#175CD3");
-                        CloseButtonColor = Color.FromArgb("#175CD3");
+                        if (BackgroundColor == Colors.Transparent) BackgroundColor = Color.FromArgb("#EFF8FF");
+                        if (TextColor == null) TextColor = Color.FromArgb("#175CD3");
+                        if (TitleColor == null) TitleColor = Color.FromArgb("#175CD3");
+                        if (CloseButtonColor == null) CloseButtonColor = Color.FromArgb("#175CD3");
                         break;
                 }
             }
+
+            // Final fallbacks
+            if (BackgroundColor == Colors.Transparent) BackgroundColor = Helpers.ThemeHelper.GetThemeResource<Color>("SurfaceColor");
+            if (TextColor == null) TextColor = Helpers.ThemeHelper.GetThemeResource<Color>("TextColor");
+            if (TitleColor == null) TitleColor = Helpers.ThemeHelper.GetThemeResource<Color>("TextColor");
+            if (CloseButtonColor == null) CloseButtonColor = Helpers.ThemeHelper.GetThemeResource<Color>("TextSecondaryColor");
         }
 
         /// <summary>

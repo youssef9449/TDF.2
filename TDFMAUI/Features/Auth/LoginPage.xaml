@@ -7,7 +7,7 @@
              x:Class="TDFMAUI.Features.Auth.LoginPage"
              x:DataType="{x:Null}"
              Title="Login"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{StaticResource BackgroundColor}">
 
     <ContentPage.Resources>
         <Style x:Key="EntryStyle" TargetType="Entry">
@@ -27,7 +27,7 @@
         <Style x:Key="LoginInputFrameStyle" TargetType="Frame">
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="15,0" />
-            <Setter Property="BackgroundColor" Value="{StaticResource Gray100}" />
+            <Setter Property="BackgroundColor" Value="{StaticResource SurfaceVariantColor}" />
             <Setter Property="HasShadow" Value="False" />
             <Setter Property="BorderColor" Value="Transparent" />
             <Setter Property="HeightRequest" Value="45" />
@@ -69,7 +69,7 @@
                                        Placeholder="User Name"
                                        Text="{Binding Username}"
                                        Keyboard="Text"
-                                       TextColor="{AppThemeBinding Light=Black, Dark=White}" />
+                                       TextColor="{StaticResource TextColor}" />
                             </Frame>
 
                             <!-- Password input -->
@@ -78,12 +78,12 @@
                                        Placeholder="Password"
                                        IsPassword="True"
                                        Text="{Binding Password}"
-                                       TextColor="{AppThemeBinding Light=Black, Dark=White}" />
+                                       TextColor="{StaticResource TextColor}" />
                             </Frame>
 
                             <!-- Error message -->
                             <Label Text="{Binding ErrorMessage}"
-                                   TextColor="{AppThemeBinding Light=#FF3B30, Dark=#FF6B60}"
+                                   TextColor="{StaticResource ErrorColor}"
                                    IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyConverter}}"
                                    HorizontalOptions="Start"
                                    FontSize="14"
@@ -93,7 +93,7 @@
                             <!-- Login button - using platform-specific styling -->
                             <Button Text="Sign In"
                                     Command="{Binding LoginCommand}"
-                                    TextColor="White"
+                                    TextColor="{StaticResource OnPrimaryColor}"
                                     FontAttributes="Bold"
                                     FontSize="16"
                                     CornerRadius="{OnPlatform iOS=25, MacCatalyst=25, Default=10}"

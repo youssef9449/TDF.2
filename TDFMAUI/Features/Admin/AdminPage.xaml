@@ -17,15 +17,15 @@
         <Grid Grid.Row="1" Padding="20" ColumnDefinitions="*,*" RowDefinitions="Auto">
             <Frame BackgroundColor="{StaticResource Primary}" Padding="15" CornerRadius="15" Grid.Column="0">
                 <VerticalStackLayout Spacing="15">
-                    <Label Text="Users" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                    <Button Text="Add User" Command="{Binding AddUserCommand}" BackgroundColor="White" TextColor="{StaticResource Primary}" CornerRadius="10"/>
+                    <Label Text="Users" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource OnPrimaryColor}"/>
+                    <Button Text="Add User" Command="{Binding AddUserCommand}" BackgroundColor="{StaticResource SurfaceColor}" TextColor="{StaticResource Primary}" CornerRadius="10"/>
                 </VerticalStackLayout>
             </Frame>
             
             <Frame BackgroundColor="{StaticResource Primary}" Padding="15" CornerRadius="15" Grid.Column="1" Margin="10,0,0,0">
                  <VerticalStackLayout Spacing="15">
-                    <Label Text="Requests" FontSize="20" FontAttributes="Bold" TextColor="White"/>
-                    <Button Text="Manage Requests" Command="{Binding ManageRequestsCommand}" BackgroundColor="White" TextColor="{StaticResource Primary}" CornerRadius="10"/>
+                    <Label Text="Requests" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource OnPrimaryColor}"/>
+                    <Button Text="Manage Requests" Command="{Binding ManageRequestsCommand}" BackgroundColor="{StaticResource SurfaceColor}" TextColor="{StaticResource Primary}" CornerRadius="10"/>
                 </VerticalStackLayout>
             </Frame>
         </Grid>

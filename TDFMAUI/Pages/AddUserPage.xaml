@@ -34,7 +34,7 @@
                      <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
                 </VerticalStackLayout.HorizontalOptions>
 
-                <Frame BackgroundColor="White" Padding="15">
+                <Frame BackgroundColor="{StaticResource SurfaceColor}" Padding="15">
                     <VerticalStackLayout Spacing="15">
                         <Label Text="Username" FontAttributes="Bold"/>
                         <Entry Text="{Binding Username}" Placeholder="Enter username"/>
@@ -61,12 +61,12 @@
                             <Label Text="Admin" VerticalOptions="Center"/>
                         </HorizontalStackLayout>
 
-                        <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextColor="Red" />
+                        <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextColor="{StaticResource ErrorColor}" />
 
                         <Button Text="Add User"
                                 Command="{Binding AddUserCommand}"
                                 BackgroundColor="{StaticResource Primary}"
-                                TextColor="White"
+                                TextColor="{StaticResource OnPrimaryColor}"
                                 FontAttributes="Bold"/>
                     </VerticalStackLayout>
                 </Frame>

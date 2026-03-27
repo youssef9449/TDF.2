@@ -49,12 +49,12 @@ namespace TDFMAUI.ViewModels
         {
             return status switch
             {
-                UserPresenceStatus.Online => Colors.Green,
-                UserPresenceStatus.Away => Colors.Orange,
-                UserPresenceStatus.Busy => Colors.Red,
-                UserPresenceStatus.DoNotDisturb => Colors.DarkRed,
-                UserPresenceStatus.Offline => Application.Current?.Resources["TextSecondaryColor"] as Color ?? Colors.Gray,
-                _ => Application.Current?.Resources["TextSecondaryColor"] as Color ?? Colors.Gray
+                UserPresenceStatus.Online => Helpers.ThemeHelper.GetThemeResource<Color>("SuccessColor"),
+                UserPresenceStatus.Away => Helpers.ThemeHelper.GetThemeResource<Color>("WarningColor"),
+                UserPresenceStatus.Busy => Helpers.ThemeHelper.GetThemeResource<Color>("ErrorColor"),
+                UserPresenceStatus.DoNotDisturb => Color.FromArgb("#8B0000"), // DarkRed fallback
+                UserPresenceStatus.Offline => Helpers.ThemeHelper.GetThemeResource<Color>("TextSecondaryColor"),
+                _ => Helpers.ThemeHelper.GetThemeResource<Color>("TextSecondaryColor")
             };
         }
 

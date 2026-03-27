@@ -38,8 +38,8 @@
 
             <!-- User Info -->
             <Frame Padding="20" 
-                   BorderColor="{StaticResource Gray300}"
-                   BackgroundColor="White"
+                   BorderColor="{StaticResource BorderColor}"
+                   BackgroundColor="{StaticResource SurfaceColor}"
                    CornerRadius="10">
                 <VerticalStackLayout Spacing="15">
                     <Label Text="Username:" 

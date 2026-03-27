@@ -163,7 +163,7 @@ public partial class GlobalChatPage : ContentPage
             Frame messageFrame = new Frame
             {
                 BackgroundColor = senderId == App.CurrentUser.UserID ? 
-                    Color.FromArgb("#E3F2FD") : Color.FromArgb("#FFFFFF"),
+                    ThemeHelper.GetThemeResource<Color>("BlueCardColor") : ThemeHelper.GetThemeResource<Color>("SurfaceColor"),
                 Padding = new Thickness(10),
                 CornerRadius = 10,
                 Margin = new Thickness(0, 5)
@@ -191,7 +191,7 @@ public partial class GlobalChatPage : ContentPage
             {
                 Text = timestamp.ToString("HH:mm"),
                 FontSize = 12,
-                TextColor = Application.Current.Resources["TextSecondaryColor"] as Color ?? Colors.Gray,
+                TextColor = ThemeHelper.GetThemeResource<Color>("TextSecondaryColor"),
                 HorizontalOptions = LayoutOptions.End
             };
 

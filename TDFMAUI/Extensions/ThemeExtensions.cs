@@ -14,7 +14,7 @@ namespace TDFMAUI.Extensions
         /// </summary>
         public static T GetThemeResource<T>(this VisualElement element, string resourceKey)
         {
-            return ThemeHelper.GetThemeResource<T>(resourceKey, ThemeHelper.CurrentTheme);
+            return ThemeHelper.GetThemeResource<T>(resourceKey);
         }
         
         /// <summary>
@@ -64,7 +64,7 @@ namespace TDFMAUI.Extensions
             else if (element is Frame frame)
             {
                 frame.CornerRadius = 4;
-                frame.BorderColor = ThemeHelper.GetThemeResource<Color>("WindowsControlBorderColor", ThemeHelper.CurrentTheme);
+                frame.BorderColor = ThemeHelper.GetThemeResource<Color>("WindowsControlBorderColor");
             }
         }
         
@@ -82,7 +82,7 @@ namespace TDFMAUI.Extensions
             else if (element is Frame frame)
             {
                 frame.CornerRadius = 6;
-                frame.BorderColor = ThemeHelper.GetThemeResource<Color>("MacOSControlBorderColor", ThemeHelper.CurrentTheme);
+                frame.BorderColor = ThemeHelper.GetThemeResource<Color>("MacOSControlBorderColor");
             }
         }
         

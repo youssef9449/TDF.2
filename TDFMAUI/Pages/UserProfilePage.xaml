@@ -28,7 +28,7 @@
                 
                 <Button Text="Change Photo" Command="{Binding ChangeImageCommand}" IsVisible="{Binding IsEditing}" HorizontalOptions="Center" />
 
-                <Frame BackgroundColor="White" Padding="20">
+                <Frame BackgroundColor="{StaticResource SurfaceColor}" Padding="20">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Full Name" FontAttributes="Bold" />
                         <Label Text="{Binding CurrentUser.FullName}" IsVisible="{Binding IsEditing, Converter={StaticResource BooleanInverter}}" />
@@ -46,11 +46,11 @@
 
                 <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
                     <Button Text="Edit Profile" Command="{Binding EditProfileCommand}" IsVisible="{Binding IsEditing, Converter={StaticResource BooleanInverter}}" />
-                    <Button Text="Save" Command="{Binding SaveProfileCommand}" IsVisible="{Binding IsEditing}" BackgroundColor="Green" TextColor="White" />
-                    <Button Text="Cancel" Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}" BackgroundColor="Red" TextColor="White" />
+                    <Button Text="Save" Command="{Binding SaveProfileCommand}" IsVisible="{Binding IsEditing}" BackgroundColor="{StaticResource SuccessColor}" TextColor="{StaticResource OnPrimaryColor}" />
+                    <Button Text="Cancel" Command="{Binding CancelEditCommand}" IsVisible="{Binding IsEditing}" BackgroundColor="{StaticResource ErrorColor}" TextColor="{StaticResource OnPrimaryColor}" />
                 </HorizontalStackLayout>
 
-                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextColor="Red" HorizontalOptions="Center" />
+                <Label Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" TextColor="{StaticResource ErrorColor}" HorizontalOptions="Center" />
             </VerticalStackLayout>
         </ScrollView>
 

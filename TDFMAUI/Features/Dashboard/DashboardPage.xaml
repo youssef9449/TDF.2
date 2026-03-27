@@ -10,7 +10,7 @@
              x:Class="TDFMAUI.Features.Dashboard.DashboardPage"
              Title="Dashboard"
              x:DataType="vm:DashboardViewModel"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{StaticResource BackgroundColor}">
 
     <!-- BindingContext is set in code-behind -->
 

@@ -8,6 +8,7 @@ using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using TDFShared.DTOs.Users;
 using TDFShared.Exceptions;
+using TDFShared.Validation;
 
 namespace TDFShared.Services
 {
@@ -18,6 +19,7 @@ namespace TDFShared.Services
     public class SecurityService : ISecurityService
     {
         private readonly IRoleService _roleService;
+        private readonly IValidationService _validationService;
 
         // Security constants - using modern recommended values
         private const int PBKDF2_ITERATIONS = 310000; // OWASP recommended minimum for 2024
@@ -28,9 +30,11 @@ namespace TDFShared.Services
         /// Initializes a new instance of the <see cref="SecurityService"/> class.
         /// </summary>
         /// <param name="roleService">The role service dependency.</param>
-        public SecurityService(IRoleService roleService)
+        /// <param name="validationService">The validation service dependency.</param>
+        public SecurityService(IRoleService roleService, IValidationService validationService)
         {
             _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
+            _validationService = validationService ?? throw new ArgumentNullException(nameof(validationService));
         }
 
         /// <summary>
@@ -137,50 +141,9 @@ namespace TDFShared.Services
         /// </summary>
         public bool IsPasswordStrong(string password, out string validationMessage)
         {
-            validationMessage = string.Empty;
-
-            if (string.IsNullOrEmpty(password))
-            {
-                validationMessage = "Password cannot be empty.";
-                return false;
-            }
-
-            // Password must be at least 8 characters
-            if (password.Length < 8)
-            {
-                validationMessage = "Password must be at least 8 characters long.";
-                return false;
-            }
-
-          /*  // Password must contain at least one uppercase letter
-            if (!password.Any(char.IsUpper))
-            {
-                validationMessage = "Password must contain at least one uppercase letter.";
-                return false;
-            }
-
-            // Password must contain at least one lowercase letter
-            if (!password.Any(char.IsLower))
-            {
-                validationMessage = "Password must contain at least one lowercase letter.";
-                return false;
-            }
-
-            // Password must contain at least one digit
-            if (!password.Any(char.IsDigit))
-            {
-                validationMessage = "Password must contain at least one digit.";
-                return false;
-            }
-
-            // Password must contain at least one special character
-            if (!password.Any(c => !char.IsLetterOrDigit(c)))
-            {
-                validationMessage = "Password must contain at least one special character (e.g., !@#$).";
-                return false;
-            }*/
-
-            return true;
+            var result = _validationService.ValidatePassword(password);
+            validationMessage = result.IsValid ? string.Empty : string.Join(" ", result.Errors);
+            return result.IsValid;
         }
 
         /// <summary>

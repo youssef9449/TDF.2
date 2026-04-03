@@ -147,28 +147,6 @@ namespace TDFAPI.Controllers
                     return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse(string.Join(", ", errors)));
                 }
 
-                // Check if username already exists
-                var existingUser = await _userService.GetByUsernameAsync(request.Username);
-                if (existingUser != null)
-                {
-                    return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse("Username already exists"));
-                }
-                
-                // Check if full name is already taken
-                try
-                {
-                    var isFullNameTaken = await _userService.IsFullNameTakenAsync(request.FullName);
-                    if (isFullNameTaken)
-                    {
-                        return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse($"Full name '{request.FullName}' is already taken"));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Error checking for duplicate full name: {FullName}", request.FullName);
-                    // Continue with registration attempt even if this check fails
-                }
-
                 // Prevent self-assignment of admin privileges for regular registrations
                 request.IsAdmin = false;
                 request.IsManager = false;

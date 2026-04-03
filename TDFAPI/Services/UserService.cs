@@ -111,22 +111,6 @@ namespace TDFAPI.Services
                     throw new ValidationException("Full name is required");
                 }
 
-                // Check if username already exists
-                var existingUser = await _userRepository.GetByUsernameAsync(userDto.Username);
-                if (existingUser != null)
-                {
-                    _logger.LogWarning("User creation failed: Username {Username} already exists", userDto.Username);
-                    throw new ValidationException($"Username '{userDto.Username}' is already taken.");
-                }
-
-                // Check if full name already exists
-                var isFullNameTaken = await _userRepository.IsFullNameTakenAsync(userDto.FullName);
-                if (isFullNameTaken)
-                {
-                    _logger.LogWarning("User creation failed: Full name {FullName} already exists", userDto.FullName);
-                    throw new ValidationException($"Full name '{userDto.FullName}' is already taken.");
-                }
-
                 // Create business rule context
                 var context = new BusinessRuleContext
                 {
@@ -134,6 +118,10 @@ namespace TDFAPI.Services
                     {
                         var user = await _userRepository.GetByUsernameAsync(username);
                         return user != null;
+                    },
+                    FullNameExistsAsync = async (fullName) =>
+                    {
+                        return await _userRepository.IsFullNameTakenAsync(fullName);
                     }
                 };
 

@@ -18,7 +18,7 @@ namespace TDFMAUI.Features.Auth
         private readonly IApiService _apiService;
         private readonly ILookupService _lookupService;
         private readonly ILogger<SignupViewModel> _logger;
-        private readonly ISecurityService _securityService;
+        private readonly IValidationService _validationService;
 
         [ObservableProperty]
         private string _username = string.Empty;
@@ -49,12 +49,12 @@ namespace TDFMAUI.Features.Auth
         [ObservableProperty]
         private string _selectedTitle = string.Empty;
 
-        public SignupViewModel(IApiService apiService, ILookupService lookupService, ILogger<SignupViewModel> logger, ISecurityService securityService)
+        public SignupViewModel(IApiService apiService, ILookupService lookupService, ILogger<SignupViewModel> logger, IValidationService validationService)
         {
             _apiService = apiService;
             _lookupService = lookupService;
             _logger = logger;
-            _securityService = securityService;
+            _validationService = validationService;
             Title = "Sign Up";
             _ = LoadDepartmentsAsync();
         }
@@ -94,39 +94,35 @@ namespace TDFMAUI.Features.Auth
         [RelayCommand(CanExecute = nameof(IsNotBusy))]
         private async Task SignupAsync()
         {
-            if (string.IsNullOrWhiteSpace(Username) || string.IsNullOrWhiteSpace(Password) ||
-                string.IsNullOrWhiteSpace(ConfirmPassword) || string.IsNullOrWhiteSpace(FullName) ||
-                SelectedDepartment == null || string.IsNullOrWhiteSpace(SelectedTitle))
+            var registerRequest = new RegisterRequestDto
             {
-                ErrorMessage = "All fields are required.";
+                Username = Username,
+                Password = Password,
+                ConfirmPassword = ConfirmPassword,
+                FullName = FullName,
+                Department = SelectedDepartment?.Name ?? string.Empty,
+                Title = SelectedTitle
+            };
+
+            // Basic DTO validation
+            var validationResult = _validationService.ValidateObject(registerRequest);
+            if (!validationResult.IsValid)
+            {
+                ErrorMessage = validationResult.Errors.FirstOrDefault() ?? "Validation failed.";
                 return;
             }
 
-            if (Password != ConfirmPassword)
+            // Strong password validation
+            var passwordResult = _validationService.ValidatePassword(Password);
+            if (!passwordResult.IsValid)
             {
-                ErrorMessage = "Passwords do not match.";
-                return;
-            }
-
-            if (!_securityService.IsPasswordStrong(Password, out string passwordValidationMessage))
-            {
-                ErrorMessage = passwordValidationMessage;
+                ErrorMessage = passwordResult.Errors.FirstOrDefault() ?? "Password does not meet requirements.";
                 return;
             }
 
             IsBusy = true;
             try
             {
-                var registerRequest = new RegisterRequestDto
-                {
-                    Username = Username,
-                    Password = Password,
-                    ConfirmPassword = ConfirmPassword,
-                    FullName = FullName,
-                    Department = SelectedDepartment.Name,
-                    Title = SelectedTitle
-                };
-
                 var response = await _apiService.RegisterAsync(registerRequest);
                 if (response.Success)
                 {
@@ -135,7 +131,15 @@ namespace TDFMAUI.Features.Auth
                 }
                 else
                 {
-                    ErrorMessage = response.Message ?? "Registration failed.";
+                    if (response.Errors != null && response.Errors.Any())
+                    {
+                        var allErrors = response.Errors.SelectMany(kvp => kvp.Value);
+                        ErrorMessage = string.Join(" ", allErrors);
+                    }
+                    else
+                    {
+                        ErrorMessage = response.Message ?? "Registration failed.";
+                    }
                 }
             }
             catch (Exception ex)

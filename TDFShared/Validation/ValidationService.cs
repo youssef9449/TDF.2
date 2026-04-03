@@ -255,13 +255,7 @@ namespace TDFShared.Validation
 
             if (!password.Any(char.IsDigit))
             {
-                result.Errors.Add("Password must contain at least one number.");
-                meetsBasicRequirements = false;
-            }
-
-            if (!password.Any(c => !char.IsLetterOrDigit(c)))
-            {
-                result.Errors.Add("Password must contain at least one special character.");
+                result.Errors.Add("Password must contain at least one digit.");
                 meetsBasicRequirements = false;
             }
 

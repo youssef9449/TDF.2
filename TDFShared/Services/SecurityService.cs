@@ -8,7 +8,6 @@ using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using TDFShared.DTOs.Users;
 using TDFShared.Exceptions;
-using TDFShared.Validation;
 
 namespace TDFShared.Services
 {
@@ -19,7 +18,6 @@ namespace TDFShared.Services
     public class SecurityService : ISecurityService
     {
         private readonly IRoleService _roleService;
-        private readonly IValidationService _validationService;
 
         // Security constants - using modern recommended values
         private const int PBKDF2_ITERATIONS = 310000; // OWASP recommended minimum for 2024
@@ -30,11 +28,9 @@ namespace TDFShared.Services
         /// Initializes a new instance of the <see cref="SecurityService"/> class.
         /// </summary>
         /// <param name="roleService">The role service dependency.</param>
-        /// <param name="validationService">The validation service dependency.</param>
-        public SecurityService(IRoleService roleService, IValidationService validationService)
+        public SecurityService(IRoleService roleService)
         {
             _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
-            _validationService = validationService ?? throw new ArgumentNullException(nameof(validationService));
         }
 
         /// <summary>
@@ -141,9 +137,46 @@ namespace TDFShared.Services
         /// </summary>
         public bool IsPasswordStrong(string password, out string validationMessage)
         {
-            var result = _validationService.ValidatePassword(password);
-            validationMessage = result.IsValid ? string.Empty : string.Join(" ", result.Errors);
-            return result.IsValid;
+            validationMessage = string.Empty;
+            var errors = new List<string>();
+
+            if (string.IsNullOrEmpty(password))
+            {
+                validationMessage = "Password cannot be empty.";
+                return false;
+            }
+
+            // Password must be at least 8 characters
+            if (password.Length < 8)
+            {
+                errors.Add("Password must be at least 8 characters long.");
+            }
+
+            // Password must contain at least one uppercase letter
+            if (!password.Any(char.IsUpper))
+            {
+                errors.Add("Password must contain at least one uppercase letter.");
+            }
+
+            // Password must contain at least one lowercase letter
+            if (!password.Any(char.IsLower))
+            {
+                errors.Add("Password must contain at least one lowercase letter.");
+            }
+
+            // Password must contain at least one digit
+            if (!password.Any(char.IsDigit))
+            {
+                errors.Add("Password must contain at least one digit.");
+            }
+
+            if (errors.Any())
+            {
+                validationMessage = string.Join(" ", errors);
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>

@@ -330,141 +330,84 @@ namespace TDFMAUI
 
         private async Task SetupInitialPageAsync(CancellationToken cancellationToken = default)
         {
-            DebugService.LogInfo("App", "SetupInitialPageAsync entered.");
-            System.Diagnostics.Debug.WriteLine("[App] SetupInitialPageAsync entered");
-            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 if (Services == null)
                 {
-                    DebugService.LogError("App", "Services not initialized, cannot set up initial page");
-                    System.Diagnostics.Debug.WriteLine("[App] Services not initialized, cannot set up initial page");
                     DisplayFatalErrorPage("App services not initialized correctly.", null);
                     return;
                 }
-                using var setupTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                setupTimeout.CancelAfter(SetupInitialPageTimeout);
 
                 ApiConfig.IsDevelopmentMode = true;
-                System.Diagnostics.Debug.WriteLine("[App] ApiConfig.IsDevelopmentMode set");
-                if (SafeMode)
-                {
-                    DebugService.LogWarning("App", "*** STARTING IN SAFE MODE ***");
-                    System.Diagnostics.Debug.WriteLine("[App] Starting in SAFE MODE");
-                    await Shell.Current.GoToAsync("DiagnosticsPage");
-                    return;
-                }
+
+                // Perform authentication check for all platforms to avoid session regression
+                UserDto? currentUser = null;
                 try
                 {
-                    System.Diagnostics.Debug.WriteLine("[App] About to get required services");
+                    using var authTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    authTimeout.CancelAfter(TokenValidationTimeout + CurrentUserLookupTimeout);
+
                     var authService = Services.GetRequiredService<IAuthService>();
-                    System.Diagnostics.Debug.WriteLine("[App] Got IAuthService");
                     var secureStorage = Services.GetRequiredService<SecureStorageService>();
-                    System.Diagnostics.Debug.WriteLine("[App] Got SecureStorageService");
-                    var logger = Services.GetRequiredService<ILogger<App>>();
-                    System.Diagnostics.Debug.WriteLine("[App] Got ILogger<App>");
-                    System.Diagnostics.Debug.WriteLine("[App] Got required services for SetupInitialPageAsync");
-                    
-                    System.Diagnostics.Debug.WriteLine("[App] About to call HandleTokenPersistenceAsync");
+
                     bool hasValidToken = await ExecuteWithTimeoutAsync(
                         () => secureStorage.HandleTokenPersistenceAsync(),
                         TokenValidationTimeout,
-                        setupTimeout.Token,
+                        authTimeout.Token,
                         "HandleTokenPersistenceAsync");
-                    System.Diagnostics.Debug.WriteLine($"[App] HandleTokenPersistenceAsync result: {hasValidToken}");
-                    
-                    System.Diagnostics.Debug.WriteLine("[App] About to call GetCurrentUserAsync");
-                    UserDto currentUser = hasValidToken
-                        ? await ExecuteWithTimeoutAsync(
+
+                    if (hasValidToken)
+                    {
+                        currentUser = await ExecuteWithTimeoutAsync(
                             () => authService.GetCurrentUserAsync(),
                             CurrentUserLookupTimeout,
-                            setupTimeout.Token,
-                            "GetCurrentUserAsync")
-                        : null;
-                    System.Diagnostics.Debug.WriteLine($"[App] GetCurrentUserAsync result: {currentUser != null}");
-                    bool isAuthenticated = currentUser != null;
-                    System.Diagnostics.Debug.WriteLine($"[App] User authentication status: {isAuthenticated}");
-                    if (isAuthenticated)
-                    {
-                        logger.LogInformation("User is authenticated. Setting MainPage to AppShell.");
-                        System.Diagnostics.Debug.WriteLine("[App] About to set MainPage to AppShell");
-                        
-                        System.Diagnostics.Debug.WriteLine("[App] About to get AppShell from services");
-                        var shell = Services.GetRequiredService<AppShell>();
-                        System.Diagnostics.Debug.WriteLine($"[App] Got AppShell: {shell != null}");
-                        
-                        System.Diagnostics.Debug.WriteLine("[App] About to set MainPage");
-                        MainPage = shell;
-                        System.Diagnostics.Debug.WriteLine($"[App] MainPage set to AppShell. Current MainPage type: {MainPage?.GetType().Name}");
-                        
-                        DebugService.LogInfo("App", "MainPage set to AppShell. Registering WebSocket event handlers.");
-                        RegisterWebSocketEventHandlers();
-                        
-                        DebugService.LogInfo("App", "Navigating to DashboardPage.");
-                        System.Diagnostics.Debug.WriteLine("[App] About to navigate to DashboardPage");
-                        await Shell.Current.GoToAsync("DashboardPage");
-                        System.Diagnostics.Debug.WriteLine("[App] Navigated to DashboardPage");
-                        DebugService.LogInfo("App", "Navigation to DashboardPage completed.");
-                    }
-                    else
-                    {
-                        logger.LogInformation("User is not authenticated. Navigating to LoginPage within AppShell.");
-                        System.Diagnostics.Debug.WriteLine("[App] User not authenticated - ensure AppShell is MainPage and navigate to //LoginPage");
-
-                        // Ensure Shell is the MainPage
-                        if (MainPage is not AppShell)
-                        {
-                            System.Diagnostics.Debug.WriteLine("[App] MainPage is not AppShell. Resolving AppShell and setting as MainPage.");
-                            var shell = Services.GetRequiredService<AppShell>();
-                            MainPage = shell;
-                        }
-
-                        // Navigate to LoginPage using absolute Shell route
-                        try
-                        {
-                            System.Diagnostics.Debug.WriteLine("[App] Navigating to //LoginPage");
-                            await Shell.Current.GoToAsync("//LoginPage");
-                        }
-                        catch (Exception navEx)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[App] Failed to navigate to //LoginPage: {navEx.Message}");
-                        }
-                        DebugService.LogInfo("App", "Navigated to LoginPage inside AppShell.");
+                            authTimeout.Token,
+                            "GetCurrentUserAsync");
                     }
                 }
                 catch (Exception ex)
                 {
-                    DebugService.LogError("App", $"Error preparing next page: {ex.Message}");
-                    System.Diagnostics.Debug.WriteLine($"[App] Error preparing next page: {ex.Message}");
-                    System.Diagnostics.Debug.WriteLine($"[App] Error preparing next page stack trace: {ex.StackTrace}");
-                    if (ex.InnerException != null)
+                    DebugService.LogWarning("App", $"Silent auth check failed: {ex.Message}");
+                }
+
+                var shell = Services.GetRequiredService<AppShell>();
+
+                if (SafeMode)
+                {
+                    DebugService.LogWarning("App", "*** STARTING IN SAFE MODE ***");
+                    MainPage = shell;
+                    await Shell.Current.GoToAsync("DiagnosticsPage");
+                    return;
+                }
+
+                if (DeviceHelper.IsDesktop)
+                {
+                    // Desktop Flow: Startup Diagnostics -> AppShell (which redirects to Login via Shell guard if unauthenticated)
+                    var startupPage = Services.GetRequiredService<StartupDiagnosticPage>();
+                    startupPage.NextPage = shell;
+                    MainPage = startupPage;
+                    DebugService.LogInfo("App", "Desktop detected: showing StartupDiagnosticPage.");
+                }
+                else
+                {
+                    // Mobile Flow: Auth Check -> Dashboard OR LoginPage
+                    MainPage = shell;
+                    if (currentUser != null)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[App] Inner exception: {ex.InnerException.Message}");
-                        System.Diagnostics.Debug.WriteLine($"[App] Inner stack trace: {ex.InnerException.StackTrace}");
+                        RegisterWebSocketEventHandlers();
+                        await Shell.Current.GoToAsync("DashboardPage");
+                        DebugService.LogInfo("App", "Mobile detected: authenticated, navigating to DashboardPage.");
                     }
-                    
-                    // Try to show diagnostics page, but if that fails, show error page
-                    try
+                    else
                     {
-                        await Shell.Current.GoToAsync("DiagnosticsPage");
-                    }
-                    catch (Exception navEx)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[App] Failed to navigate to DiagnosticsPage: {navEx.Message}");
-                        DisplayFatalErrorPage("Failed to set up initial page", ex);
+                        await Shell.Current.GoToAsync("//LoginPage");
+                        DebugService.LogInfo("App", "Mobile detected: unauthenticated, navigating to LoginPage.");
                     }
                 }
             }
             catch (Exception ex)
             {
                 DebugService.LogError("App", $"Error setting up initial page: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[App] Error setting up initial page: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"[App] Error setting up initial page stack trace: {ex.StackTrace}");
-                if (ex.InnerException != null)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[App] Inner exception: {ex.InnerException.Message}");
-                    System.Diagnostics.Debug.WriteLine($"[App] Inner stack trace: {ex.InnerException.StackTrace}");
-                }
                 DisplayFatalErrorPage("Failed to initialize application.", ex);
             }
         }

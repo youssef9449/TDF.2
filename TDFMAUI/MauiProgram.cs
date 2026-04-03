@@ -233,6 +233,7 @@ namespace TDFMAUI
             builder.Services.AddTransient<AdminPage>();
             builder.Services.AddTransient<AddRequestPage>();
             builder.Services.AddTransient<DiagnosticsPage>();
+            builder.Services.AddTransient<StartupDiagnosticPage>();
             builder.Services.AddTransient<UsersPage>();
             builder.Services.AddTransient<UserProfilePage>();
             builder.Services.AddTransient<ProfilePage>();

@@ -180,6 +180,7 @@ namespace TDFShared.Validation
         public Func<int, LeaveType, Task<int>>? GetLeaveBalanceAsync { get; set; }
         public Func<int, DateTime, DateTime, int, Task<bool>>? HasConflictingRequestsAsync { get; set; }
         public Func<string, Task<bool>>? UsernameExistsAsync { get; set; }
+        public Func<string, Task<bool>>? FullNameExistsAsync { get; set; }
         public Func<int, Task<RequestResponseDto?>>? GetRequestAsync { get; set; }
         public Func<string, DateTime, DateTime, Task<int>>? GetDepartmentRequestCountAsync { get; set; }
         public Func<int, Task<UserDto?>>? GetUserAsync { get; set; }

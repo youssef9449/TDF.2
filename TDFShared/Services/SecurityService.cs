@@ -138,6 +138,7 @@ namespace TDFShared.Services
         public bool IsPasswordStrong(string password, out string validationMessage)
         {
             validationMessage = string.Empty;
+            var errors = new List<string>();
 
             if (string.IsNullOrEmpty(password))
             {
@@ -148,37 +149,32 @@ namespace TDFShared.Services
             // Password must be at least 8 characters
             if (password.Length < 8)
             {
-                validationMessage = "Password must be at least 8 characters long.";
-                return false;
+                errors.Add("Password must be at least 8 characters long.");
             }
 
-          /*  // Password must contain at least one uppercase letter
+            // Password must contain at least one uppercase letter
             if (!password.Any(char.IsUpper))
             {
-                validationMessage = "Password must contain at least one uppercase letter.";
-                return false;
+                errors.Add("Password must contain at least one uppercase letter.");
             }
 
             // Password must contain at least one lowercase letter
             if (!password.Any(char.IsLower))
             {
-                validationMessage = "Password must contain at least one lowercase letter.";
-                return false;
+                errors.Add("Password must contain at least one lowercase letter.");
             }
 
             // Password must contain at least one digit
             if (!password.Any(char.IsDigit))
             {
-                validationMessage = "Password must contain at least one digit.";
-                return false;
+                errors.Add("Password must contain at least one digit.");
             }
 
-            // Password must contain at least one special character
-            if (!password.Any(c => !char.IsLetterOrDigit(c)))
+            if (errors.Any())
             {
-                validationMessage = "Password must contain at least one special character (e.g., !@#$).";
+                validationMessage = string.Join(" ", errors);
                 return false;
-            }*/
+            }
 
             return true;
         }

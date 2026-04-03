@@ -162,6 +162,17 @@ namespace TDFShared.Validation
                 }
             }
 
+            // Full name uniqueness
+            if (context.FullNameExistsAsync != null)
+            {
+                var fullNameExistsAsync = context.FullNameExistsAsync;
+                bool fullNameExists = await fullNameExistsAsync(user.FullName);
+                if (fullNameExists)
+                {
+                    errors.Add($"Full name '{user.FullName}' is already taken.");
+                }
+            }
+
             // Password validation
             var passwordResult = _validationService.ValidatePassword(user.Password);
             if (!passwordResult.IsValid)

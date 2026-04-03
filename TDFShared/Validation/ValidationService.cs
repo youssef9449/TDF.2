@@ -233,42 +233,26 @@ namespace TDFShared.Validation
                 return result;
             }
 
-            // Basic requirements
-            var meetsBasicRequirements = true;
-            if (password.Length < 8)
+            // Delegate core logic to SecurityService to avoid duplication and break cycles
+            bool isValid = _securityService.IsPasswordStrong(password, out string validationMessage);
+
+            if (!isValid)
             {
-                result.Errors.Add("Password must be at least 8 characters long.");
-                meetsBasicRequirements = false;
+                // Split errors if multiple were returned
+                if (!string.IsNullOrEmpty(validationMessage))
+                {
+                    result.Errors.AddRange(validationMessage.Split('.', StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim() + "."));
+                }
+                result.IsValid = false;
+                result.Strength = PasswordStrength.VeryWeak;
+                result.StrengthMessage = "Password does not meet requirements.";
+                return result;
             }
 
-            if (!password.Any(char.IsUpper))
-            {
-                result.Errors.Add("Password must contain at least one uppercase letter.");
-                meetsBasicRequirements = false;
-            }
-
-            if (!password.Any(char.IsLower))
-            {
-                result.Errors.Add("Password must contain at least one lowercase letter.");
-                meetsBasicRequirements = false;
-            }
-
-            if (!password.Any(char.IsDigit))
-            {
-                result.Errors.Add("Password must contain at least one number.");
-                meetsBasicRequirements = false;
-            }
-
-            if (!password.Any(c => !char.IsLetterOrDigit(c)))
-            {
-                result.Errors.Add("Password must contain at least one special character.");
-                meetsBasicRequirements = false;
-            }
-
-            // Calculate password strength
-            result.Strength = CalculatePasswordStrength(password, meetsBasicRequirements);
+            // Calculate password strength for valid passwords
+            result.Strength = CalculatePasswordStrength(password, true);
             result.StrengthMessage = GetStrengthMessage(result.Strength);
-            result.IsValid = meetsBasicRequirements;
+            result.IsValid = true;
 
             return result;
         }

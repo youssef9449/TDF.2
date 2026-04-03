@@ -59,6 +59,19 @@ namespace TDFMAUI
             // Subscribe to user changes from the session service
             _userSessionService.UserChanged += (sender, args) =>
             {
+                // Automatically manage WebSocket handlers when user session changes
+                if (Application.Current is App app)
+                {
+                    if (_userSessionService.CurrentUser != null)
+                    {
+                        app.RegisterWebSocketEventHandlers();
+                    }
+                    else
+                    {
+                        app.UnregisterWebSocketEventHandlers();
+                    }
+                }
+
                 UserChanged?.Invoke(null, EventArgs.Empty);
             };
         }
@@ -340,7 +353,17 @@ namespace TDFMAUI
 
                 ApiConfig.IsDevelopmentMode = true;
 
-                // Perform authentication check for all platforms to avoid session regression
+                // 1. Safe Mode Check (Priority: Bypass auth calls if system is unstable)
+                if (SafeMode)
+                {
+                    DebugService.LogWarning("App", "*** STARTING IN SAFE MODE ***");
+                    var safeShell = Services.GetRequiredService<AppShell>();
+                    MainPage = safeShell;
+                    await Shell.Current.GoToAsync("DiagnosticsPage");
+                    return;
+                }
+
+                // 2. Silent authentication check for all platforms to avoid session regression
                 UserDto? currentUser = null;
                 try
                 {
@@ -372,14 +395,7 @@ namespace TDFMAUI
 
                 var shell = Services.GetRequiredService<AppShell>();
 
-                if (SafeMode)
-                {
-                    DebugService.LogWarning("App", "*** STARTING IN SAFE MODE ***");
-                    MainPage = shell;
-                    await Shell.Current.GoToAsync("DiagnosticsPage");
-                    return;
-                }
-
+                // 3. Platform-specific launch logic
                 if (DeviceHelper.IsDesktop)
                 {
                     // Desktop Flow: Startup Diagnostics -> AppShell (which redirects to Login via Shell guard if unauthenticated)
@@ -394,7 +410,7 @@ namespace TDFMAUI
                     MainPage = shell;
                     if (currentUser != null)
                     {
-                        RegisterWebSocketEventHandlers();
+                        // Note: WebSocket handlers are now registered automatically via UserChanged in InitializeUserSession
                         await Shell.Current.GoToAsync("DashboardPage");
                         DebugService.LogInfo("App", "Mobile detected: authenticated, navigating to DashboardPage.");
                     }

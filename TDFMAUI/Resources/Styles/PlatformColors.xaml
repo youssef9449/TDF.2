@@ -6,7 +6,7 @@
     <Color x:Key="WindowsControlHighlightColor">#0078D7</Color>
     <Color x:Key="WindowsAccentColor">#0078D7</Color>
 
-    <OnAppTheme x:Key="WindowsBorderColor" x:TypeArguments="Color" Light="#CCCCCC" Dark="#404040" />
+    <OnAppTheme x:Key="WindowsControlBorderColor" x:TypeArguments="Color" Light="#CCCCCC" Dark="#404040" />
     <OnAppTheme x:Key="WindowsControlForegroundColor" x:TypeArguments="Color" Light="#000000" Dark="#FFFFFF" />
     <OnAppTheme x:Key="WindowsControlBackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#2D2D2D" />
     <OnAppTheme x:Key="WindowsControlDisabledColor" x:TypeArguments="Color" Light="#AAAAAA" Dark="#666666" />

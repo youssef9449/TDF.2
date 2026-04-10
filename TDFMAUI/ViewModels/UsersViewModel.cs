@@ -128,7 +128,7 @@ namespace TDFMAUI.ViewModels
             var viewModel = new UserProfileViewModel(_apiService, localStorageService);
             await viewModel.LoadUserByIdAsync(userId);
 
-            await Shell.Current.Navigation.PushAsync(new UserProfilePage(viewModel, localStorageService));
+            await Shell.Current.Navigation.PushAsync(new UserProfilePage(viewModel));
         }
 
         public void HandleUserStatusChanged(UserStatusChangedEventArgs e)

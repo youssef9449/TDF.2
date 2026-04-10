@@ -189,8 +189,8 @@
     <FlyoutItem Title="Profile" Icon="profile.png">
         <ShellContent
             Title="Profile"
-            ContentTemplate="{DataTemplate pages:ProfilePage}"
-            Route="ProfilePage" />
+            ContentTemplate="{DataTemplate pages:UserProfilePage}"
+            Route="UserProfilePage" />
     </FlyoutItem>
 
     <MenuItem Text="Logout"

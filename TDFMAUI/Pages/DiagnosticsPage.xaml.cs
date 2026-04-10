@@ -223,25 +223,21 @@ namespace TDFMAUI.Pages
         {
             try
             {
-                if (App.Services == null)
+                if (Shell.Current != null)
                 {
-                    DebugService.LogError("DiagnosticsPage", "App.Services is null. Cannot resolve LoginPage.");
-                    await DisplayAlert("Navigation Error", "App services are not available. Please restart the app.", "OK");
-                    return;
+                    await Shell.Current.GoToAsync("//LoginPage");
+                    DebugService.LogInfo("DiagnosticsPage", "Successfully navigated to login page via Shell");
                 }
-                // Get the login page from DI container
-                var loginPage = App.Services.GetService<LoginPage>();
-                if (loginPage == null)
+                else
                 {
-                    DebugService.LogError("DiagnosticsPage", "LoginPage could not be resolved from DI container.");
-                    await DisplayAlert("Navigation Error", "Failed to resolve LoginPage. Please restart the app.", "OK");
-                    return;
+                    // Fallback if Shell is not yet initialized
+                    var loginPage = App.Services?.GetService<LoginPage>();
+                    if (loginPage != null)
+                    {
+                        Application.Current.MainPage = new NavigationPage(loginPage);
+                        DebugService.LogInfo("DiagnosticsPage", "Successfully navigated to login page via MainPage override");
+                    }
                 }
-                // Create a new navigation page with the login page
-                var navPage = new NavigationPage(loginPage);
-                // Set as main page
-                Application.Current.MainPage = navPage;
-                DebugService.LogInfo("DiagnosticsPage", "Successfully navigated to login page");
             }
             catch (Exception ex)
             {

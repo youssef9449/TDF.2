@@ -90,13 +90,10 @@ namespace TDFMAUI
             Routing.RegisterRoute(nameof(Features.Auth.LoginPage), typeof(Features.Auth.LoginPage));
             Routing.RegisterRoute(nameof(Features.Auth.SignupPage), typeof(Features.Auth.SignupPage));
             // Main pages
-            Routing.RegisterRoute(nameof(MainPage), typeof(MainPage));
             Routing.RegisterRoute(nameof(Features.Dashboard.DashboardPage), typeof(Features.Dashboard.DashboardPage));
             // User related pages
-            Routing.RegisterRoute(nameof(ProfilePage), typeof(ProfilePage));
             Routing.RegisterRoute(nameof(UserProfilePage), typeof(UserProfilePage));
             Routing.RegisterRoute(nameof(UsersPage), typeof(UsersPage));
-            Routing.RegisterRoute(nameof(UserDetailsPage), typeof(UserDetailsPage));
             Routing.RegisterRoute(nameof(AddUserPage), typeof(AddUserPage));
             Routing.RegisterRoute(nameof(EditUserPage), typeof(EditUserPage));
             // Request related pages
@@ -259,14 +256,14 @@ namespace TDFMAUI
                 }
                 else
                 {
-                    var mainPageRoute = "//" + nameof(MainPage);
+                    var dashboardPageRoute = "//" + nameof(DashboardPage);
                     try
-                    { // Attempt to navigate to main page, if route is not valid GoToAsync will throw
-                        await Shell.Current.GoToAsync(mainPageRoute, true);
+                    { // Attempt to navigate to dashboard page, if route is not valid GoToAsync will throw
+                        await Shell.Current.GoToAsync(dashboardPageRoute, true);
                     }
-                    catch (Exception ex_mainpage_nav)
+                    catch (Exception ex_nav)
                     {
-                        _logger?.LogWarning(ex_mainpage_nav, $"Could not navigate to {mainPageRoute}, going to Shell root.");
+                        _logger?.LogWarning(ex_nav, $"Could not navigate to {dashboardPageRoute}, going to Shell root.");
                         await Shell.Current.GoToAsync("//", true); // Go to shell root as a last resort
                     }
                 }

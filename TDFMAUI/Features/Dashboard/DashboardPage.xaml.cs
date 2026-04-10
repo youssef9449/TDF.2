@@ -11,46 +11,13 @@ namespace TDFMAUI.Features.Dashboard
 {
     public partial class DashboardPage : ContentPage
     {
-        private DashboardViewModel _viewModel;
+        private readonly DashboardViewModel _viewModel;
         
-        public DashboardPage(DashboardViewModel viewModel = null)
+        public DashboardPage(DashboardViewModel viewModel)
         {
             InitializeComponent();
             
-            // Use the provided ViewModel or resolve from DI
-            if (viewModel != null)
-            {
-                _viewModel = viewModel;
-            }
-            else
-            {
-                _viewModel = IPlatformApplication.Current?.Services.GetService<DashboardViewModel>();
-                
-                // If still null, create a new instance with required services
-                if (_viewModel == null)
-                {
-                    var requestService = IPlatformApplication.Current?.Services.GetService<IRequestService>();
-                    var notificationService = IPlatformApplication.Current?.Services.GetService<TDFMAUI.Services.INotificationService>();
-                    var logger = IPlatformApplication.Current?.Services.GetService<Microsoft.Extensions.Logging.ILogger<DashboardViewModel>>();
-                    var authService = IPlatformApplication.Current?.Services.GetService<IAuthService>();
-                    
-                    if (requestService != null && notificationService != null && authService != null)
-                    {
-                        _viewModel = new DashboardViewModel(
-                            requestService, 
-                            notificationService, 
-                            logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<DashboardViewModel>.Instance,
-                            authService);
-                    }
-                    else
-                    {
-                        // Show error if required services are not available
-                        DisplayAlert("Error", "Required services are not available", "OK");
-                    }
-                }
-            }
-            
-            // Set the BindingContext
+            _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
             BindingContext = _viewModel;
             
             // Register for size changes to update layout if needed

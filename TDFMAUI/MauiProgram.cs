@@ -236,14 +236,12 @@ namespace TDFMAUI
             builder.Services.AddTransient<StartupDiagnosticPage>();
             builder.Services.AddTransient<UsersPage>();
             builder.Services.AddTransient<UserProfilePage>();
-            builder.Services.AddTransient<ProfilePage>();
             builder.Services.AddTransient<NotificationsPage>();
             builder.Services.AddTransient<NotificationTestPage>();
             builder.Services.AddTransient<SignupPage>();
             builder.Services.AddTransient<RequestDetailsPage>();
             builder.Services.AddTransient<LoginPage>();
             builder.Services.AddTransient<DashboardPage>();
-            builder.Services.AddTransient<MainPage>();
             builder.Services.AddTransient<PrivateMessagesPage>();
             builder.Services.AddTransient<GlobalMessagesPage>();
             builder.Services.AddTransient<ReportsPage>();

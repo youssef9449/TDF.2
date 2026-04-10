@@ -963,7 +963,8 @@ namespace TDFMAUI
                 // Re-register WebSocketService event handlers if the user is logged in
                 if (CurrentUser != null)
                 {
-                    RegisterWebSocketEventHandlers();
+                    // Note: WebSocket handlers are now registered automatically via UserChanged in InitializeUserSession
+                    // But on Resume we might need to ensure connection is restored
 
                     // Check if WebSocket is connected and reconnect if needed
                     if (Services != null)

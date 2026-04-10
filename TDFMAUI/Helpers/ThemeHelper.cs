@@ -81,6 +81,19 @@ namespace TDFMAUI.Helpers
         }
 
         /// <summary>
+        /// Gets or sets whether the app should use platform-specific themes
+        /// </summary>
+        public static bool UsePlatformSpecificThemes
+        {
+            get => Preferences.Get(nameof(UsePlatformSpecificThemes), true);
+            set
+            {
+                Preferences.Set(nameof(UsePlatformSpecificThemes), value);
+                ApplyTheme();
+            }
+        }
+
+        /// <summary>
         /// Gets or sets the user's preferred theme when not following system theme
         /// </summary>
         public static AppTheme UserTheme
@@ -317,7 +330,8 @@ namespace TDFMAUI.Helpers
         /// </summary>
         public static void ApplyPlatformSpecificAdaptations()
         {
-            // This is now handled primarily by OnAppTheme and OnPlatform in XAML
+            // Trigger a theme refresh to ensure all platform-specific styles are applied
+            ApplyTheme();
         }
     }
 }

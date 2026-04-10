@@ -237,11 +237,6 @@ namespace TDFMAUI
                 themeService?.Initialize();
                 DebugService.LogInfo("App", "Theme service initialized");
 
-                // Dynamically merge the correct theme dictionary
-                DebugService.LogInfo("App", "About to call SetThemeColors");
-                SetThemeColors();
-                DebugService.LogInfo("App", "SetThemeColors completed");
-
                 await ApplyThemeWhenWindowReadyAsync(cancellationToken);
 
                 // Set initial page and navigate
@@ -1032,14 +1027,6 @@ namespace TDFMAUI
             }
         }
 
-        /// <summary>
-        /// Dynamically applies the correct theme resource dictionary for colors by using ThemeHelper.
-        /// </summary>
-        private void SetThemeColors()
-        {
-            // Theme colors are now handled primarily by AppThemeBinding in Colors.xaml
-        }
-        
 
         private void DisplayFatalErrorPage(string message, Exception ex)
         {

@@ -123,8 +123,8 @@ namespace TDFMAUI.Controls
         
         private void ApplyPlatformButtonStyles()
         {
-            // Apply platform-specific styles to the action button if needed
-            // This can be implemented later if specific button styling is required
+            // ActionButton platform-specific styles can be applied here if needed
+            // For now, they are handled by global button styles and AppThemeBinding
         }
         
         private static void OnActionTextChanged(BindableObject bindable, object oldValue, object newValue)

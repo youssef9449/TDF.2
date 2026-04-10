@@ -447,15 +447,6 @@ namespace TDFMAUI.Helpers
         }
         
         /// <summary>
-        /// Gets the platform-specific theme resource dictionary.
-        /// (Deprecated: resources should be defined in XAML using OnPlatform and AppThemeBinding)
-        /// </summary>
-        public static ResourceDictionary GetPlatformThemeResources(AppTheme theme)
-        {
-            return new ResourceDictionary();
-        }
-        
-        /// <summary>
         /// Gets the current system theme
         /// </summary>
         public static AppTheme GetSystemTheme()

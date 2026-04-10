@@ -95,9 +95,7 @@ namespace TDFMAUI.Services
                 {
                     try
                     {
-                        var statusBarColor = theme == AppTheme.Dark
-                            ? ThemeHelper.GetThemeResource<Color>("AndroidStatusBarColor", AppTheme.Dark)
-                            : ThemeHelper.GetThemeResource<Color>("AndroidStatusBarColor", AppTheme.Light);
+                        var statusBarColor = ThemeHelper.GetThemeResource<Color>("AndroidStatusBarColor", theme);
 
                         if (statusBarColor == null)
                         {

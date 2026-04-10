@@ -87,7 +87,7 @@
                        Padding="{OnIdiom Phone='12', Default='20'}"
                        CornerRadius="{OnPlatform WinUI=8, MacCatalyst=10, Default=15}"
                        HasShadow="True"
-                       BorderColor="{OnPlatform WinUI={StaticResource WindowsBorderColor}, MacCatalyst={StaticResource MacOSControlBorderColor}, Default=Transparent}">
+                       BorderColor="{OnPlatform WinUI={StaticResource WindowsControlBorderColor}, MacCatalyst={StaticResource MacOSControlBorderColor}, Default=Transparent}">
                     <VisualStateManager.VisualStateGroups>
                         <VisualStateGroup Name="DeviceStates">
                             <VisualState Name="Desktop">

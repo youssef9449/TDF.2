@@ -6,7 +6,7 @@
              x:Class="TDFMAUI.Pages.AddUserPage"
              x:DataType="viewmodels:AddUserViewModel"
              Title="{Binding Title}"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{DynamicResource BackgroundColor}">
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->

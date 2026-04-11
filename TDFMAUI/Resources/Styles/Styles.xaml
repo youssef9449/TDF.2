@@ -85,7 +85,7 @@
     <Style TargetType="Entry">
         <Setter Property="TextColor" Value="{DynamicResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSans-Regular" />
-        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray600}}" />
+        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={DynamicResource Gray500}, Dark={DynamicResource Gray600}}" />
         <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceVariantColor}" />
         <Setter Property="VisualStateManager.VisualStateGroups">
             <VisualStateGroupList>
@@ -97,7 +97,7 @@
                     </VisualState>
                     <VisualState x:Name="Disabled">
                         <VisualState.Setters>
-                            <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Gray400}, Dark={StaticResource Gray600}}" />
+                            <Setter Property="TextColor" Value="{AppThemeBinding Light={DynamicResource Gray400}, Dark={DynamicResource Gray600}}" />
                             <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceColor}" />
                         </VisualState.Setters>
                     </VisualState>
@@ -148,14 +148,14 @@
     <Style TargetType="SearchBar">
         <Setter Property="TextColor" Value="{DynamicResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSans-Regular" />
-        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray600}}" />
+        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={DynamicResource Gray500}, Dark={DynamicResource Gray600}}" />
         <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceVariantColor}" />
     </Style>
 
     <Style TargetType="Picker">
         <Setter Property="TextColor" Value="{DynamicResource TextColor}" />
         <Setter Property="FontFamily" Value="OpenSans-Regular" />
-        <Setter Property="TitleColor" Value="{AppThemeBinding Light={StaticResource Gray500}, Dark={StaticResource Gray600}}" />
+        <Setter Property="TitleColor" Value="{AppThemeBinding Light={DynamicResource Gray500}, Dark={DynamicResource Gray600}}" />
         <Setter Property="BackgroundColor" Value="{DynamicResource SurfaceVariantColor}" />
     </Style>
 

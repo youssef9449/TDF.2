@@ -8,7 +8,7 @@
              x:DataType="viewModels:AddRequestViewModel"
              x:Class="TDFMAUI.Features.Requests.AddRequestPage"
              Title="{Binding IsEditMode, Converter={StaticResource BoolToStringConverter}, ConverterParameter='Edit Leave Request|Add Leave Request'}"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{DynamicResource BackgroundColor}">
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -20,7 +20,7 @@
 
             <Style x:Key="FormFieldTitleLabelStyle" TargetType="Label">
                 <Setter Property="FontAttributes" Value="Bold" />
-                <Setter Property="TextColor" Value="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}" />
+                <Setter Property="TextColor" Value="{OnPlatform WinUI={DynamicResource WindowsControlForegroundColor}, MacCatalyst={DynamicResource MacOSControlForegroundColor}, Default=White}" />
                 <Setter Property="VerticalOptions" Value="Center" />
                 <Setter Property="Margin" Value="0,0,0,5" />
                 <Setter Property="FontSize" Value="{OnPlatform WinUI=14, MacCatalyst=14, Default=14}" />
@@ -87,7 +87,7 @@
                        Padding="{OnIdiom Phone='12', Default='20'}"
                        CornerRadius="{OnPlatform WinUI=8, MacCatalyst=10, Default=15}"
                        HasShadow="True"
-                       BorderColor="{OnPlatform WinUI={StaticResource WindowsControlBorderColor}, MacCatalyst={StaticResource MacOSControlBorderColor}, Default=Transparent}">
+                       BorderColor="{OnPlatform WinUI={DynamicResource WindowsControlBorderColor}, MacCatalyst={DynamicResource MacOSControlBorderColor}, Default=Transparent}">
                     <VisualStateManager.VisualStateGroups>
                         <VisualStateGroup Name="DeviceStates">
                             <VisualState Name="Desktop">
@@ -95,7 +95,7 @@
                                     <StateTrigger IsActive="{Binding Source={x:Static helpers:DeviceHelper.IsDesktop}}" />
                                 </VisualState.StateTriggers>
                                 <VisualState.Setters>
-                                    <Setter Property="BackgroundColor" Value="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default={StaticResource Primary}}" />
+                                    <Setter Property="BackgroundColor" Value="{OnPlatform WinUI={DynamicResource WindowsControlBackgroundColor}, MacCatalyst={DynamicResource MacOSControlBackgroundColor}, Default={StaticResource Primary}}" />
                                     <Setter Property="Padding" Value="20" />
                                     <Setter Property="Margin" Value="0,5,0,5" />
                                 </VisualState.Setters>
@@ -125,13 +125,13 @@
                                 StrokeThickness="1"
                                 Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='LeaveType'}"
                                 Padding="0" 
-                                BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default={StaticResource SurfaceColor}}">
+                                BackgroundColor="{OnPlatform WinUI={DynamicResource WindowsControlBackgroundColor}, MacCatalyst={DynamicResource MacOSControlBackgroundColor}, Default={DynamicResource SurfaceColor}}">
                             <Picker Title="Select Leave Type"
                                     ItemsSource="{Binding LeaveTypes}"
                                     SelectedItem="{Binding SelectedLeaveType}"
                                     IsEnabled="{Binding IsNotBusy}"
-                                    TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
-                                    TitleColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default={StaticResource TextSecondaryColor}}"
+                                    TextColor="{OnPlatform WinUI={DynamicResource WindowsControlForegroundColor}, MacCatalyst={DynamicResource MacOSControlForegroundColor}, Default=White}"
+                                    TitleColor="{OnPlatform WinUI={DynamicResource WindowsControlDisabledColor}, MacCatalyst={DynamicResource MacOSControlDisabledColor}, Default={DynamicResource TextSecondaryColor}}"
                                     BackgroundColor="Transparent"/>
                         </Border>
 
@@ -143,10 +143,10 @@
                                 StrokeThickness="1"
                                 Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartDate'}"
                                 Padding="0" 
-                                BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                                BackgroundColor="{OnPlatform WinUI={DynamicResource WindowsControlBackgroundColor}, MacCatalyst={DynamicResource MacOSControlBackgroundColor}, Default=Transparent}">
                             <DatePicker Date="{Binding StartDate}"
                                        Format="dddd, MMMM d, yyyy"
-                                       TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                       TextColor="{OnPlatform WinUI={DynamicResource WindowsControlForegroundColor}, MacCatalyst={DynamicResource MacOSControlForegroundColor}, Default=White}"
                                        MinimumDate="{Binding MinDate}"
                                        MaximumDate="{Binding MaxDate}"
                                        IsEnabled="{Binding IsNotBusy}"/>
@@ -161,11 +161,11 @@
                                 StrokeThickness="1"
                                 Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndDate'}"
                                 Padding="0" 
-                                BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}"
+                                BackgroundColor="{OnPlatform WinUI={DynamicResource WindowsControlBackgroundColor}, MacCatalyst={DynamicResource MacOSControlBackgroundColor}, Default=Transparent}"
                                 IsVisible="{Binding SelectedLeaveType, Converter={StaticResource LeaveTypeToEndDateVisibilityConverter}}">
                             <DatePicker Date="{Binding EndDate}"
                                        Format="dddd, MMMM d, yyyy"
-                                       TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                       TextColor="{OnPlatform WinUI={DynamicResource WindowsControlForegroundColor}, MacCatalyst={DynamicResource MacOSControlForegroundColor}, Default=White}"
                                        MinimumDate="{Binding StartDate}"
                                        MaximumDate="{Binding MaxDate}"
                                        IsEnabled="{Binding IsNotBusy}"
@@ -183,10 +183,10 @@
                                 <Border StrokeThickness="1"
                                         Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='StartTime'}"
                                         Padding="0" 
-                                        BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                                        BackgroundColor="{OnPlatform WinUI={DynamicResource WindowsControlBackgroundColor}, MacCatalyst={DynamicResource MacOSControlBackgroundColor}, Default=Transparent}">
                                     <TimePicker Time="{Binding StartTime}"
                                                Format="t"
-                                               TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                               TextColor="{OnPlatform WinUI={DynamicResource WindowsControlForegroundColor}, MacCatalyst={DynamicResource MacOSControlForegroundColor}, Default=White}"
                                                IsEnabled="{Binding IsNotBusy}" />
                                 </Border>
                             </VerticalStackLayout>
@@ -195,10 +195,10 @@
                                 <Border StrokeThickness="1"
                                         Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='EndTime'}"
                                         Padding="0" 
-                                        BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                                        BackgroundColor="{OnPlatform WinUI={DynamicResource WindowsControlBackgroundColor}, MacCatalyst={DynamicResource MacOSControlBackgroundColor}, Default=Transparent}">
                                     <TimePicker Time="{Binding EndTime}"
                                                Format="t"
-                                               TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
+                                               TextColor="{OnPlatform WinUI={DynamicResource WindowsControlForegroundColor}, MacCatalyst={DynamicResource MacOSControlForegroundColor}, Default=White}"
                                                IsEnabled="{Binding IsNotBusy}" />
                                 </Border>
                             </VerticalStackLayout>
@@ -212,11 +212,11 @@
                                 StrokeThickness="1"
                                 Stroke="{Binding ValidationErrors, Converter={StaticResource ValidationColorConverter}, ConverterParameter='Reason'}"
                                 Padding="0" 
-                                BackgroundColor="{OnPlatform WinUI={StaticResource WindowsControlBackgroundColor}, MacCatalyst={StaticResource MacOSControlBackgroundColor}, Default=Transparent}">
+                                BackgroundColor="{OnPlatform WinUI={DynamicResource WindowsControlBackgroundColor}, MacCatalyst={DynamicResource MacOSControlBackgroundColor}, Default=Transparent}">
                             <Editor Text="{Binding RequestReason}" 
                                    Placeholder="Enter reason for leave (optional)" 
-                                   TextColor="{OnPlatform WinUI={StaticResource WindowsControlForegroundColor}, MacCatalyst={StaticResource MacOSControlForegroundColor}, Default=White}"
-                                   PlaceholderColor="{OnPlatform WinUI={StaticResource WindowsControlDisabledColor}, MacCatalyst={StaticResource MacOSControlDisabledColor}, Default={StaticResource TextSecondaryColor}}"
+                                   TextColor="{OnPlatform WinUI={DynamicResource WindowsControlForegroundColor}, MacCatalyst={DynamicResource MacOSControlForegroundColor}, Default=White}"
+                                   PlaceholderColor="{OnPlatform WinUI={DynamicResource WindowsControlDisabledColor}, MacCatalyst={DynamicResource MacOSControlDisabledColor}, Default={DynamicResource TextSecondaryColor}}"
                                    MaxLength="200" 
                                    AutoSize="TextChanges" 
                                    HeightRequest="100"
@@ -275,7 +275,7 @@
                     Text="Cancel"
                     Command="{Binding CancelCommand}"
                     IsEnabled="{Binding IsNotBusy}"
-                    BackgroundColor="{OnPlatform WinUI=#555555, MacCatalyst=#666666, Default={StaticResource TextSecondaryColor}}"
+                    BackgroundColor="{OnPlatform WinUI=#555555, MacCatalyst=#666666, Default={DynamicResource TextSecondaryColor}}"
                     TextColor="White"
                     WidthRequest="{OnPlatform WinUI=140, MacCatalyst=140, Default={OnIdiom Phone=100, Default=120}}"
                     HeightRequest="{OnPlatform WinUI=50, MacCatalyst=50, Default={OnIdiom Phone=40, Default=45}}"

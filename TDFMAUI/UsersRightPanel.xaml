@@ -25,7 +25,7 @@
                             <Frame BackgroundColor="{Binding StatusColor}" WidthRequest="12" HeightRequest="12" CornerRadius="6" Padding="0" VerticalOptions="Center" Margin="0,0,10,0" />
                             <VerticalStackLayout Grid.Column="1">
                                 <Label Text="{Binding FullName}" FontSize="14" FontAttributes="Bold" />
-                                <Label Text="{Binding Department}" FontSize="12" TextColor="{StaticResource Gray600}" />
+                                <Label Text="{Binding Department}" FontSize="12" TextColor="{DynamicResource Gray600}" />
                             </VerticalStackLayout>
                         </Grid>
                     </DataTemplate>

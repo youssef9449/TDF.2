@@ -6,7 +6,7 @@
              x:Class="TDFMAUI.Pages.ProfilePage"
              Title="Profile"
              x:DataType="viewmodels:UserProfileViewModel"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{DynamicResource BackgroundColor}">
 
     <ScrollView>
         <Grid RowDefinitions="Auto,Auto,Auto" Padding="20" RowSpacing="20">

@@ -7,7 +7,7 @@
              x:Class="TDFMAUI.Pages.UserProfilePage"
              Title="{Binding Title}"
              x:DataType="viewmodels:UserProfileViewModel"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{DynamicResource BackgroundColor}">
 
     <ContentPage.Resources>
         <ResourceDictionary>

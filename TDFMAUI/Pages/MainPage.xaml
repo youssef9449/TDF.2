@@ -4,13 +4,13 @@
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              x:Class="TDFMAUI.Pages.MainPage"
              Title="Dashboard"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{DynamicResource BackgroundColor}">
 
     <Grid RowDefinitions="Auto,*,Auto" Padding="20">
         <Label Grid.Row="2" Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}" 
-               HorizontalOptions="End" VerticalOptions="End" Margin="0,0,10,10" FontSize="10" TextColor="{StaticResource Gray600}"/>
+               HorizontalOptions="End" VerticalOptions="End" Margin="0,0,10,10" FontSize="10" TextColor="{DynamicResource Gray600}"/>
         <Label Grid.Row="2" Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}" 
-               HorizontalOptions="End" VerticalOptions="End" Margin="0,0,10,10" FontSize="10" TextColor="{StaticResource Gray600}"/>
+               HorizontalOptions="End" VerticalOptions="End" Margin="0,0,10,10" FontSize="10" TextColor="{DynamicResource Gray600}"/>
         <!-- Header -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,20">
             <VerticalStackLayout>

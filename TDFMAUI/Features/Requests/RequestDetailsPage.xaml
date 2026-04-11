@@ -4,7 +4,7 @@
              xmlns:pages="clr-namespace:TDFMAUI.Features.Requests"
              x:Class="TDFMAUI.Features.Requests.RequestDetailsPage"
              Title="Request Details"
-             BackgroundColor="{StaticResource Gray100}">
+             BackgroundColor="{DynamicResource Gray100}">
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->

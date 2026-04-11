@@ -4,7 +4,7 @@
              xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
              x:Class="TDFMAUI.Pages.DiagnosticsPage"
              Title="Diagnostics"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{DynamicResource BackgroundColor}">
     <ScrollView>
         <VerticalStackLayout Padding="20">
             <Label Text="App Diagnostics" FontSize="24" FontAttributes="Bold" Margin="0,0,0,20"/>

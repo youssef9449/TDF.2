@@ -6,7 +6,7 @@
              x:Class="TDFMAUI.Pages.UsersPage"
              x:DataType="viewmodels:UsersViewModel"
              Title="{Binding Title}"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{DynamicResource BackgroundColor}">
 
     <Grid RowDefinitions="Auto,*,Auto" Padding="{OnIdiom Phone='10', Tablet='15', Desktop='20'}">
         <!-- Header -->
@@ -76,15 +76,15 @@
                     <CollectionView ItemsSource="{Binding Users}" EmptyView="No users currently online">
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="viewmodels:UserViewModel">
-                                <Frame Margin="0,5" Padding="{OnIdiom Phone='10', Default='15'}" BackgroundColor="White" CornerRadius="10" BorderColor="{StaticResource Gray300}">
+                                <Frame Margin="0,5" Padding="{OnIdiom Phone='10', Default='15'}" BackgroundColor="White" CornerRadius="10" BorderColor="{DynamicResource Gray300}">
                                     <VerticalStackLayout>
                                         <!-- Desktop/Tablet Layout -->
                                         <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{x:Static helpers:DeviceHelper.IsLargeScreen}">
                                             <Frame Grid.Column="0" BackgroundColor="{Binding StatusColor}" WidthRequest="16" HeightRequest="16" CornerRadius="8" Padding="0" VerticalOptions="Center" Margin="0,0,10,0" />
                                             <VerticalStackLayout Grid.Column="1" Spacing="5">
                                                 <Label Text="{Binding FullName}" FontAttributes="Bold" FontSize="16" />
-                                                <Label Text="{Binding Department}" TextColor="{StaticResource Gray600}" FontSize="14" />
-                                                <Label Text="{Binding StatusMessage}" IsVisible="{Binding HasStatusMessage}" TextColor="{StaticResource Gray500}" FontSize="12" MaxLines="2" LineBreakMode="TailTruncation" />
+                                                <Label Text="{Binding Department}" TextColor="{DynamicResource Gray600}" FontSize="14" />
+                                                <Label Text="{Binding StatusMessage}" IsVisible="{Binding HasStatusMessage}" TextColor="{DynamicResource Gray500}" FontSize="12" MaxLines="2" LineBreakMode="TailTruncation" />
                                             </VerticalStackLayout>
                                             <HorizontalStackLayout Grid.Column="2" Spacing="10" VerticalOptions="Center">
                                                 <Button Text="Message"
@@ -103,9 +103,9 @@
                                             <Frame Grid.Row="0" Grid.Column="0" BackgroundColor="{Binding StatusColor}" WidthRequest="12" HeightRequest="12" CornerRadius="6" Padding="0" VerticalOptions="Center" Margin="0,0,8,0" />
                                             <VerticalStackLayout Grid.Row="0" Grid.Column="1" Spacing="2">
                                                 <Label Text="{Binding FullName}" FontAttributes="Bold" FontSize="14" />
-                                                <Label Text="{Binding Department}" TextColor="{StaticResource Gray600}" FontSize="12" />
+                                                <Label Text="{Binding Department}" TextColor="{DynamicResource Gray600}" FontSize="12" />
                                             </VerticalStackLayout>
-                                            <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Text="{Binding StatusMessage}" IsVisible="{Binding HasStatusMessage}" TextColor="{StaticResource Gray500}" FontSize="12" MaxLines="2" LineBreakMode="TailTruncation" />
+                                            <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Text="{Binding StatusMessage}" IsVisible="{Binding HasStatusMessage}" TextColor="{DynamicResource Gray500}" FontSize="12" MaxLines="2" LineBreakMode="TailTruncation" />
                                             <HorizontalStackLayout Grid.Row="0" Grid.Column="2" Spacing="5" VerticalOptions="Center">
                                                 <Button Text="Msg"
                                                         Command="{Binding BindingContext.MessageUserAsyncCommand, Source={x:Reference usersPage}}"
@@ -130,7 +130,7 @@
         <ActivityIndicator Grid.Row="1" IsVisible="{Binding IsBusy}" IsRunning="{Binding IsBusy}" Color="{StaticResource Primary}" HorizontalOptions="Center" VerticalOptions="Center" />
                            
         <!-- My status display -->
-        <Frame Grid.Row="2" IsVisible="False" x:Name="myStatusFrame" Margin="0,10,0,0" Padding="{OnIdiom Phone='10', Default='15'}" BackgroundColor="White" BorderColor="{StaticResource Gray300}" CornerRadius="10">
+        <Frame Grid.Row="2" IsVisible="False" x:Name="myStatusFrame" Margin="0,10,0,0" Padding="{OnIdiom Phone='10', Default='15'}" BackgroundColor="White" BorderColor="{DynamicResource Gray300}" CornerRadius="10">
             <VerticalStackLayout>
                 <VerticalStackLayout.MaximumWidthRequest>
                     <OnIdiom x:TypeArguments="x:Double" Phone="10000" Tablet="600" Desktop="700" />

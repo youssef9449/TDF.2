@@ -5,7 +5,7 @@
              xmlns:controls="clr-namespace:TDFMAUI.Controls"
              x:Class="TDFMAUI.Features.Settings.ThemeSettingsPage"
              Title="Theme Settings"
-             BackgroundColor="{AppThemeBinding Light={StaticResource BackgroundColor}, Dark={StaticResource BackgroundColor}}">
+             BackgroundColor="{AppThemeBinding Light={DynamicResource BackgroundColor}, Dark={DynamicResource BackgroundColor}}">
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="20">
@@ -46,7 +46,7 @@
                         
                         <Label Text="When enabled, the app will use platform-specific colors and styles for each platform (Windows, macOS, iOS, Android)." 
                                FontSize="12" 
-                               TextColor="{AppThemeBinding Light={StaticResource TextTertiaryColor}, Dark={StaticResource TextTertiaryColor}}" />
+                               TextColor="{AppThemeBinding Light={DynamicResource TextTertiaryColor}, Dark={DynamicResource TextTertiaryColor}}" />
                     </VerticalStackLayout>
                 </controls:ThemedCard.Content>
             </controls:ThemedCard>
@@ -82,17 +82,17 @@
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
                             <Button Grid.Column="0" Text="Primary" Style="{StaticResource ButtonPrimary}" />
                             <Button Grid.Column="1" Text="Secondary" 
-                                    BackgroundColor="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray800}}" 
-                                    TextColor="{AppThemeBinding Light={StaticResource TextColor}, Dark={StaticResource TextColor}}" />
+                                    BackgroundColor="{AppThemeBinding Light={DynamicResource Gray200}, Dark={DynamicResource Gray800}}"
+                                    TextColor="{AppThemeBinding Light={DynamicResource TextColor}, Dark={DynamicResource TextColor}}" />
                         </Grid>
                         
                         <Entry Placeholder="Enter text here" />
                         
-                        <BoxView HeightRequest="1" Color="{AppThemeBinding Light={StaticResource BorderColor}, Dark={StaticResource BorderColor}}" />
+                        <BoxView HeightRequest="1" Color="{AppThemeBinding Light={DynamicResource BorderColor}, Dark={DynamicResource BorderColor}}" />
                         
                         <Label Text="Platform-specific styling is applied to this card and its contents" 
                                FontSize="12" 
-                               TextColor="{AppThemeBinding Light={StaticResource TextTertiaryColor}, Dark={StaticResource TextTertiaryColor}}" />
+                               TextColor="{AppThemeBinding Light={DynamicResource TextTertiaryColor}, Dark={DynamicResource TextTertiaryColor}}" />
                     </VerticalStackLayout>
                 </controls:ThemedCard.Content>
             </controls:ThemedCard>

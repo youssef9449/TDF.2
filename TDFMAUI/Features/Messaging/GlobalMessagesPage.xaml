@@ -6,7 +6,7 @@
              x:Class="TDFMAUI.Pages.GlobalMessagesPage"
              x:DataType="vm:GlobalMessagesViewModel"
              Title="Global Messages"
-             BackgroundColor="{StaticResource Gray100}">
+             BackgroundColor="{DynamicResource Gray100}">
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->
@@ -59,7 +59,7 @@
                         <DataTemplate x:DataType="msgModels:ChatMessageModel">
                             <Frame Margin="0,5" 
                                    Padding="{OnIdiom Phone='10', Default='15'}"
-                                   BorderColor="{StaticResource Gray300}"
+                                   BorderColor="{DynamicResource Gray300}"
                                    BackgroundColor="White"
                                    CornerRadius="10">
                                 <Grid>
@@ -72,7 +72,7 @@
                                                        FontSize="16"/>
                                                 <Label Grid.Column="1" 
                                                        Text="{Binding SentAt, StringFormat='{0:MM/dd/yyyy HH:mm}'}" 
-                                                       TextColor="{StaticResource Gray500}"
+                                                       TextColor="{DynamicResource Gray500}"
                                                        FontSize="12"/>
                                             </Grid>
                                             <Label Text="{Binding Content}" 
@@ -90,7 +90,7 @@
                                                FontSize="14"/>
                                         <Label Grid.Row="0" Grid.Column="1" 
                                                Text="{Binding SentAt, StringFormat='{0:MM/dd HH:mm}'}" 
-                                               TextColor="{StaticResource Gray500}"
+                                               TextColor="{DynamicResource Gray500}"
                                                FontSize="10"
                                                HorizontalOptions="End"/>
                                         <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"

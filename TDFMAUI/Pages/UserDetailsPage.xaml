@@ -6,7 +6,7 @@
              x:Class="TDFMAUI.Pages.UserDetailsPage"
              Title="User Details"
              x:DataType="viewmodels:UserViewModel"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{DynamicResource BackgroundColor}">
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="20">
@@ -38,7 +38,7 @@
 
             <!-- User Info -->
             <Frame Padding="20" 
-                   BorderColor="{StaticResource Gray300}"
+                   BorderColor="{DynamicResource Gray300}"
                    BackgroundColor="White"
                    CornerRadius="10">
                 <VerticalStackLayout Spacing="15">

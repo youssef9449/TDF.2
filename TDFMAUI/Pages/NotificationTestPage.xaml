@@ -34,7 +34,7 @@
 
                 <!-- Info Notification -->
                 <Border StrokeShape="RoundRectangle 8"
-                        Stroke="{StaticResource Gray300}"
+                        Stroke="{DynamicResource Gray300}"
                         StrokeThickness="1"
                         Padding="15">
                     <VerticalStackLayout Spacing="15">
@@ -58,7 +58,7 @@
                 
                 <!-- Success Notification -->
                 <Border StrokeShape="RoundRectangle 8"
-                        Stroke="{StaticResource Gray300}"
+                        Stroke="{DynamicResource Gray300}"
                         StrokeThickness="1"
                         Padding="15">
                     <VerticalStackLayout Spacing="15">
@@ -82,7 +82,7 @@
                 
                 <!-- Warning Notification -->
                 <Border StrokeShape="RoundRectangle 8"
-                        Stroke="{StaticResource Gray300}"
+                        Stroke="{DynamicResource Gray300}"
                         StrokeThickness="1"
                         Padding="15">
                     <VerticalStackLayout Spacing="15">
@@ -106,7 +106,7 @@
                 
                 <!-- Error Notification -->
                 <Border StrokeShape="RoundRectangle 8"
-                        Stroke="{StaticResource Gray300}"
+                        Stroke="{DynamicResource Gray300}"
                         StrokeThickness="1"
                         Padding="15">
                     <VerticalStackLayout Spacing="15">

@@ -8,9 +8,9 @@
             <!-- Card styles that adapt to the current theme -->
             <Style x:Key="CardBorderStyle" TargetType="Border">
                 <Setter Property="StrokeShape" Value="RoundRectangle 8" />
-                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource BorderColor}, Dark={StaticResource BorderColor}}" />
+                <Setter Property="Stroke" Value="{AppThemeBinding Light={DynamicResource BorderColor}, Dark={DynamicResource BorderColor}}" />
                 <Setter Property="StrokeThickness" Value="1" />
-                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource SurfaceColor}, Dark={StaticResource SurfaceColor}}" />
+                <Setter Property="Background" Value="{AppThemeBinding Light={DynamicResource SurfaceColor}, Dark={DynamicResource SurfaceColor}}" />
                 <Setter Property="Padding" Value="16" />
                 <Setter Property="Margin" Value="0,0,0,16" />
                 <Setter Property="Shadow">
@@ -26,20 +26,20 @@
             <!-- Platform-specific card styles -->
             <Style x:Key="WindowsCardStyle" TargetType="Border" BasedOn="{StaticResource CardBorderStyle}">
                 <Setter Property="StrokeShape" Value="RoundRectangle 4" />
-                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource WindowsControlBorderColor}, Dark={StaticResource WindowsControlBorderColor}}" />
-                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource WindowsControlBackgroundColor}, Dark={StaticResource WindowsControlBackgroundColor}}" />
+                <Setter Property="Stroke" Value="{AppThemeBinding Light={DynamicResource WindowsControlBorderColor}, Dark={DynamicResource WindowsControlBorderColor}}" />
+                <Setter Property="Background" Value="{AppThemeBinding Light={DynamicResource WindowsControlBackgroundColor}, Dark={DynamicResource WindowsControlBackgroundColor}}" />
             </Style>
             
             <Style x:Key="MacOSCardStyle" TargetType="Border" BasedOn="{StaticResource CardBorderStyle}">
                 <Setter Property="StrokeShape" Value="RoundRectangle 6" />
-                <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource MacOSControlBorderColor}, Dark={StaticResource MacOSControlBorderColor}}" />
-                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource MacOSControlBackgroundColor}, Dark={StaticResource MacOSControlBackgroundColor}}" />
+                <Setter Property="Stroke" Value="{AppThemeBinding Light={DynamicResource MacOSControlBorderColor}, Dark={DynamicResource MacOSControlBorderColor}}" />
+                <Setter Property="Background" Value="{AppThemeBinding Light={DynamicResource MacOSControlBackgroundColor}, Dark={DynamicResource MacOSControlBackgroundColor}}" />
             </Style>
             
             <Style x:Key="iOSCardStyle" TargetType="Border" BasedOn="{StaticResource CardBorderStyle}">
                 <Setter Property="StrokeShape" Value="RoundRectangle 10" />
                 <Setter Property="Stroke" Value="Transparent" />
-                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource iOSSystemBackgroundColor}, Dark={StaticResource iOSSystemBackgroundColor}}" />
+                <Setter Property="Background" Value="{AppThemeBinding Light={DynamicResource iOSSystemBackgroundColor}, Dark={DynamicResource iOSSystemBackgroundColor}}" />
                 <Setter Property="Shadow">
                     <Setter.Value>
                         <Shadow Brush="{AppThemeBinding Light=Black, Dark=#40000000}" 
@@ -53,7 +53,7 @@
             <Style x:Key="AndroidCardStyle" TargetType="Border" BasedOn="{StaticResource CardBorderStyle}">
                 <Setter Property="StrokeShape" Value="RoundRectangle 8" />
                 <Setter Property="Stroke" Value="Transparent" />
-                <Setter Property="Background" Value="{AppThemeBinding Light={StaticResource AndroidCardViewColor}, Dark={StaticResource AndroidCardViewColor}}" />
+                <Setter Property="Background" Value="{AppThemeBinding Light={DynamicResource AndroidCardViewColor}, Dark={DynamicResource AndroidCardViewColor}}" />
                 <Setter Property="Shadow">
                     <Setter.Value>
                         <Shadow Brush="{AppThemeBinding Light=Black, Dark=#40000000}" 
@@ -78,7 +78,7 @@
                        Text="{Binding Title}" 
                        FontSize="18" 
                        FontAttributes="Bold"
-                       TextColor="{AppThemeBinding Light={StaticResource TextColor}, Dark={StaticResource TextColor}}" />
+                       TextColor="{AppThemeBinding Light={DynamicResource TextColor}, Dark={DynamicResource TextColor}}" />
                 
                 <Button x:Name="ActionButton" 
                         Grid.Column="1"

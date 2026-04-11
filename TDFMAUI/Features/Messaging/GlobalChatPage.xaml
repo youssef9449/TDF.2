@@ -5,7 +5,7 @@
              Title="Global Chat">
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Padding="10" BackgroundColor="{StaticResource SurfaceVariantColor}">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Padding="10" BackgroundColor="{DynamicResource SurfaceVariantColor}">
             <Button Grid.Column="0" 
                     Text="Back" 
                     Clicked="OnBackClicked" 

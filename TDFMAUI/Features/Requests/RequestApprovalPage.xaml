@@ -11,7 +11,7 @@
              x:Class="TDFMAUI.Pages.RequestApprovalPage"
              Title="Request Approval"
              x:DataType="vm:RequestApprovalViewModel"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{DynamicResource BackgroundColor}">
 
     <ContentPage.Resources>
         <ResourceDictionary>

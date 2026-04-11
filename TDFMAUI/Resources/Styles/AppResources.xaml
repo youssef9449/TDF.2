@@ -14,5 +14,4 @@
     <converters:BooleanInverter x:Key="BooleanInverter" />
     <converters:IntToBoolConverter x:Key="IntToBoolConverter" />
     <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
-    <converters:ThemeToBackgroundColorConverter x:Key="ThemeToBackgroundColorConverter" />
 </ResourceDictionary>

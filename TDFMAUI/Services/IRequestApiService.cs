@@ -17,6 +17,8 @@ namespace TDFMAUI.Services
         Task<ApiResponse<bool>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto);
         Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetRequestsAsync(RequestPaginationDto pagination, int? userId = null, string department = null, bool queueIfUnavailable = true);
         Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetRequestsForApprovalAsync(RequestPaginationDto pagination, bool queueIfUnavailable = true);
+        Task<ApiResponse<List<RequestResponseDto>>> GetRecentDashboardRequestsAsync();
+        Task<ApiResponse<int>> GetPendingDashboardRequestCountAsync();
         Task<ApiResponse<Dictionary<string, int>>> GetLeaveBalancesAsync(int userId, bool queueIfUnavailable = true);
     }
 }

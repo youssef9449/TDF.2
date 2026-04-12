@@ -272,6 +272,10 @@ namespace TDFAPI.Controllers
             {
                 return Forbid(ex.Message);
             }
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
+            {
+                return BadRequest(ex.Message);
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in manager approval for request {RequestId}", id);
@@ -302,6 +306,10 @@ namespace TDFAPI.Controllers
             catch (System.UnauthorizedAccessException ex)
             {
                 return Forbid(ex.Message);
+            }
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {
@@ -334,6 +342,10 @@ namespace TDFAPI.Controllers
             {
                 return Forbid(ex.Message);
             }
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
+            {
+                return BadRequest(ex.Message);
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in manager rejection for request {RequestId}", id);
@@ -364,6 +376,10 @@ namespace TDFAPI.Controllers
             catch (System.UnauthorizedAccessException ex)
             {
                 return Forbid(ex.Message);
+            }
+            catch (TDFShared.Exceptions.BusinessRuleException ex)
+            {
+                return BadRequest(ex.Message);
             }
             catch (Exception ex)
             {

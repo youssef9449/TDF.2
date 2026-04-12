@@ -15,6 +15,10 @@ namespace TDFMAUI.Services
         Task<string> GetRawResponseAsync(string endpoint);
         Task<T> GetAsync<T>(string endpoint, bool queueIfUnavailable = false);
         
+        // Dashboard
+        Task<ApiResponse<List<RequestResponseDto>>> GetRecentDashboardRequestsAsync();
+        Task<ApiResponse<int>> GetPendingDashboardRequestCountAsync();
+
         // Connectivity
         Task<bool> TestConnectivityAsync();
     }

@@ -13,7 +13,7 @@ namespace TDFMAUI.ViewModels
 {
     public partial class UserProfileViewModel : BaseViewModel
     {
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
         private readonly ILocalStorageService _localStorageService;
 
         [ObservableProperty]
@@ -31,9 +31,9 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private ImageSource _profileImage = ImageSource.FromFile("default_profile.png");
 
-        public UserProfileViewModel(ApiService apiService, ILocalStorageService localStorageService)
+        public UserProfileViewModel(IUserApiService userApiService, ILocalStorageService localStorageService)
         {
-            _apiService = apiService;
+            _userApiService = userApiService;
             _localStorageService = localStorageService;
             Title = "Profile";
         }
@@ -58,7 +58,7 @@ namespace TDFMAUI.ViewModels
             IsBusy = true;
             try
             {
-                var user = await _apiService.GetUserAsync(userId);
+                var user = await _userApiService.GetUserByIdAsync(userId);
                 if (user != null)
                 {
                     CurrentUser = user;
@@ -82,7 +82,7 @@ namespace TDFMAUI.ViewModels
 
                 if (CurrentUser.UserID > 0)
                 {
-                    var user = await _apiService.GetUserAsync(CurrentUser.UserID);
+                    var user = await _userApiService.GetUserByIdAsync(CurrentUser.UserID);
                     if (user != null)
                     {
                         CurrentUser = user;
@@ -121,7 +121,7 @@ namespace TDFMAUI.ViewModels
                     Title = EditingUser.Title
                 };
 
-                if (await _apiService.UpdateUserProfileAsync(request))
+                if (await _userApiService.UpdateUserProfileAsync(request))
                 {
                     CurrentUser = EditingUser;
                     await _localStorageService.SetItemAsync("CurrentUser", CurrentUser);
@@ -160,7 +160,7 @@ namespace TDFMAUI.ViewModels
                     await stream.CopyToAsync(ms);
                     ms.Position = 0;
 
-                    if (await _apiService.UploadProfilePictureAsync(ms, photo.FileName, photo.ContentType))
+                    if (await _userApiService.UploadProfilePictureAsync(ms, photo.FileName, photo.ContentType))
                     {
                         await LoadUserProfileAsync();
                     }

@@ -12,20 +12,17 @@ using TDFShared.Services;
 
 namespace TDFAPI.Repositories
 {
-    public class RequestRepository : IRequestRepository
+    public class RequestRepository : GenericRepository<RequestEntity>, IRequestRepository
     {
-        private readonly ApplicationDbContext _context;
-        private readonly ILogger<RequestRepository> _logger;
         private readonly IRoleService _roleService;
 
         public RequestRepository(ApplicationDbContext context, ILogger<RequestRepository> logger, IRoleService roleService)
+            : base(context, logger)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
         }
 
-        public async Task<RequestEntity> GetByIdAsync(int requestId)
+        public new async Task<RequestEntity?> GetByIdAsync(int requestId)
         {
             try
             {

@@ -11,7 +11,7 @@ namespace TDFMAUI.Services
 {
     public class UserPresenceService : IUserPresenceService, IDisposable
     {
-        private readonly IUserPresenceApiService _apiService;
+        private readonly IUserPresenceApiService _userPresenceApiService;
         private readonly IUserPresenceEventsService _eventsService;
         private readonly IUserPresenceCacheService _cacheService;
         private readonly ILogger<UserPresenceService> _logger;
@@ -24,12 +24,12 @@ namespace TDFMAUI.Services
         public event EventHandler<WebSocketErrorEventArgs>? PresenceErrorReceived;
 
         public UserPresenceService(
-            IUserPresenceApiService apiService,
+            IUserPresenceApiService userPresenceApiService,
             IUserPresenceEventsService eventsService,
             IUserPresenceCacheService cacheService,
             ILogger<UserPresenceService> logger)
         {
-            _apiService = apiService;
+            _userPresenceApiService = userPresenceApiService;
             _eventsService = eventsService;
             _cacheService = cacheService;
             _logger = logger;
@@ -50,7 +50,7 @@ namespace TDFMAUI.Services
                 return status.Status;
             }
 
-            var response = await _apiService.GetUserStatusAsync(userId);
+            var response = await _userPresenceApiService.GetUserStatusAsync(userId);
             if (response != null)
             {
                 _cacheService.UpdateUserStatus(userId, response);
@@ -62,7 +62,7 @@ namespace TDFMAUI.Services
 
         public async Task<PaginatedResult<UserPresenceInfo>> GetOnlineUsersAsync(int page = 1, int pageSize = 100)
         {
-            var result = await _apiService.GetOnlineUsersAsync(page, pageSize);
+            var result = await _userPresenceApiService.GetOnlineUsersAsync(page, pageSize);
             if (page == 1)
             {
                 _cacheService.Clear();
@@ -90,7 +90,7 @@ namespace TDFMAUI.Services
             try
             {
                 await _eventsService.UpdatePresenceStatusAsync(status.ToString(), statusMessage ?? string.Empty);
-                await _apiService.UpdateUserConnectionStatusAsync(userId, status != UserPresenceStatus.Offline);
+                await _userPresenceApiService.UpdateUserConnectionStatusAsync(userId, status != UserPresenceStatus.Offline);
 
                 if (_cacheService.TryGetUserStatus(userId, out var userInfo))
                 {
@@ -169,7 +169,7 @@ namespace TDFMAUI.Services
                 }
                 else
                 {
-                    var status = await _apiService.GetUserStatusAsync(userId);
+                    var status = await _userPresenceApiService.GetUserStatusAsync(userId);
                     if (status != null)
                     {
                         _cacheService.UpdateUserStatus(userId, status);

@@ -12,7 +12,7 @@ namespace TDFMAUI.ViewModels
 {
     public partial class PrivateMessagesViewModel : BaseViewModel
     {
-        private readonly ApiService _apiService;
+        private readonly IMessageApiService _messageApiService;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
@@ -27,9 +27,9 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private int _partnerId;
 
-        public PrivateMessagesViewModel(ApiService apiService)
+        public PrivateMessagesViewModel(IMessageApiService messageApiService)
         {
-            _apiService = apiService;
+            _messageApiService = messageApiService;
             Title = "Private Messages";
         }
 
@@ -48,7 +48,7 @@ namespace TDFMAUI.ViewModels
                     FromUserId = PartnerId
                 };
 
-                var result = await _apiService.GetPrivateMessagesAsync(App.CurrentUser?.UserID ?? 0, pagination);
+                var result = await _messageApiService.GetPrivateMessagesAsync(App.CurrentUser?.UserID ?? 0, pagination);
                 Messages.Clear();
                 if (result?.Items != null)
                 {
@@ -93,7 +93,7 @@ namespace TDFMAUI.ViewModels
 
             try
             {
-                var sent = await _apiService.CreatePrivateMessageAsync(dto);
+                var sent = await _messageApiService.CreatePrivateMessageAsync(dto);
                 Messages.Add(new MessageModel
                 {
                     Id = sent.MessageId,
@@ -115,7 +115,7 @@ namespace TDFMAUI.ViewModels
             try
             {
                 var unreadIds = Messages.Where(m => m.FromUserId == partnerId && !m.IsRead).Select(m => m.Id).ToList();
-                if (unreadIds.Any()) await _apiService.MarkMessagesAsReadAsync(unreadIds);
+                if (unreadIds.Any()) await _messageApiService.MarkMessagesAsReadAsync(unreadIds);
             }
             catch (Exception ex) { }
         }

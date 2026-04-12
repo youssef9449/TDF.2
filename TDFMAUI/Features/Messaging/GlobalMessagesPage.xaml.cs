@@ -9,10 +9,10 @@ namespace TDFMAUI.Pages
 {
     public partial class GlobalMessagesPage : ContentPage
     {
-        public GlobalMessagesPage(ApiService apiService, WebSocketService webSocketService)
+        public GlobalMessagesPage(IMessageApiService messageApiService, WebSocketService webSocketService)
         {
             InitializeComponent();
-            BindingContext = new GlobalMessagesViewModel(apiService, webSocketService);
+            BindingContext = new GlobalMessagesViewModel(messageApiService, webSocketService);
         }
 
         // Added for XAML event handler fix

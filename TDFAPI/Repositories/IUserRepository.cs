@@ -7,11 +7,11 @@ using TDFAPI.Services;
 
 namespace TDFAPI.Repositories
 {
-    public interface IUserRepository
+    public interface IUserRepository : IGenericRepository<UserEntity>
     {
-        Task<UserDto?> GetByIdAsync(int userId);
+        new Task<UserDto?> GetByIdAsync(int userId);
         Task<UserDto?> GetByUsernameAsync(string username);
-        Task<List<UserDto>> GetAllAsync();
+        new Task<List<UserDto>> GetAllAsync();
         Task<PaginatedResult<UserDto>> GetPaginatedAsync(int page, int pageSize);
         Task<int> CreateAsync(CreateUserRequest userDto, string passwordHash, string salt);
         Task<bool> UpdateAsync(int userId, UpdateUserRequest userDto);

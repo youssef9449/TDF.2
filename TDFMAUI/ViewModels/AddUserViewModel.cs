@@ -11,7 +11,7 @@ namespace TDFMAUI.ViewModels
 {
     public partial class AddUserViewModel : BaseViewModel
     {
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
         private readonly LookupService _lookupService;
         private readonly ISecurityService _securityService;
 
@@ -44,9 +44,9 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private bool _isAdmin;
 
-        public AddUserViewModel(ApiService apiService, LookupService lookupService, ISecurityService securityService)
+        public AddUserViewModel(IUserApiService userApiService, LookupService lookupService, ISecurityService securityService)
         {
-            _apiService = apiService;
+            _userApiService = userApiService;
             _lookupService = lookupService;
             _securityService = securityService;
             Title = "Add User";
@@ -97,7 +97,7 @@ namespace TDFMAUI.ViewModels
                     IsAdmin = IsAdmin
                 };
 
-                await _apiService.CreateUserAsync(request);
+                await _userApiService.CreateUserAsync(request);
                 await Shell.Current.DisplayAlert("Success", "User added successfully", "OK");
                 await Shell.Current.Navigation.PopAsync();
             }

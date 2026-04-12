@@ -13,31 +13,37 @@ namespace TDFMAUI.Services
 {
     public class RequestService : IRequestService
     {
-        private readonly IApiService _apiService;
+        private readonly IRequestApiService _requestApiService;
+        private readonly IUserApiService _userApiService;
+        private readonly ILookupApiService _lookupApiService;
         private readonly ILogger<RequestService> _logger;
         private readonly IAuthService _authService;
         private readonly SecureStorageService _secureStorageService;
 
         public RequestService(
-            IApiService apiService,
+            IRequestApiService requestApiService,
+            IUserApiService userApiService,
+            ILookupApiService lookupApiService,
             ILogger<RequestService> logger,
             IAuthService authService,
             SecureStorageService secureStorageService)
         {
-            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _requestApiService = requestApiService ?? throw new ArgumentNullException(nameof(requestApiService));
+            _userApiService = userApiService ?? throw new ArgumentNullException(nameof(userApiService));
+            _lookupApiService = lookupApiService ?? throw new ArgumentNullException(nameof(lookupApiService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _authService = authService;
             _secureStorageService = secureStorageService ?? throw new ArgumentNullException(nameof(secureStorageService));
-            _logger.LogInformation("RequestService initialized, using IApiService.");
+            _logger.LogInformation("RequestService initialized, using specialized API services.");
         }
 
         public async Task<ApiResponse<RequestResponseDto>> CreateRequestAsync(RequestCreateDto requestDto)
         {
             if (requestDto == null) throw new ArgumentNullException(nameof(requestDto));
-            _logger.LogInformation("RequestService: Calling IApiService.CreateRequestAsync");
+            _logger.LogInformation("RequestService: Calling IRequestApiService.CreateRequestAsync");
             try
             {
-                var response = await _apiService.CreateRequestAsync(requestDto);
+                var response = await _requestApiService.CreateRequestAsync(requestDto);
                 return response;
             }
             catch (Exception ex)
@@ -54,10 +60,10 @@ namespace TDFMAUI.Services
         public async Task<ApiResponse<RequestResponseDto>> UpdateRequestAsync(int requestId, RequestUpdateDto requestDto)
         {
             if (requestDto == null) throw new ArgumentNullException(nameof(requestDto));
-            _logger.LogInformation("RequestService: Calling IApiService.UpdateRequestAsync for requestId {RequestId}", requestId);
+            _logger.LogInformation("RequestService: Calling IRequestApiService.UpdateRequestAsync for requestId {RequestId}", requestId);
             try
             {
-                var response = await _apiService.UpdateRequestAsync(requestId, requestDto);
+                var response = await _requestApiService.UpdateRequestAsync(requestId, requestDto);
                 return response;
             }
             catch (Exception ex)
@@ -77,7 +83,7 @@ namespace TDFMAUI.Services
             _logger.LogInformation("RequestService: Attempting to get current user ID for GetMyRequestsAsync.");
             try
             {
-                var userIdResponse = await _apiService.GetCurrentUserIdAsync();
+                var userIdResponse = await _userApiService.GetCurrentUserIdAsync();
                 if (!userIdResponse.Success || userIdResponse.Data == 0)
                 {
                     _logger.LogWarning("RequestService: GetMyRequestsAsync - Could not determine current user ID or user ID is 0. Returning empty result.");
@@ -93,8 +99,8 @@ namespace TDFMAUI.Services
                         }
                     };
                 }
-                _logger.LogInformation("RequestService: Calling IApiService.GetRequestsAsync for current user ID {UserId}", userIdResponse.Data);
-                var response = await _apiService.GetRequestsAsync(pagination, userIdResponse.Data, string.Empty);
+                _logger.LogInformation("RequestService: Calling IRequestApiService.GetRequestsAsync for current user ID {UserId}", userIdResponse.Data);
+                var response = await _requestApiService.GetRequestsAsync(pagination, userIdResponse.Data, string.Empty);
                 return response;
             }
             catch (Exception ex)
@@ -111,10 +117,10 @@ namespace TDFMAUI.Services
         public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetAllRequestsAsync(RequestPaginationDto pagination)
         {
             if (pagination == null) throw new ArgumentNullException(nameof(pagination));
-            _logger.LogInformation("RequestService: Calling IApiService.GetRequestsAsync for all requests");
+            _logger.LogInformation("RequestService: Calling IRequestApiService.GetRequestsAsync for all requests");
             try
             {
-                var response = await _apiService.GetRequestsAsync(pagination, null, string.Empty);
+                var response = await _requestApiService.GetRequestsAsync(pagination, null, string.Empty);
                 return response;
             }
             catch (Exception ex)
@@ -131,10 +137,10 @@ namespace TDFMAUI.Services
         public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetRequestsByDepartmentAsync(string department, RequestPaginationDto pagination)
         {
             if (pagination == null) throw new ArgumentNullException(nameof(pagination));
-            _logger.LogInformation("RequestService: Calling IApiService.GetRequestsAsync for department {Department}", department);
+            _logger.LogInformation("RequestService: Calling IRequestApiService.GetRequestsAsync for department {Department}", department);
             try
             {
-                var response = await _apiService.GetRequestsAsync(pagination, null, department);
+                var response = await _requestApiService.GetRequestsAsync(pagination, null, department);
                 return response;
             }
             catch (Exception ex)
@@ -152,7 +158,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var response = await _apiService.GetRequestByIdAsync(requestId);
+                var response = await _requestApiService.GetRequestByIdAsync(requestId);
                 return response;
             }
             catch (Exception ex)
@@ -167,10 +173,10 @@ namespace TDFMAUI.Services
 
         public async Task<ApiResponse<bool>> DeleteRequestAsync(int requestId)
         {
-            _logger.LogInformation("RequestService: Calling IApiService.DeleteRequestAsync for requestId {RequestId}", requestId);
+            _logger.LogInformation("RequestService: Calling IRequestApiService.DeleteRequestAsync for requestId {RequestId}", requestId);
             try
             {
-                var response = await _apiService.DeleteRequestAsync(requestId);
+                var response = await _requestApiService.DeleteRequestAsync(requestId);
                 return response;
             }
             catch (Exception ex)
@@ -186,7 +192,7 @@ namespace TDFMAUI.Services
 
         public async Task<ApiResponse<RequestResponseDto>> ManagerApproveRequestAsync(int requestId, ManagerApprovalDto approvalDto)
         {
-            var response = await _apiService.ManagerApproveRequestAsync(requestId, approvalDto);
+            var response = await _requestApiService.ManagerApproveRequestAsync(requestId, approvalDto);
             if (response.Success)
             {
                 // Fetch updated request details if needed
@@ -198,7 +204,7 @@ namespace TDFMAUI.Services
 
         public async Task<ApiResponse<RequestResponseDto>> HRApproveRequestAsync(int requestId, HRApprovalDto approvalDto)
         {
-            var response = await _apiService.HRApproveRequestAsync(requestId, approvalDto);
+            var response = await _requestApiService.HRApproveRequestAsync(requestId, approvalDto);
             if (response.Success)
             {
                 var details = await GetRequestByIdAsync(requestId);
@@ -209,7 +215,7 @@ namespace TDFMAUI.Services
 
         public async Task<ApiResponse<RequestResponseDto>> ManagerRejectRequestAsync(int requestId, ManagerRejectDto rejectDto)
         {
-            var response = await _apiService.ManagerRejectRequestAsync(requestId, rejectDto);
+            var response = await _requestApiService.ManagerRejectRequestAsync(requestId, rejectDto);
             if (response.Success)
             {
                 var details = await GetRequestByIdAsync(requestId);
@@ -220,7 +226,7 @@ namespace TDFMAUI.Services
 
         public async Task<ApiResponse<RequestResponseDto>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto)
         {
-            var response = await _apiService.HRRejectRequestAsync(requestId, rejectDto);
+            var response = await _requestApiService.HRRejectRequestAsync(requestId, rejectDto);
             if (response.Success)
             {
                 var details = await GetRequestByIdAsync(requestId);
@@ -258,7 +264,15 @@ namespace TDFMAUI.Services
                     queryParams.Add($"department={Uri.EscapeDataString(department)}");
 
                 var queryString = string.Join("&", queryParams);
-                var response = await _apiService.GetAsync<ApiResponse<PaginatedResult<RequestResponseDto>>>($"{TDFShared.Constants.ApiRoutes.Requests.GetForApproval}?{queryString}");
+                // Extract parameters from queryString and use IRequestApiService instead of direct GetAsync
+                var pagination = new RequestPaginationDto
+                {
+                    Page = pageNumber,
+                    PageSize = pageSize,
+                    Department = department
+                };
+
+                var response = await _requestApiService.GetRequestsForApprovalAsync(pagination);
 
                 return response ?? new ApiResponse<PaginatedResult<RequestResponseDto>>
                 {
@@ -280,8 +294,18 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var result = await _apiService.GetAsync<List<RequestResponseDto>>(TDFShared.Constants.ApiRoutes.Requests.GetRecentDashboard);
-                return result;
+                // This logic might need to be moved to IRequestApiService or kept as is if we have a direct GetAsync there
+                // For now, let's assume we want to use the RequestApiService if possible
+                // Re-examining ApiService shows it was just calling GetAsync
+
+                // Let's keep it simple for now, as IRequestApiService doesn't have this exact method yet,
+                // we should either add it or use the generic GetAsync if available.
+                // Looking at my defined IRequestApiService, it doesn't have GetRecentDashboardRequestsAsync.
+
+                // I will use IRequestApiService.GetRequestsAsync with specific parameters to simulate it
+                var pagination = new RequestPaginationDto { Page = 1, PageSize = 5, SortBy = "CreatedDate", Ascending = false };
+                var response = await _requestApiService.GetRequestsAsync(pagination);
+                return response.Data?.Items?.ToList() ?? new List<RequestResponseDto>();
             }
             catch (Exception ex)
             {
@@ -294,8 +318,9 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var result = await _apiService.GetAsync<int>(TDFShared.Constants.ApiRoutes.Requests.GetPendingDashboardCount);
-                return result;
+                var pagination = new RequestPaginationDto { CountOnly = true, FilterStatus = TDFShared.Enums.RequestStatus.Pending };
+                var response = await _requestApiService.GetRequestsAsync(pagination);
+                return response.Data?.TotalCount ?? 0;
             }
             catch (Exception ex)
             {

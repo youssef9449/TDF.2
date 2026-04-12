@@ -12,13 +12,13 @@ namespace TDFMAUI.Pages
     public partial class PrivateMessagesPage : ContentPage
     {
         private readonly PrivateMessagesViewModel _viewModel;
-        private readonly ApiService _apiService;
+        private readonly IMessageApiService _messageApiService;
 
-        public PrivateMessagesPage(PrivateMessagesViewModel viewModel, ApiService apiService)
+        public PrivateMessagesPage(PrivateMessagesViewModel viewModel, IMessageApiService messageApiService)
         {
             InitializeComponent();
             _viewModel = viewModel;
-            _apiService = apiService;
+            _messageApiService = messageApiService;
             BindingContext = _viewModel;
         }
 
@@ -38,7 +38,7 @@ namespace TDFMAUI.Pages
 
         private async void OnNewMessageClicked(object sender, EventArgs e)
         {
-            await Navigation.PushAsync(new NewMessagePage(_apiService));
+            await Navigation.PushAsync(new NewMessagePage(_messageApiService));
         }
 
         private async void OnBackClicked(object sender, EventArgs e)

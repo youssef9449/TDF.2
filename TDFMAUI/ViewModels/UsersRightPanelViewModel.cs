@@ -14,7 +14,7 @@ namespace TDFMAUI.ViewModels
     public partial class UsersRightPanelViewModel : BaseViewModel
     {
         private readonly IUserPresenceService _userPresenceService;
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
         private readonly ILogger<UsersRightPanelViewModel> _logger;
         private readonly IConnectivityService _connectivityService;
 
@@ -44,12 +44,12 @@ namespace TDFMAUI.ViewModels
 
         public UsersRightPanelViewModel(
             IUserPresenceService userPresenceService,
-            ApiService apiService,
+            IUserApiService userApiService,
             ILogger<UsersRightPanelViewModel> logger,
             IConnectivityService connectivityService)
         {
             _userPresenceService = userPresenceService;
-            _apiService = apiService;
+            _userApiService = userApiService;
             _logger = logger;
             _connectivityService = connectivityService;
         }

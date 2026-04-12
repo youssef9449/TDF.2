@@ -11,11 +11,13 @@ namespace TDFMAUI.Services
 {
     public class UserPresenceApiService : IUserPresenceApiService
     {
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
+        private readonly IApiService _apiService;
         private readonly ILogger<UserPresenceApiService> _logger;
 
-        public UserPresenceApiService(ApiService apiService, ILogger<UserPresenceApiService> logger)
+        public UserPresenceApiService(IUserApiService userApiService, IApiService apiService, ILogger<UserPresenceApiService> logger)
         {
+            _userApiService = userApiService;
             _apiService = apiService;
             _logger = logger;
         }
@@ -24,8 +26,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var response = await _apiService.GetAsync<UserPresenceInfo>($"users/{userId}/status");
-                return response;
+                return await _userApiService.GetUserStatusAsync(userId);
             }
             catch (Exception ex)
             {
@@ -38,29 +39,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var apiResponse = await _apiService.GetAsync<ApiResponse<PaginatedResult<UserDto>>>(
-                    $"{ApiRoutes.Users.GetAllWithStatus}?pageNumber={page}&pageSize={pageSize}");
-
-                if (apiResponse?.Success == true && apiResponse.Data?.Items != null)
-                {
-                    var items = new List<UserPresenceInfo>();
-                    foreach (var user in apiResponse.Data.Items)
-                    {
-                        items.Add(new UserPresenceInfo
-                        {
-                            UserId = user.UserID,
-                            Username = user.UserName,
-                            FullName = user.FullName,
-                            Department = user.Department,
-                            Status = user.PresenceStatus,
-                            StatusMessage = user.StatusMessage,
-                            IsAvailableForChat = user.IsAvailableForChat ?? false,
-                            ProfilePictureData = user.Picture,
-                            LastActivityTime = user.LastActivityTime ?? DateTime.MinValue
-                        });
-                    }
-                    return new PaginatedResult<UserPresenceInfo>(items, page, pageSize, apiResponse.Data.TotalCount);
-                }
+                return await _userApiService.GetOnlineUsersPresenceAsync(page, pageSize);
             }
             catch (Exception ex)
             {
@@ -73,11 +52,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var updateData = new { isConnected };
-                await _apiService.PutAsync<object, object>(
-                    string.Format(ApiRoutes.Users.UpdateConnection, userId),
-                    updateData,
-                    false);
+                await _userApiService.UpdateUserConnectionStatusAsync(userId, isConnected);
             }
             catch (Exception ex)
             {

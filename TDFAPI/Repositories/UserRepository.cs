@@ -14,24 +14,21 @@ using TDFShared.Services;
 
 namespace TDFAPI.Repositories
 {
-    public class UserRepository : IUserRepository
+    public class UserRepository : GenericRepository<UserEntity>, IUserRepository
     {
-        private readonly ILogger<UserRepository> _logger;
-        private readonly ApplicationDbContext _context;
         private readonly IRoleService _roleService;
         
         public UserRepository(ILogger<UserRepository> logger, ApplicationDbContext context, IRoleService roleService)
+            : base(context, logger)
         {
-            _logger = logger;
-            _context = context ?? throw new ArgumentNullException(nameof(context));
             _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
         }
         
-        public async Task<UserDto?> GetByIdAsync(int userId)
+        public new async Task<UserDto?> GetByIdAsync(int userId)
         {
             try
             {
-                var user = await _context.Users
+                var user = await _dbSet
                                        .Include(u => u.AnnualLeave)
                                        .AsNoTracking()
                                        .FirstOrDefaultAsync(u => u.UserID == userId);
@@ -48,7 +45,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users
+                var user = await _dbSet
                                        .Include(u => u.AnnualLeave)
                                        .AsNoTracking()
                                        .FirstOrDefaultAsync(u => u.UserName == username);
@@ -61,11 +58,11 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<List<UserDto>> GetAllAsync()
+        public new async Task<List<UserDto>> GetAllAsync()
         {
             try
             {
-                var users = await _context.Users
+                var users = await _dbSet
                                         .Include(u => u.AnnualLeave)
                                         .AsNoTracking()
                                         .OrderBy(u => u.UserName)
@@ -83,8 +80,8 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var totalCount = await _context.Users.CountAsync();
-                var users = await _context.Users
+                var totalCount = await _dbSet.CountAsync();
+                var users = await _dbSet
                                         .Include(u => u.AnnualLeave)
                                         .AsNoTracking()
                                         .OrderBy(u => u.UserName)
@@ -145,7 +142,7 @@ namespace TDFAPI.Repositories
 
             try
             {
-                _context.Users.Add(newUser);
+                _dbSet.Add(newUser);
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Created new user with ID {UserId}", newUser.UserID);
                 return newUser.UserID;
@@ -170,7 +167,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("User not found for update: ID {UserId}", userId);
@@ -199,7 +196,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                return await _context.Users
+                return await _dbSet
                     .Where(u => u.UserID == userId)
                     .Select(u => new UserAuthData
                     {
@@ -220,18 +217,18 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<bool> DeleteAsync(int userId)
+        public new async Task<bool> DeleteAsync(int userId)
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("User not found for deletion: ID {UserId}", userId);
                         return false;
                     }
                     
-                _context.Users.Remove(user);
+                _dbSet.Remove(user);
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("User deleted: ID {UserId}", userId);
                     return true;
@@ -252,7 +249,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("User not found for password change: ID {UserId}", userId);
@@ -277,7 +274,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("User not found for refresh token update: ID {UserId}", userId);
@@ -302,7 +299,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("User not found for login attempt update: ID {UserId}", userId);
@@ -327,7 +324,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("User not found for post-login update: ID {UserId}", userId);
@@ -356,7 +353,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("User not found for self-update: ID {UserId}", userId);
@@ -381,7 +378,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("User not found for profile picture update: ID {UserId}", userId);
@@ -405,7 +402,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null) return false;
 
                 user.PresenceStatus = status;
@@ -429,7 +426,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null) return false;
 
                 user.LastActivityTime = activityTime;
@@ -447,7 +444,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null) return false;
 
                 user.CurrentDevice = device?.Length > 100 ? device.Substring(0, 100) : device;
@@ -467,7 +464,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null) return false;
 
                 user.IsAvailableForChat = isAvailable;
@@ -486,7 +483,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var users = await _context.Users
+                var users = await _dbSet
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.Department == department)
                                         .AsNoTracking()
@@ -507,7 +504,7 @@ namespace TDFAPI.Repositories
             {
                 if (userIds == null || !userIds.Any()) return new List<UserDto>();
 
-                var users = await _context.Users
+                var users = await _dbSet
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => userIds.Contains(u.UserID))
                                         .AsNoTracking()
@@ -525,7 +522,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var users = await _context.Users
+                var users = await _dbSet
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.IsConnected == true)
                                         .AsNoTracking()
@@ -545,7 +542,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var users = await _context.Users
+                var users = await _dbSet
                                         .Include(u => u.AnnualLeave)
                                         .Where(u => u.Department == department && (u.IsAdmin == true || u.IsManager == true || u.IsHR == true))
                                         .AsNoTracking()
@@ -564,7 +561,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                IQueryable<UserEntity> query = _context.Users.Include(u => u.AnnualLeave).AsNoTracking();
+                IQueryable<UserEntity> query = _dbSet.Include(u => u.AnnualLeave).AsNoTracking();
 
                 if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
                     query = query.Where(u => u.IsAdmin == true);
@@ -595,7 +592,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("User not found for status update: ID {UserId}", userId);
@@ -634,7 +631,7 @@ namespace TDFAPI.Repositories
                     return false;
                 }
                 
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("User not found for availability update: ID {UserId}", userId);
@@ -658,7 +655,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _dbSet.FindAsync(userId);
                 if (user == null)
                 {
                     _logger.LogWarning("Attempted to update device info for non-existent user {UserId}", userId);
@@ -684,7 +681,7 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var query = _context.Users.Where(u => u.FullName == fullName);
+                var query = _dbSet.Where(u => u.FullName == fullName);
                 
                 if (excludeUserId.HasValue)
                 {

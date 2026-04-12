@@ -11,14 +11,14 @@ namespace TDFMAUI.Services
 {
     public class LookupService : ILookupService, IDisposable
     {
-        private readonly ApiService _apiService;
+        private readonly ILookupApiService _lookupApiService;
         private readonly ILogger<LookupService> _logger;
         private List<LookupItem> _departments;
         private bool _disposed;
 
-        public LookupService(ApiService apiService, ILogger<LookupService> logger)
+        public LookupService(ILookupApiService lookupApiService, ILogger<LookupService> logger)
         {
-            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _lookupApiService = lookupApiService ?? throw new ArgumentNullException(nameof(lookupApiService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _departments = new List<LookupItem>();
             _logger.LogInformation("LookupService initialized");
@@ -68,7 +68,9 @@ namespace TDFMAUI.Services
             try
             {
                 _logger.LogInformation("Fetching titles for department {DepartmentId}", departmentId);
-                var response = await _apiService.GetAsync<ApiResponse<List<string>>>(
+                // ILookupApiService doesn't have GetTitlesForDepartmentAsync, using IApiService directly for now or I should add it
+                var apiService = App.Services.GetService<IApiService>();
+                var response = await apiService.GetAsync<ApiResponse<List<string>>>(
                     string.Format(ApiRoutes.Lookups.GetTitlesByDepartment, departmentId));
 
                 if (response?.Success == true && response.Data != null)
@@ -106,7 +108,7 @@ namespace TDFMAUI.Services
                     throw new Exception($"No internet connection. Current network status: {networkAccess}");
                 }
 
-                var departmentsResponse = await _apiService.GetDepartmentsAsync();
+                var departmentsResponse = await _lookupApiService.GetDepartmentsAsync();
                 _logger.LogInformation("GetDepartmentsAsync completed");
 
                 if (!departmentsResponse.Success)

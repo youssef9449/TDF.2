@@ -13,14 +13,14 @@ namespace TDFMAUI.Services
     public class UserProfileService : IUserProfileService
     {
         private readonly ILogger<UserProfileService> _logger;
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
         private readonly ILocalStorageService _localStorageService;
         private readonly IUserSessionService _userSessionService;
 
-        public UserProfileService(ApiService apiService, ILocalStorageService localStorageService, ILogger<UserProfileService> logger, IUserSessionService userSessionService)
+        public UserProfileService(IUserApiService userApiService, ILocalStorageService localStorageService, ILogger<UserProfileService> logger, IUserSessionService userSessionService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
+            _userApiService = userApiService ?? throw new ArgumentNullException(nameof(userApiService));
             _localStorageService = localStorageService ?? throw new ArgumentNullException(nameof(localStorageService));
             _userSessionService = userSessionService ?? throw new ArgumentNullException(nameof(userSessionService));
             _logger.LogInformation("UserProfileService constructor finished.");
@@ -30,7 +30,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                return await _apiService.GetUserAsync(userId);
+                return await _userApiService.GetUserByIdAsync(userId);
             }
             catch (Exception ex)
             {
@@ -43,7 +43,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var result = await _apiService.UpdateUserAsync(userId, updateUserDto);
+                var result = await _userApiService.UpdateUserAsync(userId, updateUserDto);
                 return result != null;
             }
             catch (Exception ex)
@@ -57,7 +57,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                return await _apiService.ChangePasswordAsync(changePasswordDto);
+                return await _userApiService.ChangePasswordAsync(changePasswordDto);
             }
             catch (Exception ex)
             {
@@ -70,7 +70,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var response = await _apiService.GetUserProfileAsync(userId);
+                var response = await _userApiService.GetUserProfileAsync(userId);
                 if (response?.Success == true && response.Data?.ProfilePictureData != null && response.Data.ProfilePictureData.Length > 0)
                 {
                     return ImageSource.FromStream(() => new MemoryStream(response.Data.ProfilePictureData));
@@ -91,8 +91,8 @@ namespace TDFMAUI.Services
                 if (newPictureData == null || newPictureData.Length == 0) return false;
 
                 using var stream = new MemoryStream(newPictureData);
-                // Currently ApiService.UploadProfilePictureAsync handles the current user's profile picture
-                return await _apiService.UploadProfilePictureAsync(stream, $"profile_{userId}.jpg", "image/jpeg");
+                // Currently UserApiService.UploadProfilePictureAsync handles the current user's profile picture
+                return await _userApiService.UploadProfilePictureAsync(stream, $"profile_{userId}.jpg", "image/jpeg");
             }
             catch (Exception ex)
             {

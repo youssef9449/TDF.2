@@ -40,7 +40,8 @@ public class AuthService : IAuthService
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly string _baseApiUrl;
     private readonly IRoleService _roleService;
-    private readonly IApiService _apiService;
+    private readonly IAuthApiService _authApiService;
+    private readonly IUserApiService _userApiService;
     private readonly ISecureStorage _secureStorage;
     private readonly IUserSessionService _userSessionService;
     private readonly IUserPresenceService _userPresenceService;
@@ -56,7 +57,8 @@ public class AuthService : IAuthService
         ISecurityService securityService,
         ILogger<AuthService> logger,
         IRoleService roleService,
-        IApiService apiService,
+        IAuthApiService authApiService,
+        IUserApiService userApiService,
         ISecureStorage secureStorage,
         IUserSessionService userSessionService,
         IUserPresenceService userPresenceService,
@@ -88,9 +90,13 @@ public class AuthService : IAuthService
             _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
             logger?.LogInformation("RoleService resolved successfully.");
 
-            logger?.LogInformation("Checking ApiService...");
-            _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
-            logger?.LogInformation("ApiService resolved successfully.");
+            logger?.LogInformation("Checking AuthApiService...");
+            _authApiService = authApiService ?? throw new ArgumentNullException(nameof(authApiService));
+            logger?.LogInformation("AuthApiService resolved successfully.");
+
+            logger?.LogInformation("Checking UserApiService...");
+            _userApiService = userApiService ?? throw new ArgumentNullException(nameof(userApiService));
+            logger?.LogInformation("UserApiService resolved successfully.");
 
             logger?.LogInformation("Checking SecureStorage...");
             _secureStorage = secureStorage ?? throw new ArgumentNullException(nameof(secureStorage));
@@ -145,7 +151,7 @@ public class AuthService : IAuthService
         try
         {
             // Use the API service directly for login
-            var apiResponse = await _apiService.LoginAsync(loginRequest);
+            var apiResponse = await _authApiService.LoginAsync(loginRequest);
 
             if (apiResponse?.Success == true && apiResponse.Data != null && !string.IsNullOrEmpty(apiResponse.Data.Token))
             {
@@ -245,7 +251,7 @@ public class AuthService : IAuthService
             // 2. Call the API to logout (server-side cleanup)
             try
             {
-                await _apiService.LogoutAsync();
+                await _authApiService.LogoutAsync();
             }
             catch (Exception apiEx)
             {
@@ -472,10 +478,10 @@ public class AuthService : IAuthService
     {
         try
         {
-            _logger.LogInformation("Getting current user details via ApiService");
+            _logger.LogInformation("Getting current user details via UserApiService");
 
-            // Use the ApiService to get current user instead of making direct HTTP calls
-            var apiResponse = await _apiService.GetCurrentUserAsync();
+            // Use the UserApiService to get current user instead of making direct HTTP calls
+            var apiResponse = await _userApiService.GetCurrentUserAsync();
             if (apiResponse?.Success == true && apiResponse.Data != null)
             {
                 // Set current user via UserSessionService

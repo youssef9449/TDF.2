@@ -1,0 +1,145 @@
+using MediatR;
+using TDFAPI.CQRS.Core;
+using TDFShared.DTOs.Requests;
+using TDFAPI.Services;
+using TDFAPI.Repositories;
+using System.ComponentModel.DataAnnotations;
+
+namespace TDFAPI.CQRS.Commands
+{
+    public class CreateRequestCommand : ICommand<RequestResponseDto>
+    {
+        [Required]
+        public RequestCreateDto CreateDto { get; set; }
+
+        [Required]
+        public int UserId { get; set; }
+    }
+
+    public class CreateRequestCommandHandler : IRequestHandler<CreateRequestCommand, RequestResponseDto>
+    {
+        private readonly IRequestRepository _requestRepository;
+        private readonly IUserRepository _userRepository;
+        private readonly INotificationService _notificationService;
+        private readonly TDFShared.Validation.IValidationService _validationService;
+        private readonly TDFShared.Validation.IBusinessRulesService _businessRulesService;
+        private readonly ILogger<CreateRequestCommandHandler> _logger;
+
+        public CreateRequestCommandHandler(
+            IRequestRepository requestRepository,
+            IUserRepository userRepository,
+            INotificationService notificationService,
+            TDFShared.Validation.IValidationService validationService,
+            TDFShared.Validation.IBusinessRulesService businessRulesService,
+            ILogger<CreateRequestCommandHandler> logger)
+        {
+            _requestRepository = requestRepository;
+            _userRepository = userRepository;
+            _notificationService = notificationService;
+            _validationService = validationService;
+            _businessRulesService = businessRulesService;
+            _logger = logger;
+        }
+
+        public async Task<RequestResponseDto> Handle(CreateRequestCommand request, CancellationToken cancellationToken)
+        {
+            var createDto = request.CreateDto;
+            var userId = request.UserId;
+
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null) throw new TDFAPI.Exceptions.EntityNotFoundException("User", userId);
+
+            if (_validationService.ContainsDangerousPatterns(createDto.RequestReason))
+            {
+                _logger.LogWarning("User {UserId} attempted to create request with potentially dangerous input", userId);
+                throw new TDFShared.Exceptions.ValidationException("Invalid input detected.");
+            }
+
+            createDto.RequestReason = _validationService.SanitizeInput(createDto.RequestReason);
+
+            // Business Rule Validation
+            var context = new TDFShared.Validation.BusinessRuleContext
+            {
+                GetLeaveBalanceAsync = async (uid, leaveType) =>
+                {
+                    var balances = await _requestRepository.GetLeaveBalancesAsync(uid);
+                    var key = TDFShared.Enums.LeaveTypeHelper.GetBalanceKey(leaveType);
+                    return key != null && balances.TryGetValue(key, out var balance) ? balance : 0;
+                },
+                HasConflictingRequestsAsync = _requestRepository.HasConflictingRequestsAsync,
+                MinAdvanceNoticeDays = 0,
+                MaxRequestDurationDays = 30
+            };
+
+            var businessRuleResult = await _businessRulesService.ValidateLeaveRequestAsync(createDto, userId, context);
+            if (!businessRuleResult.IsValid)
+            {
+                throw new TDFShared.Exceptions.BusinessRuleException(string.Join("; ", businessRuleResult.Errors));
+            }
+
+            int numberOfDays = TDFShared.Utils.DateUtils.CalculateBusinessDays(
+                createDto.RequestStartDate,
+                createDto.RequestEndDate.HasValue ? createDto.RequestEndDate.Value : createDto.RequestStartDate);
+
+            var requestEntity = new TDFShared.Models.Request.RequestEntity
+            {
+                RequestUserID = userId,
+                RequestUserFullName = user.FullName ?? string.Empty,
+                RequestDepartment = user.Department,
+                RequestType = createDto.LeaveType,
+                RequestReason = createDto.RequestReason ?? string.Empty,
+                RequestFromDay = createDto.RequestStartDate,
+                RequestToDay = createDto.RequestEndDate,
+                RequestBeginningTime = createDto.RequestBeginningTime,
+                RequestEndingTime = createDto.RequestEndingTime,
+                RequestManagerStatus = TDFShared.Enums.RequestStatus.Pending,
+                RequestHRStatus = TDFShared.Enums.RequestStatus.Pending,
+                RequestNumberOfDays = numberOfDays,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            int requestId = await _requestRepository.CreateAsync(requestEntity);
+            var createdEntity = await _requestRepository.GetByIdAsync(requestId);
+
+            await NotifyDepartmentManagers(requestEntity.RequestDepartment,
+                $"New {requestEntity.RequestType} request from {user.FullName}", userId);
+
+            return MapToResponseDto(createdEntity);
+        }
+
+        private async Task NotifyDepartmentManagers(string department, string message, int excludedUserId = 0)
+        {
+            var usersInDepartment = await _userRepository.GetUsersByDepartmentAsync(department);
+            var managers = await _userRepository.GetUsersByRoleAsync("Manager");
+            var departmentManagers = managers.Where(m => usersInDepartment.Any(u => u.UserID == m.UserID) && m.UserID != excludedUserId);
+
+            foreach (var manager in departmentManagers)
+            {
+                await _notificationService.CreateNotificationAsync(manager.UserID, message);
+            }
+        }
+
+        private RequestResponseDto MapToResponseDto(TDFShared.Models.Request.RequestEntity entity)
+        {
+            return new RequestResponseDto
+            {
+                RequestID = entity.RequestID,
+                RequestUserID = entity.RequestUserID,
+                UserName = entity.RequestUserFullName,
+                LeaveType = entity.RequestType,
+                RequestReason = entity.RequestReason,
+                RequestStartDate = entity.RequestFromDay,
+                RequestEndDate = entity.RequestToDay,
+                RequestBeginningTime = entity.RequestBeginningTime,
+                RequestEndingTime = entity.RequestEndingTime,
+                RequestDepartment = entity.RequestDepartment,
+                Status = entity.RequestManagerStatus,
+                HRStatus = entity.RequestHRStatus,
+                CreatedDate = entity.CreatedAt.GetValueOrDefault(DateTime.MinValue),
+                LastModifiedDate = entity.UpdatedAt,
+                RequestNumberOfDays = entity.RequestNumberOfDays,
+                RowVersion = entity.RowVersion
+            };
+        }
+    }
+}

@@ -18,7 +18,7 @@ namespace TDFMAUI.ViewModels
     [QueryProperty(nameof(RequestId), "RequestId")]
     public partial class RequestDetailsViewModel : BaseViewModel
     {
-        private readonly IApiService _apiService;
+        private readonly IRequestApiService _requestApiService;
         private readonly IAuthService _authService;
         private readonly ILogger<RequestDetailsViewModel> _logger;
 
@@ -33,9 +33,9 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty] private bool _canEdit;
         [ObservableProperty] private bool _canDelete;
 
-        public RequestDetailsViewModel(IApiService apiService, IAuthService authService, ILogger<RequestDetailsViewModel> logger)
+        public RequestDetailsViewModel(IRequestApiService requestApiService, IAuthService authService, ILogger<RequestDetailsViewModel> logger)
         {
-            _apiService = apiService;
+            _requestApiService = requestApiService;
             _authService = authService;
             _logger = logger;
             Title = "Request Details";
@@ -55,7 +55,7 @@ namespace TDFMAUI.ViewModels
             IsBusy = true;
             try
             {
-                var response = await _apiService.GetRequestByIdAsync(RequestId);
+                var response = await _requestApiService.GetRequestByIdAsync(RequestId);
                 if (response?.Data != null)
                 {
                     Request = response.Data;
@@ -113,7 +113,7 @@ namespace TDFMAUI.ViewModels
                 IsBusy = true;
                 try
                 {
-                    await _apiService.DeleteRequestAsync(Request.RequestID);
+                    await _requestApiService.DeleteRequestAsync(Request.RequestID);
                     await Shell.Current.GoToAsync("..");
                 }
                 catch (Exception ex) { _logger.LogError(ex, "Failed to delete"); ErrorMessage = "Delete failed."; }
@@ -133,8 +133,8 @@ namespace TDFMAUI.ViewModels
             {
                 var currentUser = await _authService.GetCurrentUserAsync();
                 ApiResponse<bool>? response = null;
-                if (currentUser?.IsManager == true) response = await _apiService.ManagerApproveRequestAsync(Request.RequestID, new ManagerApprovalDto { ManagerRemarks = comment });
-                else if (currentUser?.IsHR == true) response = await _apiService.HRApproveRequestAsync(Request.RequestID, new HRApprovalDto { HRRemarks = comment });
+                if (currentUser?.IsManager == true) response = await _requestApiService.ManagerApproveRequestAsync(Request.RequestID, new ManagerApprovalDto { ManagerRemarks = comment });
+                else if (currentUser?.IsHR == true) response = await _requestApiService.HRApproveRequestAsync(Request.RequestID, new HRApprovalDto { HRRemarks = comment });
 
                 if (response?.Success == true) await LoadRequestDetailsAsync();
             }
@@ -154,8 +154,8 @@ namespace TDFMAUI.ViewModels
             {
                 var currentUser = await _authService.GetCurrentUserAsync();
                 ApiResponse<bool>? response = null;
-                if (currentUser?.IsManager == true) response = await _apiService.ManagerRejectRequestAsync(Request.RequestID, new ManagerRejectDto { ManagerRemarks = reason });
-                else if (currentUser?.IsHR == true) response = await _apiService.HRRejectRequestAsync(Request.RequestID, new HRRejectDto { HRRemarks = reason });
+                if (currentUser?.IsManager == true) response = await _requestApiService.ManagerRejectRequestAsync(Request.RequestID, new ManagerRejectDto { ManagerRemarks = reason });
+                else if (currentUser?.IsHR == true) response = await _requestApiService.HRRejectRequestAsync(Request.RequestID, new HRRejectDto { HRRemarks = reason });
 
                 if (response?.Success == true) await LoadRequestDetailsAsync();
             }

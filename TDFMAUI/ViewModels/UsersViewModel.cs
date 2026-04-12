@@ -15,7 +15,7 @@ namespace TDFMAUI.ViewModels
     public partial class UsersViewModel : BaseViewModel
     {
         private readonly IUserPresenceService _userPresenceService;
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
         private readonly ILogger<UsersViewModel> _logger;
 
         [ObservableProperty]
@@ -40,11 +40,11 @@ namespace TDFMAUI.ViewModels
 
         public UsersViewModel(
             IUserPresenceService userPresenceService,
-            ApiService apiService,
+            IUserApiService userApiService,
             ILogger<UsersViewModel> logger)
         {
             _userPresenceService = userPresenceService;
-            _apiService = apiService;
+            _userApiService = userApiService;
             _logger = logger;
             Title = "Users";
         }
@@ -111,7 +111,8 @@ namespace TDFMAUI.ViewModels
             var user = Users.FirstOrDefault(u => u.UserId == userId);
             if (user == null) return;
 
-            await Shell.Current.Navigation.PushAsync(new NewMessagePage(_apiService)
+            var messageApiService = App.Services.GetService<IMessageApiService>();
+            await Shell.Current.Navigation.PushAsync(new NewMessagePage(messageApiService)
             {
                 PreSelectedUserId = userId,
                 PreSelectedUserName = user.FullName
@@ -125,7 +126,7 @@ namespace TDFMAUI.ViewModels
             if (user == null) return;
 
             var localStorageService = App.Services.GetService<ILocalStorageService>();
-            var viewModel = new UserProfileViewModel(_apiService, localStorageService);
+            var viewModel = new UserProfileViewModel(_userApiService, localStorageService);
             await viewModel.LoadUserByIdAsync(userId);
 
             await Shell.Current.Navigation.PushAsync(new UserProfilePage(viewModel, localStorageService));

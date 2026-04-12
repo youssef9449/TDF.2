@@ -20,7 +20,7 @@ namespace TDFMAUI.Services
         private readonly NotificationService _notificationService;
         private readonly IPlatformNotificationService _platformService;
         private readonly ILogger<NotificationExtensionService> _logger;
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
 
         // Correct event signature to match INotificationService
         public event EventHandler<NotificationDto> NotificationReceived;
@@ -28,13 +28,13 @@ namespace TDFMAUI.Services
         public NotificationExtensionService(
             NotificationService notificationService,
             IPlatformNotificationService platformService,
-            ApiService apiService,
+            IUserApiService userApiService,
             ILogger<NotificationExtensionService> logger)
         {
             _notificationService = notificationService;
             _platformService = platformService;
             _logger = logger;
-            _apiService = apiService;
+            _userApiService = userApiService;
         }
 
         public async Task<IEnumerable<TDFShared.Models.Notification.NotificationEntity>> GetUnreadNotificationsAsync()
@@ -263,10 +263,9 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var apiService = App.Services.GetService<ApiService>();
-                if (apiService != null)
+                if (_userApiService != null)
                 {
-                    var user = await apiService.GetUserAsync(userId);
+                    var user = await _userApiService.GetUserByIdAsync(userId);
                     if (user != null && !string.IsNullOrWhiteSpace(user.FullName))
                         return user.FullName;
                     if (user != null && !string.IsNullOrWhiteSpace(user.UserName))

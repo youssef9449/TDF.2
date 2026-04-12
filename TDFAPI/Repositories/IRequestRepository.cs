@@ -8,10 +8,8 @@ using TDFShared.Enums;
 
 namespace TDFAPI.Repositories
 {
-    public interface IRequestRepository
+    public interface IRequestRepository : IGenericRepository<RequestEntity>
     {
-        Task<RequestEntity> GetByIdAsync(int requestId);
-        Task<IEnumerable<RequestEntity>> GetAllAsync();
         Task<PaginatedResult<RequestEntity>> GetAllAsync(RequestPaginationDto pagination);
         Task<IEnumerable<RequestEntity>> GetByUserIdAsync(int userId);
         Task<PaginatedResult<RequestEntity>> GetByUserIdAsync(int userId, RequestPaginationDto pagination);

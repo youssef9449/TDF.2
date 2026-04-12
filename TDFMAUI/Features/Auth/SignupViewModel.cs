@@ -15,7 +15,7 @@ namespace TDFMAUI.Features.Auth
 {
     public partial class SignupViewModel : BaseViewModel
     {
-        private readonly IApiService _apiService;
+        private readonly IAuthApiService _authApiService;
         private readonly ILookupService _lookupService;
         private readonly ILogger<SignupViewModel> _logger;
         private readonly IValidationService _validationService;
@@ -49,9 +49,9 @@ namespace TDFMAUI.Features.Auth
         [ObservableProperty]
         private string _selectedTitle = string.Empty;
 
-        public SignupViewModel(IApiService apiService, ILookupService lookupService, ILogger<SignupViewModel> logger, IValidationService validationService)
+        public SignupViewModel(IAuthApiService authApiService, ILookupService lookupService, ILogger<SignupViewModel> logger, IValidationService validationService)
         {
-            _apiService = apiService;
+            _authApiService = authApiService;
             _lookupService = lookupService;
             _logger = logger;
             _validationService = validationService;
@@ -123,7 +123,7 @@ namespace TDFMAUI.Features.Auth
             IsBusy = true;
             try
             {
-                var response = await _apiService.RegisterAsync(registerRequest);
+                var response = await _authApiService.RegisterAsync(registerRequest);
                 if (response.Success)
                 {
                     await Shell.Current.DisplayAlert("Success", "Registration successful! You can now log in.", "OK");

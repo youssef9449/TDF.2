@@ -12,6 +12,7 @@ namespace TDFMAUI.ViewModels
     public partial class LoginPageViewModel : BaseViewModel
     {
         private readonly IAuthService _authService;
+        private readonly IAuthApiService _authApiService;
         private readonly IWebSocketService _webSocketService;
         private readonly ILogger<LoginPageViewModel> _logger;
         private readonly IServiceProvider _serviceProvider;
@@ -27,12 +28,14 @@ namespace TDFMAUI.ViewModels
 
         public LoginPageViewModel(
             IAuthService authService,
+            IAuthApiService authApiService,
             IWebSocketService webSocketService,
             IUserPresenceService userPresenceService,
             ILogger<LoginPageViewModel> logger,
             IServiceProvider serviceProvider)
         {
             _authService = authService;
+            _authApiService = authApiService;
             _webSocketService = webSocketService;
             _userPresenceService = userPresenceService;
             _logger = logger;

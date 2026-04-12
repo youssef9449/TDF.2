@@ -11,7 +11,7 @@ namespace TDFMAUI.ViewModels
 {
     public partial class GlobalMessagesViewModel : BaseViewModel
     {
-        private readonly ApiService _apiService;
+        private readonly IMessageApiService _messageApiService;
         private readonly IWebSocketService _webSocketService;
 
         [ObservableProperty]
@@ -21,9 +21,9 @@ namespace TDFMAUI.ViewModels
         [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
         private string _newMessageText = string.Empty;
 
-        public GlobalMessagesViewModel(ApiService apiService, IWebSocketService webSocketService)
+        public GlobalMessagesViewModel(IMessageApiService messageApiService, IWebSocketService webSocketService)
         {
-            _apiService = apiService;
+            _messageApiService = messageApiService;
             _webSocketService = webSocketService;
             Title = "Global Messages";
             _ = LoadMessagesAsync();
@@ -35,7 +35,7 @@ namespace TDFMAUI.ViewModels
             IsBusy = true;
             try
             {
-                var messages = await _apiService.GetRecentChatMessagesAsync(100);
+                var messages = await _messageApiService.GetRecentChatMessagesAsync(100);
                 Messages.Clear();
                 foreach (var dto in messages.OrderBy(m => m.SentAt))
                 {

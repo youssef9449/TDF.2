@@ -15,7 +15,8 @@ namespace TDFMAUI.ViewModels
 {
     public partial class MyTeamViewModel : BaseViewModel
     {
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
+        private readonly ILookupApiService _lookupApiService;
         private readonly IAuthService _authService;
         private readonly INavigationService _navigationService;
 
@@ -26,11 +27,13 @@ namespace TDFMAUI.ViewModels
         private ObservableCollection<UserDto> _teamMembers = new();
 
         public MyTeamViewModel(
-            ApiService apiService,
+            IUserApiService userApiService,
+            ILookupApiService lookupApiService,
             IAuthService authService,
             INavigationService navigationService)
         {
-            _apiService = apiService;
+            _userApiService = userApiService;
+            _lookupApiService = lookupApiService;
             _authService = authService;
             _navigationService = navigationService;
             Title = "My Team";
@@ -57,14 +60,14 @@ namespace TDFMAUI.ViewModels
                     return;
                 }
 
-                var allDepartmentsResponse = await _apiService.GetDepartmentsAsync();
+                var allDepartmentsResponse = await _lookupApiService.GetDepartmentsAsync();
                 var departmentNames = allDepartmentsResponse?.Data?.Select(d => d.Name);
                 var accessibleDepartments = AuthorizationUtilities.GetAccessibleDepartments(currentUser, departmentNames);
 
                 TeamMembers.Clear();
                 foreach (var department in accessibleDepartments)
                 {
-                    var members = await _apiService.GetUsersByDepartmentAsync(department);
+                    var members = await _userApiService.GetUsersByDepartmentAsync(department);
                     if (members != null)
                     {
                         foreach (var member in members.Where(m => m.UserID != currentUser.UserID))

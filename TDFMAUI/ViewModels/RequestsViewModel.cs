@@ -21,6 +21,7 @@ namespace TDFMAUI.ViewModels
     public partial class RequestsViewModel : BaseViewModel
     {
         private readonly IRequestService _requestService;
+        private readonly IRequestApiService _requestApiService;
         private readonly IAuthService _authService;
         private readonly ILogger<RequestsViewModel> _logger;
         private readonly IErrorHandlingService _errorHandlingService;
@@ -48,12 +49,14 @@ namespace TDFMAUI.ViewModels
 
         public RequestsViewModel(
             IRequestService requestService,
+            IRequestApiService requestApiService,
             IAuthService authService,
             ILogger<RequestsViewModel> logger,
             IErrorHandlingService errorHandlingService,
             ILookupService lookupService)
         {
             _requestService = requestService;
+            _requestApiService = requestApiService;
             _authService = authService;
             _logger = logger;
             _errorHandlingService = errorHandlingService;
@@ -116,15 +119,15 @@ namespace TDFMAUI.ViewModels
                 switch (accessLevel)
                 {
                     case RequestAccessLevel.All:
-                        response = await _requestService.GetAllRequestsAsync(pagination);
+                        response = await _requestApiService.GetRequestsAsync(pagination);
                         break;
                     case RequestAccessLevel.Department:
                         string? department = (SelectedDepartment != null && SelectedDepartment.Id != "0") ? SelectedDepartment.Name : currentUser?.Department;
-                        if (!string.IsNullOrEmpty(department)) response = await _requestService.GetRequestsByDepartmentAsync(department, pagination);
-                        else response = await _requestService.GetMyRequestsAsync(pagination);
+                        if (!string.IsNullOrEmpty(department)) response = await _requestApiService.GetRequestsAsync(pagination, department: department);
+                        else response = await _requestApiService.GetRequestsAsync(pagination, userId: currentUser?.UserID);
                         break;
                     default:
-                        response = await _requestService.GetMyRequestsAsync(pagination);
+                        response = await _requestApiService.GetRequestsAsync(pagination, userId: currentUser?.UserID);
                         break;
                 }
 

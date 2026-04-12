@@ -9,13 +9,11 @@ namespace TDFMAUI.Pages;
 
 public partial class MainPage : ContentPage
 {
-    private readonly ApiService _apiService;
     private readonly IServiceProvider _serviceProvider; // Add IServiceProvider
 
     public MainPage(IServiceProvider serviceProvider) // Inject IServiceProvider
     {
         InitializeComponent();
-        _apiService = App.Services.GetService<ApiService>();
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider)); // Assign IServiceProvider
     }
 
@@ -59,21 +57,20 @@ public partial class MainPage : ContentPage
     {
         var webSocketService = App.Services.GetService<WebSocketService>();
         var userPresenceService = App.Services.GetService<IUserPresenceService>();
-        await Navigation.PushAsync(new MessagesPage(_apiService, webSocketService, userPresenceService));
+        var messageApiService = App.Services.GetService<IMessageApiService>();
+        await Navigation.PushAsync(new MessagesPage(messageApiService, webSocketService, userPresenceService));
     }
 
     private async void OnProfileClicked(object sender, EventArgs e)
     {
-        await Navigation.PushAsync(new ProfilePage(_apiService));
+        var viewModel = App.Services.GetService<UserProfileViewModel>();
+        await Navigation.PushAsync(new ProfilePage(viewModel));
     }
 
     private async void OnAdminClicked(object sender, EventArgs e)
     {
         if (App.CurrentUser != null && (App.CurrentUser.IsAdmin ?? false))
         {
-            var requestService = App.Services.GetRequiredService<IRequestService>();
-            var apiService = App.Services.GetRequiredService<ApiService>();
-            var errorHandlingService = App.Services.GetRequiredService<TDFShared.Services.IErrorHandlingService>();
             await Navigation.PushAsync(_serviceProvider.GetRequiredService<AdminPage>());
         }
     }

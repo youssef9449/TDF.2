@@ -22,7 +22,7 @@ namespace TDFMAUI.Services
     public class PushNotificationService : IPushNotificationService
     {
         private readonly ILogger<PushNotificationService> _logger;
-        private readonly IApiService _apiService;
+        private readonly IAuthApiService _authApiService;
         private readonly IPlatformNotificationService _platformNotificationService;
         private readonly ILocalStorageService _localStorage;
         private readonly SemaphoreSlim _registrationSemaphore = new SemaphoreSlim(1, 1);
@@ -37,12 +37,12 @@ namespace TDFMAUI.Services
 
         public PushNotificationService(
             ILogger<PushNotificationService> logger,
-            IApiService apiService,
+            IAuthApiService authApiService,
             IPlatformNotificationService platformNotificationService,
             ILocalStorageService localStorage)
         {
             _logger = logger;
-            _apiService = apiService;
+            _authApiService = authApiService;
             _platformNotificationService = platformNotificationService;
             _localStorage = localStorage;
 
@@ -145,14 +145,10 @@ namespace TDFMAUI.Services
                         // Try to register the token
                         try
                         {
-                            // Since there's no direct method to send push tokens in IApiService,
-                            // we'll log this for now. In a real implementation, you would need to
-                            // add a specific method to IApiService for push token registration.
-                            _logger.LogInformation("Would register token: {Token} for platform: {Platform}", 
+                            _logger.LogInformation("Registering token: {Token} for platform: {Platform}",
                                 registration.Token, registration.Platform);
                             
-                            // For testing purposes, we'll consider this successful
-                            success = true;
+                            success = await _authApiService.RegisterPushTokenAsync(registration);
                         }
                         catch (Exception ex)
                         {
@@ -207,13 +203,9 @@ namespace TDFMAUI.Services
                 
                 try
                 {
-                    // Since there's no direct method to unregister push tokens in IApiService,
-                    // we'll log this for now. In a real implementation, you would need to
-                    // add a specific method to IApiService for push token unregistration.
-                    _logger.LogInformation("Would unregister token: {Token}", token);
+                    _logger.LogInformation("Unregistering token: {Token}", token);
                     
-                    // For testing purposes, we'll consider this successful
-                    success = true;
+                    success = await _authApiService.UnregisterPushTokenAsync(token);
                 }
                 catch (Exception ex)
                 {

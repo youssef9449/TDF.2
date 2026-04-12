@@ -146,12 +146,18 @@ namespace TDFMAUI
             builder.Services.AddSingleton<IWebSocketService>(sp => sp.GetRequiredService<WebSocketService>());
             builder.Services.AddSingleton<ApiService>();
             builder.Services.AddSingleton<IApiService>(sp => sp.GetRequiredService<ApiService>());
+            builder.Services.AddSingleton<IAuthApiService>(sp => sp.GetRequiredService<ApiService>());
+            builder.Services.AddSingleton<IUserApiService>(sp => sp.GetRequiredService<ApiService>());
+            builder.Services.AddSingleton<IRequestApiService>(sp => sp.GetRequiredService<ApiService>());
+            builder.Services.AddSingleton<IMessageApiService>(sp => sp.GetRequiredService<ApiService>());
+            builder.Services.AddSingleton<ILookupApiService>(sp => sp.GetRequiredService<ApiService>());
             builder.Services.AddSingleton<SecureStorageService>();
             builder.Services.AddSingleton(SecureStorage.Default);
             builder.Services.AddSingleton<NetworkService>();
             builder.Services.AddSingleton<LocalStorageService>();
             builder.Services.AddSingleton<ILocalStorageService, LocalStorageService>();
-            builder.Services.AddSingleton<IUserPresenceApiService, UserPresenceApiService>();
+            builder.Services.AddSingleton<UserPresenceApiService>();
+            builder.Services.AddSingleton<IUserPresenceApiService>(sp => sp.GetRequiredService<UserPresenceApiService>());
             builder.Services.AddSingleton<IUserPresenceEventsService, UserPresenceEventsService>();
             builder.Services.AddSingleton<IUserPresenceCacheService, UserPresenceCacheService>();
             builder.Services.AddSingleton<IUserPresenceService, UserPresenceService>();
@@ -272,7 +278,7 @@ namespace TDFMAUI
             {
                 connectivityService.ConnectivityChanged += async (sender, e) =>
                 {
-                    var apiService = app.Services.GetService<ApiService>();
+                    var apiService = app.Services.GetService<IApiService>();
                     var webSocketService = app.Services.GetService<WebSocketService>();
                     if (e.IsConnected)
                     {

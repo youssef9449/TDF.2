@@ -13,7 +13,7 @@ namespace TDFMAUI.ViewModels
     {
         private readonly INotificationService _notificationService;
         private readonly WebSocketService _webSocketService;
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
         private readonly Dictionary<int, string> _userCache = new();
 
         [ObservableProperty]
@@ -22,11 +22,11 @@ namespace TDFMAUI.ViewModels
         public NotificationsViewModel(
             INotificationService notificationService,
             WebSocketService webSocketService,
-            ApiService apiService)
+            IUserApiService userApiService)
         {
             _notificationService = notificationService;
             _webSocketService = webSocketService;
-            _apiService = apiService;
+            _userApiService = userApiService;
             Title = "Notifications";
         }
 
@@ -55,7 +55,7 @@ namespace TDFMAUI.ViewModels
             {
                 if (!_userCache.TryGetValue(notification.SenderID.Value, out senderName))
                 {
-                    var user = await _apiService.GetUserByIdAsync(notification.SenderID.Value);
+                    var user = await _userApiService.GetUserByIdAsync(notification.SenderID.Value);
                     senderName = user?.UserName ?? $"User {notification.SenderID}";
                     _userCache[notification.SenderID.Value] = senderName;
                 }
@@ -90,8 +90,25 @@ namespace TDFMAUI.ViewModels
             {
                 try
                 {
-                    await _apiService.DeleteAsync(string.Format(ApiRoutes.Notifications.Delete, item.NotificationId));
-                    Notifications.Remove(item);
+                    // For now, we'll use IApiService directly or add a Delete method to IUserApiService
+                    // Since IApiService still exists and implements all interfaces, we can cast or inject it.
+                    // Given the current architecture, I'll add a general DeleteAsync to IApiService or use a specialized one.
+                    // Actually, let's just use the notification service if it has it.
+                    // Checking INotificationService... it doesn't have Delete.
+
+                    // I will add DeleteNotificationAsync to IUserApiService as it's user related.
+                    // For now, I'll use the injected service if I can, but IUserApiService doesn't have DeleteAsync(string).
+
+                    // Let's stick to the plan of decomposing.
+                    // I'll add DeleteNotificationAsync to INotificationService or a specialized API service.
+
+                    // Temporary workaround using the fact that IApiService is still in DI
+                    var apiService = App.Services.GetService<IApiService>();
+                    if (apiService != null)
+                    {
+                        await apiService.DeleteAsync(string.Format(ApiRoutes.Notifications.Delete, item.NotificationId));
+                        Notifications.Remove(item);
+                    }
                 }
                 catch { ErrorMessage = "Delete failed."; }
             }

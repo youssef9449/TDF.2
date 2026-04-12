@@ -7,13 +7,13 @@ namespace TDFMAUI.Pages;
 
 public partial class UserDetailsPage : ContentPage
 {
-    private readonly ApiService _apiService;
+    private readonly IUserApiService _userApiService;
     private readonly int _userId;
 
     public UserDetailsPage(int userId)
     {
         InitializeComponent();
-        _apiService = App.Services.GetService<ApiService>();
+        _userApiService = App.Services.GetService<IUserApiService>();
         _userId = userId;
         LoadUserDetails();
     }
@@ -22,7 +22,7 @@ public partial class UserDetailsPage : ContentPage
     {
         try
         {
-            var user = await _apiService.GetUserAsync(_userId);
+            var user = await _userApiService.GetUserByIdAsync(_userId);
             if (user != null)
             {
                 userNameLabel.Text = user.UserName;

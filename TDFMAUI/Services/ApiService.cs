@@ -43,7 +43,7 @@ namespace TDFMAUI.Services
     /// - Performance tracking with DebugService
     /// - Comprehensive error handling with user-friendly messages
     /// </summary>
-    public class ApiService : IApiService, IDisposable
+    public class ApiService : IApiService, IAuthApiService, IUserApiService, IRequestApiService, IMessageApiService, ILookupApiService, IDisposable
     {
         private readonly TDFShared.Services.IHttpClientService _httpClientService;
         private readonly SecureStorageService _secureStorage;
@@ -486,6 +486,36 @@ namespace TDFMAUI.Services
         #endregion
 
         #region Authentication
+        public async Task<bool> RegisterPushTokenAsync(PushTokenRegistrationDto registration)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            try
+            {
+                var response = await PostAsync<PushTokenRegistrationDto, ApiResponse<bool>>(ApiRoutes.PushToken.Register, registration);
+                return response?.Success ?? false;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Push token registration failed");
+                return false;
+            }
+        }
+
+        public async Task<bool> UnregisterPushTokenAsync(string token)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            try
+            {
+                var response = await PostAsync<object, ApiResponse<bool>>(ApiRoutes.PushToken.Unregister, new { Token = token });
+                return response?.Success ?? false;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Push token unregistration failed");
+                return false;
+            }
+        }
+
         public async Task<ApiResponse<TokenResponse>> LoginAsync(LoginRequestDto loginRequest)
         {
             if (!_initialized) await InitializeAuthenticationAsync();
@@ -989,6 +1019,22 @@ namespace TDFMAUI.Services
             return response.Data ?? new PaginatedResult<ChatMessageDto>() { Items = new List<ChatMessageDto>() };
         }
 
+        public async Task<int> GetUnreadMessagesCountAsync(int userId)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = string.Format(ApiRoutes.Messages.GetUnreadCount, userId);
+            try
+            {
+                var response = await GetAsync<int>(endpoint);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to get unread messages count");
+                return 0;
+            }
+        }
+
         public async Task<bool> MarkNotificationAsSeenAsync(int notificationId)
         {
              if (!_initialized) await InitializeAuthenticationAsync();
@@ -1142,6 +1188,52 @@ namespace TDFMAUI.Services
         #endregion
 
         // AUTH
+        public async Task<UserPresenceInfo> GetUserStatusAsync(int userId)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = string.Format(ApiRoutes.Users.GetStatus, userId);
+            try
+            {
+                var response = await GetAsync<UserPresenceInfo>(endpoint);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to get user status");
+                return null;
+            }
+        }
+
+        public async Task<PaginatedResult<UserPresenceInfo>> GetOnlineUsersPresenceAsync(int page = 1, int pageSize = 100)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = $"{ApiRoutes.Users.GetOnline}?pageNumber={page}&pageSize={pageSize}";
+            try
+            {
+                var response = await GetAsync<PaginatedResult<UserPresenceInfo>>(endpoint);
+                return response ?? new PaginatedResult<UserPresenceInfo>();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to get online users presence");
+                return new PaginatedResult<UserPresenceInfo>();
+            }
+        }
+
+        public async Task UpdateUserConnectionStatusAsync(int userId, bool isConnected)
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = string.Format(ApiRoutes.Users.UpdateConnection, userId);
+            try
+            {
+                await PutAsync<object, object>(endpoint, new { isConnected }, false);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to update user connection status");
+            }
+        }
+
         public async Task<ApiResponse<UserDto>> GetCurrentUserAsync()
         {
             if (!_initialized) await InitializeAuthenticationAsync();

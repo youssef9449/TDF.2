@@ -15,17 +15,19 @@ namespace TDFMAUI.Pages;
 public partial class NewMessagePage : ContentPage
 {
     public ObservableCollection<UserDto> Users { get; set; } = new ObservableCollection<UserDto>();
-    private readonly ApiService _apiService;
+    private readonly IMessageApiService _messageApiService;
+    private readonly IUserApiService _userApiService;
     private readonly WebSocketService _webSocketService;
     
     // Add properties for pre-selected user
     public int PreSelectedUserId { get; set; }
     public string PreSelectedUserName { get; set; }
 
-    public NewMessagePage(ApiService apiService, WebSocketService webSocketService = null)
+    public NewMessagePage(IMessageApiService messageApiService, WebSocketService webSocketService = null)
     {
         InitializeComponent();
-        _apiService = apiService;
+        _messageApiService = messageApiService;
+        _userApiService = App.Services.GetService<IUserApiService>();
         _webSocketService = webSocketService;
         BindingContext = this;
         LoadUsers();
@@ -47,7 +49,7 @@ public partial class NewMessagePage : ContentPage
         try
         {
             Users.Clear();
-            var usersResult = await _apiService.GetAllUsersAsync();
+            var usersResult = await _userApiService.GetAllUsersAsync();
             if (usersResult != null && usersResult.Items != null)
             {
                 foreach (var user in usersResult.Items.Where(u => u.UserID != App.CurrentUser.UserID))
@@ -113,7 +115,7 @@ public partial class NewMessagePage : ContentPage
                 SentAt = DateTime.UtcNow
             };
 
-            await _apiService.CreateMessageAsync(message);
+            await _messageApiService.CreateMessageAsync(message);
             
             // Send a WebSocket notification if available
             if (_webSocketService != null)

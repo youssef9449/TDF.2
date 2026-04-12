@@ -11,7 +11,7 @@ namespace TDFMAUI.Pages;
 public partial class GlobalChatPage : ContentPage
 {
     private HashSet<string> displayedMessageIds = new HashSet<string>();
-    private readonly ApiService _apiService;
+    private readonly IMessageApiService _messageApiService;
     private readonly WebSocketService _webSocketService;
     private readonly ObservableCollection<MessageModel> chatMessages = new ObservableCollection<MessageModel>();
     
@@ -25,10 +25,10 @@ public partial class GlobalChatPage : ContentPage
     // private Button sendButton;
     private CollectionView MessagesListView;
 
-    public GlobalChatPage(ApiService apiService, WebSocketService webSocketService)
+    public GlobalChatPage(IMessageApiService messageApiService, WebSocketService webSocketService)
     {
         InitializeComponent();
-        _apiService = apiService;
+        _messageApiService = messageApiService;
         _webSocketService = webSocketService;
         
         // We don't need to use FindByName for elements with x:Name already defined in XAML
@@ -72,7 +72,7 @@ public partial class GlobalChatPage : ContentPage
         try
         {
             // Get chat messages from API
-            var messages = await _apiService.GetRecentChatMessagesAsync(50);
+            var messages = await _messageApiService.GetRecentChatMessagesAsync(50);
             
             foreach (var message in messages)
             {
@@ -121,7 +121,7 @@ public partial class GlobalChatPage : ContentPage
         try
         {
             // Get recent chat messages from API
-            var messages = await _apiService.GetRecentChatMessagesAsync(20);
+            var messages = await _messageApiService.GetRecentChatMessagesAsync(20);
             
             await MainThread.InvokeOnMainThreadAsync(() => {
                 bool newMessagesAdded = false;
@@ -306,7 +306,7 @@ public partial class GlobalChatPage : ContentPage
     private async void OnNewMessageClicked(object sender, EventArgs e)
     {
         // Navigate to the new message composition page
-        await Navigation.PushAsync(new NewMessagePage(_apiService, _webSocketService));
+        await Navigation.PushAsync(new NewMessagePage(_messageApiService, _webSocketService));
     }
 
     private void OnWebSocketMessageReceived(object sender, ChatMessageEventArgs args)

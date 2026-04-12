@@ -9,7 +9,7 @@ namespace TDFMAUI.ViewModels
 {
     public partial class EditUserViewModel : BaseViewModel
     {
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
         private readonly UpdateUserRequest _user;
 
         [ObservableProperty]
@@ -30,9 +30,9 @@ namespace TDFMAUI.ViewModels
         public List<string> DepartmentOptions { get; } = new() { "IT", "HR", "Finance", "Marketing", "Operations", "Sales" };
         public List<string> TitleOptions { get; } = new() { "Manager", "Supervisor", "Team Lead", "Senior", "Junior", "Intern" };
 
-        public EditUserViewModel(UpdateUserRequest user, ApiService apiService)
+        public EditUserViewModel(UpdateUserRequest user, IUserApiService userApiService)
         {
-            _apiService = apiService;
+            _userApiService = userApiService;
             _user = user;
             Title = "Edit User";
 
@@ -61,7 +61,7 @@ namespace TDFMAUI.ViewModels
                 _user.Title = TitleName;
                 _user.IsAdmin = IsAdmin;
 
-                await _apiService.UpdateUserAsync(_user.UserID, _user);
+                await _userApiService.UpdateUserAsync(_user.UserID, _user);
                 await Shell.Current.DisplayAlert("Success", "User updated successfully", "OK");
                 await Shell.Current.Navigation.PopAsync();
             }
@@ -86,7 +86,7 @@ namespace TDFMAUI.ViewModels
             IsBusy = true;
             try
             {
-                await _apiService.DeleteUserAsync(_user.UserID);
+                await _userApiService.DeleteUserAsync(_user.UserID);
                 await Shell.Current.DisplayAlert("Success", "User deleted successfully", "OK");
                 await Shell.Current.Navigation.PopAsync();
             }

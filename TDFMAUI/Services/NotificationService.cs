@@ -9,7 +9,10 @@ namespace TDFMAUI.Services
 {
     public class NotificationService : INotificationService, IExtendedNotificationService
     {
-        private readonly ApiService _apiService;
+        private readonly IUserApiService _userApiService;
+        private readonly IMessageApiService _messageApiService;
+        private readonly IAuthApiService _authApiService;
+        private readonly IApiService _apiService;
         private readonly WebSocketService _webSocketService;
         private readonly ILogger<NotificationService> _logger;
         private readonly ILocalStorageService _localStorage;
@@ -29,7 +32,10 @@ namespace TDFMAUI.Services
         }
 
         public NotificationService(
-            ApiService apiService,
+            IUserApiService userApiService,
+            IMessageApiService messageApiService,
+            IAuthApiService authApiService,
+            IApiService apiService,
             WebSocketService webSocketService,
             ILocalStorageService localStorage,
             ILogger<NotificationService> logger,
@@ -38,6 +44,9 @@ namespace TDFMAUI.Services
             // Log constructor entry
             logger?.LogInformation("NotificationService constructor started.");
 
+            _userApiService = userApiService ?? throw new ArgumentNullException(nameof(userApiService));
+            _messageApiService = messageApiService ?? throw new ArgumentNullException(nameof(messageApiService));
+            _authApiService = authApiService ?? throw new ArgumentNullException(nameof(authApiService));
             _apiService = apiService ?? throw new ArgumentNullException(nameof(apiService));
             _webSocketService = webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
             _localStorage = localStorage ?? throw new ArgumentNullException(nameof(localStorage));
@@ -310,7 +319,7 @@ namespace TDFMAUI.Services
                 }
 
                 var userId = App.CurrentUser.UserID;
-                var count = await _apiService.GetAsync<int>(string.Format(TDFShared.Constants.ApiRoutes.Messages.GetUnreadCount, userId));
+                var count = await _messageApiService.GetUnreadMessagesCountAsync(userId);
 
                 return count;
             }

@@ -13,7 +13,7 @@ namespace TDFAPI.Repositories
     /// Generic repository implementation using Entity Framework Core
     /// </summary>
     /// <typeparam name="T">The entity type</typeparam>
-    public class GenericRepository<T> where T : class
+    public class GenericRepository<T> : IGenericRepository<T> where T : class
     {
         protected readonly ApplicationDbContext _context;
         protected readonly DbSet<T> _dbSet;

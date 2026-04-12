@@ -13,7 +13,7 @@ namespace TDFMAUI.ViewModels
 {
     public partial class MessagesViewModel : BaseViewModel
     {
-        private readonly ApiService _apiService;
+        private readonly IMessageApiService _messageApiService;
         private readonly ILogger<MessagesViewModel> _logger;
         private readonly WebSocketService _webSocketService;
         private readonly IUserPresenceService _userPresenceService;
@@ -26,12 +26,12 @@ namespace TDFMAUI.ViewModels
         private ObservableCollection<MessageItemViewModel> _messages = new();
 
         public MessagesViewModel(
-            ApiService apiService,
+            IMessageApiService messageApiService,
             ILogger<MessagesViewModel> logger,
             WebSocketService webSocketService,
             IUserPresenceService userPresenceService)
         {
-            _apiService = apiService;
+            _messageApiService = messageApiService;
             _logger = logger;
             _webSocketService = webSocketService;
             _userPresenceService = userPresenceService;
@@ -46,7 +46,7 @@ namespace TDFMAUI.ViewModels
             try
             {
                 var pagination = new MessagePaginationDto { PageNumber = 1, PageSize = 50, SortDescending = true };
-                var result = await _apiService.GetUserMessagesAsync(App.CurrentUser.UserID, pagination);
+                var result = await _messageApiService.GetUserMessagesAsync(App.CurrentUser.UserID, pagination);
 
                 Messages.Clear();
                 if (result?.Items != null)
@@ -88,7 +88,7 @@ namespace TDFMAUI.ViewModels
             try
             {
                 var dto = new MessageCreateDto { MessageText = content, ReceiverID = 0, MessageType = MessageType.Chat };
-                var created = await _apiService.CreateMessageAsync(dto);
+                var created = await _messageApiService.CreateMessageAsync(dto);
                 if (created != null) await LoadMessagesAsync();
             }
             catch (Exception ex) { ErrorMessage = "Failed to send message."; }

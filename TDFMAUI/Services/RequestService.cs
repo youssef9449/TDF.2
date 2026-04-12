@@ -269,7 +269,11 @@ namespace TDFMAUI.Services
                 {
                     Page = pageNumber,
                     PageSize = pageSize,
-                    Department = department
+                    Department = department,
+                    FilterStatus = string.IsNullOrEmpty(status) || status == "All" ? null : (TDFShared.Enums.RequestStatus?)Enum.Parse(typeof(TDFShared.Enums.RequestStatus), status),
+                    FilterType = string.IsNullOrEmpty(type) || type == "All" ? null : (TDFShared.Enums.LeaveType?)Enum.Parse(typeof(TDFShared.Enums.LeaveType), type),
+                    FromDate = fromDate,
+                    ToDate = toDate
                 };
 
                 var response = await _requestApiService.GetRequestsForApprovalAsync(pagination);
@@ -294,18 +298,8 @@ namespace TDFMAUI.Services
         {
             try
             {
-                // This logic might need to be moved to IRequestApiService or kept as is if we have a direct GetAsync there
-                // For now, let's assume we want to use the RequestApiService if possible
-                // Re-examining ApiService shows it was just calling GetAsync
-
-                // Let's keep it simple for now, as IRequestApiService doesn't have this exact method yet,
-                // we should either add it or use the generic GetAsync if available.
-                // Looking at my defined IRequestApiService, it doesn't have GetRecentDashboardRequestsAsync.
-
-                // I will use IRequestApiService.GetRequestsAsync with specific parameters to simulate it
-                var pagination = new RequestPaginationDto { Page = 1, PageSize = 5, SortBy = "CreatedDate", Ascending = false };
-                var response = await _requestApiService.GetRequestsAsync(pagination);
-                return response.Data?.Items?.ToList() ?? new List<RequestResponseDto>();
+                var response = await _requestApiService.GetRecentDashboardRequestsAsync();
+                return response.Data ?? new List<RequestResponseDto>();
             }
             catch (Exception ex)
             {
@@ -318,9 +312,8 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var pagination = new RequestPaginationDto { CountOnly = true, FilterStatus = TDFShared.Enums.RequestStatus.Pending };
-                var response = await _requestApiService.GetRequestsAsync(pagination);
-                return response.Data?.TotalCount ?? 0;
+                var response = await _requestApiService.GetPendingDashboardRequestCountAsync();
+                return response.Data;
             }
             catch (Exception ex)
             {

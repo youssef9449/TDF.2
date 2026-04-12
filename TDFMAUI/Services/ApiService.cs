@@ -492,7 +492,9 @@ namespace TDFMAUI.Services
             try
             {
                 var response = await PostAsync<PushTokenRegistrationDto, ApiResponse<bool>>(ApiRoutes.PushToken.Register, registration);
-                return response?.Success ?? false;
+                // The API might return Ok() with no body, which PostAsync might deserialize to null
+                // Or it might return ApiResponse<bool> where Success is true
+                return response?.Success ?? true;
             }
             catch (Exception ex)
             {
@@ -1455,6 +1457,38 @@ namespace TDFMAUI.Services
             {
                 _logger?.LogError(ex, "Error getting requests: {Message}", ex.Message);
                 return new ApiResponse<PaginatedResult<RequestResponseDto>> { Success = false, Message = ex.Message };
+            }
+        }
+
+        public async Task<ApiResponse<List<RequestResponseDto>>> GetRecentDashboardRequestsAsync()
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = ApiRoutes.Requests.GetRecentDashboard;
+            try
+            {
+                var response = await GetAsync<ApiResponse<List<RequestResponseDto>>>(endpoint);
+                return response ?? new ApiResponse<List<RequestResponseDto>> { Success = false, Message = "Failed to get recent dashboard requests" };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to get recent dashboard requests: {Message}", ex.Message);
+                return new ApiResponse<List<RequestResponseDto>> { Success = false, Message = ex.Message };
+            }
+        }
+
+        public async Task<ApiResponse<int>> GetPendingDashboardRequestCountAsync()
+        {
+            if (!_initialized) await InitializeAuthenticationAsync();
+            string endpoint = ApiRoutes.Requests.GetPendingDashboardCount;
+            try
+            {
+                var response = await GetAsync<ApiResponse<int>>(endpoint);
+                return response ?? new ApiResponse<int> { Success = false, Message = "Failed to get pending dashboard request count" };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "ApiService: Failed to get pending dashboard request count: {Message}", ex.Message);
+                return new ApiResponse<int> { Success = false, Message = ex.Message };
             }
         }
 

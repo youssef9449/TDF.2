@@ -11,7 +11,7 @@ namespace TDFAPI.Controllers
     [Authorize]
     [ApiController]
     [Route(TDFShared.Constants.ApiRoutes.PushToken.Base)]
-    public class PushTokenController : ControllerBase
+    public class PushTokenController : BaseApiController
     {
         private readonly IPushTokenService _pushTokenService;
         private readonly ILogger<PushTokenController> _logger;
@@ -34,12 +34,12 @@ namespace TDFAPI.Controllers
             {
                 var userId = int.Parse(User.FindFirst("sub")?.Value);
                 await _pushTokenService.RegisterTokenAsync(userId, registration);
-                return Ok();
+                return OkResponse(true, "Token registered successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error registering push token");
-                return StatusCode(500, "Error registering push token");
+                return ErrorResponse("Error registering push token", System.Net.HttpStatusCode.InternalServerError, ex.Message);
             }
         }
 
@@ -53,12 +53,12 @@ namespace TDFAPI.Controllers
             {
                 var userId = int.Parse(User.FindFirst("sub")?.Value);
                 await _pushTokenService.UnregisterTokenAsync(userId, token);
-                return Ok();
+                return OkResponse(true, "Token unregistered successfully");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error unregistering push token");
-                return StatusCode(500, "Error unregistering push token");
+                return ErrorResponse("Error unregistering push token", System.Net.HttpStatusCode.InternalServerError, ex.Message);
             }
         }
 

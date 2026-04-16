@@ -8,6 +8,7 @@ namespace TDFMAUI.Services
     public interface IUserApiService
     {
         Task<ApiResponse<UserDto>> GetCurrentUserAsync();
+        Task<ApiResponse<UserDto>> GetCurrentAsync();
         Task<ApiResponse<int>> GetCurrentUserIdAsync();
         Task<ApiResponse<UserProfileDto>> GetUserProfileAsync(int userId);
         Task<UserDto> GetUserByIdAsync(int userId);

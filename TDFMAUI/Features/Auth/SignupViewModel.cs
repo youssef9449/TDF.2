@@ -19,6 +19,7 @@ namespace TDFMAUI.Features.Auth
         private readonly ILookupService _lookupService;
         private readonly ILogger<SignupViewModel> _logger;
         private readonly IValidationService _validationService;
+        private readonly IBusinessRulesService _businessRulesService;
 
         [ObservableProperty]
         private string _username = string.Empty;
@@ -49,12 +50,18 @@ namespace TDFMAUI.Features.Auth
         [ObservableProperty]
         private string _selectedTitle = string.Empty;
 
-        public SignupViewModel(IAuthApiService authApiService, ILookupService lookupService, ILogger<SignupViewModel> logger, IValidationService validationService)
+        public SignupViewModel(
+            IAuthApiService authApiService,
+            ILookupService lookupService,
+            ILogger<SignupViewModel> logger,
+            IValidationService validationService,
+            IBusinessRulesService businessRulesService)
         {
             _authApiService = authApiService;
             _lookupService = lookupService;
             _logger = logger;
             _validationService = validationService;
+            _businessRulesService = businessRulesService;
             Title = "Sign Up";
             _ = LoadDepartmentsAsync();
         }
@@ -104,19 +111,25 @@ namespace TDFMAUI.Features.Auth
                 Title = SelectedTitle
             };
 
-            // Basic DTO validation
-            var validationResult = _validationService.ValidateObject(registerRequest);
-            if (!validationResult.IsValid)
+            // Use BusinessRulesService for comprehensive validation
+            var context = new TDFShared.Validation.BusinessRuleContext
             {
-                ErrorMessage = validationResult.Errors.FirstOrDefault() ?? "Validation failed.";
-                return;
-            }
+                UsernameExistsAsync = async (u) => false, // Client-side can't easily check, but let's assume valid
+                FullNameExistsAsync = async (f) => false
+            };
 
-            // Strong password validation
-            var passwordResult = _validationService.ValidatePassword(Password);
-            if (!passwordResult.IsValid)
+            var businessRuleResult = await _businessRulesService.ValidateUserCreationAsync(new CreateUserRequest
             {
-                ErrorMessage = passwordResult.Errors.FirstOrDefault() ?? "Password does not meet requirements.";
+                Username = Username,
+                Password = Password,
+                FullName = FullName,
+                Department = SelectedDepartment?.Name ?? string.Empty,
+                Title = SelectedTitle
+            }, context);
+
+            if (!businessRuleResult.IsValid)
+            {
+                ErrorMessage = businessRuleResult.Errors.FirstOrDefault() ?? "Validation failed.";
                 return;
             }
 

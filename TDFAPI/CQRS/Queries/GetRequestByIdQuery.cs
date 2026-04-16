@@ -5,6 +5,7 @@ using TDFAPI.Repositories;
 using TDFAPI.Services;
 using TDFShared.Utilities;
 using TDFShared.Services;
+using TDFAPI.Extensions;
 
 namespace TDFAPI.CQRS.Queries
 {
@@ -45,26 +46,7 @@ namespace TDFAPI.CQRS.Queries
             var balanceKey = TDFShared.Enums.LeaveTypeHelper.GetBalanceKey(entity.RequestType);
             int? remainingBalance = (balanceKey != null && balances.TryGetValue(balanceKey, out int val)) ? val : null;
 
-            var requestDto = new RequestResponseDto
-            {
-                RequestID = entity.RequestID,
-                RequestUserID = entity.RequestUserID,
-                UserName = entity.RequestUserFullName,
-                LeaveType = entity.RequestType,
-                RequestReason = entity.RequestReason,
-                RequestStartDate = entity.RequestFromDay,
-                RequestEndDate = entity.RequestToDay,
-                RequestBeginningTime = entity.RequestBeginningTime,
-                RequestEndingTime = entity.RequestEndingTime,
-                RequestDepartment = entity.RequestDepartment,
-                Status = entity.RequestManagerStatus,
-                HRStatus = entity.RequestHRStatus,
-                CreatedDate = entity.CreatedAt.GetValueOrDefault(DateTime.MinValue),
-                LastModifiedDate = entity.UpdatedAt,
-                RequestNumberOfDays = entity.RequestNumberOfDays,
-                RemainingBalance = remainingBalance,
-                RowVersion = entity.RowVersion
-            };
+            var requestDto = entity.ToResponseDto(remainingBalance);
 
             if (!RequestStateManager.CanViewRequest(requestDto, currentUser))
             {

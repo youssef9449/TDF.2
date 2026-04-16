@@ -28,19 +28,14 @@ namespace TDFShared.Enums
         /// </summary>
         Rejected,
 
-                /// <summary>
-        /// Request has been rejected
+        /// <summary>
+        /// Request has been rejected by manager
         /// </summary>
         ManagerRejected,
         
         /// <summary>
         /// Request has been canceled
         /// </summary>
-        Canceled,
-        
-        /// <summary>
-        /// Request is in progress
-        /// </summary>
-        All
+        Canceled
     }
 } 

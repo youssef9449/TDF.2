@@ -112,30 +112,23 @@ namespace TDFMAUI.ViewModels
                     FilterStatus = ShowPendingOnly ? RequestStatus.Pending : null
                 };
 
-                var currentUser = await _authService.GetCurrentUserAsync();
-                var accessLevel = AuthorizationUtilities.GetRequestAccessLevel(currentUser);
-                ApiResponse<PaginatedResult<RequestResponseDto>>? response = null;
-
-                switch (accessLevel)
+                // Apply selected department filter if any
+                if (SelectedDepartment != null && SelectedDepartment.Id != "0")
                 {
-                    case RequestAccessLevel.All:
-                        response = await _requestApiService.GetRequestsAsync(pagination);
-                        break;
-                    case RequestAccessLevel.Department:
-                        string? department = (SelectedDepartment != null && SelectedDepartment.Id != "0") ? SelectedDepartment.Name : currentUser?.Department;
-                        if (!string.IsNullOrEmpty(department)) response = await _requestApiService.GetRequestsAsync(pagination, department: department);
-                        else response = await _requestApiService.GetRequestsAsync(pagination, userId: currentUser?.UserID);
-                        break;
-                    default:
-                        response = await _requestApiService.GetRequestsAsync(pagination, userId: currentUser?.UserID);
-                        break;
+                    pagination.Department = SelectedDepartment.Name;
                 }
+
+                var currentUser = await _authService.GetCurrentUserAsync();
+
+                // Simplified: The backend now handles security scoping based on the user's role.
+                // We just call GetRequestsAsync with any optional filters (like department).
+                var response = await _requestApiService.GetRequestsAsync(pagination);
 
                 if (response?.Success == true && response.Data?.Items != null)
                 {
                     foreach (var request in response.Data.Items)
                     {
-                        await SetRequestPermissions(request, currentUser);
+                        SetRequestPermissions(request, currentUser);
                         Requests.Add(request);
                     }
                 }
@@ -149,14 +142,14 @@ namespace TDFMAUI.ViewModels
             finally { IsBusy = false; }
         }
 
-        private async Task SetRequestPermissions(RequestResponseDto request, UserDto? user)
+        private void SetRequestPermissions(RequestResponseDto request, UserDto? user)
         {
             if (user == null) return;
             bool isOwner = request.RequestUserID == user.UserID;
             request.CanEdit = RequestStateManager.CanEdit(request, user.IsAdmin ?? false, isOwner);
             request.CanDelete = request.CanEdit;
-            request.CanApprove = AuthorizationUtilities.CanPerformRequestAction(user, request, RequestAction.Approve);
-            request.CanReject = AuthorizationUtilities.CanPerformRequestAction(user, request, RequestAction.Reject);
+            request.CanApprove = RequestStateManager.CanApproveRequest(request, user);
+            request.CanReject = RequestStateManager.CanRejectRequest(request, user);
         }
 
         [RelayCommand]
@@ -249,9 +242,23 @@ namespace TDFMAUI.ViewModels
             var currentUser = await _authService.GetCurrentUserAsync();
 
             var departmentsList = allDepartments.ToList();
-            departmentsList.Insert(0, new LookupItem { Name = "All", Id = "0" });
+
+            // Filter departments based on user permissions
+            if (currentUser != null && !(currentUser.IsAdmin == true || currentUser.IsHR == true))
+            {
+                departmentsList = departmentsList
+                    .Where(d => RequestStateManager.CanAccessDepartment(currentUser.Department, d.Name))
+                    .ToList();
+            }
+
+            // Only add "All" if user can see multiple departments
+            if (departmentsList.Count > 1 || (currentUser?.IsAdmin == true || currentUser?.IsHR == true))
+            {
+                departmentsList.Insert(0, new LookupItem { Name = "All", Id = "0" });
+            }
+
             Departments = new ObservableCollection<LookupItem>(departmentsList);
-            SelectedDepartment = Departments[0];
+            if (Departments.Any()) SelectedDepartment = Departments[0];
         }
     }
 }

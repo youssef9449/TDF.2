@@ -77,20 +77,7 @@ namespace TDFShared.Utilities
         /// <returns>True if the user can access the department</returns>
         public static bool CanAccessDepartment(UserDto user, string targetDepartment)
         {
-            if (user == null || string.IsNullOrEmpty(targetDepartment))
-                return false;
-
-            // Admin and HR can access all departments
-            if ((user.IsAdmin ?? false) || (user.IsHR ?? false))
-                return true;
-
-            // Managers can access their own department (including constituent departments for hyphenated departments)
-            if ((user.IsManager ?? false) && !string.IsNullOrEmpty(user.Department))
-                return RequestStateManager.CanManageDepartment(user, targetDepartment);
-
-            // Regular users can only access their own department for limited operations
-            return !string.IsNullOrEmpty(user.Department) &&
-                   RequestStateManager.CanManageDepartment(user, targetDepartment);
+            return RequestStateManager.CanManageDepartment(user, targetDepartment);
         }
 
         /// <summary>
@@ -104,15 +91,7 @@ namespace TDFShared.Utilities
             if (user == null || allDepartments == null)
                 return Enumerable.Empty<string>();
 
-            // Admin and HR can access all departments
-            if ((user.IsAdmin ?? false) || (user.IsHR ?? false))
-                return allDepartments;
-
-            // Managers and regular users can access departments based on their department (including constituent departments for hyphenated departments)
-            if (!string.IsNullOrEmpty(user.Department))
-                return allDepartments.Where(dept => RequestStateManager.CanManageDepartment(user, dept));
-
-            return Enumerable.Empty<string>();
+            return allDepartments.Where(dept => RequestStateManager.CanManageDepartment(user, dept));
         }
 
         #endregion
@@ -152,11 +131,11 @@ namespace TDFShared.Utilities
 
             return action switch
             {
-                RequestAction.View => CanViewRequest(user, request),
-                RequestAction.Edit => CanEditRequest(user, request),
-                RequestAction.Delete => CanDeleteRequest(user, request),
-                RequestAction.Approve => CanApproveRequest(user, request),
-                RequestAction.Reject => CanRejectRequest(user, request),
+                RequestAction.View => RequestStateManager.CanViewRequest(request, user),
+                RequestAction.Edit => RequestStateManager.CanEdit(request, user.IsAdmin ?? false, request.RequestUserID == user.UserID),
+                RequestAction.Delete => RequestStateManager.CanDelete(request, user.IsAdmin ?? false, request.RequestUserID == user.UserID),
+                RequestAction.Approve => RequestStateManager.CanApproveRequest(request, user),
+                RequestAction.Reject => RequestStateManager.CanRejectRequest(request, user),
                 _ => false
             };
         }
@@ -169,63 +148,7 @@ namespace TDFShared.Utilities
         /// <returns>True if the user can view the request; otherwise, false.</returns>
         public static bool CanViewRequest(UserDto user, RequestResponseDto request)
         {
-            // Admin and HR can view all requests
-            if ((user.IsAdmin ?? false) || (user.IsHR ?? false)) return true;
- 
-            // Users can view their own requests
-            if (request.RequestUserID == user.UserID) return true;
- 
-            // Managers can view requests from their department
-            return (user.IsManager ?? false) && CanAccessDepartment(user, request.RequestDepartment);
-        }
-
-        #endregion
-
-        #region Private Helper Methods
- 
-        private static bool CanEditRequest(UserDto user, RequestResponseDto request)
-        {
-            // Only pending requests can be edited
-            if (request.Status != RequestStatus.Pending) return false;
-
-            // Admin can edit any pending request
-            if (user.IsAdmin ?? false) return true;
-
-            // Users can edit their own pending requests
-            return request.RequestUserID == user.UserID;
-        }
-
-        private static bool CanDeleteRequest(UserDto user, RequestResponseDto request)
-        {
-            // Only pending requests can be deleted
-            if (request.Status != RequestStatus.Pending) return false;
-
-            // Admin can delete any pending request
-            if (user.IsAdmin ?? false) return true;
-
-            // Users can delete their own pending requests
-            return request.RequestUserID == user.UserID;
-        }
-
-        private static bool CanApproveRequest(UserDto user, RequestResponseDto request)
-        {
-            // Only pending requests can be approved
-            if (request.Status != RequestStatus.Pending) return false;
-
-            // Users cannot approve their own requests
-            if (request.RequestUserID == user.UserID) return false;
-
-            // Admin and HR can approve all requests
-            if ((user.IsAdmin ?? false) || (user.IsHR ?? false)) return true;
-
-            // Managers can approve requests from their department
-            return (user.IsManager ?? false) && CanAccessDepartment(user, request.RequestDepartment);
-        }
-
-        private static bool CanRejectRequest(UserDto user, RequestResponseDto request)
-        {
-            // Same logic as approval
-            return CanApproveRequest(user, request);
+            return RequestStateManager.CanViewRequest(request, user);
         }
 
         #endregion

@@ -67,7 +67,7 @@ namespace TDFMAUI.ViewModels
             }
 
             CanViewReports = RequestStateManager.CanManageRequests(user);
-            CanExportReports = AuthorizationUtilities.CanPerformRequestAction(user, null, RequestAction.View);
+            CanExportReports = CanViewReports; // Export requires management permissions too
 
             if (!CanViewReports)
             {
@@ -101,12 +101,21 @@ namespace TDFMAUI.ViewModels
                     PageSize = 50
                 };
 
+                // Apply security scope - if manager, force their department if no other department/user filter is set
+                // but for Reports we usually want to show what the user is allowed to see.
+                // The backend now handles this scoping.
                 var result = await _requestService.GetAllRequestsAsync(pagination);
 
                 if (result?.Data?.Items != null)
                 {
-                    var filtered = result.Data.Items.Where(r => RequestStateManager.CanViewRequest(r, user)).ToList();
-                    foreach (var req in filtered) Requests.Add(req);
+                    foreach (var req in result.Data.Items)
+                    {
+                        // Double check visibility client-side for safety
+                        if (RequestStateManager.CanViewRequest(req, user))
+                        {
+                            Requests.Add(req);
+                        }
+                    }
                 }
                 RequestCountText = $"Total: {Requests.Count} requests";
             }
@@ -124,11 +133,7 @@ namespace TDFMAUI.ViewModels
         [RelayCommand]
         private async Task NavigateToAddRequestAsync()
         {
-            var user = await _authService.GetCurrentUserAsync();
-            if (user != null && AuthorizationUtilities.CanPerformRequestAction(user, null, RequestAction.View))
-            {
-                await Shell.Current.GoToAsync(nameof(AddRequestPage));
-            }
+            await Shell.Current.GoToAsync(nameof(AddRequestPage));
         }
 
         [RelayCommand]

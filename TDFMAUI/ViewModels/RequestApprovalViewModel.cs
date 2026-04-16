@@ -120,10 +120,25 @@ namespace TDFMAUI.ViewModels
             try
             {
                 var allDepartments = await _lookupService.GetDepartmentsAsync();
+                var currentUser = await _authService.GetCurrentUserAsync();
                 var departmentsList = allDepartments.ToList();
-                departmentsList.Insert(0, new LookupItem { Name = "All", Id = "0" });
+
+                // Filter departments based on user permissions
+                if (currentUser != null && !(currentUser.IsAdmin == true || currentUser.IsHR == true))
+                {
+                    departmentsList = departmentsList
+                        .Where(d => RequestStateManager.CanAccessDepartment(currentUser.Department, d.Name))
+                        .ToList();
+                }
+
+                // Only add "All" if user can see multiple departments
+                if (departmentsList.Count > 1 || (currentUser?.IsAdmin == true || currentUser?.IsHR == true))
+                {
+                    departmentsList.Insert(0, new LookupItem { Name = "All", Id = "0" });
+                }
+
                 Departments = new ObservableCollection<LookupItem>(departmentsList);
-                SelectedDepartment = Departments[0];
+                if (Departments.Any()) SelectedDepartment = Departments[0];
             }
             catch (Exception ex) { _logger.LogError(ex, "Error loading departments"); }
         }

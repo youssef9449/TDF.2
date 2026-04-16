@@ -94,8 +94,8 @@ namespace TDFMAUI.ViewModels
             bool isOwner = Request.RequestUserID == currentUser.UserID;
             CanEdit = RequestStateManager.CanEdit(Request, currentUser.IsAdmin ?? false, isOwner);
             CanDelete = RequestStateManager.CanDelete(Request, currentUser.IsAdmin ?? false, isOwner);
-            CanApprove = AuthorizationUtilities.CanPerformRequestAction(currentUser, Request, RequestAction.Approve);
-            CanReject = AuthorizationUtilities.CanPerformRequestAction(currentUser, Request, RequestAction.Reject);
+            CanApprove = RequestStateManager.CanApproveRequest(Request, currentUser);
+            CanReject = RequestStateManager.CanRejectRequest(Request, currentUser);
         }
 
         [RelayCommand]

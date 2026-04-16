@@ -6,6 +6,7 @@ using TDFAPI.Repositories;
 using TDFShared.Utilities;
 using TDFShared.Services;
 using System.ComponentModel.DataAnnotations;
+using TDFAPI.Extensions;
 using INotificationService = TDFAPI.Services.INotificationService;
 
 namespace TDFAPI.CQRS.Commands
@@ -52,7 +53,7 @@ namespace TDFAPI.CQRS.Commands
 
             bool isOwner = existingEntity.RequestUserID == request.UserId;
             // Map entity to DTO for RequestStateManager check
-            var existingDto = MapToResponseDto(existingEntity);
+            var existingDto = existingEntity.ToResponseDto();
             if (!RequestStateManager.CanEdit(existingDto, currentUser.IsAdmin ?? false, isOwner))
             {
                 throw new System.UnauthorizedAccessException("You do not have permission to edit this request.");
@@ -70,7 +71,7 @@ namespace TDFAPI.CQRS.Commands
                     return key != null && balances.TryGetValue(key, out var balance) ? balance : 0;
                 },
                 HasConflictingRequestsAsync = _requestRepository.HasConflictingRequestsAsync,
-                GetRequestAsync = async (rid) => MapToResponseDto(await _requestRepository.GetByIdAsync(rid)),
+                GetRequestAsync = async (rid) => (await _requestRepository.GetByIdAsync(rid)).ToResponseDto(),
                 MinAdvanceNoticeDays = 0,
                 MaxRequestDurationDays = 30
             };
@@ -99,7 +100,7 @@ namespace TDFAPI.CQRS.Commands
 
             await NotifyDepartmentManagers(updatedEntity.RequestDepartment, $"Request from {updatedEntity.RequestUserFullName} was updated", request.UserId);
 
-            return MapToResponseDto(updatedEntity);
+            return updatedEntity.ToResponseDto();
         }
 
         private async Task NotifyDepartmentManagers(string department, string message, int excludedUserId = 0)
@@ -112,30 +113,6 @@ namespace TDFAPI.CQRS.Commands
             {
                 await _notificationService.CreateNotificationAsync(manager.UserID, message);
             }
-        }
-
-        private RequestResponseDto MapToResponseDto(TDFShared.Models.Request.RequestEntity entity)
-        {
-            if (entity == null) return null!;
-            return new RequestResponseDto
-            {
-                RequestID = entity.RequestID,
-                RequestUserID = entity.RequestUserID,
-                UserName = entity.RequestUserFullName,
-                LeaveType = entity.RequestType,
-                RequestReason = entity.RequestReason,
-                RequestStartDate = entity.RequestFromDay,
-                RequestEndDate = entity.RequestToDay,
-                RequestBeginningTime = entity.RequestBeginningTime,
-                RequestEndingTime = entity.RequestEndingTime,
-                RequestDepartment = entity.RequestDepartment,
-                Status = entity.RequestManagerStatus,
-                HRStatus = entity.RequestHRStatus,
-                CreatedDate = entity.CreatedAt.GetValueOrDefault(DateTime.MinValue),
-                LastModifiedDate = entity.UpdatedAt,
-                RequestNumberOfDays = entity.RequestNumberOfDays,
-                RowVersion = entity.RowVersion
-            };
         }
     }
 }

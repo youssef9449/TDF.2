@@ -4,6 +4,7 @@ using TDFShared.DTOs.Requests;
 using TDFAPI.Services;
 using TDFAPI.Repositories;
 using System.ComponentModel.DataAnnotations;
+using TDFAPI.Extensions;
 
 namespace TDFAPI.CQRS.Commands
 {
@@ -104,7 +105,7 @@ namespace TDFAPI.CQRS.Commands
             await NotifyDepartmentManagers(requestEntity.RequestDepartment,
                 $"New {requestEntity.RequestType} request from {user.FullName}", userId);
 
-            return MapToResponseDto(createdEntity);
+            return createdEntity.ToResponseDto();
         }
 
         private async Task NotifyDepartmentManagers(string department, string message, int excludedUserId = 0)
@@ -117,29 +118,6 @@ namespace TDFAPI.CQRS.Commands
             {
                 await _notificationService.CreateNotificationAsync(manager.UserID, message);
             }
-        }
-
-        private RequestResponseDto MapToResponseDto(TDFShared.Models.Request.RequestEntity entity)
-        {
-            return new RequestResponseDto
-            {
-                RequestID = entity.RequestID,
-                RequestUserID = entity.RequestUserID,
-                UserName = entity.RequestUserFullName,
-                LeaveType = entity.RequestType,
-                RequestReason = entity.RequestReason,
-                RequestStartDate = entity.RequestFromDay,
-                RequestEndDate = entity.RequestToDay,
-                RequestBeginningTime = entity.RequestBeginningTime,
-                RequestEndingTime = entity.RequestEndingTime,
-                RequestDepartment = entity.RequestDepartment,
-                Status = entity.RequestManagerStatus,
-                HRStatus = entity.RequestHRStatus,
-                CreatedDate = entity.CreatedAt.GetValueOrDefault(DateTime.MinValue),
-                LastModifiedDate = entity.UpdatedAt,
-                RequestNumberOfDays = entity.RequestNumberOfDays,
-                RowVersion = entity.RowVersion
-            };
         }
     }
 }

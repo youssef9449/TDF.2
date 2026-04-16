@@ -22,6 +22,7 @@ namespace TDFMAUI.ViewModels
         private readonly IAuthService _authService;
         private readonly ILogger<AddRequestViewModel> _logger;
         private readonly TDFShared.Validation.IValidationService _validationService;
+        private readonly TDFShared.Validation.IBusinessRulesService _businessRulesService;
 
         [ObservableProperty]
         private bool _isEditMode;
@@ -153,12 +154,19 @@ namespace TDFMAUI.ViewModels
             }
         }
 
-        public AddRequestViewModel(IRequestService requestService, IAuthService authService, ILogger<AddRequestViewModel> logger, TDFShared.Validation.IValidationService validationService, RequestResponseDto? existingRequest = null)
+        public AddRequestViewModel(
+            IRequestService requestService,
+            IAuthService authService,
+            ILogger<AddRequestViewModel> logger,
+            TDFShared.Validation.IValidationService validationService,
+            TDFShared.Validation.IBusinessRulesService businessRulesService,
+            RequestResponseDto? existingRequest = null)
         {
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _validationService = validationService ?? throw new ArgumentNullException(nameof(validationService));
+            _businessRulesService = businessRulesService ?? throw new ArgumentNullException(nameof(businessRulesService));
 
             LoadLeaveTypes();
 
@@ -226,6 +234,14 @@ namespace TDFMAUI.ViewModels
                 if (CurrentUserId == 0)
                 {
                     await Shell.Current.DisplayAlert("Authentication Error", "Could not verify user identity. Please log in again.", "OK");
+                    return;
+                }
+
+                // Enhanced Validation using BusinessRulesService
+                var businessRuleResult = await RunBusinessRuleValidationAsync();
+                if (!businessRuleResult.IsValid)
+                {
+                    await Shell.Current.DisplayAlert("Validation Errors", string.Join("\n", businessRuleResult.Errors), "OK");
                     return;
                 }
 
@@ -339,6 +355,37 @@ namespace TDFMAUI.ViewModels
 
             ValidationErrors = errors;
             return !errors.Any();
+        }
+
+        private async Task<TDFShared.Validation.BusinessRuleValidationResult> RunBusinessRuleValidationAsync()
+        {
+            var context = new TDFShared.Validation.BusinessRuleContext
+            {
+                GetLeaveBalanceAsync = async (uid, type) =>
+                {
+                    var balancesResponse = await _requestService.GetLeaveBalancesAsync(uid);
+                    if (balancesResponse?.Success == true && balancesResponse.Data != null)
+                    {
+                        var key = LeaveTypeHelper.GetBalanceKey(type);
+                        return key != null && balancesResponse.Data.TryGetValue(key, out int balance) ? balance : 0;
+                    }
+                    return 0;
+                },
+                HasConflictingRequestsAsync = async (uid, start, end, excludeId) =>
+                {
+                    // Basic client-side check could be added here, but usually requires server call
+                    return false;
+                }
+            };
+
+            if (IsEditMode)
+            {
+                return await _businessRulesService.ValidateLeaveRequestUpdateAsync(RequestUpdateDto, RequestId, CurrentUserId, context);
+            }
+            else
+            {
+                return await _businessRulesService.ValidateLeaveRequestAsync(RequestCreateDto, CurrentUserId, context);
+            }
         }
 
         private static bool IsWeekend(DateTime date) => date.DayOfWeek == DayOfWeek.Friday || date.DayOfWeek == DayOfWeek.Saturday;

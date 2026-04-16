@@ -116,40 +116,32 @@ namespace TDFAPI.Middleware
             }
         }
 
-        // Updated to use Problem Details (RFC 7807)
+        // Standardized ApiResponse for exceptions
         private async Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
             var errorId = Guid.NewGuid().ToString();
             var statusCode = GetStatusCode(exception);
 
             // Log the error with the error ID for correlation
-            // Sanitize the exception message to prevent format string conflicts
             var sanitizedMessage = SanitizeLogMessage(exception.Message);
             _logger.LogError(exception, "Error ID: {ErrorId} - {ExceptionType}: {Message}",
                 errorId, exception.GetType().Name, sanitizedMessage);
 
-            // Create RFC 7807 Problem Details response with extended properties
-            var problemDetails = new ExtendedProblemDetails
-            {
-                Status = statusCode,
-                Title = GetProblemTitle(exception),
-                Detail = GetUserFriendlyMessage(exception),
-                Type = GetProblemType(exception),
-                Instance = context.Request.Path,
-                ErrorId = errorId,
-                Timestamp = DateTime.UtcNow
-            };
+            // Create standardized ApiResponse
+            var apiResponse = TDFShared.DTOs.Common.ApiResponse<object>.ErrorResponse(
+                GetUserFriendlyMessage(exception),
+                (HttpStatusCode)statusCode);
 
-            // Include debug information in development environment
+            // In development, we can add more details to the message
             if (_env.IsDevelopment())
             {
-                problemDetails.Debug = exception.ToString();
+                apiResponse.Message += $" (Debug ID: {errorId})";
             }
 
-            context.Response.ContentType = "application/problem+json";
+            context.Response.ContentType = "application/json";
             context.Response.StatusCode = statusCode;
 
-            await context.Response.WriteAsync(TDFShared.Helpers.JsonSerializationHelper.SerializePretty(problemDetails));
+            await context.Response.WriteAsync(TDFShared.Helpers.JsonSerializationHelper.SerializePretty(apiResponse));
         }
 
         private int GetStatusCode(Exception exception)

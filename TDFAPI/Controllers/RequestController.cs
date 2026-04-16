@@ -39,7 +39,7 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests
         [HttpGet("")]
-        public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetAllRequests([FromQuery] RequestPaginationDto pagination)
+        public async Task<ActionResult<ApiResponse<PaginatedResult<RequestResponseDto>>>> GetAllRequests([FromQuery] RequestPaginationDto pagination)
         {
             try
             {
@@ -48,22 +48,22 @@ namespace TDFAPI.Controllers
                     CurrentUserId = GetCurrentUserId(),
                     Pagination = pagination
                 });
-                return Ok(result);
+                return Ok(ApiResponse<PaginatedResult<RequestResponseDto>>.SuccessResponse(result));
             }
             catch (System.UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, ApiResponse<PaginatedResult<RequestResponseDto>>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving requests");
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<PaginatedResult<RequestResponseDto>>.ErrorResponse("Internal server error"));
             }
         }
 
         // GET: api/requests/my
         [HttpGet("my")]
-        public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetMyRequests([FromQuery] RequestPaginationDto pagination)
+        public async Task<ActionResult<ApiResponse<PaginatedResult<RequestResponseDto>>>> GetMyRequests([FromQuery] RequestPaginationDto pagination)
         {
             // Reusing GetRequestsQuery as it handles "Own" access level correctly
             return await GetAllRequests(pagination);
@@ -71,7 +71,7 @@ namespace TDFAPI.Controllers
 
         // GET: api/requests/{id}
         [HttpGet("{id:int}")]
-        public async Task<ActionResult<RequestResponseDto>> GetRequestById(int id)
+        public async Task<ActionResult<ApiResponse<RequestResponseDto>>> GetRequestById(int id)
         {
             try
             {
@@ -80,28 +80,31 @@ namespace TDFAPI.Controllers
                     RequestId = id,
                     CurrentUserId = GetCurrentUserId()
                 });
-                return Ok(result);
+                return Ok(ApiResponse<RequestResponseDto>.SuccessResponse(result));
             }
             catch (EntityNotFoundException)
             {
-                return NotFound();
+                return NotFound(ApiResponse<RequestResponseDto>.ErrorResponse("Request not found"));
             }
             catch (System.UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, ApiResponse<RequestResponseDto>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving request {RequestId}", id);
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<RequestResponseDto>.ErrorResponse("Internal server error"));
             }
         }
 
         // POST: api/requests
         [HttpPost("")]
-        public async Task<ActionResult<RequestResponseDto>> CreateRequest([FromBody] RequestCreateDto createDto)
+        public async Task<ActionResult<ApiResponse<RequestResponseDto>>> CreateRequest([FromBody] RequestCreateDto createDto)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ApiResponse<RequestResponseDto>.FromModelState(ModelState));
+            }
 
             try
             {
@@ -110,28 +113,32 @@ namespace TDFAPI.Controllers
                     CreateDto = createDto,
                     UserId = GetCurrentUserId()
                 });
-                return CreatedAtAction(nameof(GetRequestById), new { id = result.RequestID }, result);
+                var response = ApiResponse<RequestResponseDto>.SuccessResponse(result, "Request created successfully");
+                return CreatedAtAction(nameof(GetRequestById), new { id = result.RequestID }, response);
             }
             catch (TDFShared.Exceptions.ValidationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(ApiResponse<RequestResponseDto>.ErrorResponse(ex.Message));
             }
             catch (TDFShared.Exceptions.BusinessRuleException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(ApiResponse<RequestResponseDto>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating request");
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<RequestResponseDto>.ErrorResponse("Internal server error"));
             }
         }
 
         // PUT: api/requests/{id}
         [HttpPut("{id:int}")]
-        public async Task<ActionResult<RequestResponseDto>> UpdateRequest(int id, [FromBody] RequestUpdateDto updateDto)
+        public async Task<ActionResult<ApiResponse<RequestResponseDto>>> UpdateRequest(int id, [FromBody] RequestUpdateDto updateDto)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ApiResponse<RequestResponseDto>.FromModelState(ModelState));
+            }
 
             try
             {
@@ -141,30 +148,30 @@ namespace TDFAPI.Controllers
                     UpdateDto = updateDto,
                     UserId = GetCurrentUserId()
                 });
-                return Ok(result);
+                return Ok(ApiResponse<RequestResponseDto>.SuccessResponse(result, "Request updated successfully"));
             }
             catch (EntityNotFoundException)
             {
-                return NotFound();
+                return NotFound(ApiResponse<RequestResponseDto>.ErrorResponse("Request not found"));
             }
             catch (System.UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, ApiResponse<RequestResponseDto>.ErrorResponse(ex.Message));
             }
             catch (TDFShared.Exceptions.ValidationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(ApiResponse<RequestResponseDto>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating request {RequestId}", id);
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<RequestResponseDto>.ErrorResponse("Internal server error"));
             }
         }
 
         // DELETE: api/requests/{id}
         [HttpDelete("{id:int}")]
-        public async Task<IActionResult> DeleteRequest(int id)
+        public async Task<ActionResult<ApiResponse<bool>>> DeleteRequest(int id)
         {
             try
             {
@@ -173,60 +180,60 @@ namespace TDFAPI.Controllers
                     RequestId = id,
                     UserId = GetCurrentUserId()
                 });
-                if (success) return NoContent();
-                return BadRequest("Failed to delete request");
+                if (success) return Ok(ApiResponse<bool>.SuccessResponse(true, "Request deleted successfully"));
+                return BadRequest(ApiResponse<bool>.ErrorResponse("Failed to delete request"));
             }
             catch (EntityNotFoundException)
             {
-                return NotFound();
+                return NotFound(ApiResponse<bool>.ErrorResponse("Request not found"));
             }
             catch (System.UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, ApiResponse<bool>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting request {RequestId}", id);
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<bool>.ErrorResponse("Internal server error"));
             }
         }
 
         // GET: api/requests/recent-dashboard
         [HttpGet(ApiRoutes.Requests.GetRecentDashboard)]
-        public async Task<ActionResult<List<RequestResponseDto>>> GetRecentRequestsForDashboard()
+        public async Task<ActionResult<ApiResponse<List<RequestResponseDto>>>> GetRecentRequestsForDashboard()
         {
             try
             {
                 var result = await _mediator.Send(new GetRecentDashboardRequestsQuery { UserId = GetCurrentUserId() });
-                return Ok(result);
+                return Ok(ApiResponse<List<RequestResponseDto>>.SuccessResponse(result));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving recent dashboard requests");
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<List<RequestResponseDto>>.ErrorResponse("Internal server error"));
             }
         }
 
         // GET: api/requests/pending-dashboard-count
         [HttpGet(ApiRoutes.Requests.GetPendingDashboardCount)]
-        public async Task<ActionResult<int>> GetPendingRequestsCountForDashboard()
+        public async Task<ActionResult<ApiResponse<int>>> GetPendingRequestsCountForDashboard()
         {
             try
             {
                 var result = await _mediator.Send(new GetPendingRequestsCountQuery { UserId = GetCurrentUserId() });
-                return Ok(result);
+                return Ok(ApiResponse<int>.SuccessResponse(result));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving pending dashboard requests count");
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<int>.ErrorResponse("Internal server error"));
             }
         }
 
         // GET: api/requests/approval
         [HttpGet(ApiRoutes.Requests.GetForApproval)]
         [Authorize(Roles = "Manager,HR,Admin")]
-        public async Task<ActionResult<PaginatedResult<RequestResponseDto>>> GetRequestsForApproval([FromQuery] RequestPaginationDto pagination)
+        public async Task<ActionResult<ApiResponse<PaginatedResult<RequestResponseDto>>>> GetRequestsForApproval([FromQuery] RequestPaginationDto pagination)
         {
             try
             {
@@ -235,23 +242,23 @@ namespace TDFAPI.Controllers
                     UserId = GetCurrentUserId(),
                     Pagination = pagination
                 });
-                return Ok(result);
+                return Ok(ApiResponse<PaginatedResult<RequestResponseDto>>.SuccessResponse(result));
             }
             catch (System.UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, ApiResponse<PaginatedResult<RequestResponseDto>>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving requests for approval");
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<PaginatedResult<RequestResponseDto>>.ErrorResponse("Internal server error"));
             }
         }
 
         // POST: api/requests/{id}/manager/approve
         [HttpPost(ApiRoutes.Requests.ManagerApproveTemplate)]
         [Authorize(Roles = "Manager,Admin")]
-        public async Task<ActionResult<bool>> ManagerApproveRequest(int id, [FromBody] ManagerApprovalDto approvalDto)
+        public async Task<ActionResult<ApiResponse<bool>>> ManagerApproveRequest(int id, [FromBody] ManagerApprovalDto approvalDto)
         {
             try
             {
@@ -262,27 +269,27 @@ namespace TDFAPI.Controllers
                     IsHR = false,
                     Remarks = approvalDto.ManagerRemarks
                 });
-                return Ok(result);
+                return Ok(ApiResponse<bool>.SuccessResponse(result, "Request approved by manager"));
             }
             catch (EntityNotFoundException)
             {
-                return NotFound();
+                return NotFound(ApiResponse<bool>.ErrorResponse("Request not found"));
             }
             catch (System.UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, ApiResponse<bool>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in manager approval for request {RequestId}", id);
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<bool>.ErrorResponse("Internal server error"));
             }
         }
 
         // POST: api/requests/{id}/hr/approve
         [HttpPost(ApiRoutes.Requests.HRApproveTemplate)]
         [Authorize(Roles = "HR,Admin")]
-        public async Task<ActionResult<bool>> HRApproveRequest(int id, [FromBody] HRApprovalDto approvalDto)
+        public async Task<ActionResult<ApiResponse<bool>>> HRApproveRequest(int id, [FromBody] HRApprovalDto approvalDto)
         {
             try
             {
@@ -293,27 +300,27 @@ namespace TDFAPI.Controllers
                     IsHR = true,
                     Remarks = approvalDto.HRRemarks
                 });
-                return Ok(result);
+                return Ok(ApiResponse<bool>.SuccessResponse(result, "Request approved by HR"));
             }
             catch (EntityNotFoundException)
             {
-                return NotFound();
+                return NotFound(ApiResponse<bool>.ErrorResponse("Request not found"));
             }
             catch (System.UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, ApiResponse<bool>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in HR approval for request {RequestId}", id);
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<bool>.ErrorResponse("Internal server error"));
             }
         }
 
         // POST: api/requests/{id}/manager/reject
         [HttpPost(ApiRoutes.Requests.ManagerRejectTemplate)]
         [Authorize(Roles = "Manager,Admin")]
-        public async Task<ActionResult<bool>> ManagerRejectRequest(int id, [FromBody] ManagerRejectDto rejectDto)
+        public async Task<ActionResult<ApiResponse<bool>>> ManagerRejectRequest(int id, [FromBody] ManagerRejectDto rejectDto)
         {
             try
             {
@@ -324,27 +331,27 @@ namespace TDFAPI.Controllers
                     IsHR = false,
                     Remarks = rejectDto.ManagerRemarks
                 });
-                return Ok(result);
+                return Ok(ApiResponse<bool>.SuccessResponse(result, "Request rejected by manager"));
             }
             catch (EntityNotFoundException)
             {
-                return NotFound();
+                return NotFound(ApiResponse<bool>.ErrorResponse("Request not found"));
             }
             catch (System.UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, ApiResponse<bool>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in manager rejection for request {RequestId}", id);
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<bool>.ErrorResponse("Internal server error"));
             }
         }
 
         // POST: api/requests/{id}/hr/reject
         [HttpPost(ApiRoutes.Requests.HRRejectTemplate)]
         [Authorize(Roles = "HR,Admin")]
-        public async Task<ActionResult<bool>> HRRejectRequest(int id, [FromBody] HRRejectDto rejectDto)
+        public async Task<ActionResult<ApiResponse<bool>>> HRRejectRequest(int id, [FromBody] HRRejectDto rejectDto)
         {
             try
             {
@@ -355,20 +362,20 @@ namespace TDFAPI.Controllers
                     IsHR = true,
                     Remarks = rejectDto.HRRemarks
                 });
-                return Ok(result);
+                return Ok(ApiResponse<bool>.SuccessResponse(result, "Request rejected by HR"));
             }
             catch (EntityNotFoundException)
             {
-                return NotFound();
+                return NotFound(ApiResponse<bool>.ErrorResponse("Request not found"));
             }
             catch (System.UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(403, ApiResponse<bool>.ErrorResponse(ex.Message));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in HR rejection for request {RequestId}", id);
-                return StatusCode(500, "Internal server error");
+                return StatusCode(500, ApiResponse<bool>.ErrorResponse("Internal server error"));
             }
         }
 

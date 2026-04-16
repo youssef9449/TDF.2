@@ -144,13 +144,17 @@ namespace TDFMAUI
 
             builder.Services.AddSingleton<WebSocketService>();
             builder.Services.AddSingleton<IWebSocketService>(sp => sp.GetRequiredService<WebSocketService>());
+
+            // Register specialized API services
+            builder.Services.AddSingleton<IAuthApiService, TDFMAUI.Services.Api.AuthApiService>();
+            builder.Services.AddSingleton<IUserApiService, TDFMAUI.Services.Api.UserApiService>();
+            builder.Services.AddSingleton<IRequestApiService, TDFMAUI.Services.Api.RequestApiService>();
+            builder.Services.AddSingleton<IMessageApiService, TDFMAUI.Services.Api.MessageApiService>();
+            builder.Services.AddSingleton<ILookupApiService, TDFMAUI.Services.Api.LookupApiService>();
+
             builder.Services.AddSingleton<ApiService>();
             builder.Services.AddSingleton<IApiService>(sp => sp.GetRequiredService<ApiService>());
-            builder.Services.AddSingleton<IAuthApiService>(sp => sp.GetRequiredService<ApiService>());
-            builder.Services.AddSingleton<IUserApiService>(sp => sp.GetRequiredService<ApiService>());
-            builder.Services.AddSingleton<IRequestApiService>(sp => sp.GetRequiredService<ApiService>());
-            builder.Services.AddSingleton<IMessageApiService>(sp => sp.GetRequiredService<ApiService>());
-            builder.Services.AddSingleton<ILookupApiService>(sp => sp.GetRequiredService<ApiService>());
+
             builder.Services.AddSingleton<SecureStorageService>();
             builder.Services.AddSingleton(SecureStorage.Default);
             builder.Services.AddSingleton<NetworkService>();

@@ -48,26 +48,50 @@ namespace TDFAPI.CQRS.Queries
                 request.CurrentUserId, currentUser.IsAdmin, currentUser.IsHR, currentUser.IsManager, currentUser.Department);
 
             var accessLevel = AuthorizationUtilities.GetRequestAccessLevel(currentUser);
-            PaginatedResult<TDFShared.Models.Request.RequestEntity> result;
+
+            // Unified filtering approach:
+            // 1. Determine the "Security Scope" based on the user's role.
+            // 2. Allow user to further filter within that scope (via Pagination DTO).
+            // 3. Ensure they don't exceed their scope.
 
             switch (accessLevel)
             {
                 case RequestAccessLevel.All:
-                    result = await _requestRepository.GetAllAsync(request.Pagination);
+                    // Admin/HR can see anything. They can filter by userId or department if they want.
                     break;
 
                 case RequestAccessLevel.Department:
-                    result = await _requestRepository.GetRequestsForManagerAsync(request.CurrentUserId, currentUser.Department, request.Pagination);
+                    // Managers can see their department's requests or their own requests.
+                    if (request.Pagination.UserId.HasValue && request.Pagination.UserId.Value != currentUser.UserID)
+                    {
+                        // If they want to see a specific user, they MUST be in the same department
+                        // (We'll let the repository handle the department check if a userId is provided,
+                        // but here we can set the department filter as a security boundary)
+                        request.Pagination.Department = currentUser.Department;
+                    }
+                    else if (string.IsNullOrEmpty(request.Pagination.Department))
+                    {
+                        // Default to their department if no specific user/dept is requested
+                        request.Pagination.Department = currentUser.Department;
+                    }
+                    else if (!RequestStateManager.CanAccessDepartment(currentUser.Department, request.Pagination.Department))
+                    {
+                         // They are trying to access a department they don't have access to
+                         throw new System.UnauthorizedAccessException("You do not have permission to view requests for this department.");
+                    }
                     break;
 
                 case RequestAccessLevel.Own:
-                    result = await _requestRepository.GetByUserIdAsync(request.CurrentUserId, request.Pagination);
+                    // Regular users can ONLY see their own requests. Force the filter.
+                    request.Pagination.UserId = currentUser.UserID;
+                    request.Pagination.Department = null; // Clear department filter if set
                     break;
 
                 default:
                     throw new System.UnauthorizedAccessException("You do not have permission to view requests.");
             }
 
+            var result = await _requestRepository.GetAllAsync(request.Pagination);
             return await MapToPaginatedResponseDto(result);
         }
 

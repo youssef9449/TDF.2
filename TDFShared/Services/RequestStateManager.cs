@@ -44,7 +44,7 @@ namespace TDFShared.Services
         /// <param name="managerDepartment">The manager's department</param>
         /// <param name="targetDepartment">The target department to check access for</param>
         /// <returns>True if the manager can access the target department</returns>
-        private static bool CanAccessDepartment(string managerDepartment, string targetDepartment)
+        public static bool CanAccessDepartment(string managerDepartment, string targetDepartment)
         {
             if (string.IsNullOrEmpty(managerDepartment) || string.IsNullOrEmpty(targetDepartment))
                 return false;
@@ -123,25 +123,25 @@ namespace TDFShared.Services
         }
 
         /// <summary>
-        /// Determines if a user can approve or reject a specific request
+        /// Determines if a user can approve a specific request
         /// </summary>
         /// <param name="request">The request to check approval rights for</param>
-        /// <param name="currentUser">The current user attempting to approve/reject</param>
-        /// <returns>True if the user can approve/reject the request</returns>
-        public static bool CanApproveOrRejectRequest(RequestResponseDto request, UserDto currentUser)
+        /// <param name="currentUser">The current user attempting to approve</param>
+        /// <returns>True if the user can approve the request</returns>
+        public static bool CanApproveRequest(RequestResponseDto request, UserDto currentUser)
         {
             if (request == null || currentUser == null) return false;
 
             // Request must be pending
             if (request.Status != RequestStatus.Pending) return false;
 
-            // Users cannot approve/reject their own requests
+            // Users cannot approve their own requests
             if (request.RequestUserID == currentUser.UserID) return false;
 
-            // Admin and HR can approve/reject all requests
+            // Admin and HR can approve all requests
             if ((currentUser.IsAdmin ?? false) || (currentUser.IsHR ?? false)) return true;
 
-            // Managers can approve/reject requests from their department (including constituent departments for hyphenated departments)
+            // Managers can approve requests from their department (including constituent departments for hyphenated departments)
             if ((currentUser.IsManager ?? false) &&
                 !string.IsNullOrEmpty(currentUser.Department) &&
                 CanAccessDepartment(currentUser.Department, request.RequestDepartment))
@@ -150,6 +150,29 @@ namespace TDFShared.Services
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Determines if a user can reject a specific request
+        /// </summary>
+        /// <param name="request">The request to check rejection rights for</param>
+        /// <param name="currentUser">The current user attempting to reject</param>
+        /// <returns>True if the user can reject the request</returns>
+        public static bool CanRejectRequest(RequestResponseDto request, UserDto currentUser)
+        {
+            // Same logic as approval
+            return CanApproveRequest(request, currentUser);
+        }
+
+        /// <summary>
+        /// Determines if a user can approve or reject a specific request (Legacy/Helper)
+        /// </summary>
+        /// <param name="request">The request to check approval rights for</param>
+        /// <param name="currentUser">The current user attempting to approve/reject</param>
+        /// <returns>True if the user can approve/reject the request</returns>
+        public static bool CanApproveOrRejectRequest(RequestResponseDto request, UserDto currentUser)
+        {
+            return CanApproveRequest(request, currentUser);
         }
 
         /// <summary>

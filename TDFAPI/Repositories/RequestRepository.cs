@@ -467,6 +467,18 @@ namespace TDFAPI.Repositories
             IQueryable<RequestEntity> query,
             RequestPaginationDto pagination)
         {
+            // Security filters (set by Command Handler)
+            if (pagination.UserId.HasValue)
+            {
+                query = query.Where(r => r.RequestUserID == pagination.UserId.Value);
+            }
+
+            if (!string.IsNullOrEmpty(pagination.Department))
+            {
+                query = query.Where(r => r.RequestDepartment == pagination.Department);
+            }
+
+            // User filters
             // Filter by status if specified
             if (pagination.FilterStatus.HasValue)
             {
@@ -503,8 +515,8 @@ namespace TDFAPI.Repositories
             RequestPaginationDto pagination)
         {
             // Use reflection to get the property to sort by
-            var property = typeof(RequestEntity).GetProperty(
-                GetRequestPropertyName(pagination.SortBy) ?? "CreatedAt");
+            var propertyName = GetRequestPropertyName(pagination.SortBy) ?? "CreatedAt";
+            var property = typeof(RequestEntity).GetProperty(propertyName);
 
             if (property == null)
             {
@@ -530,18 +542,25 @@ namespace TDFAPI.Repositories
         }
 
         // Maps DTO property names to entity property names
-        private string GetRequestPropertyName(string dtoPropertyName)
+        private string? GetRequestPropertyName(string dtoPropertyName)
         {
             var propertyMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 { "StartDate", "RequestFromDay" },
+                { "RequestStartDate", "RequestFromDay" },
                 { "EndDate", "RequestToDay" },
+                { "RequestEndDate", "RequestToDay" },
                 { "Type", "RequestType" },
+                { "LeaveType", "RequestType" },
                 { "Status", "RequestManagerStatus" },
                 { "Department", "RequestDepartment" },
+                { "RequestDepartment", "RequestDepartment" },
                 { "UserID", "RequestUserID" },
+                { "RequestUserID", "RequestUserID" },
                 { "CreatedAt", "CreatedAt" },
-                { "UpdatedAt", "UpdatedAt" }
+                { "CreatedDate", "CreatedAt" },
+                { "UpdatedAt", "UpdatedAt" },
+                { "LastModifiedDate", "UpdatedAt" }
             };
 
             if (propertyMap.TryGetValue(dtoPropertyName, out var entityProperty))

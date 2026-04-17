@@ -475,7 +475,19 @@ namespace TDFAPI.Repositories
 
             if (!string.IsNullOrEmpty(pagination.Department))
             {
-                query = query.Where(r => r.RequestDepartment == pagination.Department);
+                var departments = pagination.Department.Split('-')
+                                     .Select(d => d.Trim())
+                                     .Where(d => !string.IsNullOrEmpty(d))
+                                     .ToList();
+
+                if (departments.Count > 1)
+                {
+                    query = query.Where(r => departments.Contains(r.RequestDepartment));
+                }
+                else
+                {
+                    query = query.Where(r => r.RequestDepartment == pagination.Department);
+                }
             }
 
             // User filters

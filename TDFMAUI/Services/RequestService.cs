@@ -242,35 +242,37 @@ namespace TDFMAUI.Services
             string? type = null,
             DateTime? fromDate = null,
             DateTime? toDate = null,
-            string? department = null)
+            string? department = null,
+            int? userId = null)
         {
             try
             {
-                var queryParams = new List<string>
-                {
-                    $"pageNumber={pageNumber}",
-                    $"pageSize={pageSize}"
-                };
+                // Note: The previous logic of building query string manually is redundant
+                // since we now use the RequestPaginationDto and pass it to IRequestApiService.
 
-                if (!string.IsNullOrEmpty(status) && status != "All")
-                    queryParams.Add($"status={status}");
-                if (!string.IsNullOrEmpty(type) && type != "All")
-                    queryParams.Add($"type={type}");
-                if (fromDate.HasValue)
-                    queryParams.Add($"fromDate={fromDate.Value:yyyy-MM-dd}");
-                if (toDate.HasValue)
-                    queryParams.Add($"toDate={toDate.Value:yyyy-MM-dd}");
-                if (!string.IsNullOrEmpty(department))
-                    queryParams.Add($"department={Uri.EscapeDataString(department)}");
-
-                var queryString = string.Join("&", queryParams);
-                // Extract parameters from queryString and use IRequestApiService instead of direct GetAsync
                 var pagination = new RequestPaginationDto
                 {
                     Page = pageNumber,
                     PageSize = pageSize,
-                    Department = department
+                    Department = department,
+                    UserId = userId
                 };
+
+                // Parse status and type strings to enums if provided
+                if (!string.IsNullOrEmpty(status) && status != "All")
+                {
+                    if (Enum.TryParse<TDFShared.Enums.RequestStatus>(status, true, out var parsedStatus))
+                        pagination.FilterStatus = parsedStatus;
+                }
+
+                if (!string.IsNullOrEmpty(type) && type != "All")
+                {
+                    if (Enum.TryParse<TDFShared.Enums.LeaveType>(type.Replace(" ", ""), true, out var parsedType))
+                        pagination.FilterType = parsedType;
+                }
+
+                pagination.FromDate = fromDate;
+                pagination.ToDate = toDate;
 
                 var response = await _requestApiService.GetRequestsForApprovalAsync(pagination);
 

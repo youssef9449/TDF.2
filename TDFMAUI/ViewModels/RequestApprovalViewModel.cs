@@ -17,9 +17,21 @@ using TDFShared.DTOs.Common;
 
 namespace TDFMAUI.ViewModels
 {
+    [QueryProperty(nameof(UserId), "userId")]
     public partial class RequestApprovalViewModel : BaseViewModel, IDisposable
     {
         private readonly IRequestService _requestService;
+
+        [ObservableProperty]
+        private int _userId;
+
+        partial void OnUserIdChanged(int value)
+        {
+            if (value > 0)
+            {
+                _ = LoadRequestsAsync();
+            }
+        }
         private readonly Services.INotificationService _notificationService;
         private readonly IAuthService _authService;
         private readonly ILogger<RequestApprovalViewModel> _logger;
@@ -153,13 +165,24 @@ namespace TDFMAUI.ViewModels
                 var user = _userSessionService.CurrentUser;
                 if (user == null || !RequestStateManager.CanManageRequests(user)) return;
 
+                // If UserId is set (from My Team navigation), we filter for that specific user.
+                // Otherwise we use the UI filters.
+                var filterUserId = UserId > 0 ? UserId : (int?)null;
+                var filterDept = UserId > 0 ? null : (SelectedDepartment?.Name == "All" ? null : SelectedDepartment?.Name);
+
                 var result = await _requestService.GetRequestsForApprovalAsync(
                     CurrentPage, PageSize,
                     SelectedStatus == "All" ? null : SelectedStatus,
                     SelectedType == "All" ? null : SelectedType,
                     FromDate, ToDate,
-                    SelectedDepartment?.Name == "All" ? null : SelectedDepartment?.Name
+                    filterDept,
+                    filterUserId
                 );
+
+                // If result is null or empty but we have a userId, we might need a different approach
+                // but GetRequestsForApprovalAsync should handle it if we pass the pagination correctly.
+                // However, IRequestService.GetRequestsForApprovalAsync doesn't take userId.
+                // Let's fix that.
 
                 if (result?.Data?.Items != null)
                 {

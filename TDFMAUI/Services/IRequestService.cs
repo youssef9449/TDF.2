@@ -16,7 +16,8 @@ public interface IRequestService
         string? type = null,
         DateTime? fromDate = null,
         DateTime? toDate = null,
-        string? department = null);
+        string? department = null,
+        int? userId = null);
 
     Task<ApiResponse<RequestResponseDto>> GetRequestByIdAsync(int requestId);
     Task<ApiResponse<RequestResponseDto>> CreateRequestAsync(RequestCreateDto requestDto);

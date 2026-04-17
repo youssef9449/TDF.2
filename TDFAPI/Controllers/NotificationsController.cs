@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using TDFShared.Services;
+using TDFAPI.Services;
 using TDFShared.DTOs.Messages;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
@@ -29,15 +29,19 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
-                {
-                    _logger.LogWarning("UnreadNotifications: Missing or invalid userId claim. Claims: {Claims}", string.Join(", ", User.Claims.Select(c => $"{c.Type}:{c.Value}")));
-                    return BadRequest(ApiResponse<IEnumerable<NotificationDto>>.ErrorResponse("User ID claim missing or invalid in token."));
-                }
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
                 var notifications = await _notificationService.GetUnreadNotificationsAsync(userId);
-                var notificationDtos = notifications.Select(MapToNotificationDto);
-                return Ok(ApiResponse<IEnumerable<NotificationDto>>.SuccessResponse(notificationDtos));
+                var dtos = notifications.Select(n => new NotificationDto
+                {
+                    NotificationId = n.NotificationID,
+                    UserId = n.ReceiverID,
+                    SenderId = n.SenderID,
+                    Message = n.Message ?? string.Empty,
+                    Timestamp = n.Timestamp,
+                    IsSeen = n.IsSeen,
+                    Title = "Notification"
+                });
+                return Ok(ApiResponse<IEnumerable<NotificationDto>>.SuccessResponse(dtos));
             }
             catch (Exception ex)
             {
@@ -47,7 +51,7 @@ namespace TDFAPI.Controllers
         }
 
         [HttpPost("{notificationId}/seen")]
-        public async Task<ActionResult<ApiResponse<bool>>> MarkAsRead(int notificationId)
+        public async Task<ActionResult<ApiResponse<bool>>> MarkAsSeen(int notificationId)
         {
             try
             {
@@ -62,33 +66,36 @@ namespace TDFAPI.Controllers
             }
         }
 
+        [HttpDelete("{notificationId}")]
+        public async Task<ActionResult<ApiResponse<bool>>> DeleteNotification(int notificationId)
+        {
+            try
+            {
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+                var result = await _notificationService.DeleteNotificationAsync(notificationId, userId);
+                return Ok(ApiResponse<bool>.SuccessResponse(result));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting notification");
+                return StatusCode(500, ApiResponse<bool>.ErrorResponse("Error deleting notification"));
+            }
+        }
+
         [HttpPost("broadcast")]
         [Authorize(Roles = "Admin,HR")]
         public async Task<ActionResult<ApiResponse<bool>>> BroadcastNotification([FromBody] BroadcastNotificationDto notification)
         {
             try
             {
-                var senderId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-                var result = await _notificationService.BroadcastNotificationAsync(notification.Message, senderId, notification.Department);
-                return Ok(ApiResponse<bool>.SuccessResponse(result));
+                await _notificationService.SendDepartmentNotificationAsync(notification.Department ?? string.Empty, "Broadcast", notification.Message);
+                return Ok(ApiResponse<bool>.SuccessResponse(true));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error broadcasting notification");
                 return StatusCode(500, ApiResponse<bool>.ErrorResponse("Error broadcasting notification"));
             }
-        }
-
-        private NotificationDto MapToNotificationDto(TDFShared.Models.Notification.NotificationEntity entity)
-        {
-            return new NotificationDto
-            {
-                NotificationId = entity.NotificationID,
-                UserId = entity.ReceiverID,
-                Message = entity.Message,
-                Timestamp = entity.Timestamp,
-                IsSeen = entity.IsSeen
-            };
         }
     }
 }

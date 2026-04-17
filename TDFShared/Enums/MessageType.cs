@@ -14,23 +14,18 @@ namespace TDFShared.Enums
         Chat = 0,
         
         /// <summary>
-        /// System-generated message
-        /// </summary>
-        System = 1,
-        
-        /// <summary>
-        /// Notification for events
-        /// </summary>
-        Notification = 2,
-
-        /// <summary>
-        /// Notification for Announcement
-        /// </summary>
-        Announcement = 3,
-        
-        /// <summary>
         /// Private direct message
         /// </summary>
-        Private = 4
+        Private = 1,
+
+        /// <summary>
+        /// Group or Department message
+        /// </summary>
+        Group = 2,
+
+        /// <summary>
+        /// System-generated message appearing in chat
+        /// </summary>
+        System = 3
     }
-} 
+}

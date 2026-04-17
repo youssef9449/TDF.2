@@ -13,13 +13,13 @@ namespace TDFShared.DTOs.Messages
         /// ID of the user sending the message
         /// </summary>
         [JsonPropertyName("senderId")]
-        public int SenderID { get; set; }
+        public int SenderId { get; set; }
         
         /// <summary>
         /// ID of the user receiving the message
         /// </summary>
-        [JsonPropertyName("recipientId")]
-        public int ReceiverID { get; set; }
+        [JsonPropertyName("receiverId")]
+        public int ReceiverId { get; set; }
         
         /// <summary>
         /// Text content of the message
@@ -30,11 +30,11 @@ namespace TDFShared.DTOs.Messages
         /// <summary>
         /// Indicates if the message is a private direct message
         /// </summary>
-        [JsonPropertyName("isPrivate")]
-        public bool IsPrivate { get; set; }
+        [JsonPropertyName("messageType")]
+        public MessageType MessageType { get; set; } = MessageType.Chat;
         
         /// <summary>
-        /// Department ID for department messages
+        /// Department for group messages
         /// </summary>
         [JsonPropertyName("department")]
         public string? Department { get; set; }
@@ -42,7 +42,7 @@ namespace TDFShared.DTOs.Messages
         /// <summary>
         /// Optional idempotency key for message tracking
         /// </summary>
-        [JsonPropertyName("idempotencykey")]
+        [JsonPropertyName("idempotencyKey")]
         public string? IdempotencyKey { get; set; }
 
         /// <summary>
@@ -50,7 +50,5 @@ namespace TDFShared.DTOs.Messages
         /// </summary>
         [JsonPropertyName("attachments")]
         public List<AttachmentDto>? Attachments { get; set; }
-
-
     }
-} 
+}

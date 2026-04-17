@@ -6,12 +6,12 @@ using TDFShared.Enums;
 namespace TDFShared.DTOs.Messages
 {
     /// <summary>
-    /// Base message DTO that all messages inherit from
+    /// Base message DTO that all WebSocket messages inherit from
     /// </summary>
     public abstract class BaseMessageDTO
     {
         /// <summary>
-        /// The type of message
+        /// The type of message (chat_message, notification, user_presence, etc.)
         /// </summary>
         [JsonPropertyName("type")]
         public string Type { get; set; } = string.Empty;
@@ -24,71 +24,49 @@ namespace TDFShared.DTOs.Messages
     }
     
     /// <summary>
-    /// Chat message DTO for sending and receiving chat messages
+    /// Chat message DTO for sending and receiving chat messages via WebSocket
     /// </summary>
     public class ChatMessageDto : BaseMessageDTO
     {
-        /// <summary>
-        /// Default constructor, sets type to "chat_message"
-        /// </summary>
         public ChatMessageDto()
         {
             Type = "chat_message";
         }
         
-        /// <summary>
-        /// Unique identifier for the message
-        /// </summary>
         [JsonPropertyName("messageId")]
         public int MessageId { get; set; }
         
-        /// <summary>
-        /// ID of the sender
-        /// </summary>
         [JsonPropertyName("senderId")]
         public int SenderId { get; set; }
 
-        public int Id { get; set; }
-
-        public int ReceiverId { get; set; }
-        public DateTime SentAt { get; set; } = DateTime.UtcNow;
-
-
-
-        /// <summary>
-        /// Name of the sender
-        /// </summary>
         [JsonPropertyName("senderName")]
         public string SenderName { get; set; } = string.Empty;
+
+        [JsonPropertyName("receiverId")]
+        public int ReceiverId { get; set; }
         
-        /// <summary>
-        /// The message content
-        /// </summary>
-        [JsonPropertyName("message")]
-        public string MessageText { get; set; } = string.Empty;
+        [JsonPropertyName("content")]
+        public string Content { get; set; } = string.Empty;
         
-        /// <summary>
-        /// Type of the message (chat, system, notification)
-        /// </summary>
         [JsonPropertyName("messageType")]
         public MessageType MessageType { get; set; } = MessageType.Chat;
         
-        /// <summary>
-        /// Whether this is a global/broadcast message
-        /// </summary>
         [JsonPropertyName("isGlobal")]
         public bool IsGlobal { get; set; }
 
+        [JsonPropertyName("isRead")]
         public bool IsRead { get; set; }
-        public bool IsDelivered { get; set; }
-        public required string Department { get; set; }
 
-        /// <summary>
-        /// Optional idempotency key for message tracking
-        /// </summary>
+        [JsonPropertyName("isDelivered")]
+        public bool IsDelivered { get; set; }
+
+        [JsonPropertyName("department")]
+        public string? Department { get; set; }
+
         [JsonPropertyName("idempotencyKey")]
         public string? IdempotencyKey { get; set; }
     }
+
     public class HeartbeatDTO : BaseMessageDTO
     {
         public HeartbeatDTO()
@@ -97,21 +75,6 @@ namespace TDFShared.DTOs.Messages
         }
     }
 
-    // Pending message counts
-    public class PendingMessageInfoDTO
-    {
-        public int Count { get; set; }
-        public List<string> Messages { get; set; } = new List<string>();
-        public List<int> MessageIds { get; set; } = new List<int>();
-    }
-
-    // Message response DTO
-    public class MessageResponseDto
-    {
-        public int MessageID { get; set; }
-        public string Status { get; set; } = "sent";
-        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-    }
     public class ErrorMessageDTO : BaseMessageDTO
     {
         public ErrorMessageDTO()
@@ -122,6 +85,7 @@ namespace TDFShared.DTOs.Messages
         public string Message { get; set; } = string.Empty;
         public string? Code { get; set; }
     }
+
     public class UserConnectionStatusDTO : BaseMessageDTO
     {
         public UserConnectionStatusDTO()
@@ -134,4 +98,4 @@ namespace TDFShared.DTOs.Messages
         public bool IsConnected { get; set; }
         public string? Department { get; set; }
     }
-} 
+}

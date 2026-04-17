@@ -6,7 +6,6 @@ using TDFMAUI.Pages;
 using TDFMAUI.Services;
 using TDFMAUI.ViewModels;
 using Microsoft.Extensions.Configuration;
-using System.Reflection;
 using TDFMAUI.Features.Dashboard;
 using TDFMAUI.Features.Auth;
 using TDFMAUI.Features.Requests;
@@ -16,25 +15,13 @@ using System.Diagnostics;
 using TDFShared.Constants;
 using TDFShared.Validation;
 using TDFShared.Services;
-using Microsoft.Maui.Hosting;
-using Microsoft.Maui.Controls.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Maui.Storage;
-#if ANDROID || IOS
-using Plugin.Firebase.CloudMessaging;
-using Plugin.LocalNotification;
-using Plugin.LocalNotification.EventArgs;
-using Plugin.FirebasePushNotifications;
-using Plugin.Firebase.Auth;
-#endif
-
 
 namespace TDFMAUI
 {
     public static class MauiProgram
     {
 #if !WINDOWS && !MACCATALYST
-        private static void OnLocalNotificationReceived(NotificationEventArgs e)
+        private static void OnLocalNotificationReceived(Plugin.LocalNotification.EventArgs.NotificationEventArgs e)
         {
             try
             {
@@ -53,7 +40,7 @@ namespace TDFMAUI
             catch (Exception ex) { Debug.WriteLine($"Error in OnLocalNotificationReceived: {ex.Message}"); }
         }
         
-        private static void OnLocalNotificationTapped(NotificationEventArgs e)
+        private static void OnLocalNotificationTapped(Plugin.LocalNotification.EventArgs.NotificationEventArgs e)
         {
             try
             {
@@ -71,18 +58,14 @@ namespace TDFMAUI
             }
             catch (Exception ex) { Debug.WriteLine($"Error in OnLocalNotificationTapped: {ex.Message}"); }
         }
-#else
-        private static void OnLocalNotificationReceived(object e) { }
-        private static void OnLocalNotificationTapped(object e) { }
 #endif
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();
             builder
-                .UseMauiApp(serviceProvider => serviceProvider.GetRequiredService<App>())
+                .UseMauiApp<App>()
                 .UseMauiCommunityToolkit()
 #if !WINDOWS && !MACCATALYST
-                .UseFirebasePushNotifications()
                 .UseLocalNotification(config => {
                     config.AddCategory(new Plugin.LocalNotification.NotificationCategory(Plugin.LocalNotification.NotificationCategoryType.Status));
                     Plugin.LocalNotification.LocalNotificationCenter.Current.NotificationReceived += OnLocalNotificationReceived;
@@ -133,7 +116,7 @@ namespace TDFMAUI
                     options.DevelopmentMode = isDevelopment;
                 });
             }
-            catch { throw; }
+            catch { }
 
 #if DEBUG
             builder.Logging.AddDebug();
@@ -145,11 +128,11 @@ namespace TDFMAUI
             builder.Services.AddSingleton<WebSocketService>();
             builder.Services.AddSingleton<IWebSocketService>(sp => sp.GetRequiredService<WebSocketService>());
 
-            // Register specialized API services
+            // Register Services
             builder.Services.AddSingleton<IAuthApiService, TDFMAUI.Services.Api.AuthApiService>();
             builder.Services.AddSingleton<IUserApiService, TDFMAUI.Services.Api.UserApiService>();
             builder.Services.AddSingleton<IRequestApiService, TDFMAUI.Services.Api.RequestApiService>();
-            builder.Services.AddSingleton<IMessageApiService, TDFMAUI.Services.Api.MessageApiService>();
+            builder.Services.AddSingleton<IMessageService, TDFMAUI.Services.Api.MessageService>();
             builder.Services.AddSingleton<ILookupApiService, TDFMAUI.Services.Api.LookupApiService>();
 
             builder.Services.AddSingleton<ApiService>();
@@ -193,11 +176,10 @@ namespace TDFMAUI
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddSingleton<AuthService>();
             builder.Services.AddSingleton<IAuthService>(sp => sp.GetRequiredService<AuthService>());
-            builder.Services.AddSingleton<MessageService>();
             builder.Services.AddSingleton<IPlatformNotificationService, PlatformNotificationService>();
             builder.Services.AddSingleton<NotificationService>();
             builder.Services.AddSingleton<IExtendedNotificationService>(sp => sp.GetRequiredService<NotificationService>());
-            builder.Services.AddSingleton<Services.INotificationService>(sp => sp.GetRequiredService<IExtendedNotificationService>());
+            builder.Services.AddSingleton<TDFMAUI.Services.INotificationService>(sp => sp.GetRequiredService<NotificationService>());
             
 #if WINDOWS || MACCATALYST
             builder.Services.AddSingleton<IPushNotificationService, NoOpPushNotificationService>();
@@ -263,13 +245,8 @@ namespace TDFMAUI
             builder.Services.AddTransient<EditUserPage>();
             builder.Services.AddTransient<RequestApprovalPage>();
 
-            #if IOS
-            builder.Services.AddSingleton<INotificationPermissionPlatformService, TDFMAUI.Platforms.iOS.NotificationPermissionPlatformService>();
-            #endif
-
             var app = builder.Build();
             App.Services = app.Services;
-            DebugService.Initialize();
 
             var userSessionService = app.Services.GetRequiredService<IUserSessionService>();
             App.InitializeUserSession(userSessionService);

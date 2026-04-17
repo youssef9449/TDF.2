@@ -12,9 +12,9 @@ namespace TDFMAUI.Pages
     public partial class PrivateMessagesPage : ContentPage
     {
         private readonly PrivateMessagesViewModel _viewModel;
-        private readonly IMessageApiService _messageApiService;
+        private readonly IMessageService _messageApiService;
 
-        public PrivateMessagesPage(PrivateMessagesViewModel viewModel, IMessageApiService messageApiService)
+        public PrivateMessagesPage(PrivateMessagesViewModel viewModel, IMessageService messageApiService)
         {
             InitializeComponent();
             _viewModel = viewModel;
@@ -22,16 +22,11 @@ namespace TDFMAUI.Pages
             BindingContext = _viewModel;
         }
 
-        protected override async void OnAppearing()
-        {
-            base.OnAppearing();
-        }
-
         private async void OnMessageSelected(object sender, SelectionChangedEventArgs e)
         {
             if (e.CurrentSelection.FirstOrDefault() is MessageModel selectedMessage)
             {
-                await DisplayAlert("Message Details", selectedMessage.MessageContent, "OK");
+                await DisplayAlert("Message Details", selectedMessage.Content, "OK");
                 messagesCollection.SelectedItem = null;
             }
         }

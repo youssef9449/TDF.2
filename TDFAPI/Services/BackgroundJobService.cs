@@ -215,8 +215,7 @@ namespace TDFAPI.Services
                 // Extract notification data
                 if (!data.TryGetValue("userId", out var userIdObj) || 
                     !data.TryGetValue("title", out var titleObj) || 
-                    !data.TryGetValue("message", out var messageObj) || 
-                    !data.TryGetValue("type", out var typeObj))
+                    !data.TryGetValue("message", out var messageObj))
                 {
                     _logger.LogError("Missing required data for SendNotification job");
                     return false;
@@ -229,13 +228,20 @@ namespace TDFAPI.Services
                     return false;
                 }
 
-                var title = titleObj.ToString();
-                var message = messageObj.ToString();
-                var typeStr = typeObj.ToString();
+                var title = titleObj.ToString() ?? "Notification";
+                var message = messageObj.ToString() ?? string.Empty;
                 
-                if (!Enum.TryParse<NotificationType>(typeStr, out var notificationType))
+                NotificationType notificationType = NotificationType.Info;
+                if (data.TryGetValue("type", out var typeObj))
                 {
-                    notificationType = NotificationType.Info;
+                    if (Enum.TryParse<NotificationType>(typeObj.ToString(), out var parsedType))
+                    {
+                        notificationType = parsedType;
+                    }
+                    else if (int.TryParse(typeObj.ToString(), out var intType))
+                    {
+                        notificationType = (NotificationType)intType;
+                    }
                 }
 
                 // Get optional data

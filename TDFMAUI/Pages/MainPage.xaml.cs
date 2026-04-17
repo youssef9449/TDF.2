@@ -57,7 +57,7 @@ public partial class MainPage : ContentPage
     {
         var webSocketService = App.Services.GetService<WebSocketService>();
         var userPresenceService = App.Services.GetService<IUserPresenceService>();
-        var messageApiService = App.Services.GetService<IMessageApiService>();
+        var messageApiService = App.Services.GetService<IMessageService>();
         await Navigation.PushAsync(new MessagesPage(messageApiService, webSocketService, userPresenceService));
     }
 

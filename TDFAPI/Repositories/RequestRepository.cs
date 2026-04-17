@@ -26,17 +26,10 @@ namespace TDFAPI.Repositories
         {
             try
             {
-                var request = await _context.Requests
+                return await _context.Requests
                     .Include(r => r.User)
                     .ThenInclude(u => u.AnnualLeave)
                     .FirstOrDefaultAsync(r => r.RequestID == requestId);
-
-                if (request?.User != null)
-                {
-                    request.UserDto = MapUserToDto(request.User);
-                }
-
-                return request;
             }
             catch (Exception ex)
             {
@@ -47,23 +40,14 @@ namespace TDFAPI.Repositories
 
         public async Task<IEnumerable<RequestEntity>> GetAllAsync()
         {
-            var requests = await _context.Requests
+            return await _context.Requests
                 .Include(r => r.User)
                 .ThenInclude(u => u.AnnualLeave)
                 .OrderByDescending(r => r.RequestFromDay)
                 .ToListAsync();
-
-            // Map User entities to UserDto for responses
-            foreach (var request in requests.Where(r => r.User != null))
-            {
-                request.UserDto = MapUserToDto(request.User);
-            }
-
-            return requests;
         }
 
-        public async Task<PaginatedResult<RequestEntity>> GetAllAsync(RequestPaginationDto pagination
-        )
+        public async Task<PaginatedResult<RequestEntity>> GetAllAsync(RequestPaginationDto pagination)
         {
             var baseQuery = _context.Requests
                 .Include(r => r.User)
@@ -74,20 +58,12 @@ namespace TDFAPI.Repositories
 
         public async Task<IEnumerable<RequestEntity>> GetByUserIdAsync(int userId)
         {
-            var requests = await _context.Requests
+            return await _context.Requests
                 .Where(r => r.RequestUserID == userId)
                 .Include(r => r.User)
                 .ThenInclude(u => u.AnnualLeave)
                 .OrderByDescending(r => r.RequestFromDay)
                 .ToListAsync();
-
-            // Map User entities to UserDto for responses
-            foreach (var request in requests.Where(r => r.User != null))
-            {
-                request.UserDto = MapUserToDto(request.User);
-            }
-
-            return requests;
         }
 
         public async Task<PaginatedResult<RequestEntity>> GetByUserIdAsync(int userId, RequestPaginationDto pagination)
@@ -103,20 +79,12 @@ namespace TDFAPI.Repositories
 
         public async Task<IEnumerable<RequestEntity>> GetByDepartmentAsync(string department)
         {
-            var requests = await _context.Requests
+            return await _context.Requests
                 .Where(r => r.RequestDepartment == department)
                 .Include(r => r.User)
                 .ThenInclude(u => u.AnnualLeave)
                 .OrderByDescending(r => r.RequestFromDay)
                 .ToListAsync();
-
-            // Map User entities to UserDto for responses
-            foreach (var request in requests.Where(r => r.User != null))
-            {
-                request.UserDto = MapUserToDto(request.User);
-            }
-
-            return requests;
         }
 
         public async Task<PaginatedResult<RequestEntity>> GetByDepartmentAsync(string department, RequestPaginationDto pagination)
@@ -440,12 +408,6 @@ namespace TDFAPI.Repositories
                     .Take(pagination.PageSize)
                     .ToListAsync();
 
-                // Map User entities to UserDto for responses
-                foreach (var request in items.Where(r => r.User != null))
-                {
-                    request.UserDto = MapUserToDto(request.User);
-                }
-
                 return new PaginatedResult<RequestEntity>
                 {
                     Items = items,
@@ -605,41 +567,11 @@ namespace TDFAPI.Repositories
                     r.RequestType == leaveType &&
                     r.RequestFromDay >= startOfYear &&
                     r.RequestFromDay <= endOfYear &&
-                    r.RequestManagerStatus == RequestStatus.HRApproved &&
-                    r.RequestHRStatus == RequestStatus.ManagerApproved)
+                    r.RequestHRStatus == RequestStatus.HRApproved)
                 .ToListAsync();
 
             int totalDays = approvedRequests.Sum(r => r.RequestNumberOfDays ?? 0);
             return totalDays;
-        }
-
-        /// <summary>
-        /// Maps a User entity to UserDto
-        /// </summary>
-        private UserDto MapUserToDto(UserEntity user)
-        {
-            var dto = new UserDto
-            {
-                UserID = user.UserID,
-                UserName = user.UserName,
-                FullName = user.FullName,
-                Department = user.Department,
-                Title = user.Title,
-                IsActive = user.IsActive,
-                IsAdmin = user.IsAdmin,
-                IsManager = user.IsManager,
-                IsHR = user.IsHR,
-                LastLoginDate = user.LastLoginDate,
-                LastLoginIp = user.LastLoginIp,
-                IsLocked = user.IsLocked,
-                FailedLoginAttempts = user.FailedLoginAttempts,
-                Roles = new List<string>()
-            };
-
-            // Assign roles using RoleService
-            _roleService.AssignRoles(dto);
-
-            return dto;
         }
 
         #endregion

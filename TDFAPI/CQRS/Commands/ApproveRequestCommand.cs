@@ -5,6 +5,7 @@ using TDFAPI.Services;
 using TDFAPI.Repositories;
 using TDFShared.Utilities;
 using TDFShared.Services;
+using TDFAPI.Extensions;
 using INotificationService = TDFAPI.Services.INotificationService;
 
 namespace TDFAPI.CQRS.Commands
@@ -38,13 +39,18 @@ namespace TDFAPI.CQRS.Commands
 
         public async Task<bool> Handle(ApproveRequestCommand request, CancellationToken cancellationToken)
         {
-            var currentUser = await _userRepository.GetByIdAsync(request.ApproverId);
-            if (currentUser == null) throw new System.UnauthorizedAccessException("User not found.");
+            var currentUserEntity = await _userRepository.GetByIdAsync(request.ApproverId);
+            if (currentUserEntity == null) throw new System.UnauthorizedAccessException("User not found.");
+            var currentUser = currentUserEntity.ToDto();
 
             var requestEntity = await _requestRepository.GetByIdAsync(request.RequestId);
             if (requestEntity == null) throw new TDFAPI.Exceptions.EntityNotFoundException("Request", request.RequestId);
+            var requestDto = requestEntity.ToResponseDto();
 
-            string approverName = currentUser.FullName ?? "Unknown";
+            if (!RequestStateManager.CanApproveRequest(requestDto, currentUser))
+            {
+                throw new System.UnauthorizedAccessException("You do not have permission to approve this request.");
+            }
 
             if (request.IsHR)
             {
@@ -81,9 +87,6 @@ namespace TDFAPI.CQRS.Commands
             {
                 if (!(currentUser.IsManager ?? false) && !(currentUser.IsAdmin ?? false))
                     throw new System.UnauthorizedAccessException("You do not have manager permissions.");
-
-                if (!(currentUser.IsAdmin ?? false) && !RequestStateManager.CanManageDepartment(currentUser, requestEntity.RequestDepartment))
-                    throw new System.UnauthorizedAccessException("You can only approve requests from your department.");
 
                 if (requestEntity.RequestManagerStatus != TDFShared.Enums.RequestStatus.Pending)
                     throw new TDFShared.Exceptions.BusinessRuleException("Request is not pending manager approval.");

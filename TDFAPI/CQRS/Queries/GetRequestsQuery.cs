@@ -62,16 +62,24 @@ namespace TDFAPI.CQRS.Queries
 
                 case RequestAccessLevel.Department:
                     // Managers can see their department's requests or their own requests.
-                    if (request.Pagination.UserId.HasValue && request.Pagination.UserId.Value != currentUser.UserID)
+
+                    if (request.Pagination.UserId.HasValue)
                     {
-                        // If they want to see a specific user, they MUST be in the same department
-                        // (We'll let the repository handle the department check if a userId is provided,
-                        // but here we can set the department filter as a security boundary)
-                        request.Pagination.Department = currentUser.Department;
+                        if (request.Pagination.UserId.Value == currentUser.UserID)
+                        {
+                            // If they are filtering for their own requests, we don't need to force the department filter
+                            // as they might be in a sub-department of the one they manage.
+                            request.Pagination.Department = null;
+                        }
+                        else
+                        {
+                            // If they want to see another specific user, force their managed department scope.
+                            request.Pagination.Department = currentUser.Department;
+                        }
                     }
                     else if (string.IsNullOrEmpty(request.Pagination.Department))
                     {
-                        // Default to their department if no specific user/dept is requested
+                        // Default to their managed department if no specific user/dept is requested
                         request.Pagination.Department = currentUser.Department;
                     }
                     else if (!RequestStateManager.CanAccessDepartment(currentUser.Department, request.Pagination.Department))

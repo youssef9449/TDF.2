@@ -3,6 +3,7 @@ using TDFAPI.Repositories;
 using TDFShared.DTOs.Messages;
 using TDFShared.DTOs.Common;
 using TDFShared.Models.Message;
+using TDFAPI.Extensions;
 using TDFShared.Enums;
 using TDFShared.Services;
 
@@ -35,7 +36,9 @@ namespace TDFAPI.Services
             try
             {
                 var message = await _messageRepository.GetByIdAsync(messageId);
-                return message != null ? await MapToMessageDtoAsync(message) : null;
+                if (message == null) return null;
+                var sender = await _userRepository.GetByIdAsync(message.SenderID);
+                return message.ToDto(sender);
             }
             catch (Exception ex)
             {
@@ -50,7 +53,11 @@ namespace TDFAPI.Services
             {
                 var messages = await _messageRepository.GetConversationAsync(userId1, userId2);
                 var dtos = new List<MessageDto>();
-                foreach (var m in messages) dtos.Add(await MapToMessageDtoAsync(m));
+                foreach (var m in messages)
+                {
+                    var sender = await _userRepository.GetByIdAsync(m.SenderID);
+                    dtos.Add(m.ToDto(sender));
+                }
                 return dtos;
             }
             catch (Exception ex)
@@ -68,7 +75,11 @@ namespace TDFAPI.Services
                 {
                     var result = await _messageRepository.GetByUserIdAsync(userId, pagination);
                     var dtos = new List<MessageDto>();
-                    foreach (var m in result.Items) dtos.Add(await MapToMessageDtoAsync(m));
+                    foreach (var m in result.Items)
+                    {
+                        var sender = await _userRepository.GetByIdAsync(m.SenderID);
+                        dtos.Add(m.ToDto(sender));
+                    }
                     return new PaginatedResult<MessageDto>
                     {
                         Items = dtos,
@@ -81,7 +92,11 @@ namespace TDFAPI.Services
                 {
                     var messages = await _messageRepository.GetByUserIdAsync(userId);
                     var dtos = new List<MessageDto>();
-                    foreach (var m in messages) dtos.Add(await MapToMessageDtoAsync(m));
+                    foreach (var m in messages)
+                    {
+                        var sender = await _userRepository.GetByIdAsync(m.SenderID);
+                        dtos.Add(m.ToDto(sender));
+                    }
                     return new PaginatedResult<MessageDto>
                     {
                         Items = dtos,
@@ -126,7 +141,8 @@ namespace TDFAPI.Services
                     NotificationType.Info);
 
                 await _unitOfWork.CommitAsync();
-                return await MapToMessageDtoAsync(message);
+                var sender = await _userRepository.GetByIdAsync(message.SenderID);
+                return message.ToDto(sender);
             }
             catch (Exception ex)
             {
@@ -156,7 +172,11 @@ namespace TDFAPI.Services
             var conversation = await _messageRepository.GetConversationAsync(senderId, receiverId);
             var undelivered = conversation.Where(m => m.SenderID == senderId && m.ReceiverID == receiverId && !m.IsDelivered);
             var dtos = new List<MessageDto>();
-            foreach (var m in undelivered) dtos.Add(await MapToMessageDtoAsync(m));
+            foreach (var m in undelivered)
+            {
+                var sender = await _userRepository.GetByIdAsync(m.SenderID);
+                dtos.Add(m.ToDto(sender));
+            }
             return dtos;
         }
 
@@ -173,7 +193,7 @@ namespace TDFAPI.Services
             foreach (var m in messages)
             {
                 var sender = await _userRepository.GetByIdAsync(m.SenderID);
-                dtos.Add(MapToChatMessageDto(m, sender?.FullName ?? "Unknown"));
+                dtos.Add(m.ToChatDto(sender?.FullName));
             }
             return dtos;
         }
@@ -206,7 +226,7 @@ namespace TDFAPI.Services
                 }
 
                 await _unitOfWork.CommitAsync();
-                return MapToChatMessageDto(message, senderName);
+                return message.ToChatDto(senderName);
             }
             catch
             {
@@ -220,43 +240,7 @@ namespace TDFAPI.Services
             var message = await _messageRepository.GetByIdempotencyKeyAsync(idempotencyKey, userId);
             if (message == null) return null;
             var sender = await _userRepository.GetByIdAsync(message.SenderID);
-            return MapToChatMessageDto(message, sender?.FullName ?? "Unknown");
-        }
-
-        private async Task<MessageDto> MapToMessageDtoAsync(MessageEntity m)
-        {
-            var sender = await _userRepository.GetByIdAsync(m.SenderID);
-            return new MessageDto
-            {
-                Id = m.MessageID,
-                SenderId = m.SenderID,
-                ReceiverId = m.ReceiverID,
-                SenderUsername = sender?.UserName ?? "Unknown",
-                SenderFullName = sender?.FullName ?? "Unknown",
-                Content = m.MessageText,
-                Timestamp = m.Timestamp,
-                IsRead = m.IsRead,
-                IsDelivered = m.IsDelivered,
-                MessageType = m.MessageType
-            };
-        }
-
-        private ChatMessageDto MapToChatMessageDto(MessageEntity m, string senderName)
-        {
-            return new ChatMessageDto
-            {
-                MessageId = m.MessageID,
-                SenderId = m.SenderID,
-                SenderName = senderName,
-                ReceiverId = m.ReceiverID,
-                Content = m.MessageText,
-                Timestamp = m.Timestamp,
-                IsRead = m.IsRead,
-                IsDelivered = m.IsDelivered,
-                MessageType = m.MessageType,
-                IsGlobal = m.IsGlobal,
-                Department = m.Department
-            };
+            return message.ToChatDto(sender?.FullName);
         }
     }
 }

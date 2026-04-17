@@ -24,15 +24,13 @@ namespace TDFAPI.Repositories
             _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
         }
         
-        public new async Task<UserDto?> GetByIdAsync(int userId)
+        public new async Task<UserEntity?> GetByIdAsync(int userId)
         {
             try
             {
-                var user = await _dbSet
-                                       .Include(u => u.AnnualLeave)
-                                       .AsNoTracking()
-                                       .FirstOrDefaultAsync(u => u.UserID == userId);
-                return user != null ? MapUserDtoFromEntity(user) : null;
+                return await _dbSet
+                    .Include(u => u.AnnualLeave)
+                    .FirstOrDefaultAsync(u => u.UserID == userId);
             }
             catch (Exception ex)
             {
@@ -41,15 +39,13 @@ namespace TDFAPI.Repositories
             }
         }
         
-        public async Task<UserDto?> GetByUsernameAsync(string username)
+        public async Task<UserEntity?> GetByUsernameAsync(string username)
         {
             try
             {
-                var user = await _dbSet
-                                       .Include(u => u.AnnualLeave)
-                                       .AsNoTracking()
-                                       .FirstOrDefaultAsync(u => u.UserName == username);
-                return user != null ? MapUserDtoFromEntity(user) : null;
+                return await _dbSet
+                    .Include(u => u.AnnualLeave)
+                    .FirstOrDefaultAsync(u => u.UserName == username);
             }
             catch (Exception ex)
             {
@@ -58,16 +54,14 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public new async Task<List<UserDto>> GetAllAsync()
+        public new async Task<List<UserEntity>> GetAllAsync()
         {
             try
             {
-                var users = await _dbSet
-                                        .Include(u => u.AnnualLeave)
-                                        .AsNoTracking()
-                                        .OrderBy(u => u.UserName)
-                                        .ToListAsync();
-                return users.Select(MapUserDtoFromEntity).ToList();
+                return await _dbSet
+                    .Include(u => u.AnnualLeave)
+                    .OrderBy(u => u.UserName)
+                    .ToListAsync();
             }
             catch (Exception ex)
             {
@@ -76,22 +70,20 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<PaginatedResult<UserDto>> GetPaginatedAsync(int page, int pageSize)
+        public async Task<PaginatedResult<UserEntity>> GetPaginatedAsync(int page, int pageSize)
         {
             try
             {
                 var totalCount = await _dbSet.CountAsync();
                 var users = await _dbSet
-                                        .Include(u => u.AnnualLeave)
-                                        .AsNoTracking()
-                                        .OrderBy(u => u.UserName)
-                                        .Skip((page - 1) * pageSize)
-                                        .Take(pageSize)
-                                        .ToListAsync();
-                var userDtos = users.Select(MapUserDtoFromEntity).ToList();
-                return new PaginatedResult<UserDto>
+                    .Include(u => u.AnnualLeave)
+                    .OrderBy(u => u.UserName)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToListAsync();
+                return new PaginatedResult<UserEntity>
                 {
-                    Items = userDtos,
+                    Items = users,
                     PageNumber = page,
                     PageSize = pageSize,
                     TotalCount = totalCount
@@ -100,94 +92,6 @@ namespace TDFAPI.Repositories
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting paginated users: {Message}", ex.Message);
-                throw;
-            }
-        }
-
-        public async Task<int> CreateAsync(CreateUserRequest userDto, string passwordHash, string salt)
-        {
-            var newUser = new UserEntity
-            {
-                UserName = userDto.Username,
-                FullName = userDto.FullName,
-                Department = userDto.Department,
-                Title = userDto.Title,
-                PasswordHash = passwordHash,
-                Salt = salt,
-                IsAdmin = userDto.IsAdmin,
-                IsManager = userDto.IsManager,
-                IsHR = false,
-                CreatedAt = DateTime.UtcNow,
-                IsActive = false,
-                IsConnected = false,
-                PresenceStatus = UserPresenceStatus.Offline,
-                IsAvailableForChat = false,
-                FailedLoginAttempts = 0,
-                IsLocked = false
-            };
-
-            var annualLeave = new AnnualLeaveEntity
-            {
-                FullName = newUser.FullName,
-                Annual = 15,
-                EmergencyLeave = 6,
-                Permissions = 24,
-                AnnualUsed = 0,
-                EmergencyUsed = 0,
-                PermissionsUsed = 0,
-                UnpaidUsed = 0,
-                WorkFromHomeUsed = 0  // Explicitly set this property
-            };
-            newUser.AnnualLeave = annualLeave;
-
-            try
-            {
-                _dbSet.Add(newUser);
-                await _context.SaveChangesAsync();
-                _logger.LogInformation("Created new user with ID {UserId}", newUser.UserID);
-                return newUser.UserID;
-            }
-            catch (DbUpdateException dbEx)
-            {
-                _logger.LogError(dbEx, "Database error creating user {Username}: {Message}", userDto.Username, dbEx.InnerException?.Message ?? dbEx.Message);
-                if (dbEx.InnerException is SqlException sqlEx && (sqlEx.Number == 2627 || sqlEx.Number == 2601))
-                {
-                    throw new InvalidOperationException($"Username '{userDto.Username}' already exists.", dbEx);
-                }
-                throw new InvalidOperationException("Failed to save user data to the database.", dbEx);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "General error creating user {Username}: {Message}", userDto.Username, ex.Message);
-                throw;
-            }
-        }
-
-        public async Task<bool> UpdateAsync(int userId, UpdateUserRequest userDto)
-        {
-            try
-            {
-                var user = await _dbSet.FindAsync(userId);
-                if (user == null)
-                {
-                    _logger.LogWarning("User not found for update: ID {UserId}", userId);
-                    return false;
-                }
-                
-                user.FullName = userDto.FullName ?? user.FullName;
-                user.Department = userDto.Department ?? user.Department;
-                user.Title = userDto.Title ?? user.Title;
-                user.IsAdmin = userDto.IsAdmin;
-                user.IsManager = userDto.IsManager;
-                user.IsHR = userDto.IsHR;
-                user.UpdatedAt = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
-                _logger.LogInformation("User updated: ID {UserId}", userId);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating user with ID {UserId}: {Message}", userId, ex.Message);
                 throw;
             }
         }
@@ -479,17 +383,15 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<List<UserDto>> GetUsersByDepartmentAsync(string department)
+        public async Task<List<UserEntity>> GetUsersByDepartmentAsync(string department)
         {
             try
             {
-                var users = await _dbSet
-                                        .Include(u => u.AnnualLeave)
-                                        .Where(u => u.Department == department)
-                                        .AsNoTracking()
-                                        .OrderBy(u => u.UserName)
-                                        .ToListAsync();
-                return users.Select(MapUserDtoFromEntity).ToList();
+                return await _dbSet
+                    .Include(u => u.AnnualLeave)
+                    .Where(u => u.Department == department)
+                    .OrderBy(u => u.UserName)
+                    .ToListAsync();
             }
             catch (Exception ex)
             {
@@ -498,18 +400,16 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<List<UserDto>> GetUsersByIdsAsync(IEnumerable<int> userIds)
+        public async Task<List<UserEntity>> GetUsersByIdsAsync(IEnumerable<int> userIds)
         {
             try
             {
-                if (userIds == null || !userIds.Any()) return new List<UserDto>();
+                if (userIds == null || !userIds.Any()) return new List<UserEntity>();
 
-                var users = await _dbSet
-                                        .Include(u => u.AnnualLeave)
-                                        .Where(u => userIds.Contains(u.UserID))
-                                        .AsNoTracking()
-                                        .ToListAsync();
-                return users.Select(MapUserDtoFromEntity).ToList();
+                return await _dbSet
+                    .Include(u => u.AnnualLeave)
+                    .Where(u => userIds.Contains(u.UserID))
+                    .ToListAsync();
             }
             catch (Exception ex)
             {
@@ -518,18 +418,15 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<List<UserDto>> GetOnlineUsersAsync()
+        public async Task<List<UserEntity>> GetOnlineUsersAsync()
         {
             try
             {
-                var users = await _dbSet
-                                        .Include(u => u.AnnualLeave)
-                                        .Where(u => u.IsConnected == true)
-                                        .AsNoTracking()
-                                        .OrderBy(u => u.UserName)
-                                        .ToListAsync();
-
-                return users.Select(MapUserDtoFromEntity).ToList();
+                return await _dbSet
+                    .Include(u => u.AnnualLeave)
+                    .Where(u => u.IsConnected == true)
+                    .OrderBy(u => u.UserName)
+                    .ToListAsync();
             }
             catch (Exception ex)
             {
@@ -538,17 +435,15 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<List<UserDto>> GetByDepartmentAndRoleAsync(string department)
+        public async Task<List<UserEntity>> GetByDepartmentAndRoleAsync(string department)
         {
             try
             {
-                var users = await _dbSet
-                                        .Include(u => u.AnnualLeave)
-                                        .Where(u => u.Department == department && (u.IsAdmin == true || u.IsManager == true || u.IsHR == true))
-                                        .AsNoTracking()
-                                        .OrderBy(u => u.UserName)
-                                        .ToListAsync();
-                return users.Select(MapUserDtoFromEntity).ToList();
+                return await _dbSet
+                    .Include(u => u.AnnualLeave)
+                    .Where(u => u.Department == department && (u.IsAdmin == true || u.IsManager == true || u.IsHR == true))
+                    .OrderBy(u => u.UserName)
+                    .ToListAsync();
             }
             catch (Exception ex)
             {
@@ -557,11 +452,11 @@ namespace TDFAPI.Repositories
             }
         }
 
-        public async Task<List<UserDto>> GetUsersByRoleAsync(string role)
+        public async Task<List<UserEntity>> GetUsersByRoleAsync(string role)
         {
             try
             {
-                IQueryable<UserEntity> query = _dbSet.Include(u => u.AnnualLeave).AsNoTracking();
+                IQueryable<UserEntity> query = _dbSet.Include(u => u.AnnualLeave);
 
                 if (role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
                     query = query.Where(u => u.IsAdmin == true);
@@ -572,8 +467,7 @@ namespace TDFAPI.Repositories
                 else
                     query = query.Where(u => u.IsAdmin != true && u.IsManager != true && u.IsHR != true);
 
-                var users = await query.OrderBy(u => u.UserName).ToListAsync();
-                return users.Select(MapUserDtoFromEntity).ToList();
+                return await query.OrderBy(u => u.UserName).ToListAsync();
             }
             catch (Exception ex)
             {
@@ -697,30 +591,5 @@ namespace TDFAPI.Repositories
             }
         }
 
-        private UserDto MapUserDtoFromEntity(UserEntity entity)
-        {
-            var dto = new UserDto
-            {
-                UserID = entity.UserID,
-                UserName = entity.UserName,
-                FullName = entity.FullName,
-                Department = entity.Department,
-                Title = entity.Title,
-                IsActive = entity.IsActive,
-                IsAdmin = entity.IsAdmin,
-                IsManager = entity.IsManager,
-                IsHR = entity.IsHR,
-                LastLoginDate = entity.LastLoginDate,
-                LastLoginIp = entity.LastLoginIp,
-                IsLocked = entity.IsLocked,
-                FailedLoginAttempts = entity.FailedLoginAttempts,
-                Roles = new List<string>()
-            };
-
-            // Assign roles using RoleService
-            _roleService.AssignRoles(dto);
-            
-            return dto;
-        }
     }
 } 

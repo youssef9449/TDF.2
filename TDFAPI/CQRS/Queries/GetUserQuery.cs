@@ -9,6 +9,7 @@ using TDFShared.DTOs.Users;
 using TDFAPI.Repositories;
 using TDFAPI.Services;
 using TDFAPI.Utilities;
+using TDFAPI.Extensions;
 
 namespace TDFAPI.CQRS.Queries
 {
@@ -56,7 +57,7 @@ namespace TDFAPI.CQRS.Queries
                     throw new EntityNotFoundException("User", request.UserId);
                 }
 
-                return user; // UserDto is already returned from the repository
+                return user.ToDto();
             }, 30, 10); // Cache for 30 minutes with 10 minute sliding expiration
         }
     }

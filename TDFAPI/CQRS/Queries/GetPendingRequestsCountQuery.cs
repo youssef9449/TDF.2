@@ -4,6 +4,7 @@ using TDFAPI.Services;
 using TDFAPI.Repositories;
 using TDFShared.DTOs.Requests;
 using TDFShared.Services;
+using TDFAPI.Extensions;
 
 namespace TDFAPI.CQRS.Queries
 {
@@ -61,7 +62,7 @@ namespace TDFAPI.CQRS.Queries
         {
             var cacheKey = $"user_{userId}";
             return await _cacheService.GetOrCreateAsync(cacheKey,
-                async () => await _userRepository.GetByIdAsync(userId),
+                async () => (await _userRepository.GetByIdAsync(userId))?.ToDto(),
                 absoluteExpirationMinutes: 15,
                 slidingExpirationMinutes: 5);
         }

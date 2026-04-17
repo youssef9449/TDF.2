@@ -5,6 +5,7 @@ using TDFShared.DTOs.Common;
 using TDFAPI.Services;
 using TDFAPI.Repositories;
 using TDFShared.Services;
+using TDFAPI.Extensions;
 
 namespace TDFAPI.CQRS.Queries
 {
@@ -68,9 +69,23 @@ namespace TDFAPI.CQRS.Queries
         private async Task<PaginatedResult<RequestResponseDto>> MapToPaginatedResponseDto(PaginatedResult<TDFShared.Models.Request.RequestEntity> paginatedRequests)
         {
             var mappedItems = new List<RequestResponseDto>();
+
+            // Batch fetch leave balances to avoid N+1 queries
+            var uniqueUserIds = paginatedRequests.Items.Select(i => i.RequestUserID).Distinct().ToList();
+            var userBalances = new Dictionary<int, Dictionary<string, int>>();
+
+            foreach (var uid in uniqueUserIds)
+            {
+                userBalances[uid] = await _requestRepository.GetLeaveBalancesAsync(uid);
+            }
+
             foreach (var item in paginatedRequests.Items)
             {
-                mappedItems.Add(await MapToResponseDto(item));
+                var balances = userBalances.TryGetValue(item.RequestUserID, out var b) ? b : new Dictionary<string, int>();
+                var balanceKey = TDFShared.Enums.LeaveTypeHelper.GetBalanceKey(item.RequestType);
+                int? remainingBalance = (balanceKey != null && balances.TryGetValue(balanceKey, out int val)) ? val : null;
+
+                mappedItems.Add(item.ToResponseDto(remainingBalance));
             }
 
             return new PaginatedResult<RequestResponseDto>
@@ -79,34 +94,6 @@ namespace TDFAPI.CQRS.Queries
                 TotalCount = paginatedRequests.TotalCount,
                 PageNumber = paginatedRequests.PageNumber,
                 PageSize = paginatedRequests.PageSize
-            };
-        }
-
-        private async Task<RequestResponseDto> MapToResponseDto(TDFShared.Models.Request.RequestEntity entity)
-        {
-            var balances = await _requestRepository.GetLeaveBalancesAsync(entity.RequestUserID);
-            var balanceKey = TDFShared.Enums.LeaveTypeHelper.GetBalanceKey(entity.RequestType);
-            int? remainingBalance = (balanceKey != null && balances.TryGetValue(balanceKey, out int val)) ? val : null;
-
-            return new RequestResponseDto
-            {
-                RequestID = entity.RequestID,
-                RequestUserID = entity.RequestUserID,
-                UserName = entity.RequestUserFullName,
-                LeaveType = entity.RequestType,
-                RequestReason = entity.RequestReason,
-                RequestStartDate = entity.RequestFromDay,
-                RequestEndDate = entity.RequestToDay,
-                RequestBeginningTime = entity.RequestBeginningTime,
-                RequestEndingTime = entity.RequestEndingTime,
-                RequestDepartment = entity.RequestDepartment,
-                Status = entity.RequestManagerStatus,
-                HRStatus = entity.RequestHRStatus,
-                CreatedDate = entity.CreatedAt.GetValueOrDefault(DateTime.MinValue),
-                LastModifiedDate = entity.UpdatedAt,
-                RequestNumberOfDays = entity.RequestNumberOfDays,
-                RemainingBalance = remainingBalance,
-                RowVersion = entity.RowVersion
             };
         }
 

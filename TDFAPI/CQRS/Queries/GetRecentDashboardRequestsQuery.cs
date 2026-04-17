@@ -4,6 +4,7 @@ using TDFShared.DTOs.Requests;
 using TDFAPI.Services;
 using TDFAPI.Repositories;
 using TDFShared.Services;
+using TDFAPI.Extensions;
 
 namespace TDFAPI.CQRS.Queries
 {
@@ -66,39 +67,25 @@ namespace TDFAPI.CQRS.Queries
         private async Task<List<RequestResponseDto>> MapToResponseDtoList(IEnumerable<TDFShared.Models.Request.RequestEntity> entities)
         {
             var list = new List<RequestResponseDto>();
+
+            // Batch fetch leave balances
+            var uniqueUserIds = entities.Select(i => i.RequestUserID).Distinct().ToList();
+            var userBalances = new Dictionary<int, Dictionary<string, int>>();
+
+            foreach (var uid in uniqueUserIds)
+            {
+                userBalances[uid] = await _requestRepository.GetLeaveBalancesAsync(uid);
+            }
+
             foreach (var entity in entities)
             {
-                list.Add(await MapToResponseDto(entity));
+                var balances = userBalances.TryGetValue(entity.RequestUserID, out var b) ? b : new Dictionary<string, int>();
+                var balanceKey = TDFShared.Enums.LeaveTypeHelper.GetBalanceKey(entity.RequestType);
+                int? remainingBalance = (balanceKey != null && balances.TryGetValue(balanceKey, out int val)) ? val : null;
+
+                list.Add(entity.ToResponseDto(remainingBalance));
             }
             return list;
-        }
-
-        private async Task<RequestResponseDto> MapToResponseDto(TDFShared.Models.Request.RequestEntity entity)
-        {
-            var balances = await _requestRepository.GetLeaveBalancesAsync(entity.RequestUserID);
-            var balanceKey = TDFShared.Enums.LeaveTypeHelper.GetBalanceKey(entity.RequestType);
-            int? remainingBalance = (balanceKey != null && balances.TryGetValue(balanceKey, out int val)) ? val : null;
-
-            return new RequestResponseDto
-            {
-                RequestID = entity.RequestID,
-                RequestUserID = entity.RequestUserID,
-                UserName = entity.RequestUserFullName,
-                LeaveType = entity.RequestType,
-                RequestReason = entity.RequestReason,
-                RequestStartDate = entity.RequestFromDay,
-                RequestEndDate = entity.RequestToDay,
-                RequestBeginningTime = entity.RequestBeginningTime,
-                RequestEndingTime = entity.RequestEndingTime,
-                RequestDepartment = entity.RequestDepartment,
-                Status = entity.RequestManagerStatus,
-                HRStatus = entity.RequestHRStatus,
-                CreatedDate = entity.CreatedAt.GetValueOrDefault(DateTime.MinValue),
-                LastModifiedDate = entity.UpdatedAt,
-                RequestNumberOfDays = entity.RequestNumberOfDays,
-                RemainingBalance = remainingBalance,
-                RowVersion = entity.RowVersion
-            };
         }
 
         private async Task<TDFShared.DTOs.Users.UserDto?> GetCachedUserAsync(int userId)

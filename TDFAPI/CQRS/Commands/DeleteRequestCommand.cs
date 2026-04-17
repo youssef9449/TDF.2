@@ -5,6 +5,7 @@ using TDFAPI.Repositories;
 using TDFShared.DTOs.Requests;
 using TDFShared.Utilities;
 using TDFShared.Services;
+using TDFAPI.Extensions;
 using INotificationService = TDFAPI.Services.INotificationService;
 
 namespace TDFAPI.CQRS.Commands
@@ -39,11 +40,12 @@ namespace TDFAPI.CQRS.Commands
             var existingEntity = await _requestRepository.GetByIdAsync(request.RequestId);
             if (existingEntity == null) throw new TDFAPI.Exceptions.EntityNotFoundException("Request", request.RequestId);
 
-            var currentUser = await _userRepository.GetByIdAsync(request.UserId);
-            if (currentUser == null) throw new System.UnauthorizedAccessException("User not found.");
+            var currentUserEntity = await _userRepository.GetByIdAsync(request.UserId);
+            if (currentUserEntity == null) throw new System.UnauthorizedAccessException("User not found.");
+            var currentUser = currentUserEntity.ToDto();
 
             bool isOwner = existingEntity.RequestUserID == request.UserId;
-            var existingDto = MapToResponseDto(existingEntity);
+            var existingDto = existingEntity.ToResponseDto();
             if (!RequestStateManager.CanDelete(existingDto, currentUser.IsAdmin ?? false, isOwner))
             {
                 throw new System.UnauthorizedAccessException("You do not have permission to delete this request.");
@@ -72,30 +74,6 @@ namespace TDFAPI.CQRS.Commands
             {
                 await _notificationService.CreateNotificationAsync(manager.UserID, message);
             }
-        }
-
-        private RequestResponseDto MapToResponseDto(TDFShared.Models.Request.RequestEntity entity)
-        {
-            if (entity == null) return null!;
-            return new RequestResponseDto
-            {
-                RequestID = entity.RequestID,
-                RequestUserID = entity.RequestUserID,
-                UserName = entity.RequestUserFullName,
-                LeaveType = entity.RequestType,
-                RequestReason = entity.RequestReason,
-                RequestStartDate = entity.RequestFromDay,
-                RequestEndDate = entity.RequestToDay,
-                RequestBeginningTime = entity.RequestBeginningTime,
-                RequestEndingTime = entity.RequestEndingTime,
-                RequestDepartment = entity.RequestDepartment,
-                Status = entity.RequestManagerStatus,
-                HRStatus = entity.RequestHRStatus,
-                CreatedDate = entity.CreatedAt.GetValueOrDefault(DateTime.MinValue),
-                LastModifiedDate = entity.UpdatedAt,
-                RequestNumberOfDays = entity.RequestNumberOfDays,
-                RowVersion = entity.RowVersion
-            };
         }
     }
 }

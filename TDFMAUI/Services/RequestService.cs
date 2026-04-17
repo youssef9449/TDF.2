@@ -79,29 +79,24 @@ namespace TDFMAUI.Services
 
         public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetMyRequestsAsync(RequestPaginationDto pagination)
         {
-            if (pagination == null) throw new ArgumentNullException(nameof(pagination));
-            _logger.LogInformation("RequestService: Attempting to get current user ID for GetMyRequestsAsync.");
             try
             {
-                var userIdResponse = await _userApiService.GetCurrentUserIdAsync();
-                if (!userIdResponse.Success || userIdResponse.Data == 0)
+                var userId = await _authService.GetCurrentUserIdAsync();
+                if (userId == 0)
                 {
-                    _logger.LogWarning("RequestService: GetMyRequestsAsync - Could not determine current user ID or user ID is 0. Returning empty result.");
                     return new ApiResponse<PaginatedResult<RequestResponseDto>>
                     {
                         Success = true,
-                        Data = new PaginatedResult<RequestResponseDto> 
-                        { 
-                            Items = new List<RequestResponseDto>(), 
-                            TotalCount = 0, 
-                            PageNumber = pagination.Page, 
-                            PageSize = pagination.PageSize 
+                        Data = new PaginatedResult<RequestResponseDto>
+                        {
+                            Items = new List<RequestResponseDto>(),
+                            TotalCount = 0,
+                            PageNumber = pagination.Page,
+                            PageSize = pagination.PageSize
                         }
                     };
                 }
-                _logger.LogInformation("RequestService: Calling IRequestApiService.GetRequestsAsync for current user ID {UserId}", userIdResponse.Data);
-                var response = await _requestApiService.GetRequestsAsync(pagination, userIdResponse.Data, string.Empty);
-                return response;
+                return await _requestApiService.GetRequestsAsync(pagination, userId);
             }
             catch (Exception ex)
             {
@@ -116,42 +111,12 @@ namespace TDFMAUI.Services
 
         public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetAllRequestsAsync(RequestPaginationDto pagination)
         {
-            if (pagination == null) throw new ArgumentNullException(nameof(pagination));
-            _logger.LogInformation("RequestService: Calling IRequestApiService.GetRequestsAsync for all requests");
-            try
-            {
-                var response = await _requestApiService.GetRequestsAsync(pagination, null, string.Empty);
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "RequestService: Error in GetAllRequestsAsync: {Message}", ex.Message);
-                return new ApiResponse<PaginatedResult<RequestResponseDto>>
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
-            }
+            return await _requestApiService.GetRequestsAsync(pagination);
         }
 
         public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetRequestsByDepartmentAsync(string department, RequestPaginationDto pagination)
         {
-            if (pagination == null) throw new ArgumentNullException(nameof(pagination));
-            _logger.LogInformation("RequestService: Calling IRequestApiService.GetRequestsAsync for department {Department}", department);
-            try
-            {
-                var response = await _requestApiService.GetRequestsAsync(pagination, null, department);
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "RequestService: Error in GetRequestsByDepartmentAsync for department {Department}: {Message}", department, ex.Message);
-                return new ApiResponse<PaginatedResult<RequestResponseDto>>
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
-            }
+            return await _requestApiService.GetRequestsAsync(pagination, null, department);
         }
 
         public async Task<ApiResponse<RequestResponseDto>> GetRequestByIdAsync(int requestId)

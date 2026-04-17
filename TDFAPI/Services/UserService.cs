@@ -8,6 +8,8 @@ using TDFShared.Services;
 using TDFShared.Validation;
 using TDFShared.DTOs.Auth;
 using TDFShared.Models.User;
+using TDFShared.Models.Request;
+using TDFAPI.Extensions;
 
 namespace TDFAPI.Services
 {
@@ -19,25 +21,30 @@ namespace TDFAPI.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly IBusinessRulesService _businessRulesService;
 
+        private readonly MediatR.IMediator _mediator;
+
         public UserService(
             IUserRepository userRepository, 
             IAuthService authService, 
             ILogger<UserService> logger, 
             IServiceProvider serviceProvider,
-            IBusinessRulesService businessRulesService)
+            IBusinessRulesService businessRulesService,
+            MediatR.IMediator mediator)
         {
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             _businessRulesService = businessRulesService ?? throw new ArgumentNullException(nameof(businessRulesService));
+            _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         }
 
         public async Task<UserDto?> GetUserByIdAsync(int userId)
         {
             try
             {
-                return await _userRepository.GetByIdAsync(userId);
+                var entity = await _userRepository.GetByIdAsync(userId);
+                return entity?.ToDto();
             }
             catch (Exception ex)
             {
@@ -55,7 +62,8 @@ namespace TDFAPI.Services
 
             try
             {
-                return await _userRepository.GetByUsernameAsync(username);
+                var entity = await _userRepository.GetByUsernameAsync(username);
+                return entity?.ToDto();
             }
             catch (Exception ex)
             {
@@ -77,7 +85,14 @@ namespace TDFAPI.Services
 
             try
             {
-                return await _userRepository.GetPaginatedAsync(page, pageSize);
+                var result = await _userRepository.GetPaginatedAsync(page, pageSize);
+                return new PaginatedResult<UserDto>
+                {
+                    Items = result.Items.Select(u => u.ToDto()).ToList(),
+                    PageNumber = result.PageNumber,
+                    PageSize = result.PageSize,
+                    TotalCount = result.TotalCount
+                };
             }
             catch (Exception ex)
             {
@@ -88,94 +103,15 @@ namespace TDFAPI.Services
 
         public async Task<int> CreateAsync(CreateUserRequest userDto)
         {
-            if (userDto == null)
-            {
-                throw new ArgumentNullException(nameof(userDto));
-            }
-
-            try
-            {
-                // Basic validation
-                if (string.IsNullOrWhiteSpace(userDto.Username))
-                {
-                    throw new ValidationException("Username is required");
-                }
-
-                if (string.IsNullOrWhiteSpace(userDto.Password))
-                {
-                    throw new ValidationException("Password is required");
-                }
-
-                if (string.IsNullOrWhiteSpace(userDto.FullName))
-                {
-                    throw new ValidationException("Full name is required");
-                }
-
-                // Create business rule context
-                var context = new BusinessRuleContext
-                {
-                    UsernameExistsAsync = async (username) => 
-                    {
-                        var user = await _userRepository.GetByUsernameAsync(username);
-                        return user != null;
-                    },
-                    FullNameExistsAsync = async (fullName) =>
-                    {
-                        return await _userRepository.IsFullNameTakenAsync(fullName);
-                    }
-                };
-
-                // Validate business rules
-                var businessRuleResult = await _businessRulesService.ValidateUserCreationAsync(userDto, context);
-                if (!businessRuleResult.IsValid)
-                {
-                    throw new ValidationException(string.Join("; ", businessRuleResult.Errors));
-                }
-
-                // Hash password
-                var passwordHash = _authService.HashPassword(userDto.Password, out string salt);
-
-                // Create user
-                return await _userRepository.CreateAsync(userDto, passwordHash, salt);
-            }
-            catch (ValidationException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating user {Username}", userDto.Username);
-                throw new InvalidOperationException("Failed to create user. Please try again later.", ex);
-            }
+            if (userDto == null) throw new ArgumentNullException(nameof(userDto));
+            var result = await _mediator.Send(new TDFAPI.CQRS.Commands.CreateUserCommand { UserRequest = userDto });
+            return result.UserID;
         }
 
         public async Task<bool> UpdateAsync(int userId, UpdateUserRequest userDto)
         {
-            if (userDto == null)
-            {
-                throw new ArgumentNullException(nameof(userDto));
-            }
-
-            try
-            {
-                // If full name is being updated, check if it's already taken
-                if (!string.IsNullOrWhiteSpace(userDto.FullName))
-                {
-                    var isFullNameTaken = await _userRepository.IsFullNameTakenAsync(userDto.FullName, userId);
-                    if (isFullNameTaken)
-                    {
-                        _logger.LogWarning("User update failed: Full name {FullName} already exists", userDto.FullName);
-                        throw new ValidationException($"Full name '{userDto.FullName}' is already taken.");
-                    }
-                }
-
-                return await _userRepository.UpdateAsync(userId, userDto);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating user {UserId}", userId);
-                throw;
-            }
+            if (userDto == null) throw new ArgumentNullException(nameof(userDto));
+            return await _mediator.Send(new TDFAPI.CQRS.Commands.UpdateUserCommand { UserId = userId, UserRequest = userDto });
         }
 
         public async Task<bool> UpdateSelfAsync(int userId, UpdateMyProfileRequest dto)
@@ -329,7 +265,8 @@ namespace TDFAPI.Services
 
             try
             {
-                return await _userRepository.GetUsersByDepartmentAsync(department);
+                var result = await _userRepository.GetUsersByDepartmentAsync(department);
+                return result.Select(u => u.ToDto());
             }
             catch (Exception ex)
             {
@@ -342,7 +279,8 @@ namespace TDFAPI.Services
         {
             try
             {
-                return await _userRepository.GetOnlineUsersAsync();
+                var result = await _userRepository.GetOnlineUsersAsync();
+                return result.Select(u => u.ToDto());
             }
             catch (Exception ex)
             {
@@ -355,7 +293,8 @@ namespace TDFAPI.Services
         {
             try
             {
-                return await _userRepository.GetAllAsync();
+                var result = await _userRepository.GetAllAsync();
+                return result.Select(u => u.ToDto());
             }
             catch (Exception ex)
             {

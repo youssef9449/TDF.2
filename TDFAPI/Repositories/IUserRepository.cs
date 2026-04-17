@@ -9,12 +9,10 @@ namespace TDFAPI.Repositories
 {
     public interface IUserRepository : IGenericRepository<UserEntity>
     {
-        new Task<UserDto?> GetByIdAsync(int userId);
-        Task<UserDto?> GetByUsernameAsync(string username);
-        new Task<List<UserDto>> GetAllAsync();
-        Task<PaginatedResult<UserDto>> GetPaginatedAsync(int page, int pageSize);
-        Task<int> CreateAsync(CreateUserRequest userDto, string passwordHash, string salt);
-        Task<bool> UpdateAsync(int userId, UpdateUserRequest userDto);
+        new Task<UserEntity?> GetByIdAsync(int userId);
+        Task<UserEntity?> GetByUsernameAsync(string username);
+        new Task<List<UserEntity>> GetAllAsync();
+        Task<PaginatedResult<UserEntity>> GetPaginatedAsync(int page, int pageSize);
         Task<bool> UpdateSelfAsync(int userId, UpdateMyProfileRequest dto);
         Task<bool> DeleteAsync(int userId);
         Task<bool> ChangePasswordAsync(int userId, string passwordHash, string salt);
@@ -31,13 +29,13 @@ namespace TDFAPI.Repositories
         Task<bool> UpdateLastActivityAsync(int userId, DateTime activityTime);
         Task<bool> UpdateCurrentDeviceAsync(int userId, string device, string machineName);
         Task<bool> SetAvailabilityForChatAsync(int userId, bool isAvailable);
-        Task<List<UserDto>> GetUsersByDepartmentAsync(string department);
-        Task<List<UserDto>> GetUsersByIdsAsync(IEnumerable<int> userIds);
-        Task<List<UserDto>> GetOnlineUsersAsync();
+        Task<List<UserEntity>> GetUsersByDepartmentAsync(string department);
+        Task<List<UserEntity>> GetUsersByIdsAsync(IEnumerable<int> userIds);
+        Task<List<UserEntity>> GetOnlineUsersAsync();
         
         // Additional methods
-        Task<List<UserDto>> GetByDepartmentAndRoleAsync(string department);
-        Task<List<UserDto>> GetUsersByRoleAsync(string role);
+        Task<List<UserEntity>> GetByDepartmentAndRoleAsync(string department);
+        Task<List<UserEntity>> GetUsersByRoleAsync(string role);
         Task<bool> IsKnownIpAddressAsync(int userId, string ipAddress);
         
         // New methods for handling status and availability with UpdateUserStatusRequest

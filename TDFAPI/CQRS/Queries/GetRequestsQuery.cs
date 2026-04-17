@@ -138,7 +138,7 @@ namespace TDFAPI.CQRS.Queries
         {
             var cacheKey = $"user_{userId}";
             return await _cacheService.GetOrCreateAsync(cacheKey,
-                async () => await _userRepository.GetByIdAsync(userId),
+                async () => (await _userRepository.GetByIdAsync(userId))?.ToDto(),
                 absoluteExpirationMinutes: 15,
                 slidingExpirationMinutes: 5);
         }

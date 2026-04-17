@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 using TDFAPI.Repositories;
 using TDFShared.DTOs.Auth;
 using TDFShared.DTOs.Users;
+using TDFShared.Models.User;
 using TDFAPI.Extensions; // Only one set of usings
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -108,18 +109,18 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
         try
         {
             // Get user by username
-            var user = await _userRepository.GetByUsernameAsync(username);
-            if (user == null)
+            var userEntity = await _userRepository.GetByUsernameAsync(username);
+            if (userEntity == null)
             {
                 _logger.LogWarning("Login failed: User {Username} not found", username);
                 return null;
             }
 
             // Get user auth data
-            var userAuth = await _userRepository.GetUserAuthDataAsync(user.UserID);
+            var userAuth = await _userRepository.GetUserAuthDataAsync(userEntity.UserID);
             if (userAuth == null || string.IsNullOrEmpty(userAuth.PasswordHash) || string.IsNullOrEmpty(userAuth.PasswordSalt))
             {
-                _logger.LogWarning("Login failed: Invalid auth data for user {UserId}", user.UserID);
+                _logger.LogWarning("Login failed: Invalid auth data for user {UserId}", userEntity.UserID);
                 return null;
             }
 
@@ -127,7 +128,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             if (userAuth.IsLocked && userAuth.LockoutEnd.HasValue && userAuth.LockoutEnd.Value > DateTime.UtcNow)
             {
                 _logger.LogWarning("Login failed: Account for user {UserId} is locked until {LockoutEnd}",
-                    user.UserID, userAuth.LockoutEnd);
+                    userEntity.UserID, userAuth.LockoutEnd);
                 return null;
             }
 
@@ -140,13 +141,13 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 var lockoutEnd = isLocked ? DateTime.UtcNow.Add(_lockoutDuration) : (DateTime?)null; // Lock for lockout duration
 
                 await _userRepository.UpdateLoginAttemptsAsync(
-                    user.UserID,
+                    userEntity.UserID,
                     failedAttempts,
                     isLocked,
                     lockoutEnd);
 
                 _logger.LogWarning("Login failed: Invalid password for user {UserId} (attempt {Attempts})",
-                    user.UserID, failedAttempts);
+                    userEntity.UserID, failedAttempts);
 
                 return null;
             }
@@ -154,8 +155,10 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             // Reset failed login attempts on successful login
             if (userAuth.FailedLoginAttempts > 0 || userAuth.IsLocked)
             {
-                await _userRepository.UpdateLoginAttemptsAsync(user.UserID, 0, false, null);
+                await _userRepository.UpdateLoginAttemptsAsync(userEntity.UserID, 0, false, null);
             }
+
+            var user = userEntity.ToDto();
 
             // Generate tokens
             var token = GenerateJwtToken(user);
@@ -444,12 +447,13 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
             }
 
             // Get user and validate refresh token
-            var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null)
+            var userEntity = await _userRepository.GetByIdAsync(userId);
+            if (userEntity == null)
             {
                 _logger.LogWarning("Refresh token failed: User {UserId} not found", userId);
                 return null;
             }
+            var user = userEntity.ToDto();
 
             // Get user auth data to validate refresh token
             var userAuth = await _userRepository.GetUserAuthDataAsync(userId);

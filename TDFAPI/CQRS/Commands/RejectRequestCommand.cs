@@ -54,9 +54,6 @@ namespace TDFAPI.CQRS.Commands
 
             if (request.IsHR)
             {
-                if (!(currentUser.IsHR ?? false) && !(currentUser.IsAdmin ?? false))
-                    throw new System.UnauthorizedAccessException("You do not have HR permissions.");
-
                 if (requestEntity.RequestManagerStatus != TDFShared.Enums.RequestStatus.ManagerApproved)
                     throw new TDFShared.Exceptions.BusinessRuleException("Request must be manager approved before HR rejection.");
 
@@ -73,9 +70,6 @@ namespace TDFAPI.CQRS.Commands
             }
             else
             {
-                if (!(currentUser.IsManager ?? false) && !(currentUser.IsAdmin ?? false))
-                    throw new System.UnauthorizedAccessException("You do not have manager permissions.");
-
                 if (requestEntity.RequestManagerStatus != TDFShared.Enums.RequestStatus.Pending)
                     throw new TDFShared.Exceptions.BusinessRuleException("Request is not pending manager approval.");
 

@@ -9,7 +9,7 @@ using TDFShared.Models.User;
 
 namespace TDFMAUI.Services
 {
-    public interface IApiService : IAuthApiService, IRequestApiService, IUserApiService, IMessageApiService, ILookupApiService
+    public interface IApiService : IAuthApiService, IRequestApiService, IUserApiService, IMessageService, ILookupApiService
     {
         // General HTTP methods
         Task<string> GetRawResponseAsync(string endpoint);

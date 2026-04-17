@@ -15,15 +15,14 @@ namespace TDFMAUI.Pages;
 public partial class NewMessagePage : ContentPage
 {
     public ObservableCollection<UserDto> Users { get; set; } = new ObservableCollection<UserDto>();
-    private readonly IMessageApiService _messageApiService;
+    private readonly IMessageService _messageApiService;
     private readonly IUserApiService _userApiService;
     private readonly WebSocketService _webSocketService;
     
-    // Add properties for pre-selected user
     public int PreSelectedUserId { get; set; }
     public string PreSelectedUserName { get; set; }
 
-    public NewMessagePage(IMessageApiService messageApiService, WebSocketService webSocketService = null)
+    public NewMessagePage(IMessageService messageApiService, WebSocketService webSocketService = null)
     {
         InitializeComponent();
         _messageApiService = messageApiService;
@@ -37,7 +36,6 @@ public partial class NewMessagePage : ContentPage
     {
         if (App.CurrentUser == null)
         {
-            // Get LoginPageViewModel from the service provider and pass it to LoginPage
             var loginViewModel = App.Services.GetService<LoginPageViewModel>();
             await Navigation.PushAsync(new LoginPage(loginViewModel));
             return;
@@ -52,14 +50,14 @@ public partial class NewMessagePage : ContentPage
             var usersResult = await _userApiService.GetAllUsersAsync();
             if (usersResult != null && usersResult.Items != null)
             {
-                foreach (var user in usersResult.Items.Where(u => u.UserID != App.CurrentUser.UserID))
+                var others = usersResult.Items.Where(u => u.UserID != App.CurrentUser.UserID).ToList();
+                foreach (var user in others)
                 {
                     Users.Add(user);
                 }
-                recipientPicker.ItemsSource = usersResult.Items.Where(u => u.UserID != App.CurrentUser.UserID).ToList();
+                recipientPicker.ItemsSource = others;
             }
 
-            // If we have a pre-selected user, try to select them
             if (PreSelectedUserId > 0 && !string.IsNullOrEmpty(PreSelectedUserName))
             {
                 var preSelectedUser = Users.FirstOrDefault(u => u.UserID == PreSelectedUserId);
@@ -88,12 +86,6 @@ public partial class NewMessagePage : ContentPage
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(subjectEntry.Text))
-        {
-            await DisplayAlert("Error", "Please enter a subject", "OK");
-            return;
-        }
-
         if (string.IsNullOrWhiteSpace(contentEditor.Text))
         {
             await DisplayAlert("Error", "Please enter a message", "OK");
@@ -108,19 +100,17 @@ public partial class NewMessagePage : ContentPage
             UserDto recipient = (UserDto)recipientPicker.SelectedItem;
             var message = new MessageCreateDto
             {
-                SenderID = App.CurrentUser.UserID,
-                FromUserName = App.CurrentUser.UserName,
-                ReceiverID = recipient.UserID,
-                MessageText = contentEditor.Text,
-                SentAt = DateTime.UtcNow
+                SenderId = App.CurrentUser.UserID,
+                ReceiverId = recipient.UserID,
+                Content = contentEditor.Text,
+                MessageType = TDFShared.Enums.MessageType.Chat
             };
 
             await _messageApiService.CreateMessageAsync(message);
             
-            // Send a WebSocket notification if available
             if (_webSocketService != null)
             {
-                await _webSocketService.SendMessageAsync($"{{\"type\":\"newMessage\",\"recipientId\":{recipient.UserID}}}");
+                await _webSocketService.SendChatMessageAsync(recipient.UserID, contentEditor.Text);
             }
             
             await DisplayAlert("Success", "Message sent successfully", "OK");
@@ -141,4 +131,4 @@ public partial class NewMessagePage : ContentPage
     {
         await Navigation.PopAsync();
     }
-} 
+}

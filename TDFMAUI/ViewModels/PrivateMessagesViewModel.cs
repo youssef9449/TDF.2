@@ -12,7 +12,7 @@ namespace TDFMAUI.ViewModels
 {
     public partial class PrivateMessagesViewModel : BaseViewModel
     {
-        private readonly IMessageApiService _messageApiService;
+        private readonly IMessageService _messageApiService;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(SendMessageCommand))]
@@ -27,7 +27,7 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private int _partnerId;
 
-        public PrivateMessagesViewModel(IMessageApiService messageApiService)
+        public PrivateMessagesViewModel(IMessageService messageApiService)
         {
             _messageApiService = messageApiService;
             Title = "Private Messages";
@@ -56,12 +56,14 @@ namespace TDFMAUI.ViewModels
                     {
                         Messages.Add(new MessageModel
                         {
-                            Id = dto.MessageId,
+                            Id = dto.Id,
                             FromUserId = dto.SenderId,
-                            FromUserName = dto.SenderName,
-                            Content = dto.MessageText,
-                            SentAt = dto.SentAt,
-                            MessageType = dto.MessageType
+                            FromUserName = dto.SenderFullName,
+                            Content = dto.Content,
+                            SentAt = dto.Timestamp,
+                            MessageType = dto.MessageType,
+                            ReadAt = dto.IsRead ? dto.Timestamp : null,
+                            DeliveredAt = dto.IsDelivered ? dto.Timestamp : null
                         });
                     }
                     await MarkMessagesAsReadAsync(PartnerId);
@@ -84,23 +86,22 @@ namespace TDFMAUI.ViewModels
 
             var dto = new MessageCreateDto
             {
-                MessageText = content,
-                SentAt = DateTime.Now,
-                SenderID = App.CurrentUser?.UserID ?? 0,
-                ReceiverID = PartnerId,
+                Content = content,
+                SenderId = App.CurrentUser?.UserID ?? 0,
+                ReceiverId = PartnerId,
                 MessageType = TDFShared.Enums.MessageType.Private
             };
 
             try
             {
-                var sent = await _messageApiService.CreatePrivateMessageAsync(dto);
+                var sent = await _messageApiService.CreateMessageAsync(dto);
                 Messages.Add(new MessageModel
                 {
-                    Id = sent.MessageId,
+                    Id = sent.Id,
                     FromUserId = sent.SenderId,
-                    FromUserName = sent.SenderName,
-                    Content = sent.MessageText,
-                    SentAt = sent.SentAt,
+                    FromUserName = sent.SenderFullName,
+                    Content = sent.Content,
+                    SentAt = sent.Timestamp,
                     MessageType = sent.MessageType
                 });
             }

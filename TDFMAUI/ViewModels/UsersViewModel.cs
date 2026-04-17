@@ -111,7 +111,7 @@ namespace TDFMAUI.ViewModels
             var user = Users.FirstOrDefault(u => u.UserId == userId);
             if (user == null) return;
 
-            var messageApiService = App.Services.GetService<IMessageApiService>();
+            var messageApiService = App.Services.GetService<IMessageService>();
             await Shell.Current.Navigation.PushAsync(new NewMessagePage(messageApiService)
             {
                 PreSelectedUserId = userId,

@@ -13,33 +13,33 @@ namespace TDFShared.DTOs.Messages
         /// <summary>
         /// The ID of the user sending the message.
         /// </summary>
-        [JsonPropertyName("fromUserId")]
-        public int SenderID { get; set; }
+        [JsonPropertyName("senderId")]
+        public int SenderId { get; set; }
 
         /// <summary>
         /// The ID of the user receiving the message.
         /// </summary>
-        [JsonPropertyName("toUserId")]
-        public int ReceiverID { get; set; }
-        public string? Department { get; set; }
-        public MessageType MessageType { get; set; } = MessageType.Chat;
-        /// <summary>
-        /// When the message was sent
-        /// </summary>
-        [JsonPropertyName("sentAt")]
-        public DateTime SentAt { get; set; }
+        [JsonPropertyName("receiverId")]
+        public int ReceiverId { get; set; }
 
-        /// <summary>
-        /// Name of the sender
-        /// </summary>
-        [JsonPropertyName("fromUserName")]
-        public string FromUserName { get; set; } = string.Empty;
+        [JsonPropertyName("department")]
+        public string? Department { get; set; }
+
+        [JsonPropertyName("messageType")]
+        public MessageType MessageType { get; set; } = MessageType.Chat;
+
         /// <summary>
         /// The content of the message.
         /// </summary>
         [JsonPropertyName("content")]
         [Required(ErrorMessage = "Message content cannot be empty.")]
         [StringLength(2000, ErrorMessage = "Message content cannot exceed 2000 characters.")]
-        public required string MessageText { get; set; }
+        public required string Content { get; set; }
+
+        /// <summary>
+        /// Optional idempotency key for message tracking
+        /// </summary>
+        [JsonPropertyName("idempotencyKey")]
+        public string? IdempotencyKey { get; set; }
     }
-} 
+}

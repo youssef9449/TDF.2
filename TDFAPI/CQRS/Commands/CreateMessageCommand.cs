@@ -12,10 +12,16 @@ using TDFAPI.Repositories;
 using TDFAPI.Services;
 using TDFShared.Models.Message;
 using TDFShared.Enums;
-using TDFAPI.Exceptions;
 
 namespace TDFAPI.CQRS.Commands
 {
+    public class MessageResponseDto
+    {
+        public int MessageID { get; set; }
+        public string Status { get; set; } = "sent";
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    }
+
     /// <summary>
     /// Command to create a new message
     /// </summary>
@@ -70,13 +76,13 @@ namespace TDFAPI.CQRS.Commands
             var sender = await _userRepository.GetByIdAsync(request.SenderId);
             if (sender == null)
             {
-                throw new EntityNotFoundException("User", request.SenderId);
+                throw new TDFAPI.Exceptions.EntityNotFoundException("User", request.SenderId);
             }
 
             var recipient = await _userRepository.GetByIdAsync(request.RecipientId);
             if (recipient == null)
             {
-                throw new EntityNotFoundException("User", request.RecipientId);
+                throw new TDFAPI.Exceptions.EntityNotFoundException("User", request.RecipientId);
             }
 
             try

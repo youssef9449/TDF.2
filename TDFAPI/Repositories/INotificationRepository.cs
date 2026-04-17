@@ -10,5 +10,6 @@ namespace TDFAPI.Repositories
         Task<IEnumerable<NotificationEntity>> GetUnreadNotificationsAsync(int userId);
         Task<int> CreateNotificationAsync(NotificationEntity notification);
         Task<bool> MarkNotificationAsSeenAsync(int notificationId, int userId);
+        Task<bool> DeleteNotificationAsync(int notificationId, int userId);
     }
 }

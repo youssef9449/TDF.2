@@ -8,12 +8,13 @@ using TDFShared.DTOs.Messages;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using TDFShared.Enums;
+using TDFMAUI.Helpers;
 
 namespace TDFMAUI.ViewModels
 {
     public partial class MessagesViewModel : BaseViewModel
     {
-        private readonly IMessageApiService _messageApiService;
+        private readonly IMessageService _messageApiService;
         private readonly ILogger<MessagesViewModel> _logger;
         private readonly WebSocketService _webSocketService;
         private readonly IUserPresenceService _userPresenceService;
@@ -26,7 +27,7 @@ namespace TDFMAUI.ViewModels
         private ObservableCollection<MessageItemViewModel> _messages = new();
 
         public MessagesViewModel(
-            IMessageApiService messageApiService,
+            IMessageService messageApiService,
             ILogger<MessagesViewModel> logger,
             WebSocketService webSocketService,
             IUserPresenceService userPresenceService)
@@ -56,16 +57,16 @@ namespace TDFMAUI.ViewModels
                     {
                         var vm = new MessageItemViewModel
                         {
-                            Id = m.MessageId,
-                            Content = m.MessageText,
+                            Id = m.Id,
+                            Content = m.Content,
                             Timestamp = m.Timestamp,
                             SenderId = m.SenderId,
-                            SenderName = m.SenderName,
+                            SenderName = m.SenderFullName,
                             IsRead = m.IsRead,
                             IsDelivered = m.IsDelivered
                         };
                         Messages.Add(vm);
-                        if (!m.IsRead && !m.IsDelivered && m.SenderId != App.CurrentUser.UserID) deliveredIds.Add(m.MessageId);
+                        if (!m.IsRead && !m.IsDelivered && m.SenderId != App.CurrentUser.UserID) deliveredIds.Add(m.Id);
                     }
                     if (deliveredIds.Any()) await _webSocketService.MarkMessagesAsDeliveredAsync(deliveredIds);
                 }
@@ -87,7 +88,7 @@ namespace TDFMAUI.ViewModels
             NewMessageText = string.Empty;
             try
             {
-                var dto = new MessageCreateDto { MessageText = content, ReceiverID = 0, MessageType = MessageType.Chat };
+                var dto = new MessageCreateDto { Content = content, ReceiverId = 0, MessageType = MessageType.Chat };
                 var created = await _messageApiService.CreateMessageAsync(dto);
                 if (created != null) await LoadMessagesAsync();
             }
@@ -125,6 +126,8 @@ namespace TDFMAUI.ViewModels
         private bool _isRead;
 
         public bool IsDelivered { get; set; }
-        public Color BackgroundColor => IsRead ? (Color)Application.Current.Resources["SurfaceColor"] : (Color)Application.Current.Resources["BlueCardColor"];
+        public Color BackgroundColor => IsRead
+            ? ThemeHelper.GetThemeResource<Color>("SurfaceColor")
+            : ThemeHelper.GetThemeResource<Color>("BlueCardColor");
     }
 }

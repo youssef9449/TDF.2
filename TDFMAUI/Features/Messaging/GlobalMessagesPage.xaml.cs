@@ -9,7 +9,7 @@ namespace TDFMAUI.Pages
 {
     public partial class GlobalMessagesPage : ContentPage
     {
-        public GlobalMessagesPage(IMessageApiService messageApiService, WebSocketService webSocketService)
+        public GlobalMessagesPage(IMessageService messageApiService, WebSocketService webSocketService)
         {
             InitializeComponent();
             BindingContext = new GlobalMessagesViewModel(messageApiService, webSocketService);

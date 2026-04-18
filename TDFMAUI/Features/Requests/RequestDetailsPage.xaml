@@ -2,14 +2,23 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:pages="clr-namespace:TDFMAUI.Features.Requests"
+             xmlns:helpers="clr-namespace:TDFMAUI.Helpers"
+             xmlns:converters="clr-namespace:TDFMAUI.Converters"
              x:Class="TDFMAUI.Features.Requests.RequestDetailsPage"
              Title="Request Details"
-             BackgroundColor="{StaticResource Gray100}">
+             BackgroundColor="{AppThemeBinding Light={StaticResource BackgroundColorLight}, Dark={StaticResource BackgroundColorDark}}">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:StringNotEmptyConverter x:Key="StringNotEmptyConverter" />
+            <converters:StatusToColorConverter x:Key="StatusToColorConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
 
     <Grid RowDefinitions="Auto,*,Auto">
         <!-- Header -->
         <HorizontalStackLayout Grid.Row="0" Padding="20">
-            <Button Text="←" 
+            <Button Text="←"
                     Clicked="OnBackClicked"
                     BackgroundColor="Transparent"
                     TextColor="{StaticResource Primary}"
@@ -18,7 +27,9 @@
             <Label Text="Request Details"
                    FontSize="24"
                    FontAttributes="Bold"
-                   HorizontalOptions="CenterAndExpand"/>
+                   TextColor="{AppThemeBinding Light={StaticResource TextColorLight}, Dark={StaticResource TextColorDark}}"
+                   HorizontalOptions="CenterAndExpand"
+                   VerticalOptions="Center"/>
         </HorizontalStackLayout>
 
         <!-- Content -->
@@ -32,80 +43,110 @@
                      <OnIdiom Default="Fill" Phone="Fill" Tablet="Center" Desktop="Center" />
                 </VerticalStackLayout.HorizontalOptions>
 
-                <Frame BackgroundColor="White" Padding="15">
+                <!-- Summary -->
+                <Border Padding="15"
+                        StrokeShape="RoundRectangle 10"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderColorLight}, Dark={StaticResource BorderColorDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource CardColorLight}, Dark={StaticResource CardColorDark}}">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="{Binding Request.RequestType, StringFormat='Type: {0}'}"
+                        <Label Text="{Binding Request.LeaveType, StringFormat='Type: {0}'}"
                                FontSize="20"
-                               FontAttributes="Bold"/>
-                        <Label Text="{Binding Request.RequestReason, StringFormat='Reason: {0}'}"
-                               TextColor="Gray"/>
-                        <Label Text="{Binding Request.RequestStatus, StringFormat='Status: {0}'}"
-                               FontAttributes="Bold"/>
+                               FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextColorLight}, Dark={StaticResource TextColorDark}}"/>
+                        <Label Text="{Binding Request.Status, StringFormat='Status: {0}'}"
+                               FontAttributes="Bold"
+                               TextColor="{Binding Request.Status, Converter={StaticResource StatusToColorConverter}}"/>
+                        <Label Text="{Binding Request.UserName, StringFormat='Submitted by: {0}'}"
+                               FontSize="Small"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
+                               IsVisible="{Binding Request.UserName, Converter={StaticResource StringNotEmptyConverter}}"/>
+                        <Label Text="{Binding Request.RequestDepartment, StringFormat='Department: {0}'}"
+                               FontSize="Small"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
+                               IsVisible="{Binding Request.RequestDepartment, Converter={StaticResource StringNotEmptyConverter}}"/>
                     </VerticalStackLayout>
-                </Frame>
+                </Border>
 
-                <Frame BackgroundColor="White" Padding="15">
+                <!-- Reason -->
+                <Border Padding="15"
+                        StrokeShape="RoundRectangle 10"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderColorLight}, Dark={StaticResource BorderColorDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource CardColorLight}, Dark={StaticResource CardColorDark}}"
+                        IsVisible="{Binding Request.RequestReason, Converter={StaticResource StringNotEmptyConverter}}">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="Request Details"
+                        <Label Text="Reason"
                                FontSize="18"
-                               FontAttributes="Bold"/>
+                               FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextColorLight}, Dark={StaticResource TextColorDark}}"/>
                         <Label Text="{Binding Request.RequestReason}"
-                               TextColor="Gray"/>
+                               LineBreakMode="WordWrap"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"/>
                     </VerticalStackLayout>
-                </Frame>
+                </Border>
 
-                <Frame BackgroundColor="White" Padding="15">
-                    <VerticalStackLayout Spacing="10">
-                        <Label Text="Timeline"
-                               FontSize="18"
-                               FontAttributes="Bold"/>
-                        <Label Text="{Binding Request.CreatedAt, StringFormat='Submitted On: {0:g}'}"
-                               TextColor="Gray"/>
-                        <Label Text="{Binding Request.ApprovedAt, StringFormat='Approved/Rejected On: {0:g}'}"
-                               TextColor="Gray"
-                               IsVisible="{Binding Request.ApprovedAt.HasValue}"/>
-                        <Label Text="{Binding Request.RequestCloser, StringFormat='Approved/Rejected By: {0}'}"
-                               TextColor="Gray"
-                               IsVisible="{Binding Request.RequestCloser, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
-                        <Label Text="{Binding Request.RequestRejectReason, StringFormat='Rejection Reason: {0}'}"
-                               TextColor="Gray"
-                               IsVisible="{Binding Request.RequestRejectReason, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
-                    </VerticalStackLayout>
-                </Frame>
-
-                <Frame BackgroundColor="White" Padding="15">
+                <!-- Dates and Times -->
+                <Border Padding="15"
+                        StrokeShape="RoundRectangle 10"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderColorLight}, Dark={StaticResource BorderColorDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource CardColorLight}, Dark={StaticResource CardColorDark}}">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="Request Dates"
                                FontSize="18"
-                               FontAttributes="Bold"/>
-                        <Label Text="{Binding Request.RequestFromDay, StringFormat='From: {0:d}'}"
-                               TextColor="Gray"/>
-                        <Label Text="{Binding Request.RequestToDay, StringFormat='To: {0:d}'}"
-                               TextColor="Gray"
-                               IsVisible="{Binding Request.RequestToDay.HasValue}"/>
+                               FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextColorLight}, Dark={StaticResource TextColorDark}}"/>
+                        <Label Text="{Binding Request.RequestStartDate, StringFormat='From: {0:d}'}"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"/>
+                        <Label Text="{Binding Request.RequestEndDate, StringFormat='To: {0:d}'}"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
+                               IsVisible="{Binding Request.RequestEndDate.HasValue}"/>
                         <Label Text="{Binding Request.RequestBeginningTime, StringFormat='Start Time: {0:hh\:mm}'}"
-                               TextColor="Gray"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
                                IsVisible="{Binding Request.RequestBeginningTime.HasValue}"/>
                         <Label Text="{Binding Request.RequestEndingTime, StringFormat='End Time: {0:hh\:mm}'}"
-                               TextColor="Gray"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
                                IsVisible="{Binding Request.RequestEndingTime.HasValue}"/>
                         <Label Text="{Binding Request.RequestNumberOfDays, StringFormat='Number of Days: {0}'}"
-                               TextColor="Gray"/>
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
+                               IsVisible="{Binding Request.RequestNumberOfDays.HasValue}"/>
                     </VerticalStackLayout>
-                </Frame>
+                </Border>
 
-                <Frame BackgroundColor="White" Padding="15">
+                <!-- Timeline -->
+                <Border Padding="15"
+                        StrokeShape="RoundRectangle 10"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderColorLight}, Dark={StaticResource BorderColorDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource CardColorLight}, Dark={StaticResource CardColorDark}}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Timeline"
+                               FontSize="18"
+                               FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextColorLight}, Dark={StaticResource TextColorDark}}"/>
+                        <Label Text="{Binding Request.CreatedDate, StringFormat='Submitted On: {0:g}'}"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"/>
+                        <Label Text="{Binding Request.LastModifiedDate, StringFormat='Last Updated: {0:g}'}"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
+                               IsVisible="{Binding Request.LastModifiedDate.HasValue}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- HR Status -->
+                <Border Padding="15"
+                        StrokeShape="RoundRectangle 10"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderColorLight}, Dark={StaticResource BorderColorDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource CardColorLight}, Dark={StaticResource CardColorDark}}">
                     <VerticalStackLayout Spacing="10">
                         <Label Text="HR Status"
                                FontSize="18"
+                               FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextColorLight}, Dark={StaticResource TextColorDark}}"/>
+                        <Label Text="{Binding Request.HRStatus, StringFormat='HR Status: {0}'}"
+                               TextColor="{Binding Request.HRStatus, Converter={StaticResource StatusToColorConverter}}"
                                FontAttributes="Bold"/>
-                        <Label Text="{Binding Request.RequestHRStatus, StringFormat='HR Status: {0}'}"
-                               TextColor="Gray"/>
-                        <Label Text="{Binding Request.RequestHRCloser, StringFormat='HR Approved/Rejected By: {0}'}"
-                               TextColor="Gray"
-                               IsVisible="{Binding Request.RequestHRCloser, Converter={StaticResource IsNotNullOrEmptyConverter}}"/>
+                        <Label Text="{Binding Request.RemainingBalance, StringFormat='Remaining Balance: {0}'}"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
+                               IsVisible="{Binding Request.RemainingBalance.HasValue}"/>
                     </VerticalStackLayout>
-                </Frame>
+                </Border>
             </VerticalStackLayout>
         </ScrollView>
 
@@ -119,19 +160,19 @@
                     IsVisible="{Binding CanEdit}"/>
             <Button Text="Delete Request"
                     Command="{Binding DeleteRequestCommand}"
-                    BackgroundColor="Red"
+                    BackgroundColor="{StaticResource ErrorColor}"
                     TextColor="White"
                     Margin="0,0,10,5"
                     IsVisible="{Binding CanDelete}"/>
             <Button Text="Approve"
                     Command="{Binding ApproveRequestCommand}"
-                    BackgroundColor="Green"
+                    BackgroundColor="{StaticResource SuccessColor}"
                     TextColor="White"
                     Margin="0,0,10,5"
                     IsVisible="{Binding CanApprove}"/>
             <Button Text="Reject"
                     Command="{Binding RejectRequestCommand}"
-                    BackgroundColor="Orange"
+                    BackgroundColor="{StaticResource WarningColor}"
                     TextColor="White"
                     Margin="0,0,10,5"
                     IsVisible="{Binding CanReject}"/>
@@ -143,12 +184,11 @@
         </FlexLayout>
 
         <!-- Loading Indicator -->
-        <ActivityIndicator x:Name="loadingIndicator"
-                          Grid.Row="2"
-                          IsVisible="False"
-                          IsRunning="False"
+        <ActivityIndicator Grid.RowSpan="3"
+                          IsVisible="{Binding IsBusy}"
+                          IsRunning="{Binding IsBusy}"
                           Color="{StaticResource Primary}"
                           HorizontalOptions="Center"
                           VerticalOptions="Center"/>
     </Grid>
-</ContentPage> 
+</ContentPage>

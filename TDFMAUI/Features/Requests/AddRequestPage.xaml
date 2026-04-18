@@ -8,7 +8,7 @@
              x:DataType="viewModels:AddRequestViewModel"
              x:Class="TDFMAUI.Features.Requests.AddRequestPage"
              Title="{Binding IsEditMode, Converter={StaticResource BoolToStringConverter}, ConverterParameter='Edit Leave Request|Add Leave Request'}"
-             BackgroundColor="{Binding Source={x:Static helpers:ThemeHelper.CurrentTheme}, Converter={StaticResource ThemeToBackgroundColorConverter}}">
+             BackgroundColor="{AppThemeBinding Light={StaticResource BackgroundColorLight}, Dark={StaticResource BackgroundColorDark}}">
 
     <ContentPage.Resources>
         <ResourceDictionary>

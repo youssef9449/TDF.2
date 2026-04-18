@@ -84,20 +84,41 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private DateTime _fromDate = DateTime.Now.AddDays(-30);
 
+        partial void OnFromDateChanged(DateTime value) => TriggerReload();
+
         [ObservableProperty]
         private DateTime _toDate = DateTime.Now;
+
+        partial void OnToDateChanged(DateTime value) => TriggerReload();
 
         [ObservableProperty]
         private string _selectedStatus = "All";
 
+        partial void OnSelectedStatusChanged(string value) => TriggerReload();
+
         [ObservableProperty]
         private string _selectedType = "All";
+
+        partial void OnSelectedTypeChanged(string value) => TriggerReload();
 
         [ObservableProperty]
         private ObservableCollection<LookupItem> _departments = new();
 
         [ObservableProperty]
         private LookupItem? _selectedDepartment;
+
+        partial void OnSelectedDepartmentChanged(LookupItem? value) => TriggerReload();
+
+        /// <summary>
+        /// Reloads the request list after a filter change. Resets to page 1 so
+        /// the user isn't stranded on a no-longer-existent page.
+        /// </summary>
+        private void TriggerReload()
+        {
+            if (_userId <= 0) return; // not initialized yet; InitializeAsync will load
+            CurrentPage = 1;
+            _ = LoadRequestsAsync();
+        }
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(CanFilterByDepartment))]
@@ -114,7 +135,16 @@ namespace TDFMAUI.ViewModels
         public bool CanFilterByDepartment => IsAdmin == true || IsHR == true || IsManager == true;
 
         [ObservableProperty] private int _currentPage = 1;
+
         [ObservableProperty] private int _pageSize = 10;
+
+        partial void OnPageSizeChanged(int value)
+        {
+            if (_userId <= 0) return;
+            CurrentPage = 1;
+            _ = LoadRequestsAsync();
+        }
+
         [ObservableProperty] private int _totalItems;
         [ObservableProperty] private int _totalPages;
         [ObservableProperty] private bool _canGoToFirstPage;

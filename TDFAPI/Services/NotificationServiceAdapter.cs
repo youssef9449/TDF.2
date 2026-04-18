@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.WebSockets;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using TDFShared.Services;
 using TDFShared.DTOs.Messages;
 using TDFShared.Models.Message;
 using TDFShared.Models.Notification;
@@ -11,216 +13,249 @@ using TDFShared.Models.Notification;
 namespace TDFAPI.Services
 {
     /// <summary>
-    /// Adapter class that implements TDFShared.Services.INotificationService
-    /// and delegates to TDFAPI.Services.INotificationService
+    /// Server-side implementation of <see cref="TDFShared.Services.INotificationService"/>.
+    /// Thin facade over the API's own <see cref="INotificationService"/> plus the
+    /// <see cref="WebSocketConnectionManager"/> — the shared contract is intentionally
+    /// narrow enough that every method here has a real implementation.
+    ///
+    /// Previously this class was a pile of <c>return Task.FromResult(false)</c> stubs
+    /// (notably <c>HandleUserConnectionAsync</c>, which silently dropped every incoming
+    /// WebSocket). It is now a single place where the shared interface meets the API's
+    /// concrete services.
     /// </summary>
     public class NotificationServiceAdapter : TDFShared.Services.INotificationService
     {
-        private readonly TDFAPI.Services.INotificationService _notificationService;
+        private readonly INotificationService _notificationService;
+        private readonly WebSocketConnectionManager _webSocketManager;
         private readonly ILogger<NotificationServiceAdapter> _logger;
 
+        /// <summary>Buffer used while reading a single WebSocket frame.</summary>
+        private const int ReceiveBufferSize = 4 * 1024;
+
         public NotificationServiceAdapter(
-            TDFAPI.Services.INotificationService notificationService,
+            INotificationService notificationService,
+            WebSocketConnectionManager webSocketManager,
             ILogger<NotificationServiceAdapter> logger)
         {
             _notificationService = notificationService;
+            _webSocketManager = webSocketManager;
             _logger = logger;
         }
 
-        public event EventHandler<NotificationDto> NotificationReceived;
+        /// <inheritdoc />
+        /// <remarks>
+        /// No server-side publisher currently raises this event; it exists purely to
+        /// satisfy the shared interface that clients also consume. The compiler warning
+        /// about an unused event is expected until a server-side publisher is added.
+        /// </remarks>
+#pragma warning disable CS0067
+        public event EventHandler<NotificationDto>? NotificationReceived;
+#pragma warning restore CS0067
 
         public void Dispose()
         {
-            // No resources to dispose
+            // No owned resources; WebSocketConnectionManager and INotificationService
+            // are owned by the DI container.
         }
 
-        public Task<bool> BroadcastNotificationAsync(string message, int? senderId = null, string? department = null)
+        // ----- Notification CRUD (delegated) ---------------------------------
+
+        public async Task<IEnumerable<NotificationEntity>> GetUnreadNotificationsAsync(int? userId = null)
         {
-            try
+            if (userId is null)
             {
-                if (department != null)
-                {
-                    // Convert Task to Task<bool>
-                    _notificationService.SendDepartmentNotificationAsync(
-                        department,
-                        "Broadcast Notification",
-                        message,
-                        TDFShared.Enums.NotificationType.Info);
-                    
-                    return Task.FromResult(true);
-                }
-                else
-                {
-                    // Send to all users (not implemented in the adapter)
-                    _logger.LogWarning("Broadcasting to all users not implemented in adapter");
-                    return Task.FromResult(false);
-                }
+                _logger.LogWarning("GetUnreadNotificationsAsync called without a userId; returning empty result.");
+                return Array.Empty<NotificationEntity>();
             }
-            catch (Exception ex)
+
+            return await _notificationService.GetUnreadNotificationsAsync(userId.Value);
+        }
+
+        public async Task<bool> MarkAsSeenAsync(int notificationId, int? userId = null)
+        {
+            if (userId is null)
             {
-                _logger.LogError(ex, "Error in BroadcastNotificationAsync");
-                return Task.FromResult(false);
+                _logger.LogWarning("MarkAsSeenAsync called without a userId; ignoring.");
+                return false;
             }
+
+            return await _notificationService.MarkAsSeenAsync(notificationId, userId.Value);
+        }
+
+        public async Task<bool> MarkNotificationsAsSeenAsync(IEnumerable<int> notificationIds, int? userId = null)
+        {
+            if (userId is null)
+            {
+                _logger.LogWarning("MarkNotificationsAsSeenAsync called without a userId; ignoring.");
+                return false;
+            }
+
+            return await _notificationService.MarkNotificationsAsSeenAsync(notificationIds, userId.Value);
         }
 
         public Task<bool> CreateNotificationAsync(int receiverId, string message, int? senderId = null)
+            => _notificationService.CreateNotificationAsync(receiverId, message, senderId);
+
+        public async Task<bool> BroadcastNotificationAsync(string message, int? senderId = null, string? department = null)
         {
             try
             {
-                return Task.FromResult(true);
+                if (!string.IsNullOrWhiteSpace(department))
+                {
+                    await _notificationService.SendDepartmentNotificationAsync(
+                        department!, "Broadcast", message);
+                }
+                else
+                {
+                    // No department specified — fan out across every live WebSocket.
+                    await _webSocketManager.SendToAllAsync(new
+                    {
+                        type = "broadcast",
+                        senderId,
+                        message,
+                        timestamp = DateTime.UtcNow
+                    });
+                }
+
+                return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in CreateNotificationAsync");
-                return Task.FromResult(false);
+                _logger.LogError(ex, "Error broadcasting notification");
+                return false;
             }
         }
 
-        public Task<bool> DeleteConversationAsync(int otherUserId, int? currentUserId = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> DeleteMessageAsync(int messageId, int? currentUserId = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(false);
-        }
-
-        public Task<IEnumerable<MessageDto>> GetMessageHistoryAsync(int otherUserId, int? currentUserId = null, int page = 1, int pageSize = 50)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult<IEnumerable<MessageDto>>(new List<MessageDto>());
-        }
-
-        public Task<IEnumerable<MessageDto>> GetUnreadMessagesAsync(int? userId = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult<IEnumerable<MessageDto>>(new List<MessageDto>());
-        }
-
-        public Task<int> GetUnreadMessagesCountAsync(int? userId = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(0);
-        }
-
-        public Task<IEnumerable<NotificationEntity>> GetUnreadNotificationsAsync(int? userId = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult<IEnumerable<NotificationEntity>>(new List<NotificationEntity>());
-        }
-
-        public Task HandleUserConnectionAsync(WebSocketConnectionEntity connection, WebSocket socket)
-        {
-            // Not implemented in this adapter
-            return Task.CompletedTask;
-        }
-
-        public Task<bool> HandleUserConnectionAsync(int userId, bool isConnected, string? machineName = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> IsUserOnline(int userId)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> MarkAsSeenAsync(int notificationId, int? userId = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> MarkMessagesAsDeliveredAsync(int senderId, int? currentUserId = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> MarkMessagesAsDeliveredAsync(IEnumerable<int> messageIds, int? currentUserId = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> MarkMessagesAsReadAsync(int senderId, int? currentUserId = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> MarkNotificationsAsSeenAsync(IEnumerable<int> notificationIds, int? userId = null)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> SendChatMessageAsync(int receiverId, string message, bool queueIfOffline = true)
-        {
-            // Not implemented in this adapter
-            return Task.FromResult(false);
-        }
-
-        public Task SendToAllAsync(object message, IEnumerable<string>? excludedConnections = null)
-        {
-            // Not implemented in this adapter
-            return Task.CompletedTask;
-        }
-
-        public Task SendToGroupAsync(string group, object message)
-        {
-            // Not implemented in this adapter
-            return Task.CompletedTask;
-        }
-
-        public Task SendToUserAsync(int userId, object message)
-        {
-            // Not implemented in this adapter
-            return Task.CompletedTask;
-        }
-
-        public Task<bool> SendNotificationAsync(int receiverId, string message)
+        public async Task<bool> SendNotificationAsync(int receiverId, string message)
         {
             try
             {
-                // Delegate to the API notification service
-                // Convert Task to Task<bool>
-                _notificationService.SendNotificationAsync(
+                await _notificationService.SendNotificationAsync(
                     receiverId,
                     "Notification",
                     message,
                     TDFShared.Enums.NotificationType.Info);
-                
-                return Task.FromResult(true);
+                return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in SendNotificationAsync");
-                return Task.FromResult(false);
+                _logger.LogError(ex, "Error in SendNotificationAsync for user {UserId}", receiverId);
+                return false;
             }
         }
 
-        public Task ShowErrorAsync(string message)
+        // ----- WebSocket transport (delegated to WebSocketConnectionManager) --
+
+        public Task SendToUserAsync(int userId, object message)
+            => _webSocketManager.SendToAsync(userId, message);
+
+        public Task SendToGroupAsync(string group, object message)
+            => _webSocketManager.SendToGroupAsync(group, message);
+
+        public Task SendToAllAsync(object message, IEnumerable<string>? excludedConnections = null)
+            => _webSocketManager.SendToAllAsync(message, excludedConnections);
+
+        public Task<bool> IsUserOnline(int userId)
+            => Task.FromResult(_webSocketManager.GetUserConnections(userId).Any());
+
+        /// <summary>
+        /// Registers the connection with <see cref="WebSocketConnectionManager"/> and pumps
+        /// frames until the peer disconnects. Previously a stub that returned immediately,
+        /// which closed every WebSocket as soon as the HTTP scope exited.
+        /// </summary>
+        public async Task HandleUserConnectionAsync(WebSocketConnectionEntity connection, WebSocket socket)
         {
-            // Not implemented in this adapter
-            return Task.CompletedTask;
+            if (connection is null) throw new ArgumentNullException(nameof(connection));
+            if (socket is null) throw new ArgumentNullException(nameof(socket));
+
+            await _webSocketManager.AddConnectionAsync(connection, socket);
+
+            var buffer = new byte[ReceiveBufferSize];
+            try
+            {
+                while (socket.State == WebSocketState.Open)
+                {
+                    var received = await ReceiveFullMessageAsync(socket, buffer, CancellationToken.None);
+
+                    if (received is null)
+                    {
+                        // Peer initiated close.
+                        break;
+                    }
+
+                    if (received.Value.MessageType == WebSocketMessageType.Close)
+                    {
+                        await socket.CloseAsync(
+                            WebSocketCloseStatus.NormalClosure,
+                            "Client requested close",
+                            CancellationToken.None);
+                        break;
+                    }
+
+                    // Phase 1 intentionally does not route inbound frames — a dedicated
+                    // WebSocket router will be introduced in a later phase. Log at
+                    // debug level so the server stays transparent about what it saw.
+                    _logger.LogDebug(
+                        "Received {MessageType} frame ({Length} bytes) on connection {ConnectionId}",
+                        received.Value.MessageType,
+                        received.Value.Payload.Count,
+                        connection.ConnectionId);
+                }
+            }
+            catch (WebSocketException ex)
+            {
+                _logger.LogInformation(ex,
+                    "WebSocket {ConnectionId} for user {UserId} ended: {Error}",
+                    connection.ConnectionId, connection.UserId, ex.Message);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected on shutdown or client abort.
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Unhandled error while pumping WebSocket {ConnectionId} for user {UserId}",
+                    connection.ConnectionId, connection.UserId);
+            }
+            finally
+            {
+                await _webSocketManager.RemoveConnectionAsync(connection.ConnectionId);
+            }
         }
 
-        public Task ShowSuccessAsync(string message)
+        /// <summary>
+        /// Reads one logical WebSocket message, re-assembling it across continuation frames.
+        /// Returns <c>null</c> when the peer has closed the connection.
+        /// </summary>
+        private static async Task<(WebSocketMessageType MessageType, ArraySegment<byte> Payload)?> ReceiveFullMessageAsync(
+            WebSocket socket, byte[] buffer, CancellationToken cancellationToken)
         {
-            // Not implemented in this adapter
-            return Task.CompletedTask;
-        }
+            using var ms = new System.IO.MemoryStream();
+            WebSocketReceiveResult result;
 
-        public Task ShowWarningAsync(string message)
-        {
-            // Not implemented in this adapter
-            return Task.CompletedTask;
+            do
+            {
+                result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    return (WebSocketMessageType.Close, new ArraySegment<byte>(Array.Empty<byte>()));
+                }
+
+                if (result.Count > 0)
+                {
+                    ms.Write(buffer, 0, result.Count);
+                }
+            }
+            while (!result.EndOfMessage);
+
+            if (result.CloseStatus.HasValue)
+            {
+                return null;
+            }
+
+            return (result.MessageType, new ArraySegment<byte>(ms.ToArray()));
         }
     }
 }

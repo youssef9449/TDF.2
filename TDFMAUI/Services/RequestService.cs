@@ -5,6 +5,7 @@ using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Common;
 using Microsoft.Extensions.Logging;
 using TDFShared.Services;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.Services 
 {
@@ -12,12 +13,12 @@ namespace TDFMAUI.Services
     {
         private readonly IRequestApiService _requestApiService;
         private readonly ILogger<RequestService> _logger;
-        private readonly IAuthService _authService;
+        private readonly IAuthClient _authService;
 
         public RequestService(
             IRequestApiService requestApiService,
             ILogger<RequestService> logger,
-            IAuthService authService)
+            IAuthClient authService)
         {
             _requestApiService = requestApiService ?? throw new ArgumentNullException(nameof(requestApiService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));

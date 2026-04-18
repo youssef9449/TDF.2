@@ -15,6 +15,7 @@ using TDFShared.Utilities;
 using TDFMAUI.Services;
 using TDFShared.DTOs.Common;
 using TDFMAUI.Services.Notifications;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.ViewModels
 {
@@ -34,7 +35,7 @@ namespace TDFMAUI.ViewModels
             }
         }
         private readonly Services.INotificationClient _notificationService;
-        private readonly IAuthService _authService;
+        private readonly IAuthClient _authService;
         private readonly ILogger<RequestApprovalViewModel> _logger;
         private readonly ILookupService _lookupService;
         private readonly IUserSessionService _userSessionService;
@@ -94,7 +95,7 @@ namespace TDFMAUI.ViewModels
         public RequestApprovalViewModel(
             IRequestService requestService,
             Services.INotificationClient notificationService,
-            IAuthService authService,
+            IAuthClient authService,
             ILogger<RequestApprovalViewModel> logger,
             ILookupService lookupService,
             IUserSessionService userSessionService)

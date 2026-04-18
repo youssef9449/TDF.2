@@ -8,10 +8,10 @@ namespace TDFShared.Contracts
     /// <summary>
     /// Client-facing authentication contract used by MAUI ViewModels and
     /// components that only need to log in, log out, refresh the current
-    /// token, or read "who am I" claim data. The broader
-    /// <see cref="TDFShared.Services.IAuthService"/> surface (password
-    /// hashing, server-side revocation list, JWT issuance) is intentionally
-    /// kept off this contract so clients cannot accidentally call it.
+    /// token, or read "who am I" claim data. Server-side operations
+    /// (password hashing, revocation list, JWT signing) live on the
+    /// TDFAPI-only <c>IAuthTokenIssuer</c> and are intentionally kept off
+    /// this contract so clients cannot accidentally call them.
     /// </summary>
     public interface IAuthClient
     {

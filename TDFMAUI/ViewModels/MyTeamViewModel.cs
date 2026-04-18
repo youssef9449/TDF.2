@@ -10,6 +10,7 @@ using TDFMAUI.Helpers;
 using TDFShared.Utilities;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Common;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.ViewModels
 {
@@ -17,7 +18,7 @@ namespace TDFMAUI.ViewModels
     {
         private readonly IUserApiService _userApiService;
         private readonly ILookupApiService _lookupApiService;
-        private readonly IAuthService _authService;
+        private readonly IAuthClient _authService;
         private readonly INavigationService _navigationService;
 
         [ObservableProperty]
@@ -29,7 +30,7 @@ namespace TDFMAUI.ViewModels
         public MyTeamViewModel(
             IUserApiService userApiService,
             ILookupApiService lookupApiService,
-            IAuthService authService,
+            IAuthClient authService,
             INavigationService navigationService)
         {
             _userApiService = userApiService;

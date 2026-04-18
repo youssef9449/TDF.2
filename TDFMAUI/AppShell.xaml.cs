@@ -15,12 +15,13 @@ using TDFMAUI.Helpers;
 using TDFShared.Services;
 using System.Diagnostics;
 using TDFMAUI.Services.Presence;
+using TDFShared.Contracts;
 
 namespace TDFMAUI
 {
     public partial class AppShell : Shell
     {
-        private readonly IAuthService _authService;
+        private readonly IAuthClient _authService;
         private readonly ILogger<AppShell> _logger;
         private readonly IUserPresenceService _userPresenceService;
         private string _previousRoute = "//"; // To store the route before opening the flyout
@@ -41,7 +42,7 @@ namespace TDFMAUI
         /// </summary>
         public bool IsDesktopUser => DeviceHelper.IsDesktop;
 
-        public AppShell(IAuthService authService, ILogger<AppShell> logger, IUserPresenceService userPresenceService)
+        public AppShell(IAuthClient authService, ILogger<AppShell> logger, IUserPresenceService userPresenceService)
         {
             Debug.WriteLine("[AppShell] Constructor started");
             _logger = logger;

@@ -10,14 +10,14 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using TDFAPI.Configuration.Options;
-using TDFShared.Services;
+using TDFAPI.Services;
 
 namespace TDFAPI.Extensions.Startup
 {
     /// <summary>
     /// JWT bearer authentication configuration. The registered token
     /// validation parameters enforce issuer / audience / lifetime checks in
-    /// every environment and consult <see cref="IAuthService"/> to reject
+    /// every environment and consult <see cref="IAuthTokenIssuer"/> to reject
     /// revoked tokens on validation.
     /// </summary>
     public static class JwtAuthenticationExtensions
@@ -79,7 +79,7 @@ namespace TDFAPI.Extensions.Startup
                         var jti = context.Principal?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
                         if (!string.IsNullOrEmpty(jti))
                         {
-                            var authService = context.HttpContext.RequestServices.GetRequiredService<IAuthService>();
+                            var authService = context.HttpContext.RequestServices.GetRequiredService<IAuthTokenIssuer>();
                             // JwtBearerEvents is a synchronous pipeline; blocking on the revocation check
                             // is deliberate here. A fully async check would require a custom middleware.
                             if (authService.IsTokenRevokedAsync(jti).Result)

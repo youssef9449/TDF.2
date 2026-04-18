@@ -15,6 +15,7 @@ using TDFMAUI.Features.Requests;
 using TDFShared.Enums;
 using TDFShared.Utilities;
 using TDFMAUI.Helpers;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.ViewModels
 {
@@ -22,7 +23,7 @@ namespace TDFMAUI.ViewModels
     {
         private readonly IRequestService _requestService;
         private readonly IRequestApiService _requestApiService;
-        private readonly IAuthService _authService;
+        private readonly IAuthClient _authService;
         private readonly ILogger<RequestsViewModel> _logger;
         private readonly IErrorHandlingService _errorHandlingService;
         private readonly ILookupService? _lookupService;
@@ -50,7 +51,7 @@ namespace TDFMAUI.ViewModels
         public RequestsViewModel(
             IRequestService requestService,
             IRequestApiService requestApiService,
-            IAuthService authService,
+            IAuthClient authService,
             ILogger<RequestsViewModel> logger,
             IErrorHandlingService errorHandlingService,
             ILookupService lookupService)

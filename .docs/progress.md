@@ -528,6 +528,56 @@ directives across the project.
 
 ---
 
+## Phase 13 - Delete IAuthService; migrate callers to narrow contracts
+
+### Features Implemented
+1. **Migrated 13 MAUI callers** from `TDFShared.Services.IAuthService` to
+   `TDFShared.Contracts.IAuthClient`:
+   `MauiProgram.cs`, `AuthService.cs`, `AppShell.xaml.cs`, `App.xaml.cs`,
+   `LoginPageViewModel.cs`, `RequestApprovalViewModel.cs`,
+   `DashboardPage.xaml.cs`, `DashboardViewModel.cs`,
+   `WebSocket/WebSocketTokenProvider.cs`, `RequestsViewModel.cs`,
+   `AddRequestViewModel.cs`, `ReportsViewModel.cs`, `MyTeamViewModel.cs`,
+   `RequestDetailsViewModel.cs`, `RequestService.cs`. Every caller's
+   methods (`LoginAsync`, `RefreshTokenAsync`, `LogoutAsync`,
+   `GetCurrentTokenAsync`, `GetCurrentUserIdAsync`, `GetCurrentUserAsync`)
+   exist on the narrow contract so this is pure type substitution.
+2. **Migrated 3 TDFAPI callers** from `TDFShared.Services.IAuthService`
+   to `TDFAPI.Services.IAuthTokenIssuer`: `AuthController`,
+   `JwtAuthenticationExtensions`, `UserService`. Methods used -
+   `LoginAsync`, `RefreshTokenAsync`, `LogoutAsync`,
+   `IsTokenRevokedAsync`, `HashPassword`, `VerifyPassword` - all on the
+   narrow server contract.
+3. **Dropped `IAuthService` from both `AuthService` class declarations.**
+   MAUI `AuthService` is now `public class AuthService : IAuthClient`;
+   TDFAPI `AuthService` is now
+   `public class AuthService : IAuthTokenIssuer, IDisposable`.
+4. **Removed `IAuthService` DI registrations** from both
+   `TDFMAUI/MauiProgram.cs` and
+   `TDFAPI/Extensions/Startup/ApplicationServicesExtensions.cs`.
+5. **Deleted `TDFShared/Services/IAuthService.cs`** entirely and
+   updated the `IAuthClient` xmldoc cref that previously pointed at it.
+
+### Errors Encountered
+None. Every caller's method call was verified against the narrow
+interface surface before migration (one pass of grep
+`_authService\.|authService\.` confirmed 30 call sites, all of whose
+methods exist on `IAuthClient` or `IAuthTokenIssuer` as appropriate).
+
+### How Errors Were Fixed
+N/A.
+
+### Build Verification
+`TDFAPI.csproj` (which transitively compiles `TDFShared.csproj`):
+**0 errors**. MAUI full build still not possible locally (no iOS/Android
+SDKs); verified by (a) all `IAuthService` references in MAUI replaced
+1:1 with `IAuthClient`, (b) `using TDFShared.Contracts;` added to every
+updated file that didn't already have it, (c)
+`grep -r "IAuthService" TDFMAUI TDFAPI TDFShared` returns zero matches
+after the migration.
+
+---
+
 ## Phase 12 - Validation clarity + server/client IAuthService split
 
 ### Features Implemented

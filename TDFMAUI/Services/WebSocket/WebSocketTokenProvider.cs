@@ -2,26 +2,27 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using TDFMAUI.Helpers;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.Services.WebSocket
 {
     /// <summary>
     /// Default <see cref="IWebSocketTokenProvider"/>. Desktop reads the in-memory
     /// <see cref="IUserSessionService"/> token; mobile consults secure storage and falls
-    /// back to <see cref="TDFShared.Services.IAuthService.RefreshTokenAsync(string, string)"/>
+    /// back to <see cref="TDFShared.Contracts.IAuthClient.RefreshTokenAsync(string, string)"/>
     /// when the current token is missing or expired.
     /// </summary>
     public sealed class WebSocketTokenProvider : IWebSocketTokenProvider
     {
         private readonly ILogger<WebSocketTokenProvider> _logger;
         private readonly SecureStorageService _secureStorage;
-        private readonly TDFShared.Services.IAuthService _authService;
+        private readonly TDFShared.Contracts.IAuthClient _authService;
         private readonly IUserSessionService _userSessionService;
 
         public WebSocketTokenProvider(
             ILogger<WebSocketTokenProvider> logger,
             SecureStorageService secureStorage,
-            TDFShared.Services.IAuthService authService,
+            TDFShared.Contracts.IAuthClient authService,
             IUserSessionService userSessionService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));

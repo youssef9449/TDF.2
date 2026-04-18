@@ -20,6 +20,7 @@ namespace TDFAPI.Services
         private readonly ILogger<UserService> _logger;
         private readonly IServiceProvider _serviceProvider;
         private readonly IBusinessRulesService _businessRulesService;
+        private readonly IRoleService _roleService;
 
         private readonly MediatR.IMediator _mediator;
 
@@ -29,6 +30,7 @@ namespace TDFAPI.Services
             ILogger<UserService> logger, 
             IServiceProvider serviceProvider,
             IBusinessRulesService businessRulesService,
+            IRoleService roleService,
             MediatR.IMediator mediator)
         {
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
@@ -36,6 +38,7 @@ namespace TDFAPI.Services
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             _businessRulesService = businessRulesService ?? throw new ArgumentNullException(nameof(businessRulesService));
+            _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
             _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         }
 
@@ -44,7 +47,7 @@ namespace TDFAPI.Services
             try
             {
                 var entity = await _userRepository.GetByIdAsync(userId);
-                return entity?.ToDto();
+                return entity?.ToDtoWithRoles(_roleService);
             }
             catch (Exception ex)
             {
@@ -63,7 +66,7 @@ namespace TDFAPI.Services
             try
             {
                 var entity = await _userRepository.GetByUsernameAsync(username);
-                return entity?.ToDto();
+                return entity?.ToDtoWithRoles(_roleService);
             }
             catch (Exception ex)
             {
@@ -88,7 +91,7 @@ namespace TDFAPI.Services
                 var result = await _userRepository.GetPaginatedAsync(page, pageSize);
                 return new PaginatedResult<UserDto>
                 {
-                    Items = result.Items.Select(u => u.ToDto()).ToList(),
+                    Items = result.Items.Select(u => u.ToDtoWithRoles(_roleService)).ToList(),
                     PageNumber = result.PageNumber,
                     PageSize = result.PageSize,
                     TotalCount = result.TotalCount
@@ -266,7 +269,7 @@ namespace TDFAPI.Services
             try
             {
                 var result = await _userRepository.GetUsersByDepartmentAsync(department);
-                return result.Select(u => u.ToDto());
+                return result.Select(u => u.ToDtoWithRoles(_roleService));
             }
             catch (Exception ex)
             {
@@ -280,7 +283,7 @@ namespace TDFAPI.Services
             try
             {
                 var result = await _userRepository.GetOnlineUsersAsync();
-                return result.Select(u => u.ToDto());
+                return result.Select(u => u.ToDtoWithRoles(_roleService));
             }
             catch (Exception ex)
             {
@@ -294,7 +297,7 @@ namespace TDFAPI.Services
             try
             {
                 var result = await _userRepository.GetAllAsync();
-                return result.Select(u => u.ToDto());
+                return result.Select(u => u.ToDtoWithRoles(_roleService));
             }
             catch (Exception ex)
             {

@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TDFShared.Constants;
-using TDFAPI.Services;
 using TDFShared.DTOs.Messages;
 using TDFShared.DTOs.Common;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
+using MediatR;
+using TDFAPI.CQRS.Queries;
+using TDFAPI.CQRS.Commands;
 
 namespace TDFAPI.Controllers
 {
@@ -15,12 +17,12 @@ namespace TDFAPI.Controllers
     [EnableRateLimiting("api")]
     public class MessagesController : ControllerBase
     {
-        private readonly IMessageService _messageService;
+        private readonly IMediator _mediator;
         private readonly ILogger<MessagesController> _logger;
 
-        public MessagesController(IMessageService messageService, ILogger<MessagesController> logger)
+        public MessagesController(IMediator mediator, ILogger<MessagesController> logger)
         {
-            _messageService = messageService;
+            _mediator = mediator;
             _logger = logger;
         }
 
@@ -30,7 +32,7 @@ namespace TDFAPI.Controllers
             try
             {
                 var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-                var messages = await _messageService.GetByUserIdAsync(userId, pagination);
+                var messages = await _mediator.Send(new GetMessagesQuery { UserId = userId, Pagination = pagination });
                 return Ok(ApiResponse<PaginatedResult<MessageDto>>.SuccessResponse(messages));
             }
             catch (Exception ex)
@@ -48,7 +50,12 @@ namespace TDFAPI.Controllers
                 var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
                 var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
 
-                var message = await _messageService.CreateAsync(messageDto, userId, userName);
+                var message = await _mediator.Send(new CreateMessageCommand
+                {
+                    MessageDto = messageDto,
+                    SenderId = userId,
+                    SenderName = userName
+                });
                 return Ok(ApiResponse<MessageDto>.SuccessResponse(message));
             }
             catch (Exception ex)
@@ -68,11 +75,20 @@ namespace TDFAPI.Controllers
 
                 if (!string.IsNullOrEmpty(messageDto.IdempotencyKey))
                 {
-                    var existingMessage = await _messageService.GetByIdempotencyKeyAsync(messageDto.IdempotencyKey, userId);
+                    var existingMessage = await _mediator.Send(new GetMessageByIdempotencyKeyQuery
+                    {
+                        IdempotencyKey = messageDto.IdempotencyKey,
+                        UserId = userId
+                    });
                     if (existingMessage != null) return Ok(ApiResponse<ChatMessageDto>.SuccessResponse(existingMessage));
                 }
 
-                var message = await _messageService.CreateChatMessageAsync(messageDto, userId, userName);
+                var message = await _mediator.Send(new CreateChatMessageCommand
+                {
+                    MessageDto = messageDto,
+                    SenderId = userId,
+                    SenderName = userName
+                });
                 return Ok(ApiResponse<ChatMessageDto>.SuccessResponse(message));
             }
             catch (Exception ex)
@@ -87,7 +103,7 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                var messages = await _messageService.GetRecentChatMessagesAsync(count);
+                var messages = await _mediator.Send(new GetRecentChatMessagesQuery { Count = count });
                 return Ok(ApiResponse<List<ChatMessageDto>>.SuccessResponse(messages));
             }
             catch (Exception ex)
@@ -103,7 +119,7 @@ namespace TDFAPI.Controllers
             try
             {
                 var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-                var result = await _messageService.MarkAsReadAsync(messageId, userId);
+                var result = await _mediator.Send(new MarkMessageAsReadCommand { MessageId = messageId, UserId = userId });
                 return Ok(ApiResponse<bool>.SuccessResponse(result));
             }
             catch (Exception ex)
@@ -119,7 +135,7 @@ namespace TDFAPI.Controllers
             try
             {
                 var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-                var result = await _messageService.MarkAsDeliveredAsync(messageId, userId);
+                var result = await _mediator.Send(new MarkMessageAsDeliveredCommand { MessageId = messageId, UserId = userId });
                 return Ok(ApiResponse<bool>.SuccessResponse(result));
             }
             catch (Exception ex)
@@ -134,7 +150,7 @@ namespace TDFAPI.Controllers
         {
             try
             {
-                var count = await _messageService.GetUnreadMessagesCountAsync(userId);
+                var count = await _mediator.Send(new GetUnreadMessagesCountQuery { UserId = userId });
                 return Ok(ApiResponse<int>.SuccessResponse(count));
             }
             catch (Exception ex)

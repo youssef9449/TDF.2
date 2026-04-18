@@ -4,109 +4,55 @@ using System.Threading.Tasks;
 using TDFShared.DTOs.Requests;
 using TDFShared.DTOs.Common;
 using Microsoft.Extensions.Logging;
-using System.Net.Http.Json;
 using TDFShared.Services;
-using Microsoft.Maui.Controls;
-using TDFMAUI.Helpers;
 
 namespace TDFMAUI.Services 
 {
     public class RequestService : IRequestService
     {
         private readonly IRequestApiService _requestApiService;
-        private readonly IUserApiService _userApiService;
-        private readonly ILookupApiService _lookupApiService;
         private readonly ILogger<RequestService> _logger;
         private readonly IAuthService _authService;
-        private readonly SecureStorageService _secureStorageService;
 
         public RequestService(
             IRequestApiService requestApiService,
-            IUserApiService userApiService,
-            ILookupApiService lookupApiService,
             ILogger<RequestService> logger,
-            IAuthService authService,
-            SecureStorageService secureStorageService)
+            IAuthService authService)
         {
             _requestApiService = requestApiService ?? throw new ArgumentNullException(nameof(requestApiService));
-            _userApiService = userApiService ?? throw new ArgumentNullException(nameof(userApiService));
-            _lookupApiService = lookupApiService ?? throw new ArgumentNullException(nameof(lookupApiService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _authService = authService;
-            _secureStorageService = secureStorageService ?? throw new ArgumentNullException(nameof(secureStorageService));
-            _logger.LogInformation("RequestService initialized, using specialized API services.");
+            _logger.LogInformation("RequestService initialized.");
         }
 
         public async Task<ApiResponse<RequestResponseDto>> CreateRequestAsync(RequestCreateDto requestDto)
         {
-            if (requestDto == null) throw new ArgumentNullException(nameof(requestDto));
-            _logger.LogInformation("RequestService: Calling IRequestApiService.CreateRequestAsync");
-            try
-            {
-                var response = await _requestApiService.CreateRequestAsync(requestDto);
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "RequestService: Error in CreateRequestAsync: {Message}", ex.Message);
-                return new ApiResponse<RequestResponseDto>
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
-            }
+            return await _requestApiService.CreateRequestAsync(requestDto);
         }
 
         public async Task<ApiResponse<RequestResponseDto>> UpdateRequestAsync(int requestId, RequestUpdateDto requestDto)
         {
-            if (requestDto == null) throw new ArgumentNullException(nameof(requestDto));
-            _logger.LogInformation("RequestService: Calling IRequestApiService.UpdateRequestAsync for requestId {RequestId}", requestId);
-            try
-            {
-                var response = await _requestApiService.UpdateRequestAsync(requestId, requestDto);
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "RequestService: Error in UpdateRequestAsync for requestId {RequestId}: {Message}", requestId, ex.Message);
-                return new ApiResponse<RequestResponseDto>
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
-            }
+            return await _requestApiService.UpdateRequestAsync(requestId, requestDto);
         }
 
         public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetMyRequestsAsync(RequestPaginationDto pagination)
         {
-            try
+            var userId = await _authService.GetCurrentUserIdAsync();
+            if (userId == 0)
             {
-                var userId = await _authService.GetCurrentUserIdAsync();
-                if (userId == 0)
-                {
-                    return new ApiResponse<PaginatedResult<RequestResponseDto>>
-                    {
-                        Success = true,
-                        Data = new PaginatedResult<RequestResponseDto>
-                        {
-                            Items = new List<RequestResponseDto>(),
-                            TotalCount = 0,
-                            PageNumber = pagination.Page,
-                            PageSize = pagination.PageSize
-                        }
-                    };
-                }
-                return await _requestApiService.GetRequestsAsync(pagination, userId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "RequestService: Error in GetMyRequestsAsync: {Message}", ex.Message);
                 return new ApiResponse<PaginatedResult<RequestResponseDto>>
                 {
-                    Success = false,
-                    Message = ex.Message
+                    Success = true,
+                    Data = new PaginatedResult<RequestResponseDto>
+                    {
+                        Items = new List<RequestResponseDto>(),
+                        TotalCount = 0,
+                        PageNumber = pagination.Page,
+                        PageSize = pagination.PageSize
+                    }
                 };
             }
+            return await _requestApiService.GetRequestsAsync(pagination, userId);
         }
 
         public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetAllRequestsAsync(RequestPaginationDto pagination)
@@ -121,38 +67,12 @@ namespace TDFMAUI.Services
 
         public async Task<ApiResponse<RequestResponseDto>> GetRequestByIdAsync(int requestId)
         {
-            try
-            {
-                var response = await _requestApiService.GetRequestByIdAsync(requestId);
-                return response;
-            }
-            catch (Exception ex)
-            {
-                return new ApiResponse<RequestResponseDto>
-                {
-                    Success = false,
-                    Message = $"Error: {ex.Message}"
-                };
-            }
+            return await _requestApiService.GetRequestByIdAsync(requestId);
         }
 
         public async Task<ApiResponse<bool>> DeleteRequestAsync(int requestId)
         {
-            _logger.LogInformation("RequestService: Calling IRequestApiService.DeleteRequestAsync for requestId {RequestId}", requestId);
-            try
-            {
-                var response = await _requestApiService.DeleteRequestAsync(requestId);
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "RequestService: Error in DeleteRequestAsync for requestId {RequestId}: {Message}", requestId, ex.Message);
-                return new ApiResponse<bool>
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
-            }
+            return await _requestApiService.DeleteRequestAsync(requestId);
         }
 
         public async Task<ApiResponse<RequestResponseDto>> ManagerApproveRequestAsync(int requestId, ManagerApprovalDto approvalDto)
@@ -160,9 +80,7 @@ namespace TDFMAUI.Services
             var response = await _requestApiService.ManagerApproveRequestAsync(requestId, approvalDto);
             if (response.Success)
             {
-                // Fetch updated request details if needed
-                var details = await GetRequestByIdAsync(requestId);
-                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
+                return await GetRequestByIdAsync(requestId);
             }
             return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
         }
@@ -172,8 +90,7 @@ namespace TDFMAUI.Services
             var response = await _requestApiService.HRApproveRequestAsync(requestId, approvalDto);
             if (response.Success)
             {
-                var details = await GetRequestByIdAsync(requestId);
-                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
+                return await GetRequestByIdAsync(requestId);
             }
             return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
         }
@@ -183,8 +100,7 @@ namespace TDFMAUI.Services
             var response = await _requestApiService.ManagerRejectRequestAsync(requestId, rejectDto);
             if (response.Success)
             {
-                var details = await GetRequestByIdAsync(requestId);
-                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
+                return await GetRequestByIdAsync(requestId);
             }
             return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
         }
@@ -194,8 +110,7 @@ namespace TDFMAUI.Services
             var response = await _requestApiService.HRRejectRequestAsync(requestId, rejectDto);
             if (response.Success)
             {
-                var details = await GetRequestByIdAsync(requestId);
-                return new ApiResponse<RequestResponseDto> { Success = true, Message = response.Message, Data = details.Data };
+                return await GetRequestByIdAsync(requestId);
             }
             return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
         }
@@ -210,90 +125,37 @@ namespace TDFMAUI.Services
             string? department = null,
             int? userId = null)
         {
-            try
+            var pagination = new RequestPaginationDto
             {
-                // Note: The previous logic of building query string manually is redundant
-                // since we now use the RequestPaginationDto and pass it to IRequestApiService.
+                Page = pageNumber,
+                PageSize = pageSize,
+                Department = department,
+                UserId = userId,
+                FromDate = fromDate,
+                ToDate = toDate
+            };
 
-                var pagination = new RequestPaginationDto
-                {
-                    Page = pageNumber,
-                    PageSize = pageSize,
-                    Department = department,
-                    UserId = userId
-                };
+            if (!string.IsNullOrEmpty(status) && status != "All" && Enum.TryParse<TDFShared.Enums.RequestStatus>(status, true, out var parsedStatus))
+                pagination.FilterStatus = parsedStatus;
 
-                // Parse status and type strings to enums if provided
-                if (!string.IsNullOrEmpty(status) && status != "All")
-                {
-                    if (Enum.TryParse<TDFShared.Enums.RequestStatus>(status, true, out var parsedStatus))
-                        pagination.FilterStatus = parsedStatus;
-                }
+            if (!string.IsNullOrEmpty(type) && type != "All" && Enum.TryParse<TDFShared.Enums.LeaveType>(type.Replace(" ", ""), true, out var parsedType))
+                pagination.FilterType = parsedType;
 
-                if (!string.IsNullOrEmpty(type) && type != "All")
-                {
-                    if (Enum.TryParse<TDFShared.Enums.LeaveType>(type.Replace(" ", ""), true, out var parsedType))
-                        pagination.FilterType = parsedType;
-                }
-
-                pagination.FromDate = fromDate;
-                pagination.ToDate = toDate;
-
-                var response = await _requestApiService.GetRequestsForApprovalAsync(pagination);
-
-                return response ?? new ApiResponse<PaginatedResult<RequestResponseDto>>
-                {
-                    Success = false,
-                    Message = "Failed to get requests"
-                };
-            }
-            catch (Exception ex)
-            {
-                return new ApiResponse<PaginatedResult<RequestResponseDto>>
-                {
-                    Success = false,
-                    Message = $"Error: {ex.Message}"
-                };
-            }
+            return await _requestApiService.GetRequestsForApprovalAsync(pagination);
         }
 
         public async Task<List<RequestResponseDto>> GetRecentDashboardRequestsAsync()
         {
-            try
-            {
-                // This logic might need to be moved to IRequestApiService or kept as is if we have a direct GetAsync there
-                // For now, let's assume we want to use the RequestApiService if possible
-                // Re-examining ApiService shows it was just calling GetAsync
-
-                // Let's keep it simple for now, as IRequestApiService doesn't have this exact method yet,
-                // we should either add it or use the generic GetAsync if available.
-                // Looking at my defined IRequestApiService, it doesn't have GetRecentDashboardRequestsAsync.
-
-                // I will use IRequestApiService.GetRequestsAsync with specific parameters to simulate it
-                var pagination = new RequestPaginationDto { Page = 1, PageSize = 5, SortBy = "CreatedDate", Ascending = false };
-                var response = await _requestApiService.GetRequestsAsync(pagination);
-                return response.Data?.Items?.ToList() ?? new List<RequestResponseDto>();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting recent dashboard requests");
-                return new List<RequestResponseDto>();
-            }
+            var pagination = new RequestPaginationDto { Page = 1, PageSize = 5, SortBy = "CreatedDate", Ascending = false };
+            var response = await _requestApiService.GetRequestsAsync(pagination);
+            return response.Data?.Items?.ToList() ?? new List<RequestResponseDto>();
         }
 
         public async Task<int> GetPendingDashboardRequestCountAsync()
         {
-            try
-            {
-                var pagination = new RequestPaginationDto { CountOnly = true, FilterStatus = TDFShared.Enums.RequestStatus.Pending };
-                var response = await _requestApiService.GetRequestsAsync(pagination);
-                return response.Data?.TotalCount ?? 0;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting pending dashboard request count");
-                return 0;
-            }
+            var pagination = new RequestPaginationDto { CountOnly = true, FilterStatus = TDFShared.Enums.RequestStatus.Pending };
+            var response = await _requestApiService.GetRequestsAsync(pagination);
+            return response.Data?.TotalCount ?? 0;
         }
     }
 }

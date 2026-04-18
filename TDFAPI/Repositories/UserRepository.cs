@@ -38,7 +38,27 @@ namespace TDFAPI.Repositories
                 throw;
             }
         }
-        
+
+        public async Task<int> CreateAsync(UserEntity user, string passwordHash, string salt)
+        {
+            try
+            {
+                user.PasswordHash = passwordHash;
+                user.Salt = salt;
+                user.CreatedAt = DateTime.UtcNow;
+
+                await _dbSet.AddAsync(user);
+                await _context.SaveChangesAsync();
+
+                return user.UserID;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating user {Username}", user.UserName);
+                throw;
+            }
+        }
+
         public async Task<UserEntity?> GetByUsernameAsync(string username)
         {
             try

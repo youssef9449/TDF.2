@@ -21,17 +21,20 @@ namespace TDFAPI.CQRS.Queries
         private readonly IUserRepository _userRepository;
         private readonly ICacheService _cacheService;
         private readonly ILogger<GetRequestByIdQueryHandler> _logger;
+        private readonly IRoleService _roleService;
 
         public GetRequestByIdQueryHandler(
             IRequestRepository requestRepository,
             IUserRepository userRepository,
             ICacheService cacheService,
-            ILogger<GetRequestByIdQueryHandler> logger)
+            ILogger<GetRequestByIdQueryHandler> logger,
+            IRoleService roleService)
         {
             _requestRepository = requestRepository;
             _userRepository = userRepository;
             _cacheService = cacheService;
             _logger = logger;
+            _roleService = roleService;
         }
 
         public async Task<RequestResponseDto> Handle(GetRequestByIdQuery request, CancellationToken cancellationToken)
@@ -61,7 +64,10 @@ namespace TDFAPI.CQRS.Queries
         {
             var cacheKey = $"user_{userId}";
             return await _cacheService.GetOrCreateAsync(cacheKey,
-                async () => (await _userRepository.GetByIdAsync(userId))?.ToDto(),
+                async () => {
+                    var user = await _userRepository.GetByIdAsync(userId);
+                    return user?.ToDtoWithRoles(_roleService);
+                },
                 absoluteExpirationMinutes: 15,
                 slidingExpirationMinutes: 5);
         }

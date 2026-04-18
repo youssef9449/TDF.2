@@ -6,7 +6,7 @@ using TDFShared.Models.Notification;
 
 namespace TDFAPI.Services
 {
-    public interface INotificationService
+    public interface INotificationDispatchService
     {
         Task<IEnumerable<NotificationEntity>> GetUnreadNotificationsAsync(int userId);
         Task<bool> MarkAsSeenAsync(int notificationId, int userId);

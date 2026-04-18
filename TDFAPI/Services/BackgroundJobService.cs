@@ -252,7 +252,7 @@ namespace TDFAPI.Services
                 using (var scope = _serviceProvider.CreateScope())
                 {
                     // Get the API notification service directly
-                    var apiNotificationService = scope.ServiceProvider.GetRequiredService<TDFAPI.Services.INotificationService>();
+                    var apiNotificationService = scope.ServiceProvider.GetRequiredService<TDFAPI.Services.INotificationDispatchService>();
                     
                     // Send the notification using the API notification service
                     await apiNotificationService.SendNotificationAsync(

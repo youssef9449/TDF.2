@@ -12,7 +12,7 @@ namespace TDFMAUI.ViewModels
 {
     public partial class NotificationsViewModel : BaseViewModel
     {
-        private readonly INotificationService _notificationService;
+        private readonly INotificationClient _notificationService;
         private readonly IUserApiService _userApiService;
         private readonly Dictionary<int, string> _userCache = new();
 
@@ -20,7 +20,7 @@ namespace TDFMAUI.ViewModels
         private ObservableCollection<NotificationItemViewModel> _notifications = new();
 
         public NotificationsViewModel(
-            INotificationService notificationService,
+            INotificationClient notificationService,
             IUserApiService userApiService)
         {
             _notificationService = notificationService;

@@ -15,9 +15,9 @@ namespace TDFAPI.Controllers
     [EnableRateLimiting("api")]
     public class NotificationsController : ControllerBase
     {
-        private readonly INotificationService _notificationService;
+        private readonly INotificationDispatchService _notificationService;
 
-        public NotificationsController(INotificationService notificationService)
+        public NotificationsController(INotificationDispatchService notificationService)
         {
             _notificationService = notificationService;
         }

@@ -11,7 +11,7 @@ using TDFAPI.Messaging;
 
 namespace TDFAPI.Services
 {
-    public class NotificationService : INotificationService
+    public class NotificationService : INotificationDispatchService
     {
         private readonly INotificationRepository _notificationRepository;
         private readonly IUserRepository _userRepository;

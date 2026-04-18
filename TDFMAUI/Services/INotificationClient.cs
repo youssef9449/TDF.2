@@ -4,7 +4,7 @@ using TDFShared.Models.Notification;
 
 namespace TDFMAUI.Services
 {
-    public interface INotificationService
+    public interface INotificationClient
     {
         event EventHandler<NotificationDto> NotificationReceived;
         Task<IEnumerable<NotificationEntity>> GetUnreadNotificationsAsync();

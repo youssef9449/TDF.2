@@ -7,7 +7,6 @@ using TDFShared.Utilities;
 using TDFShared.Services;
 using System.ComponentModel.DataAnnotations;
 using TDFAPI.Extensions;
-using INotificationService = TDFAPI.Services.INotificationService;
 
 namespace TDFAPI.CQRS.Commands
 {
@@ -22,7 +21,7 @@ namespace TDFAPI.CQRS.Commands
     {
         private readonly IRequestRepository _requestRepository;
         private readonly IUserRepository _userRepository;
-        private readonly INotificationService _notificationService;
+        private readonly INotificationDispatchService _notificationService;
         private readonly TDFShared.Validation.IValidationService _validationService;
         private readonly TDFShared.Validation.IBusinessRulesService _businessRulesService;
         private readonly ILogger<UpdateRequestCommandHandler> _logger;
@@ -30,7 +29,7 @@ namespace TDFAPI.CQRS.Commands
         public UpdateRequestCommandHandler(
             IRequestRepository requestRepository,
             IUserRepository userRepository,
-            INotificationService notificationService,
+            INotificationDispatchService notificationService,
             TDFShared.Validation.IValidationService validationService,
             TDFShared.Validation.IBusinessRulesService businessRulesService,
             ILogger<UpdateRequestCommandHandler> logger)
@@ -82,7 +81,7 @@ namespace TDFAPI.CQRS.Commands
                 throw new TDFShared.Exceptions.BusinessRuleException(string.Join("; ", businessRuleResult.Errors));
             }
 
-            int numberOfDays = TDFShared.Utils.DateUtils.CalculateBusinessDays(
+            int numberOfDays = TDFShared.Utilities.DateUtils.CalculateBusinessDays(
                 request.UpdateDto.RequestStartDate,
                 request.UpdateDto.RequestEndDate.HasValue ? request.UpdateDto.RequestEndDate.Value : request.UpdateDto.RequestStartDate);
 

@@ -32,7 +32,7 @@ namespace TDFMAUI.ViewModels
                 _ = LoadRequestsAsync();
             }
         }
-        private readonly Services.INotificationService _notificationService;
+        private readonly Services.INotificationClient _notificationService;
         private readonly IAuthService _authService;
         private readonly ILogger<RequestApprovalViewModel> _logger;
         private readonly ILookupService _lookupService;
@@ -92,7 +92,7 @@ namespace TDFMAUI.ViewModels
 
         public RequestApprovalViewModel(
             IRequestService requestService,
-            Services.INotificationService notificationService,
+            Services.INotificationClient notificationService,
             IAuthService authService,
             ILogger<RequestApprovalViewModel> logger,
             ILookupService lookupService,

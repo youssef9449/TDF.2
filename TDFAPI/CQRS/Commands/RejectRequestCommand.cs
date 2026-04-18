@@ -6,7 +6,6 @@ using TDFAPI.Repositories;
 using TDFShared.Utilities;
 using TDFShared.Services;
 using TDFAPI.Extensions;
-using INotificationService = TDFAPI.Services.INotificationService;
 
 namespace TDFAPI.CQRS.Commands
 {
@@ -22,14 +21,14 @@ namespace TDFAPI.CQRS.Commands
     {
         private readonly IRequestRepository _requestRepository;
         private readonly IUserRepository _userRepository;
-        private readonly INotificationService _notificationService;
+        private readonly INotificationDispatchService _notificationService;
         private readonly ILogger<RejectRequestCommandHandler> _logger;
         private readonly IRoleService _roleService;
 
         public RejectRequestCommandHandler(
             IRequestRepository requestRepository,
             IUserRepository userRepository,
-            INotificationService notificationService,
+            INotificationDispatchService notificationService,
             ILogger<RejectRequestCommandHandler> logger,
             IRoleService roleService)
         {

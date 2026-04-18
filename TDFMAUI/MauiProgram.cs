@@ -188,7 +188,7 @@ namespace TDFMAUI
             builder.Services.AddSingleton<IPlatformNotificationService, PlatformNotificationService>();
             builder.Services.AddSingleton<NotificationService>();
             builder.Services.AddSingleton<IExtendedNotificationService>(sp => sp.GetRequiredService<NotificationService>());
-            builder.Services.AddSingleton<TDFMAUI.Services.INotificationService>(sp => sp.GetRequiredService<NotificationService>());
+            builder.Services.AddSingleton<TDFMAUI.Services.INotificationClient>(sp => sp.GetRequiredService<NotificationService>());
             builder.Services.AddSingleton<TDFShared.Contracts.IUserFeedbackService>(sp => sp.GetRequiredService<NotificationService>());
             
 #if WINDOWS || MACCATALYST

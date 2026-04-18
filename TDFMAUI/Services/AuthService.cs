@@ -18,6 +18,7 @@ using TDFShared.DTOs.Auth;
 using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Users;
 using TDFShared.Enums;
+using TDFShared.Models;
 using TDFShared.Services;
 using TDFShared.Helpers;
 using Microsoft.Maui.Storage;
@@ -46,7 +47,7 @@ public class AuthService : IAuthClient
     private readonly IUserApiService _userApiService;
     private readonly ISecureStorage _secureStorage;
     private readonly IUserSessionService _userSessionService;
-    private readonly IUserPresenceService _userPresenceService;
+    private readonly TDFMAUI.Services.Presence.IUserPresenceService _userPresenceService;
     private readonly IWebSocketService _webSocketService;
     private string? _currentToken;
     private DateTime _tokenExpiration = DateTime.MinValue;
@@ -63,7 +64,7 @@ public class AuthService : IAuthClient
         IUserApiService userApiService,
         ISecureStorage secureStorage,
         IUserSessionService userSessionService,
-        IUserPresenceService userPresenceService,
+        TDFMAUI.Services.Presence.IUserPresenceService userPresenceService,
         IWebSocketService webSocketService)
     {
         try

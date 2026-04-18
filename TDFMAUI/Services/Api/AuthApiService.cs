@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using Microsoft.Extensions.Logging;
 using TDFMAUI.Config;
 using TDFShared.Constants;
 using TDFShared.DTOs.Auth;

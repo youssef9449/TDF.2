@@ -43,7 +43,7 @@ namespace TDFMAUI.Services.Presence
             {
                 _logger.LogError(ex, "Error fetching online users from API");
             }
-            return new PaginatedResult<UserPresenceInfo>(new List<UserPresenceInfo>(), page, pageSize, 0);
+            return new PaginatedResult<UserPresenceInfo> { Items = new List<UserPresenceInfo>(), PageNumber = page, PageSize = pageSize, TotalCount = 0 };
         }
 
         public async Task UpdateUserConnectionStatusAsync(int userId, bool isConnected)

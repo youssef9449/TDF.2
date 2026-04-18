@@ -234,7 +234,7 @@
                     Margin="{OnPlatform WinUI='0,20,0,10', MacCatalyst='0,20,0,10', Default='0,10,0,0'}">
             <Button x:Name="SubmitButton"
                     Text="Submit"
-                    Command="{Binding SubmitRequestCommand}"
+                    Command="{Binding SubmitCommand}"
                     IsEnabled="{Binding IsNotBusy}"
                     BackgroundColor="{OnPlatform WinUI={StaticResource WindowsAccentColor}, MacCatalyst={StaticResource MacOSAccentColor}, Default={StaticResource Primary}}"
                     TextColor="White"

@@ -32,4 +32,5 @@ public interface IRequestService
     Task<ApiResponse<RequestResponseDto>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto);
     Task<List<RequestResponseDto>> GetRecentDashboardRequestsAsync();
     Task<int> GetPendingDashboardRequestCountAsync();
+    Task<ApiResponse<Dictionary<string, int>>> GetLeaveBalancesAsync(int userId);
 }

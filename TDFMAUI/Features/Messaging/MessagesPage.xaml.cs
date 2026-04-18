@@ -1,5 +1,6 @@
 using TDFMAUI.ViewModels;
 using TDFMAUI.Services;
+using TDFMAUI.Helpers;
 
 namespace TDFMAUI.Pages;
 
@@ -29,7 +30,7 @@ public partial class MessagesPage : ContentPage
         _webSocketService.ChatMessageReceived -= OnChatMessageReceived;
     }
     
-    private void OnChatMessageReceived(object sender, TDFShared.DTOs.Messages.ChatMessageEventArgs e)
+    private void OnChatMessageReceived(object sender, ChatMessageEventArgs e)
     {
         _viewModel.HandleMessageReceived(e);
     }

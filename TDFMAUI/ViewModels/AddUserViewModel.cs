@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using TDFMAUI.Services;
 using TDFShared.DTOs.Auth;
 using TDFShared.DTOs.Common;
+using TDFShared.DTOs.Users;
 using TDFShared.Services;
 
 namespace TDFMAUI.ViewModels

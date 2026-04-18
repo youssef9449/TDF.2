@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TDFMAUI.Helpers;
 using TDFShared.Enums;
+using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Users;
 
 namespace TDFMAUI.Services.Presence
@@ -36,7 +37,7 @@ namespace TDFMAUI.Services.Presence
 
             _eventsService.UserStatusChanged += OnUserStatusChanged;
             _eventsService.UserAvailabilityChanged += OnUserAvailabilityChanged;
-            _eventsService.AvailabilitySet += OnAvailabilitySet;
+            _eventsService.AvailabilityConfirmed += OnAvailabilitySet;
             _eventsService.StatusUpdateConfirmed += OnStatusUpdateConfirmed;
             _eventsService.PresenceErrorReceived += OnErrorReceived;
 
@@ -231,7 +232,7 @@ namespace TDFMAUI.Services.Presence
         {
             _eventsService.UserStatusChanged -= OnUserStatusChanged;
             _eventsService.UserAvailabilityChanged -= OnUserAvailabilityChanged;
-            _eventsService.AvailabilitySet -= OnAvailabilitySet;
+            _eventsService.AvailabilityConfirmed -= OnAvailabilitySet;
             _eventsService.StatusUpdateConfirmed -= OnStatusUpdateConfirmed;
             _eventsService.PresenceErrorReceived -= OnErrorReceived;
             _activityTimer?.Dispose();

@@ -41,8 +41,8 @@ namespace TDFMAUI.ViewModels
                 {
                     Messages.Add(new ChatMessageModel
                     {
-                        MessageId = dto.Id,
-                        FromUserName = dto.SenderFullName,
+                        MessageId = dto.MessageId,
+                        FromUserName = dto.SenderName,
                         SenderId = dto.SenderId,
                         Content = dto.Content,
                         SentAt = dto.Timestamp

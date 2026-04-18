@@ -22,6 +22,7 @@ namespace TDFMAUI.Features.Dashboard
     {
         private readonly IRequestService _requestService;
         private readonly INotificationClient _notificationService;
+        private readonly IMessageService? _messageService;
         private readonly ILogger<DashboardViewModel> _logger;
         private readonly IAuthClient _authService;
         private CancellationTokenSource? _refreshCts;
@@ -61,10 +62,12 @@ namespace TDFMAUI.Features.Dashboard
             IRequestService requestService,
             INotificationClient notificationService,
             ILogger<DashboardViewModel> logger,
-            IAuthClient authService)
+            IAuthClient authService,
+            IMessageService? messageService = null)
         {
             _requestService = requestService;
             _notificationService = notificationService;
+            _messageService = messageService;
             _logger = logger;
             _authService = authService;
 
@@ -134,7 +137,10 @@ namespace TDFMAUI.Features.Dashboard
                 PendingRequestsCount = await _requestService.GetPendingDashboardRequestCountAsync();
                 var notifications = await _notificationService.GetUnreadNotificationsAsync();
                 UnreadNotificationsCount = notifications?.Count() ?? 0;
-                UnreadMessagesCount = await _notificationService.GetUnreadMessagesCountAsync();
+                if (App.CurrentUser != null && _messageService != null)
+                {
+                    UnreadMessagesCount = await _messageService.GetUnreadMessagesCountAsync(App.CurrentUser.UserID);
+                }
             }
             catch (Exception ex) { _logger.LogError(ex, "Error loading stats"); }
         }
@@ -189,6 +195,8 @@ namespace TDFMAUI.Features.Dashboard
         {
             if (requestId > 0) await Shell.Current.GoToAsync($"//RequestDetailsPage?RequestId={requestId}");
         }
+
+        public void Cleanup() => Dispose();
 
         public void Dispose()
         {

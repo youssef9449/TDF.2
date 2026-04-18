@@ -145,6 +145,11 @@ namespace TDFMAUI.Services
             return await _requestApiService.GetRequestsForApprovalAsync(pagination);
         }
 
+        public async Task<ApiResponse<Dictionary<string, int>>> GetLeaveBalancesAsync(int userId)
+        {
+            return await _requestApiService.GetLeaveBalancesAsync(userId);
+        }
+
         public async Task<List<RequestResponseDto>> GetRecentDashboardRequestsAsync()
         {
             var pagination = new RequestPaginationDto { Page = 1, PageSize = 5, SortBy = "CreatedDate", Ascending = false };

@@ -58,7 +58,7 @@
         </Grid>
         
         <!-- Messages list -->
-        <RefreshView Grid.Row="1" Command="{Binding LoadMessagesCommand}" IsRefreshing="{Binding IsLoading}" RefreshColor="{StaticResource Primary}">
+        <RefreshView Grid.Row="1" Command="{Binding LoadMessagesCommand}" IsRefreshing="{Binding IsBusy}" RefreshColor="{StaticResource Primary}">
             <ScrollView>
                 <VerticalStackLayout> 
                     <!-- Constrain width on Desktop/Tablet -->
@@ -107,7 +107,7 @@
                                             <!-- Date -->
                                             <Label Grid.Row="2"
                                                    Grid.Column="0"
-                                                   Text="{Binding SentAt, StringFormat='{0:g}'}" 
+                                                   Text="{Binding Timestamp, StringFormat='{0:g}'}" 
                                                    FontSize="12"
                                                    TextColor="{StaticResource Gray500}"
                                                    Margin="0,5,0,0" />

@@ -34,7 +34,17 @@ namespace TDFMAUI.Pages
 
         private void OnNotificationReceived(object sender, TDFShared.DTOs.Messages.NotificationEventArgs e)
         {
-            _viewModel.HandleNotificationReceived(e);
+            var dto = new TDFShared.DTOs.Messages.NotificationDto
+            {
+                NotificationId = e.NotificationId,
+                Message = e.Message,
+                Title = e.Title,
+                NotificationType = e.Type,
+                SenderId = e.SenderId,
+                SenderName = e.SenderName,
+                Timestamp = e.Timestamp
+            };
+            _viewModel.HandleNotificationReceived(dto);
             MainThread.BeginInvokeOnMainThread(async () =>
             {
                 await Controls.NotificationToast.ShowToastAsync(this, "New Notification", e.Message, TDFShared.Enums.NotificationType.Info);

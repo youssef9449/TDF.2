@@ -1,6 +1,7 @@
 using TDFShared.Enums;
 using TDFShared.DTOs.Users;
 using TDFShared.Services;
+using TDFMAUI.Helpers;
 
 namespace TDFMAUI.Services.Presence
 {

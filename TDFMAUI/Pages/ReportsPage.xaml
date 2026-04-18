@@ -142,7 +142,7 @@
         <!-- Bind RefreshView -->
         <RefreshView Grid.Row="2" 
                      Command="{Binding RefreshRequestsCommand}" 
-                     IsRefreshing="{Binding IsLoading}">
+                     IsRefreshing="{Binding IsBusy}">
             <ScrollView>
             <VerticalStackLayout Spacing="10">
                  <!-- Constrain width on Desktop/Tablet -->
@@ -225,8 +225,8 @@
                 </CollectionView>
                 
                 <!-- Bind ActivityIndicator -->
-                <ActivityIndicator IsVisible="{Binding IsLoading}" 
-                                   IsRunning="{Binding IsLoading}" 
+                <ActivityIndicator IsVisible="{Binding IsBusy}" 
+                                   IsRunning="{Binding IsBusy}" 
                                    HorizontalOptions="Center"/>
             </VerticalStackLayout>
             </ScrollView>

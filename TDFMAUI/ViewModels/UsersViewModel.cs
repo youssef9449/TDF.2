@@ -60,7 +60,7 @@ namespace TDFMAUI.ViewModels
             {
                 var onlineUsers = await _userPresenceService.GetOnlineUsersAsync();
                 Users.Clear();
-                foreach (var user in onlineUsers.Values.Where(u => u.UserId != App.CurrentUser.UserID))
+                foreach (var user in onlineUsers.Items.Where(u => u.UserId != App.CurrentUser.UserID))
                 {
                     Users.Add(new UserViewModel
                     {
@@ -130,7 +130,7 @@ namespace TDFMAUI.ViewModels
             var viewModel = new UserProfileViewModel(_userApiService, localStorageService);
             await viewModel.LoadUserByIdAsync(userId);
 
-            await Shell.Current.Navigation.PushAsync(new UserProfilePage(viewModel, localStorageService));
+            await Shell.Current.Navigation.PushAsync(new UserProfilePage(viewModel));
         }
 
         public void HandleUserStatusChanged(UserStatusChangedEventArgs e)

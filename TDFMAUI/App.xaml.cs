@@ -476,7 +476,7 @@ namespace TDFMAUI
                 // If we have a notification service, mark as seen if appropriate
                 if (Services != null && e.NotificationId > 0)
                 {
-                    var notificationService = Services.GetService<Services.INotificationClient>();
+                    var notificationService = Services.GetService<Services.Notifications.INotificationClient>();
                     if (notificationService != null && CurrentUser != null)
                     {
                         // Fire and forget - don't block the UI
@@ -563,7 +563,7 @@ namespace TDFMAUI
                             // Update user status to Online if we're reconnecting
                             if (CurrentUser != null)
                             {
-                                var userPresenceService = Services.GetService<IUserPresenceService>();
+                                var userPresenceService = Services.GetService<TDFMAUI.Services.Presence.IUserPresenceService>();
                                 if (userPresenceService != null)
                                 {
                                     // Update status to Online
@@ -651,7 +651,7 @@ namespace TDFMAUI
                 // This will propagate the change to all parts of the application that are subscribed to the event
                 if (Services != null)
                 {
-                    var userPresenceService = Services.GetService<IUserPresenceService>();
+                    var userPresenceService = Services.GetService<TDFMAUI.Services.Presence.IUserPresenceService>();
                     if (userPresenceService != null)
                     {
                         // Create event args for the service
@@ -712,8 +712,9 @@ namespace TDFMAUI
                         {
                             DebugService.LogInfo("App", $"Updating user {username} status to {status} in UsersRightPanel");
 
-                            // Use the public Users collection directly
-                            var users = usersRightPanel.Users;
+                            // Use the public Users collection directly via BindingContext
+                            var vm = usersRightPanel.BindingContext as TDFMAUI.ViewModels.UsersRightPanelViewModel;
+                            var users = vm?.Users;
                             if (users != null)
                             {
                                 // Find the user in the collection
@@ -733,10 +734,10 @@ namespace TDFMAUI
                                 {
                                     DebugService.LogInfo("App", $"User {username} not found in UsersRightPanel, refreshing panel");
 
-                                    // Refresh the panel (RefreshUsersCommand is public)
-                                    if (usersRightPanel.RefreshUsersCommand != null && usersRightPanel.RefreshUsersCommand.CanExecute(null))
+                                    // Refresh the panel via ViewModel command
+                                    if (vm?.RefreshUsersCommand != null && vm.RefreshUsersCommand.CanExecute(null))
                                     {
-                                        usersRightPanel.RefreshUsersCommand.Execute(null);
+                                        vm.RefreshUsersCommand.Execute(null);
                                     }
                                 }
                             }
@@ -842,7 +843,7 @@ namespace TDFMAUI
             {
                 try
                 {
-                    var userPresenceService = Services.GetService<IUserPresenceService>();
+                    var userPresenceService = Services.GetService<TDFMAUI.Services.Presence.IUserPresenceService>();
                     if (userPresenceService != null)
                     {
                         // Use a timeout to prevent hanging during shutdown
@@ -1175,7 +1176,7 @@ namespace TDFMAUI
             }
         }
 
-        private static void ValidateNoDuplicateCriticalResourceKeys(IList<ResourceDictionary> mergedDictionaries, string key, string expectedSource)
+        private static void ValidateNoDuplicateCriticalResourceKeys(ICollection<ResourceDictionary> mergedDictionaries, string key, string expectedSource)
         {
             var dictionariesContainingKey = mergedDictionaries
                 .Where(d => d.ContainsKey(key))

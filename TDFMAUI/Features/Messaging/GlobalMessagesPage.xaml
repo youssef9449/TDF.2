@@ -29,7 +29,7 @@
                 <!-- Add refresh button on desktop/tablet -->
                 <Button Grid.Column="2"
                         Text="↻"
-                        Command="{Binding RefreshCommand}"
+                        Command="{Binding LoadMessagesCommand}"
                         BackgroundColor="Transparent"
                         TextColor="White"
                         HeightRequest="40"

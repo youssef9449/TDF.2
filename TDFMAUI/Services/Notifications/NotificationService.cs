@@ -3,6 +3,7 @@ using System.Text.Json;
 using TDFMAUI.Helpers;
 using Microsoft.Extensions.Logging;
 using TDFShared.Contracts;
+using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Messages;
 using TDFShared.Enums;
 using TDFShared.Models.Notification;

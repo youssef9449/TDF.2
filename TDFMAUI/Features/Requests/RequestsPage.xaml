@@ -36,16 +36,7 @@
                    FontAttributes="Bold"
                    VerticalOptions="Center" />
 
-            <Button Grid.Column="1"
-                    Text="Debug"
-                    Command="{Binding TestApiConnectivityCommand}"
-                    BackgroundColor="Orange"
-                    TextColor="White"
-                    HeightRequest="{OnIdiom Phone=35, Default=40}"
-                    WidthRequest="{OnIdiom Phone=80, Default=100}"
-                    FontSize="{OnIdiom Phone=10, Default=12}"
-                    CornerRadius="{OnIdiom Phone=18, Default=20}"
-                    Margin="0,0,5,0" />
+            <!-- Debug connectivity button removed; command not available on VM. -->
 
             <Button Grid.Column="2"
                     Text="Refresh"

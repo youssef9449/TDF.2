@@ -10,6 +10,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
 using TDFAPI.Configuration;
+using TDFAPI.Configuration.Options;
 using TDFAPI.Middleware;
 using TDFAPI.Repositories;
 using TDFAPI.Services;
@@ -242,10 +243,40 @@ try {
     // Update INI file with new sections if needed
     IniConfiguration.UpdateConfigFile();
     logger.LogInformation("Successfully updated INI configuration file");
+
+    // Bridge values loaded from config.ini into IConfiguration so strongly-typed
+    // option binding sees them alongside appsettings.json, then register the
+    // typed option classes used throughout the rest of this file.
+    ConfigurationSetup.BridgeIniIntoConfiguration(builder);
+    ConfigurationSetup.AddTypedOptions(builder);
+    logger.LogInformation("Successfully bound typed configuration options");
 } catch (Exception ex) {
     logger.LogCritical(ex, "Failed to initialize or update INI configuration: {Message}", ex.Message);
     throw; // This is critical, so we should terminate the application
 }
+
+// Eagerly-resolved option snapshots used by the minimal-APIs and configuration
+// callbacks below. DI-resolved consumers should inject IOptions<T> instead.
+var rateLimitOptions = builder.Configuration.GetSection(RateLimitOptions.SectionName).Get<RateLimitOptions>() ?? new RateLimitOptions();
+var webSocketSettings = builder.Configuration.GetSection(WebSocketSettings.SectionName).Get<WebSocketSettings>() ?? new WebSocketSettings();
+var corsOptions = builder.Configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>() ?? new CorsOptions();
+if (corsOptions.AllowedOrigins.Count == 0)
+{
+    var legacy = builder.Configuration.GetSection("AllowedOrigins").Get<List<string>>();
+    if (legacy != null) corsOptions.AllowedOrigins.AddRange(legacy);
+}
+if (corsOptions.DevelopmentAllowedOrigins.Count == 0)
+{
+    var legacyDev = builder.Configuration.GetSection("DevelopmentAllowedOrigins").Get<List<string>>();
+    if (legacyDev != null) corsOptions.DevelopmentAllowedOrigins.AddRange(legacyDev);
+}
+var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+var databaseOptions = builder.Configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>() ?? new DatabaseOptions();
+if (string.IsNullOrWhiteSpace(databaseOptions.ConnectionString))
+{
+    databaseOptions.ConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+}
+var effectiveConnectionString = databaseOptions.BuildConnectionString();
 
 // Configure Gzip compression with higher compression level
 builder.Services.AddResponseCompression(options =>
@@ -295,7 +326,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 // Test database connection before configuring health checks
 try {
     logger.LogInformation("Testing database connection");
-    using (var connection = new SqlConnection(IniConfiguration.ConnectionString))
+    using (var connection = new SqlConnection(effectiveConnectionString))
     {
         connection.Open();
         logger.LogInformation("Database connection test successful");
@@ -309,7 +340,7 @@ try {
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy())
     .AddSqlServer(
-        IniConfiguration.ConnectionString, // Use connection string from INI file
+        effectiveConnectionString,
         name: "database",
         tags: new[] { "db", "sql", "sqlserver" });
 
@@ -318,8 +349,8 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // Add general rate limiter for all endpoints using IniConfiguration
-    var globalLimit = IniConfiguration.GetRateLimitSetting("GlobalLimitPerMinute", 100);
+    // Add general rate limiter for all endpoints using RateLimitOptions
+    var globalLimit = rateLimitOptions.GlobalLimitPerMinute;
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
     {
         return RateLimitPartition.GetFixedWindowLimiter(
@@ -333,7 +364,7 @@ builder.Services.AddRateLimiter(options =>
     });
 
     // Add specific limit for auth endpoints
-    var authLimit = IniConfiguration.GetRateLimitSetting("AuthLimitPerMinute", 10);
+    var authLimit = rateLimitOptions.AuthLimitPerMinute;
     options.AddPolicy("auth", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
@@ -345,7 +376,7 @@ builder.Services.AddRateLimiter(options =>
             }));
 
     // Add policy for API endpoints
-    var apiLimit = IniConfiguration.GetRateLimitSetting("ApiLimitPerMinute", 60);
+    var apiLimit = rateLimitOptions.ApiLimitPerMinute;
     options.AddPolicy("api", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
@@ -357,7 +388,7 @@ builder.Services.AddRateLimiter(options =>
             }));
 
     // Add policy for static resources
-    var staticLimit = IniConfiguration.GetRateLimitSetting("StaticLimitPerMinute", 200);
+    var staticLimit = rateLimitOptions.StaticLimitPerMinute;
     options.AddPolicy("static", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
@@ -372,8 +403,7 @@ builder.Services.AddRateLimiter(options =>
 // Configure CORS
 if (builder.Environment.IsDevelopment())
 {
-    // In development, load allowed origins from INI configuration
-    var developmentOrigins = IniConfiguration.DevelopmentAllowedOrigins;
+    var developmentOrigins = corsOptions.DevelopmentAllowedOrigins;
 
     // Default development origins if none configured
     if (developmentOrigins.Count == 0)
@@ -406,12 +436,11 @@ if (builder.Environment.IsDevelopment())
 }
 else
 {
-    // In production, use allowed origins from INI configuration
-    var allowedOrigins = IniConfiguration.AllowedOrigins;
+    var allowedOrigins = corsOptions.AllowedOrigins;
 
     if (allowedOrigins.Count == 0)
     {
-        throw new InvalidOperationException("No allowed origins configured for CORS in production environment. Please configure AllowedOrigins in config.ini.");
+        throw new InvalidOperationException("No allowed origins configured for CORS in production environment. Please configure AllowedOrigins in config.ini or the Cors section of appsettings.json.");
     }
 
     builder.Services.AddCors(options =>
@@ -433,9 +462,7 @@ else
 // Configure WebSockets
 builder.Services.AddWebSockets(options =>
 {
-    // Configure WebSocket options from INI configuration
-    options.KeepAliveInterval = TimeSpan.FromMinutes(
-        IniConfiguration.GetWebSocketSetting("KeepAliveMinutes", 2.0));
+    options.KeepAliveInterval = TimeSpan.FromMinutes(webSocketSettings.KeepAliveMinutes);
 });
 
 // Add WebSocket manager
@@ -445,7 +472,11 @@ builder.Services.AddSingleton<WebSocketConnectionManager>();
 builder.Services.AddSingleton<MessageStore>();
 
 // Configure authentication
-var key = Encoding.ASCII.GetBytes(builder.Configuration["Jwt:SecretKey"] ?? throw new InvalidOperationException("JWT Secret Key not configured."));
+if (string.IsNullOrEmpty(jwtOptions.SecretKey))
+{
+    throw new InvalidOperationException("JWT Secret Key not configured (Jwt:SecretKey).");
+}
+var key = Encoding.ASCII.GetBytes(jwtOptions.SecretKey);
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -463,9 +494,8 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateLifetime = true,
-        // Set issuer and audience from configuration
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidIssuer = jwtOptions.Issuer,
+        ValidAudience = jwtOptions.Audience,
         // Add clock skew tolerance to prevent minor timing issues
         ClockSkew = TimeSpan.FromMinutes(1),
         // Require signature validation
@@ -541,7 +571,7 @@ builder.Services.AddAuthentication(options =>
 
 // Add database context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(IniConfiguration.ConnectionString));
+    options.UseSqlServer(effectiveConnectionString));
 
 // Add memory cache support
 builder.Services.AddMemoryCache();
@@ -585,7 +615,10 @@ builder.Services.AddScoped<TDFShared.Services.IAuthService, AuthService>();
 
 // Register repositories with connection retry policy
 builder.Services.AddScoped(provider =>
-    new SqlConnectionFactory(IniConfiguration.ConnectionString));
+{
+    var dbOptions = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<DatabaseOptions>>().Value;
+    return new SqlConnectionFactory(dbOptions.BuildConnectionString());
+});
 
 // Register UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -763,18 +796,24 @@ if (app.Environment.IsDevelopment())
             return Results.Forbid();
         }
 
+        var sanitizedConnectionString = System.Text.RegularExpressions.Regex.Replace(
+            effectiveConnectionString ?? string.Empty,
+            "Password=([^;]*)",
+            "Password=********",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
         return Results.Json(new {
             Environment = app.Environment.EnvironmentName,
             ServerUrls = urls.ToList(),
-            DatabaseConfigured = !string.IsNullOrEmpty(IniConfiguration.ConnectionString),
-            JwtConfigured = !string.IsNullOrEmpty(IniConfiguration.JwtIssuer) &&
-                           !string.IsNullOrEmpty(IniConfiguration.JwtAudience),
+            DatabaseConfigured = !string.IsNullOrEmpty(effectiveConnectionString),
+            JwtConfigured = !string.IsNullOrEmpty(jwtOptions.Issuer) &&
+                           !string.IsNullOrEmpty(jwtOptions.Audience),
             WebSocketsEnabled = true,
             RateLimits = new {
-                Global = IniConfiguration.GetRateLimitSetting("GlobalLimitPerMinute", 100),
-                Auth = IniConfiguration.GetRateLimitSetting("AuthLimitPerMinute", 10),
-                Api = IniConfiguration.GetRateLimitSetting("ApiLimitPerMinute", 60),
-                Static = IniConfiguration.GetRateLimitSetting("StaticLimitPerMinute", 200)
+                Global = rateLimitOptions.GlobalLimitPerMinute,
+                Auth = rateLimitOptions.AuthLimitPerMinute,
+                Api = rateLimitOptions.ApiLimitPerMinute,
+                Static = rateLimitOptions.StaticLimitPerMinute
             },
             // Add system information
             System = new {
@@ -786,11 +825,7 @@ if (app.Environment.IsDevelopment())
             },
             // Add database connection test
             Database = new {
-                ConnectionString = IniConfiguration.ConnectionString.Replace(
-                    IniConfiguration.ConnectionString.Contains("Password=")
-                        ? "Password=" + new string('*', 8)
-                        : "",
-                    "Password=********"),
+                ConnectionString = sanitizedConnectionString,
                 Status = "Testing..."
             }
         });
@@ -808,7 +843,7 @@ if (app.Environment.IsDevelopment())
         }
 
         try {
-            using (var connection = new SqlConnection(IniConfiguration.ConnectionString))
+            using (var connection = new SqlConnection(effectiveConnectionString))
             {
                 await connection.OpenAsync();
                 var serverVersion = connection.ServerVersion;
@@ -847,8 +882,8 @@ app.Map("/ws", async context =>
     var wsAuthHelper = new WebSocketAuthenticationHelper(
         logger,
         key,
-        builder.Configuration["Jwt:Issuer"] ?? "tdfapi",
-        builder.Configuration["Jwt:Audience"] ?? "tdfapp",
+        string.IsNullOrEmpty(jwtOptions.Issuer) ? "tdfapi" : jwtOptions.Issuer,
+        string.IsNullOrEmpty(jwtOptions.Audience) ? "tdfapp" : jwtOptions.Audience,
         !app.Environment.IsDevelopment()
     );
 

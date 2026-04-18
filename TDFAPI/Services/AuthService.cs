@@ -8,18 +8,18 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using TDFAPI.Configuration.Options;
 using TDFAPI.Repositories;
 using TDFShared.DTOs.Auth;
 using TDFShared.DTOs.Users;
 using TDFShared.Models.User;
-using TDFAPI.Extensions; // Only one set of usings
+using TDFAPI.Extensions;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
 using TDFAPI.Domain.Auth;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using TDFShared.DTOs.Common;
 using TDFShared.Enums;
 using TDFShared.Services;
@@ -32,11 +32,13 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
     private readonly ILogger<AuthService> _logger;
     private readonly IUserRepository _userRepository;
     private readonly IRevokedTokenRepository _revokedTokenRepository;
-    private readonly IConfiguration _configuration;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ISecurityService _securityService;
     private readonly IRoleService _roleService;
+    private readonly JwtOptions _jwtOptions;
     private readonly string _jwtSecretKey;
+    private readonly string _jwtIssuer;
+    private readonly string _jwtAudience;
     private readonly int _jwtTokenExpirationMinutes;
     private readonly int _refreshTokenExpirationDays;
     private bool _disposed = false;
@@ -50,7 +52,8 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
     public AuthService(
         IUserRepository userRepository,
         IRevokedTokenRepository revokedTokenRepository,
-        IConfiguration configuration,
+        IOptions<JwtOptions> jwtOptions,
+        IOptions<SecurityOptions> securityOptions,
         IHttpContextAccessor httpContextAccessor,
         ISecurityService securityService,
         ILogger<AuthService> logger,
@@ -58,42 +61,35 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
     {
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _revokedTokenRepository = revokedTokenRepository ?? throw new ArgumentNullException(nameof(revokedTokenRepository));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _httpContextAccessor = httpContextAccessor ?? throw new ArgumentNullException(nameof(httpContextAccessor));
         _securityService = securityService ?? throw new ArgumentNullException(nameof(securityService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
 
-        // Get JWT settings from configuration
-        _jwtSecretKey = _configuration["Jwt:SecretKey"] ??
-            throw new InvalidOperationException("JWT Secret Key is not configured");
+        if (jwtOptions == null) throw new ArgumentNullException(nameof(jwtOptions));
+        if (securityOptions == null) throw new ArgumentNullException(nameof(securityOptions));
 
-        // Get token expiration settings with defaults
-        if (!int.TryParse(_configuration["Jwt:TokenExpirationMinutes"], out _jwtTokenExpirationMinutes))
-        {
-            _jwtTokenExpirationMinutes = 60; // Default to 60 minutes
-        }
-
-        if (!int.TryParse(_configuration["Jwt:RefreshTokenExpirationDays"], out _refreshTokenExpirationDays))
-        {
-            _refreshTokenExpirationDays = 7; // Default to 7 days
-        }
+        _jwtOptions = jwtOptions.Value;
+        _jwtSecretKey = _jwtOptions.SecretKey;
+        _jwtIssuer = _jwtOptions.Issuer;
+        _jwtAudience = _jwtOptions.Audience;
+        _jwtTokenExpirationMinutes = _jwtOptions.TokenValidityInMinutes > 0
+            ? _jwtOptions.TokenValidityInMinutes
+            : 60;
+        _refreshTokenExpirationDays = _jwtOptions.RefreshTokenValidityInDays > 0
+            ? _jwtOptions.RefreshTokenValidityInDays
+            : 7;
 
         if (string.IsNullOrEmpty(_jwtSecretKey) || _jwtSecretKey.Length < 32)
         {
             throw new InvalidOperationException("JWT Secret Key must be at least 32 characters long");
         }
 
-        // Account lockout parameters
-        if (!int.TryParse(_configuration["AccountLockout:MaxFailedAttempts"], out _maxFailedAttempts))
-        {
-            _maxFailedAttempts = 5; // Default to 5 failed attempts
-        }
-
-        if (!TimeSpan.TryParse(_configuration["AccountLockout:LockoutDuration"], out _lockoutDuration))
-        {
-            _lockoutDuration = TimeSpan.FromMinutes(30); // Default to 30 minutes
-        }
+        var security = securityOptions.Value;
+        _maxFailedAttempts = security.MaxFailedLoginAttempts > 0 ? security.MaxFailedLoginAttempts : 5;
+        _lockoutDuration = security.LockoutDurationMinutes > 0
+            ? TimeSpan.FromMinutes(security.LockoutDurationMinutes)
+            : TimeSpan.FromMinutes(30);
     }
 
     public async Task<TokenResponse?> LoginAsync(string username, string password)
@@ -577,8 +573,8 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
         return _securityService.GenerateJwtToken(
             user,
             _jwtSecretKey,
-            _configuration["Jwt:Issuer"] ?? "tdfapi",
-            _configuration["Jwt:Audience"] ?? "tdfapp",
+            string.IsNullOrEmpty(_jwtIssuer) ? "tdfapi" : _jwtIssuer,
+            string.IsNullOrEmpty(_jwtAudience) ? "tdfapp" : _jwtAudience,
             _jwtTokenExpirationMinutes);
     }
 

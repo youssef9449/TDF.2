@@ -52,6 +52,15 @@ namespace TDFAPI.Repositories
         Task UpdateUserDeviceInfoAsync(int userId, string deviceId, string userAgent);
 
         /// <summary>
+        /// Creates a new user with the provided authentication data
+        /// </summary>
+        /// <param name="user">The user entity to create</param>
+        /// <param name="passwordHash">The hashed password</param>
+        /// <param name="salt">The password salt</param>
+        /// <returns>The ID of the newly created user</returns>
+        Task<int> CreateAsync(UserEntity user, string passwordHash, string salt);
+
+        /// <summary>
         /// Checks if a full name is already taken by another user
         /// </summary>
         /// <param name="fullName">The full name to check</param>

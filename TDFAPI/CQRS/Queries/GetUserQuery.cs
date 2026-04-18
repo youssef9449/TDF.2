@@ -10,6 +10,7 @@ using TDFAPI.Repositories;
 using TDFAPI.Services;
 using TDFAPI.Utilities;
 using TDFAPI.Extensions;
+using TDFShared.Services;
 
 namespace TDFAPI.CQRS.Queries
 {
@@ -31,15 +32,18 @@ namespace TDFAPI.CQRS.Queries
         private readonly IUserRepository _userRepository;
         private readonly ICacheService _cacheService;
         private readonly ILogger<GetUserQueryHandler> _logger;
+        private readonly IRoleService _roleService;
 
         public GetUserQueryHandler(
             IUserRepository userRepository,
             ICacheService cacheService,
-            ILogger<GetUserQueryHandler> logger)
+            ILogger<GetUserQueryHandler> logger,
+            IRoleService roleService)
         {
             _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
             _cacheService = cacheService ?? throw new ArgumentNullException(nameof(cacheService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _roleService = roleService ?? throw new ArgumentNullException(nameof(roleService));
         }
 
         public async Task<UserDto> Handle(GetUserQuery request, CancellationToken cancellationToken)
@@ -57,7 +61,9 @@ namespace TDFAPI.CQRS.Queries
                     throw new EntityNotFoundException("User", request.UserId);
                 }
 
-                return user.ToDto();
+                var dto = user.ToDto();
+                dto.Roles = _roleService.GetRoles(dto).ToList();
+                return dto;
             }, 30, 10); // Cache for 30 minutes with 10 minute sliding expiration
         }
     }

@@ -1,100 +1,69 @@
 using MediatR;
 using TDFAPI.CQRS.Core;
-using TDFShared.DTOs.Users;
-using TDFAPI.Repositories;
-using TDFShared.Services;
-using TDFShared.Validation;
-using TDFShared.Models.User;
-using TDFShared.Models.Request;
-using TDFShared.Enums;
 using TDFAPI.Extensions;
-using TDFShared.Exceptions;
+using TDFAPI.Repositories;
+using TDFShared.DTOs.Users;
+using TDFShared.Services;
 
 namespace TDFAPI.CQRS.Commands
 {
     public class CreateUserCommand : ICommand<UserDto>
     {
-        public CreateUserRequest UserRequest { get; set; }
+        public CreateUserRequest UserRequest { get; set; } = null!;
     }
 
     public class CreateUserCommandHandler : IRequestHandler<CreateUserCommand, UserDto>
     {
         private readonly IUserRepository _userRepository;
-        private readonly IAuthService _authService;
-        private readonly IBusinessRulesService _businessRulesService;
-        private readonly ILogger<CreateUserCommandHandler> _logger;
+        private readonly ISecurityService _securityService;
+        private readonly IRoleService _roleService;
+        private readonly IUnitOfWork _unitOfWork;
 
         public CreateUserCommandHandler(
             IUserRepository userRepository,
-            IAuthService authService,
-            IBusinessRulesService businessRulesService,
-            ILogger<CreateUserCommandHandler> logger)
+            ISecurityService securityService,
+            IRoleService roleService,
+            IUnitOfWork unitOfWork)
         {
             _userRepository = userRepository;
-            _authService = authService;
-            _businessRulesService = businessRulesService;
-            _logger = logger;
+            _securityService = securityService;
+            _roleService = roleService;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<UserDto> Handle(CreateUserCommand request, CancellationToken cancellationToken)
         {
-            var userDto = request.UserRequest;
-
-            // Business Rule Validation
-            var context = new BusinessRuleContext
+            await _unitOfWork.BeginTransactionAsync();
+            try
             {
-                UsernameExistsAsync = async (uname) => await _userRepository.GetByUsernameAsync(uname) != null,
-                FullNameExistsAsync = async (fname) => await _userRepository.IsFullNameTakenAsync(fname)
-            };
+                var passwordHash = _securityService.HashPassword(request.UserRequest.Password, out var passwordSalt);
 
-            var validationResult = await _businessRulesService.ValidateUserCreationAsync(userDto, context);
-            if (!validationResult.IsValid)
-            {
-                throw new BusinessRuleException(string.Join("; ", validationResult.Errors));
+                var user = new TDFShared.Models.User.UserEntity
+                {
+                    UserName = request.UserRequest.Username,
+                    FullName = request.UserRequest.FullName,
+                    Department = request.UserRequest.Department,
+                    Title = request.UserRequest.Title,
+                    IsAdmin = request.UserRequest.IsAdmin,
+                    IsManager = request.UserRequest.IsManager,
+                    IsHR = request.UserRequest.IsHR,
+                    IsActive = false // Default from original logic
+                };
+
+                var userId = await _userRepository.CreateAsync(user, passwordHash, passwordSalt);
+                user.UserID = userId;
+
+                await _unitOfWork.CommitAsync();
+
+                var dto = user.ToDto();
+                dto.Roles = _roleService.GetRoles(dto).ToList();
+                return dto;
             }
-
-            // Hash password
-            var passwordHash = _authService.HashPassword(userDto.Password, out string salt);
-
-            var newUser = new UserEntity
+            catch
             {
-                UserName = userDto.Username,
-                FullName = userDto.FullName,
-                Department = userDto.Department,
-                Title = userDto.Title,
-                PasswordHash = passwordHash,
-                Salt = salt,
-                IsAdmin = userDto.IsAdmin,
-                IsManager = userDto.IsManager,
-                IsHR = false,
-                CreatedAt = DateTime.UtcNow,
-                IsActive = false,
-                IsConnected = false,
-                PresenceStatus = UserPresenceStatus.Offline,
-                IsAvailableForChat = false,
-                FailedLoginAttempts = 0,
-                IsLocked = false
-            };
-
-            var annualLeave = new AnnualLeaveEntity
-            {
-                FullName = newUser.FullName,
-                Annual = 15,
-                EmergencyLeave = 6,
-                Permissions = 24,
-                AnnualUsed = 0,
-                EmergencyUsed = 0,
-                PermissionsUsed = 0,
-                UnpaidUsed = 0,
-                WorkFromHomeUsed = 0
-            };
-            newUser.AnnualLeave = annualLeave;
-
-            int userId = await _userRepository.AddAsync(newUser) ? newUser.UserID : 0;
-            if (userId == 0) throw new InvalidOperationException("Failed to create user.");
-
-            var createdUser = await _userRepository.GetByIdAsync(userId);
-            return createdUser!.ToDto();
+                await _unitOfWork.RollbackAsync();
+                throw;
+            }
         }
     }
 }

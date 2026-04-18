@@ -6,6 +6,7 @@ using TDFShared.Models.Message;
 using TDFShared.Models.Notification;
 using TDFShared.DTOs.Messages;
 using System.Linq;
+using TDFAPI.Models;
 
 namespace TDFAPI.Extensions
 {
@@ -59,6 +60,9 @@ namespace TDFAPI.Extensions
                 IsManager = entity.IsManager,
                 IsHR = entity.IsHR,
                 Roles = roles,
+                IsActive = entity.IsActive ?? false,
+                IsLocked = entity.IsLocked,
+                FailedLoginAttempts = entity.FailedLoginAttempts,
                 LastLoginDate = entity.LastLoginDate,
                 LastLoginIp = entity.LastLoginIp
             };
@@ -118,6 +122,23 @@ namespace TDFAPI.Extensions
                 IsSeen = entity.IsSeen,
                 Title = title ?? "Notification",
                 Type = "notification"
+            };
+        }
+
+        public static PushTokenDto ToDto(this PushToken entity)
+        {
+            if (entity == null) return null!;
+
+            return new PushTokenDto
+            {
+                Token = entity.Token,
+                Platform = entity.Platform,
+                DeviceName = entity.DeviceName,
+                DeviceModel = entity.DeviceModel,
+                AppVersion = entity.AppVersion,
+                IsActive = entity.IsActive,
+                CreatedAt = entity.CreatedAt,
+                LastUsedAt = entity.LastUsedAt
             };
         }
     }

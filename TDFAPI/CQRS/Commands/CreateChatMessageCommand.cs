@@ -9,33 +9,30 @@ using TDFShared.Models.Message;
 
 namespace TDFAPI.CQRS.Commands
 {
-    public class CreateMessageCommand : ICommand<MessageDto>
+    public class CreateChatMessageCommand : ICommand<ChatMessageDto>
     {
-        public MessageCreateDto MessageDto { get; set; } = null!;
+        public ChatMessageCreateDto MessageDto { get; set; } = null!;
         public int SenderId { get; set; }
         public string SenderName { get; set; } = null!;
     }
 
-    public class CreateMessageCommandHandler : IRequestHandler<CreateMessageCommand, MessageDto>
+    public class CreateChatMessageCommandHandler : IRequestHandler<CreateChatMessageCommand, ChatMessageDto>
     {
         private readonly IMessageRepository _messageRepository;
         private readonly INotificationService _notificationService;
-        private readonly IUserRepository _userRepository;
         private readonly IUnitOfWork _unitOfWork;
 
-        public CreateMessageCommandHandler(
+        public CreateChatMessageCommandHandler(
             IMessageRepository messageRepository,
             INotificationService notificationService,
-            IUserRepository userRepository,
             IUnitOfWork unitOfWork)
         {
             _messageRepository = messageRepository;
             _notificationService = notificationService;
-            _userRepository = userRepository;
             _unitOfWork = unitOfWork;
         }
 
-        public async Task<MessageDto> Handle(CreateMessageCommand request, CancellationToken cancellationToken)
+        public async Task<ChatMessageDto> Handle(CreateChatMessageCommand request, CancellationToken cancellationToken)
         {
             await _unitOfWork.BeginTransactionAsync();
             try
@@ -49,22 +46,25 @@ namespace TDFAPI.CQRS.Commands
                     IsRead = false,
                     IsDelivered = false,
                     MessageType = request.MessageDto.MessageType,
+                    IsGlobal = request.MessageDto.ReceiverId == 0,
+                    Department = request.MessageDto.Department,
                     IdempotencyKey = request.MessageDto.IdempotencyKey ?? Guid.NewGuid().ToString()
                 };
 
                 var messageId = await _messageRepository.CreateAsync(message);
                 message.MessageID = messageId;
 
-                await _notificationService.SendNotificationAsync(
-                    request.MessageDto.ReceiverId,
-                    "New Message",
-                    $"New message from {request.SenderName}",
-                    NotificationType.Info);
+                if (request.MessageDto.ReceiverId != 0)
+                {
+                    await _notificationService.SendNotificationAsync(
+                        request.MessageDto.ReceiverId,
+                        "New Chat Message",
+                        $"Message from {request.SenderName}",
+                        NotificationType.Info);
+                }
 
                 await _unitOfWork.CommitAsync();
-
-                var sender = await _userRepository.GetByIdAsync(request.SenderId);
-                return message.ToDto(sender);
+                return message.ToChatDto(request.SenderName);
             }
             catch
             {

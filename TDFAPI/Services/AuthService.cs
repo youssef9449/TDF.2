@@ -158,7 +158,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 await _userRepository.UpdateLoginAttemptsAsync(userEntity.UserID, 0, false, null);
             }
 
-            var user = userEntity.ToDto();
+            var user = userEntity.ToDtoWithRoles(_roleService);
 
             // Generate tokens
             var token = GenerateJwtToken(user);
@@ -453,7 +453,7 @@ public class AuthService : TDFShared.Services.IAuthService, IDisposable
                 _logger.LogWarning("Refresh token failed: User {UserId} not found", userId);
                 return null;
             }
-            var user = userEntity.ToDto();
+            var user = userEntity.ToDtoWithRoles(_roleService);
 
             // Get user auth data to validate refresh token
             var userAuth = await _userRepository.GetUserAuthDataAsync(userId);

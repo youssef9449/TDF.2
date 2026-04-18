@@ -24,24 +24,27 @@ namespace TDFAPI.CQRS.Commands
         private readonly IUserRepository _userRepository;
         private readonly INotificationService _notificationService;
         private readonly ILogger<ApproveRequestCommandHandler> _logger;
+        private readonly IRoleService _roleService;
 
         public ApproveRequestCommandHandler(
             IRequestRepository requestRepository,
             IUserRepository userRepository,
             INotificationService notificationService,
-            ILogger<ApproveRequestCommandHandler> logger)
+            ILogger<ApproveRequestCommandHandler> logger,
+            IRoleService roleService)
         {
             _requestRepository = requestRepository;
             _userRepository = userRepository;
             _notificationService = notificationService;
             _logger = logger;
+            _roleService = roleService;
         }
 
         public async Task<bool> Handle(ApproveRequestCommand request, CancellationToken cancellationToken)
         {
             var currentUserEntity = await _userRepository.GetByIdAsync(request.ApproverId);
             if (currentUserEntity == null) throw new System.UnauthorizedAccessException("User not found.");
-            var currentUser = currentUserEntity.ToDto();
+            var currentUser = currentUserEntity.ToDtoWithRoles(_roleService);
 
             var requestEntity = await _requestRepository.GetByIdAsync(request.RequestId);
             if (requestEntity == null) throw new TDFAPI.Exceptions.EntityNotFoundException("Request", request.RequestId);

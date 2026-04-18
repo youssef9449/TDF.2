@@ -47,12 +47,26 @@ namespace TDFAPI.Repositories
                 .ToListAsync();
         }
 
-        public async Task<PaginatedResult<RequestEntity>> GetAllAsync(RequestPaginationDto pagination)
+        public async Task<PaginatedResult<RequestEntity>> GetRequestsAsync(RequestPaginationDto pagination)
         {
             var baseQuery = _context.Requests
                 .Include(r => r.User)
                 .ThenInclude(u => u.AnnualLeave)
                 .AsQueryable();
+            return await ExecutePaginatedQueryAsync(baseQuery, pagination);
+        }
+
+        public async Task<PaginatedResult<RequestEntity>> GetRequestsForApprovalAsync(RequestPaginationDto pagination)
+        {
+            var baseQuery = _context.Requests
+                .Include(r => r.User)
+                .ThenInclude(u => u.AnnualLeave)
+                .AsQueryable();
+
+            // Additional filtering for approval view could go here if needed,
+            // e.g. only showing Pending/ManagerApproved requests.
+            // For now we rely on the CQRS handler setting the FilterStatus.
+
             return await ExecutePaginatedQueryAsync(baseQuery, pagination);
         }
 
@@ -324,8 +338,7 @@ namespace TDFAPI.Repositories
                         r.RequestType == LeaveType.Permission &&
                         r.RequestFromDay >= startOfMonth &&
                         r.RequestFromDay <= endOfMonth &&
-                        r.RequestManagerStatus == RequestStatus.HRApproved &&
-                        r.RequestHRStatus == RequestStatus.ManagerApproved);
+                        r.RequestHRStatus == RequestStatus.HRApproved);
 
                 return permissionsUsed;
             }

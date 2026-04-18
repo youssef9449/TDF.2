@@ -15,7 +15,7 @@ namespace TDFAPI.CQRS.Commands
         public int RequestId { get; set; }
         public int RejecterId { get; set; }
         public bool IsHR { get; set; }
-        public string Remarks { get; set; } = string.Empty;
+        public string? Remarks { get; set; }
     }
 
     public class RejectRequestCommandHandler : IRequestHandler<RejectRequestCommand, bool>
@@ -24,24 +24,27 @@ namespace TDFAPI.CQRS.Commands
         private readonly IUserRepository _userRepository;
         private readonly INotificationService _notificationService;
         private readonly ILogger<RejectRequestCommandHandler> _logger;
+        private readonly IRoleService _roleService;
 
         public RejectRequestCommandHandler(
             IRequestRepository requestRepository,
             IUserRepository userRepository,
             INotificationService notificationService,
-            ILogger<RejectRequestCommandHandler> logger)
+            ILogger<RejectRequestCommandHandler> logger,
+            IRoleService roleService)
         {
             _requestRepository = requestRepository;
             _userRepository = userRepository;
             _notificationService = notificationService;
             _logger = logger;
+            _roleService = roleService;
         }
 
         public async Task<bool> Handle(RejectRequestCommand request, CancellationToken cancellationToken)
         {
             var currentUserEntity = await _userRepository.GetByIdAsync(request.RejecterId);
             if (currentUserEntity == null) throw new System.UnauthorizedAccessException("User not found.");
-            var currentUser = currentUserEntity.ToDto();
+            var currentUser = currentUserEntity.ToDtoWithRoles(_roleService);
 
             var requestEntity = await _requestRepository.GetByIdAsync(request.RequestId);
             if (requestEntity == null) throw new TDFAPI.Exceptions.EntityNotFoundException("Request", request.RequestId);
@@ -54,57 +57,23 @@ namespace TDFAPI.CQRS.Commands
 
             if (request.IsHR)
             {
-                if (requestEntity.RequestManagerStatus != TDFShared.Enums.RequestStatus.ManagerApproved)
-                    throw new TDFShared.Exceptions.BusinessRuleException("Request must be manager approved before HR rejection.");
-
-                requestEntity.RequestManagerStatus = TDFShared.Enums.RequestStatus.Rejected;
                 requestEntity.RequestHRStatus = TDFShared.Enums.RequestStatus.Rejected;
                 requestEntity.HRApproverId = request.RejecterId;
                 requestEntity.HRRemarks = request.Remarks;
                 requestEntity.UpdatedAt = DateTime.UtcNow;
-
-                await _requestRepository.UpdateAsync(requestEntity);
-                await _notificationService.CreateNotificationAsync(requestEntity.RequestUserID, $"Your {requestEntity.RequestType} request was rejected by HR. Reason: {request.Remarks}");
-                await NotifyDepartmentManagers(requestEntity.RequestDepartment, $"Request from {requestEntity.RequestUserFullName} rejected by HR.", request.RejecterId);
-                return true;
             }
             else
             {
-                if (requestEntity.RequestManagerStatus != TDFShared.Enums.RequestStatus.Pending)
-                    throw new TDFShared.Exceptions.BusinessRuleException("Request is not pending manager approval.");
-
-                requestEntity.RequestManagerStatus = TDFShared.Enums.RequestStatus.Rejected;
-                requestEntity.RequestHRStatus = TDFShared.Enums.RequestStatus.Rejected;
+                requestEntity.RequestManagerStatus = TDFShared.Enums.RequestStatus.ManagerRejected;
                 requestEntity.ManagerApproverId = request.RejecterId;
                 requestEntity.ManagerRemarks = request.Remarks;
                 requestEntity.UpdatedAt = DateTime.UtcNow;
-
-                await _requestRepository.UpdateAsync(requestEntity);
-                await NotifyHR($"Request from {requestEntity.RequestUserFullName} rejected by manager.", request.RejecterId);
-                await _notificationService.CreateNotificationAsync(requestEntity.RequestUserID, $"Your {requestEntity.RequestType} request was rejected by your manager. Reason: {request.Remarks}");
-                return true;
             }
-        }
 
-        private async Task NotifyHR(string message, int excludedUserId = 0)
-        {
-            var hrUsers = await _userRepository.GetUsersByRoleAsync("HR");
-            foreach (var hr in hrUsers.Where(h => h.UserID != excludedUserId))
-            {
-                await _notificationService.CreateNotificationAsync(hr.UserID, message);
-            }
-        }
+            await _requestRepository.UpdateAsync(requestEntity);
+            await _notificationService.CreateNotificationAsync(requestEntity.RequestUserID, $"Your {requestEntity.RequestType} request has been rejected.");
 
-        private async Task NotifyDepartmentManagers(string department, string message, int excludedUserId = 0)
-        {
-            var usersInDepartment = await _userRepository.GetUsersByDepartmentAsync(department);
-            var managers = await _userRepository.GetUsersByRoleAsync("Manager");
-            var departmentManagers = managers.Where(m => usersInDepartment.Any(u => u.UserID == m.UserID) && m.UserID != excludedUserId);
-
-            foreach (var manager in departmentManagers)
-            {
-                await _notificationService.CreateNotificationAsync(manager.UserID, message);
-            }
+            return true;
         }
     }
 }

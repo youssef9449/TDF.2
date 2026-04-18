@@ -5,6 +5,7 @@ using TDFMAUI.Services;
 using TDFMAUI.ViewModels;
 using TDFShared.Enums;
 using Microsoft.Extensions.Logging;
+using TDFShared.DTOs.Users;
 using TDFShared.Services;
 using TDFMAUI.Services.Presence;
 
@@ -12,7 +13,7 @@ namespace TDFMAUI
 {
     public partial class UsersRightPanel : ContentPage
     {
-        private readonly IUserPresenceService _userPresenceService;
+        private readonly TDFMAUI.Services.Presence.IUserPresenceService _userPresenceService;
         private readonly ILogger<UsersRightPanel> _logger;
         private readonly PanelStateService _panelStateService;
         private readonly UsersRightPanelViewModel _viewModel;
@@ -22,7 +23,7 @@ namespace TDFMAUI
             InitializeComponent();
             try
             {
-                _userPresenceService = App.Services.GetService<IUserPresenceService>();
+                _userPresenceService = App.Services.GetService<TDFMAUI.Services.Presence.IUserPresenceService>();
                 _logger = App.Services.GetService<ILogger<UsersRightPanel>>();
                 _panelStateService = App.Services.GetService<PanelStateService>();
                 _viewModel = App.Services.GetService<UsersRightPanelViewModel>();

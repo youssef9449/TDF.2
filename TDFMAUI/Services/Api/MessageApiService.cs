@@ -1,3 +1,5 @@
+using System;
+using Microsoft.Extensions.Logging;
 using TDFShared.Constants;
 using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Messages;
@@ -20,14 +22,14 @@ namespace TDFMAUI.Services.Api
         {
             string endpoint = $"{ApiRoutes.Messages.Base}?userId={userId}&pageNumber={pagination.PageNumber}&pageSize={pagination.PageSize}";
             var response = await _httpClientService.GetAsync<ApiResponse<PaginatedResult<MessageDto>>>(endpoint);
-            return response?.Data ?? new PaginatedResult<MessageDto>();
+            return response?.Data ?? new PaginatedResult<MessageDto> { Items = Array.Empty<MessageDto>() };
         }
 
         public async Task<PaginatedResult<MessageDto>> GetAllMessagesAsync(MessagePaginationDto pagination)
         {
             string endpoint = $"{ApiRoutes.Messages.Base}?pageNumber={pagination.PageNumber}&pageSize={pagination.PageSize}";
             var response = await _httpClientService.GetAsync<ApiResponse<PaginatedResult<MessageDto>>>(endpoint);
-            return response?.Data ?? new PaginatedResult<MessageDto>();
+            return response?.Data ?? new PaginatedResult<MessageDto> { Items = Array.Empty<MessageDto>() };
         }
 
         public async Task<MessageDto> CreateMessageAsync(MessageCreateDto createDto)
@@ -66,7 +68,7 @@ namespace TDFMAUI.Services.Api
         {
             string endpoint = $"{ApiRoutes.Messages.Private}?userId={userId}&pageNumber={pagination.PageNumber}&pageSize={pagination.PageSize}";
             var response = await _httpClientService.GetAsync<ApiResponse<PaginatedResult<MessageDto>>>(endpoint);
-            return response?.Data ?? new PaginatedResult<MessageDto>();
+            return response?.Data ?? new PaginatedResult<MessageDto> { Items = Array.Empty<MessageDto>() };
         }
 
         public async Task<int> GetUnreadMessagesCountAsync(int userId)

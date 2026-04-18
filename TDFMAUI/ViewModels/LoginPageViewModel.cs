@@ -18,7 +18,7 @@ namespace TDFMAUI.ViewModels
         private readonly IWebSocketService _webSocketService;
         private readonly ILogger<LoginPageViewModel> _logger;
         private readonly IServiceProvider _serviceProvider;
-        private readonly IUserPresenceService _userPresenceService;
+        private readonly TDFMAUI.Services.Presence.IUserPresenceService _userPresenceService;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(LoginCommand))]
@@ -32,7 +32,7 @@ namespace TDFMAUI.ViewModels
             IAuthClient authService,
             IAuthApiService authApiService,
             IWebSocketService webSocketService,
-            IUserPresenceService userPresenceService,
+            TDFMAUI.Services.Presence.IUserPresenceService userPresenceService,
             ILogger<LoginPageViewModel> logger,
             IServiceProvider serviceProvider)
         {

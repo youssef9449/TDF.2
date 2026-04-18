@@ -23,7 +23,7 @@ namespace TDFMAUI
     {
         private readonly IAuthClient _authService;
         private readonly ILogger<AppShell> _logger;
-        private readonly IUserPresenceService _userPresenceService;
+        private readonly TDFMAUI.Services.Presence.IUserPresenceService _userPresenceService;
         private string _previousRoute = "//"; // To store the route before opening the flyout
 
         /// <summary>        /// Gets the previous route that was navigated from before the current route
@@ -42,7 +42,7 @@ namespace TDFMAUI
         /// </summary>
         public bool IsDesktopUser => DeviceHelper.IsDesktop;
 
-        public AppShell(IAuthClient authService, ILogger<AppShell> logger, IUserPresenceService userPresenceService)
+        public AppShell(IAuthClient authService, ILogger<AppShell> logger, TDFMAUI.Services.Presence.IUserPresenceService userPresenceService)
         {
             Debug.WriteLine("[AppShell] Constructor started");
             _logger = logger;

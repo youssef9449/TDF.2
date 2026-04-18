@@ -17,6 +17,9 @@ using TDFShared.Validation;
 using TDFShared.Services;
 using TDFMAUI.Services.Notifications;
 using TDFMAUI.Services.Presence;
+#if !WINDOWS && !MACCATALYST
+using Plugin.LocalNotification;
+#endif
 
 namespace TDFMAUI
 {
@@ -122,9 +125,9 @@ namespace TDFMAUI
 
 #if DEBUG
             builder.Logging.AddDebug();
-            builder.Services.AddLogging(lb => { lb.AddDebug(); lb.SetMinimumLevel(LogLevel.Information); });
+            builder.Services.AddLogging(lb => { lb.AddDebug(); lb.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information); });
 #else
-            builder.Services.AddLogging(lb => { lb.AddDebug(); lb.SetMinimumLevel(LogLevel.Warning); });
+            builder.Services.AddLogging(lb => { lb.AddDebug(); lb.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Warning); });
 #endif
 
             builder.Services.AddSingleton<TDFMAUI.Services.WebSocket.IWebSocketTokenProvider, TDFMAUI.Services.WebSocket.WebSocketTokenProvider>();
@@ -148,7 +151,7 @@ namespace TDFMAUI
             builder.Services.AddSingleton<IUserPresenceApiService>(sp => sp.GetRequiredService<UserPresenceApiService>());
             builder.Services.AddSingleton<IUserPresenceEventsService, UserPresenceEventsService>();
             builder.Services.AddSingleton<IUserPresenceCacheService, UserPresenceCacheService>();
-            builder.Services.AddSingleton<IUserPresenceService, UserPresenceService>();
+            builder.Services.AddSingleton<TDFMAUI.Services.Presence.IUserPresenceService, UserPresenceService>();
             builder.Services.AddSingleton<IUserProfileService, UserProfileService>();
             builder.Services.AddSingleton<PanelStateService>();
             builder.Services.AddSingleton<LookupService>();
@@ -190,7 +193,7 @@ namespace TDFMAUI
             builder.Services.AddSingleton<IPlatformNotificationService, PlatformNotificationService>();
             builder.Services.AddSingleton<NotificationService>();
             builder.Services.AddSingleton<IExtendedNotificationService>(sp => sp.GetRequiredService<NotificationService>());
-            builder.Services.AddSingleton<TDFMAUI.Services.INotificationClient>(sp => sp.GetRequiredService<NotificationService>());
+            builder.Services.AddSingleton<TDFMAUI.Services.Notifications.INotificationClient>(sp => sp.GetRequiredService<NotificationService>());
             builder.Services.AddSingleton<TDFShared.Contracts.IUserFeedbackService>(sp => sp.GetRequiredService<NotificationService>());
             
 #if WINDOWS || MACCATALYST

@@ -19,6 +19,34 @@ using TDFShared.Contracts;
 
 namespace TDFMAUI.ViewModels
 {
+    /// <summary>
+    /// Static options used by request filter UI (status + leave type dropdowns).
+    /// </summary>
+    public static class RequestOptions
+    {
+        public static List<string> StatusOptions { get; } = new()
+        {
+            "All",
+            nameof(RequestStatus.Pending),
+            nameof(RequestStatus.ManagerApproved),
+            nameof(RequestStatus.HRApproved),
+            nameof(RequestStatus.Rejected),
+            nameof(RequestStatus.ManagerRejected),
+            nameof(RequestStatus.Canceled)
+        };
+
+        public static List<string> TypeOptions { get; } = new()
+        {
+            "All",
+            nameof(LeaveType.Annual),
+            nameof(LeaveType.Emergency),
+            nameof(LeaveType.Unpaid),
+            nameof(LeaveType.Permission),
+            nameof(LeaveType.ExternalAssignment),
+            nameof(LeaveType.WorkFromHome)
+        };
+    }
+
     [QueryProperty(nameof(UserId), "userId")]
     public partial class RequestApprovalViewModel : BaseViewModel, IDisposable
     {
@@ -34,7 +62,7 @@ namespace TDFMAUI.ViewModels
                 _ = LoadRequestsAsync();
             }
         }
-        private readonly Services.INotificationClient _notificationService;
+        private readonly Services.Notifications.INotificationClient _notificationService;
         private readonly IAuthClient _authService;
         private readonly ILogger<RequestApprovalViewModel> _logger;
         private readonly ILookupService _lookupService;
@@ -71,9 +99,19 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty]
         private LookupItem? _selectedDepartment;
 
-        [ObservableProperty] private bool? _isAdmin;
-        [ObservableProperty] private bool? _isManager;
-        [ObservableProperty] private bool? _isHR;
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanFilterByDepartment))]
+        private bool? _isAdmin;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanFilterByDepartment))]
+        private bool? _isManager;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanFilterByDepartment))]
+        private bool? _isHR;
+
+        public bool CanFilterByDepartment => IsAdmin == true || IsHR == true || IsManager == true;
 
         [ObservableProperty] private int _currentPage = 1;
         [ObservableProperty] private int _pageSize = 10;
@@ -94,7 +132,7 @@ namespace TDFMAUI.ViewModels
 
         public RequestApprovalViewModel(
             IRequestService requestService,
-            Services.INotificationClient notificationService,
+            Services.Notifications.INotificationClient notificationService,
             IAuthClient authService,
             ILogger<RequestApprovalViewModel> logger,
             ILookupService lookupService,

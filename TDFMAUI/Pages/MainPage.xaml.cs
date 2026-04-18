@@ -57,9 +57,8 @@ public partial class MainPage : ContentPage
     private async void OnMessagesClicked(object sender, EventArgs e)
     {
         var webSocketService = App.Services.GetService<WebSocketService>();
-        var userPresenceService = App.Services.GetService<IUserPresenceService>();
-        var messageApiService = App.Services.GetService<IMessageService>();
-        await Navigation.PushAsync(new MessagesPage(messageApiService, webSocketService, userPresenceService));
+        var viewModel = App.Services.GetRequiredService<MessagesViewModel>();
+        await Navigation.PushAsync(new MessagesPage(viewModel, webSocketService));
     }
 
     private async void OnProfileClicked(object sender, EventArgs e)

@@ -310,13 +310,6 @@ namespace TDFMAUI.Helpers
             // Try to get the resource
             if (Application.Current.Resources.TryGetValue(resourceKey, out var value) && value != null)
             {
-                // If the resource is an OnAppTheme object, resolve it manually for C# callers
-                if (value is OnAppTheme<T> onAppTheme)
-                {
-                    var targetTheme = theme ?? CurrentTheme;
-                    return targetTheme == AppTheme.Dark ? onAppTheme.Dark : onAppTheme.Light;
-                }
-                
                 // If the resource is already of the requested type, return it
                 if (value is T typedValue)
                     return typedValue;

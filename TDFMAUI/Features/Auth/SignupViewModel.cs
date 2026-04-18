@@ -8,7 +8,9 @@ using System.Threading.Tasks;
 using TDFMAUI.Services;
 using TDFShared.DTOs.Auth;
 using TDFShared.DTOs.Common;
+using TDFShared.DTOs.Users;
 using TDFShared.Services;
+using TDFShared.Validation;
 using TDFMAUI.ViewModels;
 
 namespace TDFMAUI.Features.Auth

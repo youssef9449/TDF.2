@@ -24,24 +24,20 @@
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <ContentPage.BindingContext>
-        <vm:RequestApprovalViewModel />
-    </ContentPage.BindingContext>
-
     <Grid RowDefinitions="Auto, Auto, *, Auto" ColumnDefinitions="*, Auto" Padding="10" RowSpacing="10">
         <Label Grid.Row="0" Grid.Column="0" Text="Desktop Layout" IsVisible="{x:Static helpers:DeviceHelper.IsDesktop}"/>
         <Label Grid.Row="0" Grid.Column="0" Text="Mobile Layout" IsVisible="{x:Static helpers:DeviceHelper.IsMobile}"/>
 
         <!-- Loading Indicator -->
         <ActivityIndicator Grid.RowSpan="4" Grid.ColumnSpan="2"
-                           IsVisible="{Binding IsLoading}"
-                           IsRunning="{Binding IsLoading}"
+                           IsVisible="{Binding IsBusy}"
+                           IsRunning="{Binding IsBusy}"
                            HorizontalOptions="Center" VerticalOptions="Center" />
 
         <!-- Filters Header (Mobile) -->
         <Button Grid.Row="0" Grid.ColumnSpan="2" Text="Show Filters"
                 Clicked="OnToggleFiltersClicked"
-                IsVisible="{Binding IsLoading, Converter={StaticResource InverseBoolConverter}}">
+                IsVisible="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}">
              <Button.Triggers>
                 <DataTrigger TargetType="Button" Binding="{Binding Source={x:Reference FiltersPanel}, Path=IsVisible}" Value="True">
                     <Setter Property="Text" Value="Hide Filters"/>

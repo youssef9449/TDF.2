@@ -44,7 +44,7 @@
 
         <!-- Team Members List -->
         <RefreshView Grid.Row="1"
-                     IsRefreshing="{Binding IsLoading}"
+                     IsRefreshing="{Binding IsBusy}"
                      Command="{Binding RefreshCommand}">
             <ScrollView>
                 <VerticalStackLayout>
@@ -220,8 +220,8 @@
 
         <!-- Loading Indicator -->
         <ActivityIndicator Grid.Row="1"
-                          IsVisible="{Binding IsLoading}"
-                          IsRunning="{Binding IsLoading}"
+                          IsVisible="{Binding IsBusy}"
+                          IsRunning="{Binding IsBusy}"
                           Color="{StaticResource Primary}"
                           HorizontalOptions="Center"
                           VerticalOptions="Center"/>

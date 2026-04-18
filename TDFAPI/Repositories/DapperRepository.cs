@@ -1,27 +1,29 @@
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
-using TDFAPI.Configuration;
+using TDFAPI.Configuration.Options;
 using TDFAPI.Exceptions;
 
 namespace TDFAPI.Repositories
 {
     /// <summary>
-    /// Base repository using Dapper for performance-critical queries
+    /// Base repository using Dapper for performance-critical queries.
     /// </summary>
     public class DapperRepository
     {
         private readonly string _connectionString;
         protected readonly ILogger _logger;
 
-        public DapperRepository(ILogger logger)
+        public DapperRepository(IOptions<DatabaseOptions> databaseOptions, ILogger logger)
         {
-            _connectionString = IniConfiguration.ConnectionString;
+            if (databaseOptions == null) throw new ArgumentNullException(nameof(databaseOptions));
+            _connectionString = databaseOptions.Value.BuildConnectionString();
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 

@@ -5,7 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using TDFAPI.Configuration;
+using Microsoft.Extensions.Options;
+using TDFAPI.Configuration.Options;
 using TDFAPI.Data;
 using TDFShared.DTOs.Common;
 using TDFShared.Models.Department;
@@ -18,9 +19,13 @@ namespace TDFAPI.Services
         private readonly ILogger<LookupService> _logger;
         private readonly ApplicationDbContext _dbContext;
 
-        public LookupService(IConfiguration configuration, ILogger<LookupService> logger, ApplicationDbContext dbContext)
+        public LookupService(
+            IOptions<DatabaseOptions> databaseOptions,
+            ILogger<LookupService> logger,
+            ApplicationDbContext dbContext)
         {
-            _connectionString = IniConfiguration.ConnectionString;
+            if (databaseOptions == null) throw new ArgumentNullException(nameof(databaseOptions));
+            _connectionString = databaseOptions.Value.BuildConnectionString();
             _logger = logger;
             _dbContext = dbContext;
         }

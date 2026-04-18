@@ -2,28 +2,29 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
-using TDFAPI.Configuration;
+using TDFAPI.Configuration.Options;
 
 namespace TDFAPI.Services
 {
     public class DatabaseMigrationService : IHostedService
     {
-        private readonly IConfiguration _configuration;
+        private readonly IOptions<DatabaseOptions> _databaseOptions;
         private readonly ILogger<DatabaseMigrationService> _logger;
         private readonly IHostEnvironment _environment;
-        
+
         public DatabaseMigrationService(
-            IConfiguration configuration, 
+            IOptions<DatabaseOptions> databaseOptions,
             ILogger<DatabaseMigrationService> logger,
             IHostEnvironment environment)
         {
-            _configuration = configuration;
+            _databaseOptions = databaseOptions ?? throw new ArgumentNullException(nameof(databaseOptions));
             _logger = logger;
             _environment = environment;
         }
@@ -32,29 +33,8 @@ namespace TDFAPI.Services
         {
             try
             {
-                // Try to get connection string from IniConfiguration first
-                string connectionString = null;
-                
-                try
-                {
-                    connectionString = Configuration.IniConfiguration.ConnectionString;
-                    _logger.LogInformation("Using connection string from IniConfiguration (config.ini)");
-                }
-                catch (Exception iniEx)
-                {
-                    _logger.LogWarning(iniEx, "Failed to get connection string from IniConfiguration, falling back to appsettings.json");
-                }
-                
-                // Fall back to appsettings.json if needed
-                if (string.IsNullOrEmpty(connectionString))
-                {
-                    connectionString = _configuration.GetConnectionString("DefaultConnection");
-                    if (!string.IsNullOrEmpty(connectionString))
-                    {
-                        _logger.LogInformation("Using connection string from appsettings.json");
-                    }
-                }
-                
+                string connectionString = _databaseOptions.Value.BuildConnectionString();
+
                 if (string.IsNullOrEmpty(connectionString))
                 {
                     throw new InvalidOperationException("Database connection string not found in any configuration source");

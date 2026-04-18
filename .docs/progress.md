@@ -1,5 +1,42 @@
 # TDF Project Progress Log
 
+## Phase 2 - Options Pattern for Configuration
+
+### Features Implemented
+1. Added strongly-typed option classes in `TDFAPI/Configuration/Options/` for
+   JWT, CORS, Security (with nested password-policy), Rate Limiting,
+   WebSockets, and Database settings.
+2. Added `ConfigurationSetup` helper that (a) bridges values already parsed
+   from `config.ini` into `IConfiguration` via an in-memory source and
+   (b) registers every option class with DI from the merged configuration.
+3. Refactored `Program.cs`, `AuthService`, `DapperRepository`,
+   `LookupService`, and `DatabaseMigrationService` to consume
+   `IOptions<T>` instead of the static `IniConfiguration` accessors or raw
+   `IConfiguration["Jwt:..."]` string lookups.
+
+### Errors Encountered
+1. `AuthService` previously read `Jwt:TokenExpirationMinutes`
+   / `Jwt:RefreshTokenExpirationDays` / `AccountLockout:*` keys that do not
+   exist in `appsettings.json` (the canonical keys are
+   `Jwt:TokenValidityInMinutes` / `Jwt:RefreshTokenValidityInDays` /
+   `Security:*`). This meant token lifetimes and lockout thresholds
+   silently fell back to hard-coded defaults instead of operator config.
+2. `SqlConnectionFactory`, `ApplicationDbContext`, and the health check
+   previously took their connection string from the static
+   `IniConfiguration.ConnectionString` property, which bypasses DI and
+   prevents any form of option validation.
+
+### Solutions Implemented
+1. `AuthService` now consumes `IOptions<JwtOptions>` and
+   `IOptions<SecurityOptions>`, which bind to the actual configuration
+   section names and expose them as typed properties.
+2. `Program.cs` now resolves `DatabaseOptions` once during bootstrap and
+   passes `databaseOptions.BuildConnectionString()` to EF, Dapper, the
+   health check, and both debug endpoints. Services resolved later in the
+   container inject `IOptions<DatabaseOptions>` directly.
+3. Build verified: `TDFAPI` compiles with **0 errors** and 219 warnings
+   (2 fewer than the Phase 1 baseline).
+
 ## April 19, 2024
 
 ### Features Implemented

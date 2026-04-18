@@ -2,7 +2,7 @@ using System;
 using TDFMAUI.Helpers;
 using TDFShared.DTOs.Users;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Presence
 {
     public interface IUserPresenceEventsService : IDisposable
     {

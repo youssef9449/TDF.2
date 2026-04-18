@@ -466,3 +466,64 @@ interface or the fully-qualified `TDFShared.Services.INotificationService`
 for the shared one). Same grep check passed for `TDFAPI/`.
 
 ---
+
+## Phase 11 - Notification layering + Presence namespace on MAUI client
+
+### Features Implemented
+1. Deleted `TDFMAUI/Services/NotificationExtensionService.cs` (511 LOC of
+   dead code - implemented `IExtendedNotificationService` but was never
+   registered in DI; `NotificationService` is the sole implementation).
+2. Physically reorganized notification services into
+   `TDFMAUI/Services/Notifications/` subfolder with namespace
+   `TDFMAUI.Services.Notifications`:
+   - `INotificationClient.cs`, `IExtendedNotificationService.cs`,
+     `IPlatformNotificationService.cs`, `IPushNotificationService.cs`,
+     `INotificationPermissionPlatformService.cs`, `NotificationEventArgs.cs`,
+     `NotificationService.cs`, `PlatformNotificationService.cs`,
+     `PushNotificationService.cs`, `NoOpPushNotificationService.cs`
+3. Physically reorganized user-presence services into
+   `TDFMAUI/Services/Presence/` subfolder with namespace
+   `TDFMAUI.Services.Presence`:
+   - `IUserPresenceService.cs` (facade),
+     `IUserPresenceApiService.cs`, `IUserPresenceCacheService.cs`,
+     `IUserPresenceEventsService.cs`, `UserPresenceService.cs`,
+     `UserPresenceApiService.cs`, `UserPresenceCacheService.cs`,
+     `UserPresenceEventsService.cs`
+4. Added `using TDFMAUI.Services.Notifications;` and/or
+   `using TDFMAUI.Services.Presence;` to 27 caller files
+   (ViewModels, Pages, AppShell, App.xaml.cs per-platform,
+   DeviceHelper, NotificationHelper, WebSocketService /
+   WebSocketMessageRouter, AuthService, FirebaseMessagingService,
+   MauiProgram, iOS permission platform service).
+5. `MauiProgram.cs` DI wiring is unchanged - the same types are
+   registered, just resolved via `TDFMAUI.Services.Notifications.*` /
+   `TDFMAUI.Services.Presence.*` namespaces now. The `IUserPresenceService`
+   facade was already a facade (wraps ApiService + CacheService +
+   EventsService internally), so no additional coordinator class was
+   required for Presence - the new namespace boundary makes the
+   ViewModel-facing facade explicit. Notification DI continues to
+   register `NotificationService` as the single implementation of
+   `INotificationClient` (in-app/HTTP + WebSocket), `IExtendedNotificationService`
+   (optional extended surface), and `TDFShared.Contracts.IUserFeedbackService`
+   (UI toast/alert) - matching the layering called for in the plan
+   without forcing a breaking rename of already-distinct contracts.
+
+### Errors Encountered
+None during the Phase 11 reorganization. File moves via `git mv` preserved
+history; namespace sed was targeted (`^namespace TDFMAUI\.Services$` -
+only the exact unsuffixed namespace was rewritten, so no collateral
+damage to `TDFMAUI.Services.Api` / `TDFMAUI.Services.WebSocket`).
+
+### How Errors Were Fixed
+N/A.
+
+### Build Verification
+`TDFAPI.csproj` + `TDFShared.csproj`: 0 errors. TDFMAUI full build still
+not possible locally (no iOS/Android SDKs); verified by (a) sed touching
+only the exact namespace to be rewritten, (b) a Python walker that
+added the new `using` directive to every `.cs` file under `TDFMAUI/`
+that references one of the moved identifiers, and (c) grep confirming
+29 distinct `using TDFMAUI.Services.(Notifications|Presence);`
+directives across the project.
+
+---

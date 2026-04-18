@@ -24,6 +24,7 @@ using Microsoft.Maui.Storage;
 using Microsoft.Maui;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
+using TDFMAUI.Services.Presence;
 
 namespace TDFMAUI.Services;
 

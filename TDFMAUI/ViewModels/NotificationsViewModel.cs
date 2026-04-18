@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TDFShared.DTOs.Messages;
 using TDFMAUI.Helpers;
+using TDFMAUI.Services.Notifications;
 
 namespace TDFMAUI.ViewModels
 {

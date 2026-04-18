@@ -7,7 +7,7 @@ using TDFShared.DTOs.Users;
 using TDFShared.Enums;
 using TDFShared.Constants;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Presence
 {
     public class UserPresenceApiService : IUserPresenceApiService
     {

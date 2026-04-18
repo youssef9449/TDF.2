@@ -7,7 +7,7 @@ using TDFMAUI.Helpers;
 using TDFShared.Enums;
 using TDFShared.DTOs.Users;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Presence
 {
     public class UserPresenceService : IUserPresenceService, IDisposable
     {

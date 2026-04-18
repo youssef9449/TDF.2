@@ -14,6 +14,7 @@ using Microsoft.Maui.Devices;
 using TDFMAUI.Helpers;
 using TDFShared.Services;
 using System.Diagnostics;
+using TDFMAUI.Services.Presence;
 
 namespace TDFMAUI
 {

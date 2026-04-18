@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using TDFShared.DTOs.Messages;
 using TDFShared.Enums;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Notifications
 {
     /// <summary>
     /// Service for managing push notifications on the client side

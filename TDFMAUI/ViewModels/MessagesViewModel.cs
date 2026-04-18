@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using TDFShared.Enums;
 using TDFMAUI.Helpers;
+using TDFMAUI.Services.Presence;
 
 namespace TDFMAUI.ViewModels
 {

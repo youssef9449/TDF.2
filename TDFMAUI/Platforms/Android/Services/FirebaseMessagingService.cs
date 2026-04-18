@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using TDFMAUI.Services; // For IPushNotificationService, ILocalStorageService
 using TDFShared.DTOs.Messages;
 using TDFShared.Enums;
+using TDFMAUI.Services.Notifications;
 
 namespace TDFMAUI.Platforms.Android.Services
 {

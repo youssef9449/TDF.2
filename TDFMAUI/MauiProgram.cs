@@ -125,6 +125,8 @@ namespace TDFMAUI
             builder.Services.AddLogging(lb => { lb.AddDebug(); lb.SetMinimumLevel(LogLevel.Warning); });
 #endif
 
+            builder.Services.AddSingleton<TDFMAUI.Services.WebSocket.IWebSocketTokenProvider, TDFMAUI.Services.WebSocket.WebSocketTokenProvider>();
+            builder.Services.AddSingleton<TDFMAUI.Services.WebSocket.IWebSocketMessageRouter, TDFMAUI.Services.WebSocket.WebSocketMessageRouter>();
             builder.Services.AddSingleton<WebSocketService>();
             builder.Services.AddSingleton<IWebSocketService>(sp => sp.GetRequiredService<WebSocketService>());
 

@@ -3,6 +3,7 @@ using TDFShared.DTOs.Users;
 using TDFShared.Models.Request;
 using TDFShared.Models.User;
 using TDFShared.Models.Message;
+using TDFShared.Models.Notification;
 using TDFShared.DTOs.Messages;
 using System.Linq;
 
@@ -100,6 +101,23 @@ namespace TDFAPI.Extensions
                 Department = entity.Department,
                 IdempotencyKey = entity.IdempotencyKey,
                 Timestamp = entity.Timestamp
+            };
+        }
+
+        public static NotificationDto ToDto(this NotificationEntity entity, string? title = null)
+        {
+            if (entity == null) return null!;
+
+            return new NotificationDto
+            {
+                NotificationId = entity.NotificationID,
+                UserId = entity.ReceiverID,
+                SenderId = entity.SenderID,
+                Message = entity.Message ?? string.Empty,
+                Timestamp = entity.Timestamp,
+                IsSeen = entity.IsSeen,
+                Title = title ?? "Notification",
+                Type = "notification"
             };
         }
     }

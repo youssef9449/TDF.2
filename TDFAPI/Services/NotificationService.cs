@@ -19,6 +19,7 @@ namespace TDFAPI.Services
         private readonly ILogger<NotificationService> _logger;
         private readonly IPushTokenService _pushTokenService;
         private readonly IBackgroundJobService _jobService;
+        private readonly MediatR.IMediator _mediator;
 
         public NotificationService(
             INotificationRepository notificationRepository,
@@ -26,7 +27,8 @@ namespace TDFAPI.Services
             WebSocketConnectionManager webSocketManager,
             ILogger<NotificationService> logger,
             IPushTokenService pushTokenService,
-            IBackgroundJobService jobService)
+            IBackgroundJobService jobService,
+            MediatR.IMediator mediator)
         {
             _notificationRepository = notificationRepository;
             _userRepository = userRepository;
@@ -34,6 +36,7 @@ namespace TDFAPI.Services
             _logger = logger;
             _pushTokenService = pushTokenService;
             _jobService = jobService;
+            _mediator = mediator;
         }
 
         public async Task<IEnumerable<NotificationEntity>> GetUnreadNotificationsAsync(int userId)
@@ -43,7 +46,7 @@ namespace TDFAPI.Services
 
         public async Task<bool> MarkAsSeenAsync(int notificationId, int userId)
         {
-            return await _notificationRepository.MarkNotificationAsSeenAsync(notificationId, userId);
+            return await _mediator.Send(new TDFAPI.CQRS.Commands.MarkNotificationAsSeenCommand { NotificationId = notificationId, UserId = userId });
         }
 
         public async Task<bool> MarkNotificationsAsSeenAsync(IEnumerable<int> notificationIds, int userId)
@@ -51,7 +54,7 @@ namespace TDFAPI.Services
             bool allMarked = true;
             foreach (var id in notificationIds)
             {
-                if (!await _notificationRepository.MarkNotificationAsSeenAsync(id, userId)) allMarked = false;
+                if (!await MarkAsSeenAsync(id, userId)) allMarked = false;
             }
             return allMarked;
         }
@@ -170,7 +173,7 @@ namespace TDFAPI.Services
 
         public async Task<bool> DeleteNotificationAsync(int notificationId, int userId)
         {
-            return await _notificationRepository.DeleteNotificationAsync(notificationId, userId);
+            return await _mediator.Send(new TDFAPI.CQRS.Commands.DeleteNotificationCommand { NotificationId = notificationId, UserId = userId });
         }
 
         private async Task SendPushNotificationIfNeededAsync(int userId, NotificationEntity notification, string title, NotificationType type, string? data)

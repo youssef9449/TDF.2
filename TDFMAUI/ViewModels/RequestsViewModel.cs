@@ -36,10 +36,25 @@ namespace TDFMAUI.ViewModels
 
         partial void OnShowPendingOnlyChanged(bool value) => _ = LoadRequestsAsync();
 
-        [ObservableProperty] private bool? _isAdmin;
-        [ObservableProperty] private bool? _isManager;
-        [ObservableProperty] private bool? _isHR;
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanManageRequests))]
+        private bool? _isAdmin;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanManageRequests))]
+        private bool? _isManager;
+
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(CanManageRequests))]
+        private bool? _isHR;
+
         [ObservableProperty] private int _currentUserId;
+
+        /// <summary>
+        /// True when the current user can approve/reject/view other users' requests
+        /// (admin, HR, or manager).
+        /// </summary>
+        public bool CanManageRequests => IsAdmin == true || IsHR == true || IsManager == true;
 
         [ObservableProperty]
         private ObservableCollection<LookupItem> _departments = new();
@@ -172,17 +187,26 @@ namespace TDFMAUI.ViewModels
             if (request == null) return;
             try
             {
+                string? remarks = await Shell.Current.DisplayPromptAsync("Approve Request", "Remarks (optional):", "Approve", "Cancel");
+                if (remarks == null) return; // user canceled
+
                 var currentUser = await _authService.GetCurrentUserAsync();
                 ApiResponse<RequestResponseDto>? response = null;
-                if (currentUser?.IsManager == true) response = await _requestService.ManagerApproveRequestAsync(request.RequestID, new ManagerApprovalDto { ManagerRemarks = "Approved" });
-                else if (currentUser?.IsHR == true) response = await _requestService.HRApproveRequestAsync(request.RequestID, new HRApprovalDto { HRRemarks = "Approved" });
+                if (currentUser?.IsManager == true)
+                    response = await _requestService.ManagerApproveRequestAsync(request.RequestID, new ManagerApprovalDto { ManagerRemarks = remarks });
+                else if (currentUser?.IsHR == true || currentUser?.IsAdmin == true)
+                    response = await _requestService.HRApproveRequestAsync(request.RequestID, new HRApprovalDto { HRRemarks = remarks });
 
                 if (response?.Success == true)
                 {
-                    await Shell.Current.DisplayAlert("Success", "Approved", "OK");
+                    await Shell.Current.DisplayAlert("Success", "Request approved.", "OK");
                     await LoadRequestsAsync();
                 }
-                else ErrorMessage = response?.Message ?? "Approval failed.";
+                else
+                {
+                    ErrorMessage = response?.Message ?? "Approval failed.";
+                    await Shell.Current.DisplayAlert("Error", ErrorMessage, "OK");
+                }
             }
             catch (Exception ex) { _logger.LogError(ex, "Approval error"); }
         }
@@ -193,17 +217,26 @@ namespace TDFMAUI.ViewModels
             if (request == null) return;
             try
             {
+                string? reason = await Shell.Current.DisplayPromptAsync("Reject Request", "Reason (required):", "Reject", "Cancel");
+                if (string.IsNullOrWhiteSpace(reason)) return;
+
                 var currentUser = await _authService.GetCurrentUserAsync();
                 ApiResponse<RequestResponseDto>? response = null;
-                if (currentUser?.IsManager == true) response = await _requestService.ManagerRejectRequestAsync(request.RequestID, new ManagerRejectDto { ManagerRemarks = "Rejected" });
-                else if (currentUser?.IsHR == true) response = await _requestService.HRRejectRequestAsync(request.RequestID, new HRRejectDto { HRRemarks = "Rejected" });
+                if (currentUser?.IsManager == true)
+                    response = await _requestService.ManagerRejectRequestAsync(request.RequestID, new ManagerRejectDto { ManagerRemarks = reason });
+                else if (currentUser?.IsHR == true || currentUser?.IsAdmin == true)
+                    response = await _requestService.HRRejectRequestAsync(request.RequestID, new HRRejectDto { HRRemarks = reason });
 
                 if (response?.Success == true)
                 {
-                    await Shell.Current.DisplayAlert("Success", "Rejected", "OK");
+                    await Shell.Current.DisplayAlert("Success", "Request rejected.", "OK");
                     await LoadRequestsAsync();
                 }
-                else ErrorMessage = response?.Message ?? "Rejection failed.";
+                else
+                {
+                    ErrorMessage = response?.Message ?? "Rejection failed.";
+                    await Shell.Current.DisplayAlert("Error", ErrorMessage, "OK");
+                }
             }
             catch (Exception ex) { _logger.LogError(ex, "Rejection error"); }
         }

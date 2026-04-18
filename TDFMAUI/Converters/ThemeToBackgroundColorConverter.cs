@@ -8,13 +8,22 @@ namespace TDFMAUI.Converters
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is AppTheme theme)
+            if (Application.Current?.Resources is not { } resources)
             {
-                return theme == AppTheme.Dark 
-                    ? Application.Current.Resources["DarkBackground"] 
-                    : Application.Current.Resources["BackgroundColor"];
+                return Colors.White;
             }
-            return Application.Current.Resources["BackgroundColor"];
+
+            if (value is AppTheme theme && theme == AppTheme.Dark)
+            {
+                if (resources.TryGetValue("BackgroundColorDark", out var darkColor))
+                {
+                    return darkColor;
+                }
+            }
+
+            return resources.TryGetValue("BackgroundColor", out var bgColor)
+                ? bgColor
+                : Colors.White;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

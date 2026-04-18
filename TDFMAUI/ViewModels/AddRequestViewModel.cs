@@ -48,9 +48,6 @@ namespace TDFMAUI.ViewModels
                 // For these types, EndDate should always equal StartDate
                 EndDate = StartDate;
             }
-
-            OnPropertyChanged(nameof(RequestCreateDto));
-            OnPropertyChanged(nameof(RequestUpdateDto));
         }
 
         [ObservableProperty]
@@ -64,10 +61,23 @@ namespace TDFMAUI.ViewModels
 
         partial void OnStartDateChanged(DateTime value)
         {
-            // Prevent setting weekend dates
+            // Prevent setting weekend dates: snap to the next working day (Sunday)
+            // instead of silently accepting the invalid value.
             if (IsWeekend(value))
             {
-                Shell.Current.DisplayAlert("Invalid Date", "Start date cannot be on a weekend (Friday or Saturday). Please select a working day.", "OK");
+                DateTime nextWorkingDay = value;
+                while (IsWeekend(nextWorkingDay))
+                {
+                    nextWorkingDay = nextWorkingDay.AddDays(1);
+                }
+
+                _ = Shell.Current.DisplayAlert(
+                    "Invalid Date",
+                    "Start date cannot be on a weekend (Friday or Saturday). Moved to the next working day.",
+                    "OK");
+
+                // Reassigning triggers OnStartDateChanged again with a valid value.
+                StartDate = nextWorkingDay;
                 return;
             }
 
@@ -160,8 +170,7 @@ namespace TDFMAUI.ViewModels
             IAuthClient authService,
             ILogger<AddRequestViewModel> logger,
             TDFShared.Validation.IValidationService validationService,
-            TDFShared.Validation.IBusinessRulesService businessRulesService,
-            RequestResponseDto? existingRequest = null)
+            TDFShared.Validation.IBusinessRulesService businessRulesService)
         {
             _requestService = requestService ?? throw new ArgumentNullException(nameof(requestService));
             _authService = authService ?? throw new ArgumentNullException(nameof(authService));
@@ -170,31 +179,56 @@ namespace TDFMAUI.ViewModels
             _businessRulesService = businessRulesService ?? throw new ArgumentNullException(nameof(businessRulesService));
 
             LoadLeaveTypes();
+            ResetToCreateMode();
+        }
 
-            if (existingRequest != null)
+        /// <summary>
+        /// Switches the ViewModel into edit mode and populates its fields from an
+        /// existing request. Call from the page when navigating via the
+        /// ExistingRequest query parameter.
+        /// </summary>
+        public void InitializeWithRequest(RequestResponseDto? existingRequest)
+        {
+            if (existingRequest == null)
             {
-                IsEditMode = true;
-                RequestId = existingRequest.RequestID;
-                SelectedLeaveType = MapFromLeaveType(existingRequest.LeaveType);
-                RequestReason = existingRequest.RequestReason;
-                StartDate = existingRequest.RequestStartDate;
-                EndDate = existingRequest.RequestEndDate;
+                ResetToCreateMode();
+                return;
+            }
 
-                if (existingRequest.LeaveType == LeaveType.Permission || existingRequest.LeaveType == LeaveType.ExternalAssignment)
-                {
-                    StartTime = existingRequest.RequestBeginningTime;
-                    EndTime = existingRequest.RequestEndingTime;
-                }
+            IsEditMode = true;
+            RequestId = existingRequest.RequestID;
+            SelectedLeaveType = MapFromLeaveType(existingRequest.LeaveType);
+            RequestReason = existingRequest.RequestReason ?? string.Empty;
+            StartDate = existingRequest.RequestStartDate;
+            EndDate = existingRequest.RequestEndDate;
 
-                _ = ValidateEditAccessAsync(existingRequest);
+            if (existingRequest.LeaveType == LeaveType.Permission ||
+                existingRequest.LeaveType == LeaveType.ExternalAssignment)
+            {
+                StartTime = existingRequest.RequestBeginningTime;
+                EndTime = existingRequest.RequestEndingTime;
             }
             else
             {
-                IsEditMode = false;
-                RequestId = 0;
-                StartDate = DateTime.Today;
-                EndDate = DateTime.Today;
+                StartTime = null;
+                EndTime = null;
             }
+
+            _ = ValidateEditAccessAsync(existingRequest);
+        }
+
+        private void ResetToCreateMode()
+        {
+            IsEditMode = false;
+            RequestId = 0;
+            RequestReason = string.Empty;
+            StartTime = null;
+            EndTime = null;
+
+            var today = DateTime.Today;
+            while (IsWeekend(today)) today = today.AddDays(1);
+            StartDate = today;
+            EndDate = today;
         }
 
         private void LoadLeaveTypes()

@@ -79,41 +79,44 @@ namespace TDFMAUI.Services
         public async Task<ApiResponse<RequestResponseDto>> ManagerApproveRequestAsync(int requestId, ManagerApprovalDto approvalDto)
         {
             var response = await _requestApiService.ManagerApproveRequestAsync(requestId, approvalDto);
-            if (response.Success)
-            {
-                return await GetRequestByIdAsync(requestId);
-            }
-            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+            return ToRequestResponse(response, requestId);
         }
 
         public async Task<ApiResponse<RequestResponseDto>> HRApproveRequestAsync(int requestId, HRApprovalDto approvalDto)
         {
             var response = await _requestApiService.HRApproveRequestAsync(requestId, approvalDto);
-            if (response.Success)
-            {
-                return await GetRequestByIdAsync(requestId);
-            }
-            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+            return ToRequestResponse(response, requestId);
         }
 
         public async Task<ApiResponse<RequestResponseDto>> ManagerRejectRequestAsync(int requestId, ManagerRejectDto rejectDto)
         {
             var response = await _requestApiService.ManagerRejectRequestAsync(requestId, rejectDto);
-            if (response.Success)
-            {
-                return await GetRequestByIdAsync(requestId);
-            }
-            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+            return ToRequestResponse(response, requestId);
         }
 
         public async Task<ApiResponse<RequestResponseDto>> HRRejectRequestAsync(int requestId, HRRejectDto rejectDto)
         {
             var response = await _requestApiService.HRRejectRequestAsync(requestId, rejectDto);
-            if (response.Success)
+            return ToRequestResponse(response, requestId);
+        }
+
+        /// <summary>
+        /// Converts a bool-valued API response from an approve/reject call into the
+        /// RequestResponseDto-typed response that <see cref="IRequestService"/> exposes.
+        /// Callers that need the refreshed DTO must fetch it themselves; avoiding an
+        /// extra round-trip here keeps list refreshes from doubling API load.
+        /// </summary>
+        private static ApiResponse<RequestResponseDto> ToRequestResponse(ApiResponse<bool> response, int requestId)
+        {
+            return new ApiResponse<RequestResponseDto>
             {
-                return await GetRequestByIdAsync(requestId);
-            }
-            return new ApiResponse<RequestResponseDto> { Success = false, Message = response.Message };
+                Success = response.Success,
+                Message = response.Message,
+                StatusCode = response.StatusCode,
+                Data = response.Success
+                    ? new RequestResponseDto { RequestID = requestId }
+                    : null
+            };
         }
 
         public async Task<ApiResponse<PaginatedResult<RequestResponseDto>>> GetRequestsForApprovalAsync(

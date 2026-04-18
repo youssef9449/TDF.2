@@ -1,3 +1,6 @@
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using TDFShared.Constants;
 using TDFShared.DTOs.Common;
@@ -118,8 +121,54 @@ namespace TDFMAUI.Services.Api
 
         public async Task<bool> UploadProfilePictureAsync(Stream imageStream, string fileName, string contentType)
         {
-            // TODO: implement multipart upload via IHttpClientService.
-            return false;
+            if (imageStream is null) throw new ArgumentNullException(nameof(imageStream));
+
+            try
+            {
+                using var form = new MultipartFormDataContent();
+                var streamContent = new StreamContent(imageStream);
+
+                if (!string.IsNullOrWhiteSpace(contentType) &&
+                    MediaTypeHeaderValue.TryParse(contentType, out var parsedContentType))
+                {
+                    streamContent.Headers.ContentType = parsedContentType;
+                }
+                else
+                {
+                    streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+                }
+
+                // Server-side parameter name is "file" (IFormFile file) on
+                // POST /api/users/profile/image — keep this name in sync with UsersController.UploadProfilePicture.
+                form.Add(streamContent, "file", string.IsNullOrWhiteSpace(fileName) ? "profile.jpg" : fileName);
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, ApiRoutes.Users.UploadProfilePicture)
+                {
+                    Content = form,
+                };
+
+                using var response = await _httpClientService.HttpClient.SendAsync(request).ConfigureAwait(false);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    _logger?.LogWarning(
+                        "UploadProfilePictureAsync failed: {StatusCode} {Reason} - {Body}",
+                        (int)response.StatusCode, response.ReasonPhrase, body);
+                    return false;
+                }
+
+                var apiResponse = await response.Content
+                    .ReadFromJsonAsync<ApiResponse<bool>>()
+                    .ConfigureAwait(false);
+
+                return apiResponse?.Success == true && apiResponse.Data;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "UserApiService: Failed to upload profile picture: {Message}", ex.Message);
+                return false;
+            }
         }
 
         public async Task<bool> UpdateUserProfileAsync(UpdateMyProfileRequest profileData)

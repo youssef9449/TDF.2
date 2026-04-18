@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using TDFAPI.Services.Realtime;
 using TDFShared.DTOs.Messages;
 using TDFShared.Models.Message;
 using TDFShared.Models.Notification;
@@ -14,19 +15,15 @@ namespace TDFAPI.Services
 {
     /// <summary>
     /// Server-side implementation of <see cref="TDFShared.Services.INotificationService"/>.
-    /// Thin facade over the API's own <see cref="INotificationDispatchService"/> plus the
-    /// <see cref="WebSocketConnectionManager"/> — the shared contract is intentionally
-    /// narrow enough that every method here has a real implementation.
-    ///
-    /// Previously this class was a pile of <c>return Task.FromResult(false)</c> stubs
-    /// (notably <c>HandleUserConnectionAsync</c>, which silently dropped every incoming
-    /// WebSocket). It is now a single place where the shared interface meets the API's
-    /// concrete services.
+    /// Thin facade over the API's own <see cref="INotificationDispatchService"/>, the
+    /// <see cref="WebSocketConnectionManager"/>, and <see cref="IServerWebSocketRouter"/>
+    /// — every method on this class maps to a real server behaviour.
     /// </summary>
     public class NotificationServiceAdapter : TDFShared.Services.INotificationService
     {
         private readonly INotificationDispatchService _notificationService;
         private readonly WebSocketConnectionManager _webSocketManager;
+        private readonly IServerWebSocketRouter _router;
         private readonly ILogger<NotificationServiceAdapter> _logger;
 
         /// <summary>Buffer used while reading a single WebSocket frame.</summary>
@@ -35,10 +32,12 @@ namespace TDFAPI.Services
         public NotificationServiceAdapter(
             INotificationDispatchService notificationService,
             WebSocketConnectionManager webSocketManager,
+            IServerWebSocketRouter router,
             ILogger<NotificationServiceAdapter> logger)
         {
             _notificationService = notificationService;
             _webSocketManager = webSocketManager;
+            _router = router;
             _logger = logger;
         }
 
@@ -159,9 +158,9 @@ namespace TDFAPI.Services
             => Task.FromResult(_webSocketManager.GetUserConnections(userId).Any());
 
         /// <summary>
-        /// Registers the connection with <see cref="WebSocketConnectionManager"/> and pumps
-        /// frames until the peer disconnects. Previously a stub that returned immediately,
-        /// which closed every WebSocket as soon as the HTTP scope exited.
+        /// Registers the connection with <see cref="WebSocketConnectionManager"/>, pumps
+        /// frames until the peer disconnects, and dispatches each inbound text frame
+        /// through <see cref="IServerWebSocketRouter"/>.
         /// </summary>
         public async Task HandleUserConnectionAsync(WebSocketConnectionEntity connection, WebSocket socket)
         {
@@ -192,14 +191,22 @@ namespace TDFAPI.Services
                         break;
                     }
 
-                    // Phase 1 intentionally does not route inbound frames — a dedicated
-                    // WebSocket router will be introduced in a later phase. Log at
-                    // debug level so the server stays transparent about what it saw.
-                    _logger.LogDebug(
-                        "Received {MessageType} frame ({Length} bytes) on connection {ConnectionId}",
-                        received.Value.MessageType,
-                        received.Value.Payload.Count,
-                        connection.ConnectionId);
+                    if (received.Value.MessageType != WebSocketMessageType.Text)
+                    {
+                        _logger.LogDebug(
+                            "Ignoring non-text frame ({MessageType}, {Length} bytes) on connection {ConnectionId}",
+                            received.Value.MessageType,
+                            received.Value.Payload.Count,
+                            connection.ConnectionId);
+                        continue;
+                    }
+
+                    var json = Encoding.UTF8.GetString(
+                        received.Value.Payload.Array!,
+                        received.Value.Payload.Offset,
+                        received.Value.Payload.Count);
+
+                    await _router.RouteAsync(connection, json, CancellationToken.None);
                 }
             }
             catch (WebSocketException ex)

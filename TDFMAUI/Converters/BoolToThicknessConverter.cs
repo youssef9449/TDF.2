@@ -29,11 +29,13 @@ namespace TDFMAUI.Converters
         }
 
         /// <summary>
-        /// Not implemented
+        /// One-way converter: a <see cref="Thickness"/> cannot be reduced back to the
+        /// originating <c>bool</c>, so <see cref="ConvertBack"/> is intentionally unsupported.
         /// </summary>
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return null;
+            throw new NotSupportedException(
+                $"{nameof(BoolToThicknessConverter)} is a one-way converter and does not support {nameof(ConvertBack)}.");
         }
 
         /// <summary>

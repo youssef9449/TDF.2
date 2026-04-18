@@ -475,10 +475,13 @@ namespace TDFMAUI.Services.Notifications
                     return false;
                 }
 #else
-                _logger.LogWarning("Desktop notifications not implemented for this platform");
-                // Mark as not delivered with a specific error message
-                await UpdateNotificationDeliveryStatusAsync(trackingId, false, "Platform not supported");
-                return false;
+                // Windows/MacCatalyst are handled above; other targets (e.g. Tizen) do not
+                // expose a native desktop toast API, so fall back to the in-app notification
+                // path that drives the LocalNotificationRequested event consumers already
+                // subscribe to.
+                var fallbackResult = await ShowLocalNotificationAsync(title, message, notificationType, data);
+                await UpdateNotificationDeliveryStatusAsync(trackingId, fallbackResult);
+                return fallbackResult;
 #endif
             }
             catch (Exception ex)

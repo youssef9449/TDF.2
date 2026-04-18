@@ -74,6 +74,7 @@ namespace TDFAPI.Extensions.Startup
             services.AddScoped<ILookupService, LookupService>();
             services.AddScoped<TDFAPI.Services.IUserPresenceService, UserPresenceService>();
             services.AddScoped<TDFAPI.Services.INotificationDispatchService, TDFAPI.Services.NotificationService>();
+            services.AddSingleton<TDFAPI.Services.Realtime.IServerWebSocketRouter, TDFAPI.Services.Realtime.ServerWebSocketRouter>();
             services.AddScoped<TDFShared.Services.INotificationService, NotificationServiceAdapter>();
             services.AddScoped<TDFShared.Services.IRoleService, TDFShared.Services.RoleService>();
             services.AddScoped<IPushTokenService, PushTokenService>();

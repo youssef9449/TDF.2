@@ -1,5 +1,46 @@
 # TDF Project Progress Log
 
+## Phase 3 - Split Program.cs Into Extension Methods
+
+### Features Implemented
+1. Added `TDFAPI/Extensions/Startup/` with one extension class per bootstrap
+   concern: logging, response compression, rate limiting, CORS, JWT
+   authentication, WebSockets, controllers, persistence, application
+   services, health checks, development-only debug endpoints, request
+   pipeline composition, and startup banners.
+2. Introduced `StartupOptionsSnapshot.FromConfiguration()` which eagerly
+   materialises the six strongly-typed option classes required by
+   bootstrap-time code (rate-limiter factories, minimal-API debug
+   endpoints, the WebSocket endpoint) before the DI container is built.
+3. Shrank `Program.cs` from **1048 LOC of imperative bootstrap code** down
+   to **74 LOC** that reads top-to-bottom as the startup flow. No
+   behaviour change: the same services are registered, the same
+   middleware runs in the same order, the same endpoints are mapped, and
+   the same configuration sources are honoured.
+
+### Errors Encountered
+1. Initial extraction referenced `SqlConnectionFactory`, `IRoleService`,
+   and `RoleService` without qualification, but the first lives in
+   `TDFAPI.Services` (not imported by the new extension class) and the
+   other two live in `TDFShared.Services` (ambiguous with the `TDFAPI`
+   import). Compilation failed with `CS0246`.
+2. There are two classes named `WebSocketAuthenticationHelper`
+   (`TDFAPI.Utilities` and `TDFAPI.Middleware`). The original
+   `Program.cs` relied on the `TDFAPI.Middleware` import; the extracted
+   code needed to preserve that choice.
+
+### Solutions Implemented
+1. Added the missing `using TDFAPI.Services;` to
+   `PersistenceExtensions.cs` and fully qualified the role service
+   registration as `TDFShared.Services.IRoleService` /
+   `TDFShared.Services.RoleService` to disambiguate from the TDFAPI
+   namespace.
+2. `WebSocketStartupExtensions.cs` imports `TDFAPI.Middleware` explicitly
+   and uses the middleware-namespace helper class, matching the
+   resolution that the monolithic `Program.cs` had.
+3. Verified `TDFAPI` compiles cleanly (0 errors) with the extracted
+   extension methods and the slimmed-down `Program.cs`.
+
 ## Phase 2 - Options Pattern for Configuration
 
 ### Features Implemented

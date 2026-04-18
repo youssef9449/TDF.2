@@ -142,15 +142,6 @@ namespace TDFMAUI.Services
             }
         }
 
-        public async Task<IEnumerable<TitleDTO>> GetTitlesAsync()
-        {
-            if (_disposed) throw new ObjectDisposedException(nameof(LookupService));
-            
-            _logger.LogWarning("GetTitlesAsync called but not implemented - titles are loaded on demand");
-            await Task.CompletedTask; // Satisfy async contract
-            return new List<TitleDTO>();
-        }
-
         public void Dispose()
         {
             Dispose(true);

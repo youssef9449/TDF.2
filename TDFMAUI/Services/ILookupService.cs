@@ -8,6 +8,5 @@ namespace TDFMAUI.Services
     {
         Task<List<LookupItem>> GetDepartmentsAsync();
         Task<List<string>> GetTitlesForDepartmentAsync(string department);
-        Task<IEnumerable<TitleDTO>> GetTitlesAsync();
     }
 }

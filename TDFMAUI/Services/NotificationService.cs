@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Text.Json;
 using TDFMAUI.Helpers;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,7 @@ namespace TDFMAUI.Services
 {
     public class NotificationService : INotificationService, IExtendedNotificationService, IUserFeedbackService
     {
-        private readonly IApiService _apiService;
+        private readonly IHttpClientService _httpClientService;
         private readonly WebSocketService _webSocketService;
         private readonly ILogger<NotificationService> _logger;
         private readonly ILocalStorageService _localStorage;
@@ -20,15 +21,15 @@ namespace TDFMAUI.Services
         public event EventHandler<NotificationDto>? NotificationReceived;
 
         public NotificationService(
-            IApiService apiService,
+            IHttpClientService httpClientService,
             WebSocketService webSocketService,
             ILocalStorageService localStorage,
             ILogger<NotificationService> logger)
         {
-            _apiService = apiService;
-            _webSocketService = webSocketService;
-            _localStorage = localStorage;
-            _logger = logger;
+            _httpClientService = httpClientService ?? throw new ArgumentNullException(nameof(httpClientService));
+            _webSocketService = webSocketService ?? throw new ArgumentNullException(nameof(webSocketService));
+            _localStorage = localStorage ?? throw new ArgumentNullException(nameof(localStorage));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _webSocketService.NotificationReceived += OnWebSocketNotificationReceived;
         }
@@ -37,7 +38,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var response = await _apiService.GetAsync<ApiResponse<List<NotificationDto>>>(ApiRoutes.Notifications.GetUnread);
+                var response = await _httpClientService.GetAsync<ApiResponse<List<NotificationDto>>>(ApiRoutes.Notifications.GetUnread);
                 if (response?.Data == null) return Enumerable.Empty<NotificationEntity>();
 
                 return response.Data.Select(dto => new NotificationEntity
@@ -62,7 +63,7 @@ namespace TDFMAUI.Services
             try
             {
                 var endpoint = string.Format(ApiRoutes.Notifications.MarkSeen, notificationId);
-                var response = await _apiService.PostAsync<object, ApiResponse<bool>>(endpoint, new { });
+                var response = await _httpClientService.PostAsync<object, ApiResponse<bool>>(endpoint, new { });
                 return response?.Data ?? false;
             }
             catch (Exception ex)
@@ -76,7 +77,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var response = await _apiService.PostAsync<object, ApiResponse<bool>>(ApiRoutes.Notifications.MarkAllSeen, new { notificationIds });
+                var response = await _httpClientService.PostAsync<object, ApiResponse<bool>>(ApiRoutes.Notifications.MarkAllSeen, new { notificationIds });
                 return response?.Data ?? false;
             }
             catch (Exception ex)
@@ -90,7 +91,7 @@ namespace TDFMAUI.Services
         {
             try
             {
-                var response = await _apiService.PostAsync<object, ApiResponse<bool>>(ApiRoutes.Notifications.Broadcast, new { message, department });
+                var response = await _httpClientService.PostAsync<object, ApiResponse<bool>>(ApiRoutes.Notifications.Broadcast, new { message, department });
                 return response?.Data ?? false;
             }
             catch (Exception ex)
@@ -111,7 +112,22 @@ namespace TDFMAUI.Services
             try
             {
                 var endpoint = string.Format(ApiRoutes.Notifications.Delete, notificationId);
-                var response = await _apiService.DeleteAsync<ApiResponse<bool>>(endpoint);
+                using var httpResponse = await _httpClientService.DeleteAsync(endpoint);
+                if (!httpResponse.IsSuccessStatusCode)
+                {
+                    return false;
+                }
+
+                var body = await httpResponse.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(body))
+                {
+                    return true;
+                }
+
+                var response = JsonSerializer.Deserialize<ApiResponse<bool>>(body, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
                 return response?.Data ?? false;
             }
             catch (Exception ex)

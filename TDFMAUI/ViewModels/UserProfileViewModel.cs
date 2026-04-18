@@ -67,7 +67,7 @@ namespace TDFMAUI.ViewModels
                 }
                 else ErrorMessage = $"User {userId} not found";
             }
-            catch (Exception ex) { ErrorMessage = ApiService.GetFriendlyErrorMessage(ex); }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
             finally { IsBusy = false; }
         }
 

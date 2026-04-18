@@ -10,19 +10,9 @@ jobs:
   check-todos:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
-    - name: Set up .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: '7.0.x'
-
-    - name: Install dependencies
-      run: |
-        dotnet tool install -g dotnet-todo-checker
-        echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
     - name: Check for TODOs
       run: |
@@ -82,14 +72,14 @@ jobs:
         ./check-todos.sh
 
     - name: Create TODO Report
-      if: always()
+      if: success()
       run: |
         mkdir -p reports
         ./check-todos.sh > reports/todo-report.txt
-        
+
     - name: Upload TODO Report
-      if: always()
-      uses: actions/upload-artifact@v3
+      if: success()
+      uses: actions/upload-artifact@v4
       with:
         name: todo-report
         path: reports/todo-report.txt 

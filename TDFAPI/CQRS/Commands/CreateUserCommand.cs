@@ -68,7 +68,7 @@ namespace TDFAPI.CQRS.Commands
                 IsManager = userDto.IsManager,
                 IsHR = false,
                 CreatedAt = DateTime.UtcNow,
-                IsActive = true,
+                IsActive = false,
                 IsConnected = false,
                 PresenceStatus = UserPresenceStatus.Offline,
                 IsAvailableForChat = false,

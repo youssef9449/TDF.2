@@ -527,3 +527,60 @@ that references one of the moved identifiers, and (c) grep confirming
 directives across the project.
 
 ---
+
+## Phase 12 - Validation clarity + server/client IAuthService split
+
+### Features Implemented
+1. **Validation envelope unification:** registered a global
+   `InvalidModelStateResponseFactory` in `ControllersStartupExtensions`
+   that wraps every `[ApiController]` model-binding failure in
+   `ApiResponse<object>.FromModelState(...)`, matching the envelope every
+   controller emits for its own errors. Removed the four now-redundant
+   `if (!ModelState.IsValid) return BadRequest(...)` guards:
+   `AuthController.Login`, `AuthController.Register`,
+   `RequestController.CreateRequest`, `RequestController.UpdateRequest`.
+   Downstream handler-level validation (MediatR `ValidationBehavior` +
+   `BusinessRulesService`) is unaffected - it runs against the command
+   object, not the DTO.
+2. **Client-side auth contract:** new `TDFShared.Contracts.IAuthClient`
+   narrows the surface MAUI callers actually use - `LoginAsync`,
+   `LogoutAsync`, `RefreshTokenAsync`, `GetCurrentTokenAsync`,
+   `SetAuthenticationTokenAsync`, `GetCurrentUserIdAsync`,
+   `GetUserRolesAsync`, `GetCurrentUserDepartmentAsync`,
+   `GetCurrentUserAsync`. `TDFMAUI.Services.AuthService` now implements
+   both `IAuthService` (back-compat) and `IAuthClient`; `MauiProgram`
+   registers the class against both interface keys.
+3. **Server-side auth contract:** new `TDFAPI.Services.IAuthTokenIssuer`
+   gathers the server-only operations - JWT issuance / refresh,
+   server-side token revocation, password hashing/verification, and the
+   server's claim-principal reads. `TDFAPI.Services.AuthService` now
+   implements both `IAuthService` and `IAuthTokenIssuer`; DI registers
+   `AuthService` once and resolves both interfaces to the same scoped
+   instance (no behavioural change - it was already `AddScoped`).
+4. **Removed dead `IAuthService` dependency from `HttpClientService`:**
+   the field was assigned in the constructor but never referenced -
+   leftover from pre-Phase-5 when `HttpClientService` owned the
+   refresh-on-401 logic. Phase 5 moved that into
+   `AuthenticationHeaderHandler` using `IAuthTokenStore`, so the
+   `IAuthService` parameter was dead. Dropped the field, the parameter,
+   and the xmldoc.
+
+### Errors Encountered
+None. The dead `IAuthService` field was verified unused via
+`grep '_authService\.' TDFShared/**/*.cs` returning zero hits before
+removing it. No external caller constructs `HttpClientService` directly
+(`grep 'new HttpClientService(' .` returned zero hits), so the
+constructor-signature change is DI-only.
+
+### How Errors Were Fixed
+N/A.
+
+### Build Verification
+`TDFAPI.csproj` + `TDFShared.csproj`: 0 errors. MAUI full build still
+not possible locally (no iOS/Android SDKs); verified by code review
+that the two `AuthService` implementations now satisfy both their old
+`IAuthService` contract and their new narrow contract
+(`IAuthClient` / `IAuthTokenIssuer`) - no methods added, just an
+additional interface declaration.
+
+---

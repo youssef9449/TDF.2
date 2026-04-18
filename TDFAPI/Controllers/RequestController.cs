@@ -62,11 +62,6 @@ namespace TDFAPI.Controllers
         public async Task<ActionResult<ApiResponse<RequestResponseDto>>> CreateRequest(
             [FromBody] RequestCreateDto createDto)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ApiResponse<RequestResponseDto>.FromModelState(ModelState));
-            }
-
             var result = await _mediator.Send(new CreateRequestCommand
             {
                 CreateDto = createDto,
@@ -81,11 +76,6 @@ namespace TDFAPI.Controllers
         public async Task<ActionResult<ApiResponse<RequestResponseDto>>> UpdateRequest(
             int id, [FromBody] RequestUpdateDto updateDto)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ApiResponse<RequestResponseDto>.FromModelState(ModelState));
-            }
-
             var result = await _mediator.Send(new UpdateRequestCommand
             {
                 RequestId = id,

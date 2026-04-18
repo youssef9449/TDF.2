@@ -40,12 +40,6 @@ namespace TDFAPI.Controllers
         [HttpPost("login")]
         public async Task<ActionResult<ApiResponse<TokenResponse>>> Login([FromBody] LoginRequestDto request)
         {
-            if (!ModelState.IsValid)
-            {
-                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
-                return BadRequest(ApiResponse<TokenResponse>.ErrorResponse(string.Join(", ", errors)));
-            }
-
             var ipAddress = HttpContext.GetRealIpAddress();
             var userAgent = HttpContext.Request.Headers.UserAgent.ToString();
 
@@ -115,12 +109,6 @@ namespace TDFAPI.Controllers
         [HttpPost("register")]
         public async Task<ActionResult<ApiResponse<RegisterResponseDto>>> Register([FromBody] RegisterRequestDto request)
         {
-            if (!ModelState.IsValid)
-            {
-                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
-                return BadRequest(ApiResponse<RegisterResponseDto>.ErrorResponse(string.Join(", ", errors)));
-            }
-
             // Prevent self-assignment of privileged roles via public registration.
             request.IsAdmin = false;
             request.IsManager = false;

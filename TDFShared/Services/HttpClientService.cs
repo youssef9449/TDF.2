@@ -28,7 +28,6 @@ namespace TDFShared.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<HttpClientService> _logger;
         private readonly IConnectivityService _connectivityService;
-        private readonly IAuthService _authService;
         private readonly IAuthTokenStore _tokenStore;
         private readonly IHttpTelemetry _telemetry;
         private readonly Dictionary<string, string> _defaultHeaders = new();
@@ -100,21 +99,18 @@ namespace TDFShared.Services
         /// <param name="httpClient">The HttpClient instance to use</param>
         /// <param name="logger">The logger instance</param>
         /// <param name="connectivityService">The connectivity service</param>
-        /// <param name="authService">The authentication service</param>
         /// <param name="tokenStore">Bearer-token store shared with <see cref="AuthenticationHeaderHandler"/>.</param>
         /// <param name="telemetry">Aggregate telemetry sink shared with <see cref="HttpTelemetryHandler"/>.</param>
         public HttpClientService(
             HttpClient httpClient,
             ILogger<HttpClientService> logger,
             IConnectivityService connectivityService,
-            IAuthService authService,
             IAuthTokenStore tokenStore,
             IHttpTelemetry telemetry)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _connectivityService = connectivityService ?? throw new ArgumentNullException(nameof(connectivityService));
-            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
             _tokenStore = tokenStore ?? throw new ArgumentNullException(nameof(tokenStore));
             _telemetry = telemetry ?? throw new ArgumentNullException(nameof(telemetry));
 

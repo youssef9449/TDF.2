@@ -47,70 +47,11 @@ namespace TDFMAUI.Config
         public static int RetryDelay { get; set; } = 1000; // milliseconds
         public static double RetryMultiplier { get; set; } = 2.0; // exponential backoff multiplier
 
-        // Authentication configuration
+        // Authentication key names retained for secure-storage compatibility.
         public static string AuthTokenKey { get; set; } = "auth_token";
         public static string RefreshTokenKey { get; set; } = "refresh_token";
 
-        // Token storage - now backed by UserSessionService when available
-        private static IUserSessionService? _userSessionService;
-        private static string? _fallbackCurrentToken;
-        private static DateTime _fallbackTokenExpiration = DateTime.MinValue;
-        private static string? _fallbackCurrentRefreshToken;
-        private static DateTime _fallbackRefreshTokenExpiration = DateTime.MinValue;
-
-        public static string? CurrentToken 
-        { 
-            get => _userSessionService?.CurrentToken ?? _fallbackCurrentToken;
-            set 
-            {
-                if (_userSessionService != null)
-                {
-                    // Update via session service if available
-                    _userSessionService.SetTokens(value, TokenExpiration, CurrentRefreshToken, RefreshTokenExpiration);
-                }
-                else
-                {
-                    // Fallback to local storage
-                    _fallbackCurrentToken = value;
-                }
-            }
-        }
-
-        public static DateTime TokenExpiration 
-        { 
-            get => _userSessionService?.TokenExpiration ?? _fallbackTokenExpiration;
-            set => _fallbackTokenExpiration = value;
-        }
-
-        public static string? CurrentRefreshToken 
-        { 
-            get => _userSessionService?.CurrentRefreshToken ?? _fallbackCurrentRefreshToken;
-            set 
-            {
-                if (_userSessionService != null)
-                {
-                    // Update via session service if available
-                    _userSessionService.SetTokens(CurrentToken, TokenExpiration, value, RefreshTokenExpiration);
-                }
-                else
-                {
-                    // Fallback to local storage
-                    _fallbackCurrentRefreshToken = value;
-                }
-            }
-        }
-
-        public static DateTime RefreshTokenExpiration 
-        { 
-            get => _userSessionService?.RefreshTokenExpiration ?? _fallbackRefreshTokenExpiration;
-            set => _fallbackRefreshTokenExpiration = value;
-        }
-
-        public static bool IsTokenValid => _userSessionService?.IsTokenValid ?? 
-            (!string.IsNullOrEmpty(_fallbackCurrentToken) && _fallbackTokenExpiration > DateTime.UtcNow.AddMinutes(5));
-
-        public static bool IsRefreshTokenValid => _userSessionService?.IsRefreshTokenValid ?? 
-            (!string.IsNullOrEmpty(_fallbackCurrentRefreshToken) && _fallbackRefreshTokenExpiration > DateTime.UtcNow.AddMinutes(5));
+        // Token state intentionally lives on IUserSessionService / IAuthTokenStore — not here.
 
         // Flag to track if initialization was attempted
         private static bool _initialized = false;
@@ -151,16 +92,6 @@ namespace TDFMAUI.Config
         // Crash recovery information
         public static int CrashCount { get; private set; } = 0;
         public static DateTime LastCrashTime { get; private set; } = DateTime.MinValue;
-
-        /// <summary>
-        /// Connects the UserSessionService to ApiConfig for centralized token management
-        /// </summary>
-        /// <param name="userSessionService">The user session service instance</param>
-        public static void ConnectUserSessionService(IUserSessionService userSessionService)
-        {
-            _userSessionService = userSessionService ?? throw new ArgumentNullException(nameof(userSessionService));
-            DebugService.LogInfo("ApiConfig", "UserSessionService connected for centralized token management");
-        }
 
         /// <summary>
         /// Configure global SSL/TLS settings for the application

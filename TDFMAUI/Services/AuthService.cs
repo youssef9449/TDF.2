@@ -202,13 +202,6 @@ public class AuthService : IAuthService
                 _userSessionService.SetCurrentUser(currentUser);
                 _userSessionService.SetTokens(tokenData.Token, tokenData.Expiration, tokenData.RefreshToken, tokenData.RefreshTokenExpiration);
 
-                // Update ApiConfig for desktop fallback
-                if (DeviceHelper.IsDesktop)
-                {
-                    ApiConfig.CurrentToken = tokenData.Token;
-                    ApiConfig.TokenExpiration = tokenData.Expiration;
-                }
-
                 _logger.LogInformation("User {Username} session initialized with roles: {Roles}",
                     username, string.Join(", ", userDetails.Roles));
 
@@ -276,10 +269,6 @@ public class AuthService : IAuthService
                 // Clear local in-memory cache
                 _currentToken = null;
                 _tokenExpiration = DateTime.MinValue;
-
-                // Reset ApiConfig
-                ApiConfig.CurrentToken = null;
-                ApiConfig.TokenExpiration = DateTime.MinValue;
 
                 _logger.LogInformation("All local user session state cleared during logout.");
             }
@@ -520,13 +509,6 @@ public class AuthService : IAuthService
                 // Update HttpClient
                 await _httpClientService.SetAuthenticationTokenAsync(tokenData.Token);
 
-                // Update ApiConfig for in-memory token on desktop
-                if (DeviceHelper.IsDesktop)
-                {
-                    ApiConfig.CurrentToken = tokenData.Token;
-                    ApiConfig.TokenExpiration = tokenData.Expiration;
-                }
-
                 // Update session service
                 _userSessionService.SetTokens(tokenData.Token, tokenData.Expiration, tokenData.RefreshToken, tokenData.RefreshTokenExpiration);
 
@@ -644,13 +626,13 @@ public class AuthService : IAuthService
                 return storedToken;
             }
 
-            // For desktop platform, also check ApiConfig as fallback
-            if (DeviceHelper.IsDesktop && !string.IsNullOrEmpty(ApiConfig.CurrentToken))
+            // Fall back to the user-session service (desktop keeps its token there too).
+            if (!string.IsNullOrEmpty(_userSessionService.CurrentToken))
             {
-                _logger.LogDebug("Retrieved token from ApiConfig for desktop platform");
-                _currentToken = ApiConfig.CurrentToken;
-                _tokenExpiration = ApiConfig.TokenExpiration;
-                return ApiConfig.CurrentToken;
+                _logger.LogDebug("Retrieved token from UserSessionService");
+                _currentToken = _userSessionService.CurrentToken;
+                _tokenExpiration = _userSessionService.TokenExpiration;
+                return _userSessionService.CurrentToken;
             }
 
             _logger.LogWarning("No valid authentication token found");
@@ -680,8 +662,8 @@ public class AuthService : IAuthService
             if (!string.IsNullOrEmpty(newToken))
             {
                 // RefreshTokenFromServerAsync already handles storage and in-memory updates
-                _currentToken = ApiConfig.CurrentToken;
-                _tokenExpiration = ApiConfig.TokenExpiration;
+                _currentToken = _userSessionService.CurrentToken;
+                _tokenExpiration = _userSessionService.TokenExpiration;
                 return newToken;
             }
 
@@ -759,10 +741,7 @@ public class AuthService : IAuthService
             if (response?.Success == true && response.Data != null)
             {
                 _logger.LogInformation("Token refreshed successfully. New token length: {Length}", response.Data.Token.Length);
-                // Update the in-memory token and expiration in ApiConfig
-                ApiConfig.CurrentToken = response.Data.Token;
-                ApiConfig.TokenExpiration = response.Data.Expiration;
-                // Also save the new refresh token if provided
+                _userSessionService.SetTokens(response.Data.Token, response.Data.Expiration, response.Data.RefreshToken, response.Data.RefreshTokenExpiration);
                 if (!string.IsNullOrEmpty(response.Data.RefreshToken))
                 {
                     await _secureStorageService.SaveTokenAsync(response.Data.Token, response.Data.Expiration, response.Data.RefreshToken, response.Data.RefreshTokenExpiration);

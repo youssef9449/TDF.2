@@ -158,13 +158,23 @@ namespace TDFMAUI
             builder.Services.AddSingleton<ISecurityService, SecurityService>();
             builder.Services.AddSingleton<IErrorHandlingService, ErrorHandlingService>();
 
+            // Shared HTTP pipeline: auth header -> retry -> telemetry.
+            builder.Services.AddSingleton<TDFShared.Http.IAuthTokenStore, TDFShared.Http.InMemoryAuthTokenStore>();
+            builder.Services.AddSingleton<TDFShared.Http.IHttpTelemetry, TDFShared.Http.HttpTelemetry>();
+            builder.Services.AddTransient<TDFShared.Http.AuthenticationHeaderHandler>();
+            builder.Services.AddTransient<TDFShared.Http.PollyRetryingHandler>();
+            builder.Services.AddTransient<TDFShared.Http.HttpTelemetryHandler>();
+
             builder.Services.AddHttpClient<IHttpClientService, HttpClientService>((sp, client) =>
             {
                 var apiSettings = sp.GetRequiredService<IOptions<ApiSettings>>().Value;
                 client.BaseAddress = new Uri(apiSettings.BaseUrl);
                 client.Timeout = TimeSpan.FromSeconds(apiSettings.Timeout);
             })
-            .ConfigurePrimaryHttpMessageHandler(sp => sp.GetRequiredService<DevelopmentHttpClientHandler>());
+            .ConfigurePrimaryHttpMessageHandler(sp => sp.GetRequiredService<DevelopmentHttpClientHandler>())
+            .AddHttpMessageHandler<TDFShared.Http.AuthenticationHeaderHandler>()
+            .AddHttpMessageHandler<TDFShared.Http.PollyRetryingHandler>()
+            .AddHttpMessageHandler<TDFShared.Http.HttpTelemetryHandler>();
 
             builder.Services.AddSingleton<TDFMAUI.Services.ConnectivityService>();
             builder.Services.AddSingleton<TDFShared.Services.IConnectivityService>(sp => sp.GetRequiredService<TDFMAUI.Services.ConnectivityService>());

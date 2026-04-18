@@ -37,11 +37,22 @@ namespace TDFAPI.Extensions.Startup
 
             // Shared library services used by both API and MAUI apps.
             services.AddScoped<TDFShared.Services.ISecurityService, TDFShared.Services.SecurityService>();
+
+            // Shared HTTP pipeline: auth header -> retry -> telemetry.
+            services.AddSingleton<TDFShared.Http.IAuthTokenStore, TDFShared.Http.InMemoryAuthTokenStore>();
+            services.AddSingleton<TDFShared.Http.IHttpTelemetry, TDFShared.Http.HttpTelemetry>();
+            services.AddTransient<TDFShared.Http.AuthenticationHeaderHandler>();
+            services.AddTransient<TDFShared.Http.PollyRetryingHandler>();
+            services.AddTransient<TDFShared.Http.HttpTelemetryHandler>();
+
             services.AddHttpClient<TDFShared.Services.IHttpClientService, TDFShared.Services.HttpClientService>(client =>
             {
                 client.Timeout = System.TimeSpan.FromSeconds(30);
                 client.DefaultRequestHeaders.Add("User-Agent", "TDF-API/1.0");
-            });
+            })
+            .AddHttpMessageHandler<TDFShared.Http.AuthenticationHeaderHandler>()
+            .AddHttpMessageHandler<TDFShared.Http.PollyRetryingHandler>()
+            .AddHttpMessageHandler<TDFShared.Http.HttpTelemetryHandler>();
             services.AddSingleton<TDFShared.Services.IConnectivityService, TDFShared.Services.ConnectivityService>();
             services.AddScoped<TDFShared.Validation.IValidationService, TDFShared.Validation.ValidationService>();
             services.AddScoped<TDFShared.Validation.IBusinessRulesService, TDFShared.Validation.BusinessRulesService>();

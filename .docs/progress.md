@@ -1,5 +1,55 @@
 # TDF Project Progress Log
 
+## Phase 4 - Centralize Exception Mapping + Clean Up Controllers
+
+### Features Implemented
+1. Added `TDFAPI/Exceptions/ExceptionToResponseMapper.cs` as the single
+   source of truth for translating any thrown exception into an
+   `(HTTP status, user-facing message)` tuple.
+2. Added `TDFAPI/CQRS/Behaviors/ExceptionLoggingBehavior<TRequest,TResponse>`
+   MediatR pipeline behaviour that annotates handler failures with the
+   request name and the HTTP status they will map to, logs at the
+   appropriate level (warning for <500, error for 500+), and rethrows so
+   the global middleware can still produce the client-facing
+   `ApiResponse`.
+3. Registered the behaviour in `ApplicationServicesExtensions.AddTdfApplicationServices()`
+   alongside the existing MediatR registration.
+4. Rewrote `GlobalExceptionMiddleware.HandleExceptionAsync` to delegate
+   to `ExceptionToResponseMapper.Map(...)` instead of hand-rolled
+   switches, and removed the now-redundant `GetProblemTitle` /
+   `GetProblemType` helpers (they were dead code - the middleware never
+   emitted `ProblemDetails`, only the standardised `ApiResponse`).
+5. Stripped 70+ redundant try/catch blocks from 8 controllers
+   (`RequestController`, `UsersController`, `MessagesController`,
+   `AuthController`, `LookupsController`, `NotificationsController`,
+   `PushTokenController`, `HealthCheckController`). Exceptions now bubble
+   up so the behaviour logs them with context and the middleware produces
+   the HTTP response - removing duplicated per-endpoint
+   "log + return StatusCode(500, ...)" boilerplate. Controller-level
+   concerns (`ModelState` validation, self-delete guard, permission
+   `Forbid()` calls, pagination validation) were preserved.
+
+### Errors Encountered
+1. `AuthController` and `UsersController` lost the `TDFShared.Services`
+   using directive during the rewrite, so `IAuthService` and
+   `RequestStateManager` no longer resolved (CS0246 / CS0103).
+2. `PushTokenController` lost `TDFAPI.Extensions`, so the `PushToken.ToDto()`
+   extension method no longer resolved (CS1061).
+3. `GlobalExceptionMiddleware` still referenced the unqualified
+   `UnauthorizedAccessException` inside `GetProblemTitle` /
+   `GetProblemType`, which became ambiguous (CS0104) after
+   `using TDFAPI.Exceptions;` was added to pull in the mapper.
+
+### Solutions Implemented
+1. Added the missing `using TDFShared.Services;` to both
+   `AuthController.cs` and `UsersController.cs`.
+2. Added `using TDFAPI.Extensions;` to `PushTokenController.cs` so the
+   `ToDto()` extension in `MappingExtensions.cs` is visible again.
+3. Dropped the dead `GetProblemTitle` and `GetProblemType` helpers
+   entirely instead of disambiguating them - nothing in the middleware
+   called them, and the real mapping is now centralised in
+   `ExceptionToResponseMapper`.
+
 ## Phase 3 - Split Program.cs Into Extension Methods
 
 ### Features Implemented

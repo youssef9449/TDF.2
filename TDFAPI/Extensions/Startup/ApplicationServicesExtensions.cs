@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.DependencyInjection;
+using TDFAPI.CQRS.Behaviors;
 using TDFAPI.Messaging;
 using TDFAPI.Messaging.Interfaces;
 using TDFAPI.Repositories;
@@ -70,8 +71,9 @@ namespace TDFAPI.Extensions.Startup
             services.AddHostedService<UserInactivityBackgroundService>();
             services.AddHostedService<BackgroundJobService>();
 
-            // MediatR command / query dispatch.
+            // MediatR command / query dispatch + pipeline behaviours.
             services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
+            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ExceptionLoggingBehavior<,>));
 
             // API versioning.
             services.AddApiVersioning(options =>

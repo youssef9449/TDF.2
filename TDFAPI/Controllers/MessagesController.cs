@@ -1,13 +1,13 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using TDFShared.Constants;
-using TDFShared.DTOs.Messages;
-using TDFShared.DTOs.Common;
-using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using MediatR;
-using TDFAPI.CQRS.Queries;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TDFAPI.CQRS.Commands;
+using TDFAPI.CQRS.Queries;
+using TDFShared.Constants;
+using TDFShared.DTOs.Common;
+using TDFShared.DTOs.Messages;
 
 namespace TDFAPI.Controllers
 {
@@ -18,146 +18,108 @@ namespace TDFAPI.Controllers
     public class MessagesController : ControllerBase
     {
         private readonly IMediator _mediator;
-        private readonly ILogger<MessagesController> _logger;
 
-        public MessagesController(IMediator mediator, ILogger<MessagesController> logger)
+        public MessagesController(IMediator mediator)
         {
             _mediator = mediator;
-            _logger = logger;
         }
 
         [HttpGet]
-        public async Task<ActionResult<ApiResponse<PaginatedResult<MessageDto>>>> GetMessages([FromQuery] MessagePaginationDto pagination)
+        public async Task<ActionResult<ApiResponse<PaginatedResult<MessageDto>>>> GetMessages(
+            [FromQuery] MessagePaginationDto pagination)
         {
-            try
+            var messages = await _mediator.Send(new GetMessagesQuery
             {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-                var messages = await _mediator.Send(new GetMessagesQuery { UserId = userId, Pagination = pagination });
-                return Ok(ApiResponse<PaginatedResult<MessageDto>>.SuccessResponse(messages));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving messages");
-                return StatusCode(500, ApiResponse<PaginatedResult<MessageDto>>.ErrorResponse("Error retrieving messages"));
-            }
+                UserId = GetCurrentUserId(),
+                Pagination = pagination
+            });
+            return Ok(ApiResponse<PaginatedResult<MessageDto>>.SuccessResponse(messages));
         }
 
         [HttpPost]
         public async Task<ActionResult<ApiResponse<MessageDto>>> CreateMessage([FromBody] MessageCreateDto messageDto)
         {
-            try
+            var message = await _mediator.Send(new CreateMessageCommand
             {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-                var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
-
-                var message = await _mediator.Send(new CreateMessageCommand
-                {
-                    MessageDto = messageDto,
-                    SenderId = userId,
-                    SenderName = userName
-                });
-                return Ok(ApiResponse<MessageDto>.SuccessResponse(message));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating message");
-                return StatusCode(500, ApiResponse<MessageDto>.ErrorResponse("Error creating message"));
-            }
+                MessageDto = messageDto,
+                SenderId = GetCurrentUserId(),
+                SenderName = GetCurrentUserName()
+            });
+            return Ok(ApiResponse<MessageDto>.SuccessResponse(message));
         }
 
         [HttpPost("chat")]
-        public async Task<ActionResult<ApiResponse<ChatMessageDto>>> CreateChatMessage([FromBody] ChatMessageCreateDto messageDto)
+        public async Task<ActionResult<ApiResponse<ChatMessageDto>>> CreateChatMessage(
+            [FromBody] ChatMessageCreateDto messageDto)
         {
-            try
+            var userId = GetCurrentUserId();
+
+            if (!string.IsNullOrEmpty(messageDto.IdempotencyKey))
             {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-                var userName = User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
-
-                if (!string.IsNullOrEmpty(messageDto.IdempotencyKey))
+                var existingMessage = await _mediator.Send(new GetMessageByIdempotencyKeyQuery
                 {
-                    var existingMessage = await _mediator.Send(new GetMessageByIdempotencyKeyQuery
-                    {
-                        IdempotencyKey = messageDto.IdempotencyKey,
-                        UserId = userId
-                    });
-                    if (existingMessage != null) return Ok(ApiResponse<ChatMessageDto>.SuccessResponse(existingMessage));
-                }
-
-                var message = await _mediator.Send(new CreateChatMessageCommand
-                {
-                    MessageDto = messageDto,
-                    SenderId = userId,
-                    SenderName = userName
+                    IdempotencyKey = messageDto.IdempotencyKey,
+                    UserId = userId
                 });
-                return Ok(ApiResponse<ChatMessageDto>.SuccessResponse(message));
+                if (existingMessage != null)
+                {
+                    return Ok(ApiResponse<ChatMessageDto>.SuccessResponse(existingMessage));
+                }
             }
-            catch (Exception ex)
+
+            var message = await _mediator.Send(new CreateChatMessageCommand
             {
-                _logger.LogError(ex, "Error creating chat message");
-                return StatusCode(500, ApiResponse<ChatMessageDto>.ErrorResponse("Error creating chat message"));
-            }
+                MessageDto = messageDto,
+                SenderId = userId,
+                SenderName = GetCurrentUserName()
+            });
+            return Ok(ApiResponse<ChatMessageDto>.SuccessResponse(message));
         }
 
         [HttpGet("chat/recent")]
-        public async Task<ActionResult<ApiResponse<List<ChatMessageDto>>>> GetRecentChatMessages([FromQuery] int count = 50)
+        public async Task<ActionResult<ApiResponse<List<ChatMessageDto>>>> GetRecentChatMessages(
+            [FromQuery] int count = 50)
         {
-            try
-            {
-                var messages = await _mediator.Send(new GetRecentChatMessagesQuery { Count = count });
-                return Ok(ApiResponse<List<ChatMessageDto>>.SuccessResponse(messages));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving recent chat messages");
-                return StatusCode(500, ApiResponse<List<ChatMessageDto>>.ErrorResponse("Error retrieving recent chat messages"));
-            }
+            var messages = await _mediator.Send(new GetRecentChatMessagesQuery { Count = count });
+            return Ok(ApiResponse<List<ChatMessageDto>>.SuccessResponse(messages));
         }
 
         [HttpPost("{messageId}/read")]
         public async Task<ActionResult<ApiResponse<bool>>> MarkMessageAsRead(int messageId)
         {
-            try
+            var result = await _mediator.Send(new MarkMessageAsReadCommand
             {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-                var result = await _mediator.Send(new MarkMessageAsReadCommand { MessageId = messageId, UserId = userId });
-                return Ok(ApiResponse<bool>.SuccessResponse(result));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error marking message as read");
-                return StatusCode(500, ApiResponse<bool>.ErrorResponse("Error marking message as read"));
-            }
+                MessageId = messageId,
+                UserId = GetCurrentUserId()
+            });
+            return Ok(ApiResponse<bool>.SuccessResponse(result));
         }
 
         [HttpPost("{messageId}/delivered")]
         public async Task<ActionResult<ApiResponse<bool>>> MarkMessageAsDelivered(int messageId)
         {
-            try
+            var result = await _mediator.Send(new MarkMessageAsDeliveredCommand
             {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-                var result = await _mediator.Send(new MarkMessageAsDeliveredCommand { MessageId = messageId, UserId = userId });
-                return Ok(ApiResponse<bool>.SuccessResponse(result));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error marking message as delivered");
-                return StatusCode(500, ApiResponse<bool>.ErrorResponse("Error marking message as delivered"));
-            }
+                MessageId = messageId,
+                UserId = GetCurrentUserId()
+            });
+            return Ok(ApiResponse<bool>.SuccessResponse(result));
         }
 
         [HttpGet("unread/count/{userId}")]
         public async Task<ActionResult<ApiResponse<int>>> GetUnreadCount(int userId)
         {
-            try
-            {
-                var count = await _mediator.Send(new GetUnreadMessagesCountQuery { UserId = userId });
-                return Ok(ApiResponse<int>.SuccessResponse(count));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting unread count");
-                return StatusCode(500, ApiResponse<int>.ErrorResponse("Error getting unread count"));
-            }
+            var count = await _mediator.Send(new GetUnreadMessagesCountQuery { UserId = userId });
+            return Ok(ApiResponse<int>.SuccessResponse(count));
         }
+
+        private int GetCurrentUserId()
+        {
+            var value = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return int.TryParse(value, out var id) ? id : 0;
+        }
+
+        private string GetCurrentUserName() =>
+            User.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown";
     }
 }

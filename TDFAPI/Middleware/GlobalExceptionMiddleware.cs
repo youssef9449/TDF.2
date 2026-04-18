@@ -2,8 +2,8 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Serialization;
+using TDFAPI.Exceptions;
 using TDFAPI.Extensions;
-//using TDFAPI.Exceptions;
 
 namespace TDFAPI.Middleware
 {
@@ -120,7 +120,7 @@ namespace TDFAPI.Middleware
         private async Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
             var errorId = Guid.NewGuid().ToString();
-            var statusCode = GetStatusCode(exception);
+            var (statusCode, userMessage) = ExceptionToResponseMapper.Map(exception);
 
             // Log the error with the error ID for correlation
             var sanitizedMessage = SanitizeLogMessage(exception.Message);
@@ -129,7 +129,7 @@ namespace TDFAPI.Middleware
 
             // Create standardized ApiResponse
             var apiResponse = TDFShared.DTOs.Common.ApiResponse<object>.ErrorResponse(
-                GetUserFriendlyMessage(exception),
+                userMessage,
                 (HttpStatusCode)statusCode);
 
             // In development, we can add more details to the message
@@ -142,70 +142,6 @@ namespace TDFAPI.Middleware
             context.Response.StatusCode = statusCode;
 
             await context.Response.WriteAsync(TDFShared.Helpers.JsonSerializationHelper.SerializePretty(apiResponse));
-        }
-
-        private int GetStatusCode(Exception exception)
-        {
-            // Map exception types to appropriate status codes
-            return exception switch
-            {
-                UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
-                ArgumentException => StatusCodes.Status400BadRequest,
-                InvalidOperationException => StatusCodes.Status400BadRequest,
-                KeyNotFoundException => StatusCodes.Status404NotFound,
-                FileNotFoundException => StatusCodes.Status404NotFound,
-                NotImplementedException => StatusCodes.Status501NotImplemented,
-                // Add more mappings as needed
-                _ => StatusCodes.Status500InternalServerError
-            };
-        }
-
-        private string GetUserFriendlyMessage(Exception exception)
-        {
-            // Provide user-friendly messages based on exception type
-            return exception switch
-            {
-                UnauthorizedAccessException => "You are not authorized to perform this action",
-                ArgumentException => $"Invalid input provided: {exception.Message}",
-                InvalidOperationException => $"The requested operation is invalid: {exception.Message}",
-                KeyNotFoundException => "The requested resource was not found",
-                FileNotFoundException => "The requested file was not found",
-                NotImplementedException => "This feature is not implemented yet",
-                // Add more mappings as needed
-                _ => "An unexpected error occurred. Please try again later."
-            };
-        }
-
-        private string GetProblemTitle(Exception exception)
-        {
-            return exception switch
-            {
-                UnauthorizedAccessException => "Unauthorized",
-                ArgumentException => "Bad Request",
-                InvalidOperationException => "Bad Request",
-                KeyNotFoundException => "Not Found",
-                FileNotFoundException => "Not Found",
-                NotImplementedException => "Not Implemented",
-                // Add more mappings as needed
-                _ => "Internal Server Error"
-            };
-        }
-
-        private string GetProblemType(Exception exception)
-        {
-            string baseUrl = "https://httpstatuses.com/";
-
-            return exception switch
-            {
-                UnauthorizedAccessException => $"{baseUrl}401",
-                ArgumentException => $"{baseUrl}400",
-                InvalidOperationException => $"{baseUrl}400",
-                KeyNotFoundException => $"{baseUrl}404",
-                FileNotFoundException => $"{baseUrl}404",
-                NotImplementedException => $"{baseUrl}501",
-                // Add more mappings as needed
-                _ => $"{baseUrl}500"
-            };
         }
 
         /// <summary>

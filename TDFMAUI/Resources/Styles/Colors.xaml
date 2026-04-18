@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
-    
+
     <!-- Primary Colors (same for both themes) -->
     <Color x:Key="Primary">#512BD4</Color>
     <Color x:Key="PrimaryDark">#3E22A3</Color>
@@ -9,65 +9,167 @@
     <Color x:Key="PrimaryLighter">#8F6EEC</Color>
     <Color x:Key="Secondary">#DFD8F7</Color>
     <Color x:Key="Tertiary">#2B0B98</Color>
-    
-    <!-- Theme-aware colors using OnAppTheme -->
-    <OnAppTheme x:Key="BackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#121212" />
-    <OnAppTheme x:Key="SurfaceColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#1E1E1E" />
-    <OnAppTheme x:Key="SurfaceVariantColor" x:TypeArguments="Color" Light="#F1F1F1" Dark="#252525" />
-    <OnAppTheme x:Key="SurfaceElevatedColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#2D2D2D" />
-    <OnAppTheme x:Key="BorderColor" x:TypeArguments="Color" Light="#CDCDCD" Dark="#393939" />
-    
-    <!-- Text Colors -->
-    <OnAppTheme x:Key="TextColor" x:TypeArguments="Color" Light="#000000" Dark="#FFFFFF" />
-    <OnAppTheme x:Key="TextSecondaryColor" x:TypeArguments="Color" Light="#696969" Dark="#B0B0B0" />
-    <OnAppTheme x:Key="TextTertiaryColor" x:TypeArguments="Color" Light="#9B9B9B" Dark="#909090" />
-    
-    <!-- Card and Divider -->
-    <OnAppTheme x:Key="CardColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#2D2D2D" />
-    <OnAppTheme x:Key="DividerColor" x:TypeArguments="Color" Light="#E0E0E0" Dark="#333333" />
-    
-    <!-- Dashboard Colors -->
-    <OnAppTheme x:Key="YellowCardColor" x:TypeArguments="Color" Light="#FFF8E1" Dark="#423C00" />
-    <OnAppTheme x:Key="BlueCardColor" x:TypeArguments="Color" Light="#E3F2FD" Dark="#0A3450" />
-    <OnAppTheme x:Key="GreenCardColor" x:TypeArguments="Color" Light="#E8F5E9" Dark="#0E3B1C" />
-    
-    <!-- Status Colors -->
+
+    <!--
+        Theme-aware colors.
+
+        Each theme-aware resource is declared as three sibling <Color> keys:
+          - XxxLight  : the light-theme value
+          - XxxDark   : the dark-theme value
+          - Xxx       : the "current" value, seeded with the light value and
+                        swapped at runtime by ThemeHelper.ApplyThemeColors when
+                        the app theme changes.
+
+        Consumers should reference the base key (Xxx) via {DynamicResource Xxx}
+        so that theme changes propagate automatically. {StaticResource Xxx} will
+        bind to whatever the current value is at parse time.
+
+        This pattern replaces the previous <OnAppTheme> usage. .NET MAUI does
+        not expose an OnAppTheme XAML element type (OnAppTheme was renamed to
+        AppThemeBinding in Xamarin.Forms 4.7, and MAUI only has the markup
+        extension form), so <OnAppTheme> elements fail XAML compilation on
+        every platform, including Windows.
+    -->
+
+    <!-- Surface / background -->
+    <Color x:Key="BackgroundColorLight">#FFFFFF</Color>
+    <Color x:Key="BackgroundColorDark">#121212</Color>
+    <Color x:Key="BackgroundColor">#FFFFFF</Color>
+
+    <Color x:Key="SurfaceColorLight">#FFFFFF</Color>
+    <Color x:Key="SurfaceColorDark">#1E1E1E</Color>
+    <Color x:Key="SurfaceColor">#FFFFFF</Color>
+
+    <Color x:Key="SurfaceVariantColorLight">#F1F1F1</Color>
+    <Color x:Key="SurfaceVariantColorDark">#252525</Color>
+    <Color x:Key="SurfaceVariantColor">#F1F1F1</Color>
+
+    <Color x:Key="SurfaceElevatedColorLight">#FFFFFF</Color>
+    <Color x:Key="SurfaceElevatedColorDark">#2D2D2D</Color>
+    <Color x:Key="SurfaceElevatedColor">#FFFFFF</Color>
+
+    <Color x:Key="BorderColorLight">#CDCDCD</Color>
+    <Color x:Key="BorderColorDark">#393939</Color>
+    <Color x:Key="BorderColor">#CDCDCD</Color>
+
+    <!-- Text -->
+    <Color x:Key="TextColorLight">#000000</Color>
+    <Color x:Key="TextColorDark">#FFFFFF</Color>
+    <Color x:Key="TextColor">#000000</Color>
+
+    <Color x:Key="TextSecondaryColorLight">#696969</Color>
+    <Color x:Key="TextSecondaryColorDark">#B0B0B0</Color>
+    <Color x:Key="TextSecondaryColor">#696969</Color>
+
+    <Color x:Key="TextTertiaryColorLight">#9B9B9B</Color>
+    <Color x:Key="TextTertiaryColorDark">#909090</Color>
+    <Color x:Key="TextTertiaryColor">#9B9B9B</Color>
+
+    <!-- Cards and dividers -->
+    <Color x:Key="CardColorLight">#FFFFFF</Color>
+    <Color x:Key="CardColorDark">#2D2D2D</Color>
+    <Color x:Key="CardColor">#FFFFFF</Color>
+
+    <Color x:Key="DividerColorLight">#E0E0E0</Color>
+    <Color x:Key="DividerColorDark">#333333</Color>
+    <Color x:Key="DividerColor">#E0E0E0</Color>
+
+    <!-- Dashboard accents -->
+    <Color x:Key="YellowCardColorLight">#FFF8E1</Color>
+    <Color x:Key="YellowCardColorDark">#423C00</Color>
+    <Color x:Key="YellowCardColor">#FFF8E1</Color>
+
+    <Color x:Key="BlueCardColorLight">#E3F2FD</Color>
+    <Color x:Key="BlueCardColorDark">#0A3450</Color>
+    <Color x:Key="BlueCardColor">#E3F2FD</Color>
+
+    <Color x:Key="GreenCardColorLight">#E8F5E9</Color>
+    <Color x:Key="GreenCardColorDark">#0E3B1C</Color>
+    <Color x:Key="GreenCardColor">#E8F5E9</Color>
+
+    <!-- Status colors -->
     <Color x:Key="SuccessColor">#4CAF50</Color>
     <Color x:Key="WarningColor">#FF9800</Color>
     <Color x:Key="ErrorColor">#F44336</Color>
-    <OnAppTheme x:Key="ErrorLightColor" x:TypeArguments="Color" Light="#FFEBEE" Dark="#4A1C1C" />
+
+    <Color x:Key="ErrorLightColorLight">#FFEBEE</Color>
+    <Color x:Key="ErrorLightColorDark">#4A1C1C</Color>
+    <Color x:Key="ErrorLightColor">#FFEBEE</Color>
+
     <Color x:Key="InfoColor">#2196F3</Color>
-    
-    <!-- Additional Colors -->
+
+    <!-- Static color constants -->
     <Color x:Key="OnPrimaryColor">#FFFFFF</Color>
     <Color x:Key="White">#FFFFFF</Color>
     <Color x:Key="Black">#000000</Color>
-    
-    <!-- Gray Colors for compatibility -->
-    <OnAppTheme x:Key="Gray100" x:TypeArguments="Color" Light="#F5F5F5" Dark="#2D2D2D" />
-    <OnAppTheme x:Key="Gray200" x:TypeArguments="Color" Light="#EEEEEE" Dark="#3A3A3A" />
-    <OnAppTheme x:Key="Gray300" x:TypeArguments="Color" Light="#E0E0E0" Dark="#484848" />
-    <OnAppTheme x:Key="Gray400" x:TypeArguments="Color" Light="#BDBDBD" Dark="#6D6D6D" />
-    <OnAppTheme x:Key="Gray500" x:TypeArguments="Color" Light="#9E9E9E" Dark="#8A8A8A" />
-    <OnAppTheme x:Key="Gray600" x:TypeArguments="Color" Light="#757575" Dark="#A0A0A0" />
-    <OnAppTheme x:Key="Gray700" x:TypeArguments="Color" Light="#616161" Dark="#B8B8B8" />
-    <OnAppTheme x:Key="Gray800" x:TypeArguments="Color" Light="#424242" Dark="#D0D0D0" />
-    <OnAppTheme x:Key="Gray900" x:TypeArguments="Color" Light="#212121" Dark="#E8E8E8" />
-    
-    <!-- Shadow and Elevation -->
-    <OnAppTheme x:Key="ShadowColor" x:TypeArguments="Color" Light="#20000000" Dark="#40000000" />
-    <OnAppTheme x:Key="ElevationColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#2D2D2D" />
 
-    <!-- Adaptive Resources for dynamic updates -->
-    <OnAppTheme x:Key="AdaptiveTextColor" x:TypeArguments="Color" Light="#000000" Dark="#FFFFFF" />
-    <OnAppTheme x:Key="AdaptiveBackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#121212" />
-    <OnAppTheme x:Key="AdaptiveSurfaceColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#1E1E1E" />
-    <OnAppTheme x:Key="AdaptiveBorderColor" x:TypeArguments="Color" Light="#CDCDCD" Dark="#393939" />
+    <!-- Gray scale -->
+    <Color x:Key="Gray100Light">#F5F5F5</Color>
+    <Color x:Key="Gray100Dark">#2D2D2D</Color>
+    <Color x:Key="Gray100">#F5F5F5</Color>
+
+    <Color x:Key="Gray200Light">#EEEEEE</Color>
+    <Color x:Key="Gray200Dark">#3A3A3A</Color>
+    <Color x:Key="Gray200">#EEEEEE</Color>
+
+    <Color x:Key="Gray300Light">#E0E0E0</Color>
+    <Color x:Key="Gray300Dark">#484848</Color>
+    <Color x:Key="Gray300">#E0E0E0</Color>
+
+    <Color x:Key="Gray400Light">#BDBDBD</Color>
+    <Color x:Key="Gray400Dark">#6D6D6D</Color>
+    <Color x:Key="Gray400">#BDBDBD</Color>
+
+    <Color x:Key="Gray500Light">#9E9E9E</Color>
+    <Color x:Key="Gray500Dark">#8A8A8A</Color>
+    <Color x:Key="Gray500">#9E9E9E</Color>
+
+    <Color x:Key="Gray600Light">#757575</Color>
+    <Color x:Key="Gray600Dark">#A0A0A0</Color>
+    <Color x:Key="Gray600">#757575</Color>
+
+    <Color x:Key="Gray700Light">#616161</Color>
+    <Color x:Key="Gray700Dark">#B8B8B8</Color>
+    <Color x:Key="Gray700">#616161</Color>
+
+    <Color x:Key="Gray800Light">#424242</Color>
+    <Color x:Key="Gray800Dark">#D0D0D0</Color>
+    <Color x:Key="Gray800">#424242</Color>
+
+    <Color x:Key="Gray900Light">#212121</Color>
+    <Color x:Key="Gray900Dark">#E8E8E8</Color>
+    <Color x:Key="Gray900">#212121</Color>
+
+    <!-- Shadow and elevation -->
+    <Color x:Key="ShadowColorLight">#20000000</Color>
+    <Color x:Key="ShadowColorDark">#40000000</Color>
+    <Color x:Key="ShadowColor">#20000000</Color>
+
+    <Color x:Key="ElevationColorLight">#FFFFFF</Color>
+    <Color x:Key="ElevationColorDark">#2D2D2D</Color>
+    <Color x:Key="ElevationColor">#FFFFFF</Color>
+
+    <!-- Adaptive aliases (duplicated keys kept for backward compatibility) -->
+    <Color x:Key="AdaptiveTextColorLight">#000000</Color>
+    <Color x:Key="AdaptiveTextColorDark">#FFFFFF</Color>
+    <Color x:Key="AdaptiveTextColor">#000000</Color>
+
+    <Color x:Key="AdaptiveBackgroundColorLight">#FFFFFF</Color>
+    <Color x:Key="AdaptiveBackgroundColorDark">#121212</Color>
+    <Color x:Key="AdaptiveBackgroundColor">#FFFFFF</Color>
+
+    <Color x:Key="AdaptiveSurfaceColorLight">#FFFFFF</Color>
+    <Color x:Key="AdaptiveSurfaceColorDark">#1E1E1E</Color>
+    <Color x:Key="AdaptiveSurfaceColor">#FFFFFF</Color>
+
+    <Color x:Key="AdaptiveBorderColorLight">#CDCDCD</Color>
+    <Color x:Key="AdaptiveBorderColorDark">#393939</Color>
+    <Color x:Key="AdaptiveBorderColor">#CDCDCD</Color>
 
     <!-- Brushes for properties that require them -->
-    <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}" />
-    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
-    <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}" />
-    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
-    
+    <SolidColorBrush x:Key="BackgroundBrush" Color="{DynamicResource BackgroundColor}" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource SurfaceColor}" />
+    <SolidColorBrush x:Key="TextBrush" Color="{DynamicResource TextColor}" />
+    <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}" />
+
 </ResourceDictionary>

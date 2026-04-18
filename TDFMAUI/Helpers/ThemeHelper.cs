@@ -209,7 +209,14 @@ namespace TDFMAUI.Helpers
 
                 // Apply the theme - This triggers AppThemeBinding updates automatically
                 Application.Current.UserAppTheme = newTheme;
-                
+
+                // Swap the base color resources (e.g. BackgroundColor) to the
+                // matching "Light" or "Dark" sibling key so that consumers
+                // using {DynamicResource BackgroundColor} react to the theme
+                // change. The XAML dictionaries define BackgroundColorLight
+                // and BackgroundColorDark alongside every theme-aware key.
+                ApplyThemeColors(newTheme);
+
                 // Notify listeners of theme change
                 lock (_eventLock)
                 {
@@ -225,6 +232,99 @@ namespace TDFMAUI.Helpers
         private static AppTheme NormalizeTheme(AppTheme theme)
         {
             return theme == AppTheme.Unspecified ? _lastSystemTheme : theme;
+        }
+
+        /// <summary>
+        /// Walks the application's merged resource dictionaries looking for
+        /// theme-aware color pairs (keys ending in "Light" / "Dark") and
+        /// copies the appropriate sibling into the base key. For example,
+        /// when the new theme is Dark and both <c>BackgroundColorLight</c>
+        /// and <c>BackgroundColorDark</c> exist, the value of
+        /// <c>BackgroundColorDark</c> is copied into <c>BackgroundColor</c>.
+        ///
+        /// Consumers using <c>{DynamicResource BackgroundColor}</c> then
+        /// receive the new value automatically.
+        /// </summary>
+        private static void ApplyThemeColors(AppTheme theme)
+        {
+            try
+            {
+                var appResources = Application.Current?.Resources;
+                if (appResources == null) return;
+
+                const string lightSuffix = "Light";
+                const string darkSuffix = "Dark";
+                var suffix = theme == AppTheme.Dark ? darkSuffix : lightSuffix;
+
+                // Collect all string keys visible from the application scope
+                // (which includes merged dictionaries). Project them to any
+                // key that has a "Light" or "Dark" variant defined.
+                var baseKeys = new HashSet<string>(StringComparer.Ordinal);
+                CollectThemeBaseKeys(appResources, baseKeys);
+
+                foreach (var baseKey in baseKeys)
+                {
+                    var sourceKey = baseKey + suffix;
+                    if (TryFindResource(appResources, sourceKey, out var value) && value != null)
+                    {
+                        // Setting on Application.Current.Resources overlays the
+                        // merged dictionary entry and propagates to any
+                        // DynamicResource listeners.
+                        appResources[baseKey] = value;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying theme colors: {ex.Message}");
+            }
+        }
+
+        private static void CollectThemeBaseKeys(ResourceDictionary dictionary, HashSet<string> baseKeys)
+        {
+            if (dictionary == null) return;
+
+            foreach (var key in dictionary.Keys)
+            {
+                if (key is string stringKey)
+                {
+                    if (stringKey.EndsWith("Light", StringComparison.Ordinal) && stringKey.Length > 5)
+                    {
+                        baseKeys.Add(stringKey.Substring(0, stringKey.Length - 5));
+                    }
+                    else if (stringKey.EndsWith("Dark", StringComparison.Ordinal) && stringKey.Length > 4)
+                    {
+                        baseKeys.Add(stringKey.Substring(0, stringKey.Length - 4));
+                    }
+                }
+            }
+
+            if (dictionary.MergedDictionaries != null)
+            {
+                foreach (var merged in dictionary.MergedDictionaries)
+                {
+                    CollectThemeBaseKeys(merged, baseKeys);
+                }
+            }
+        }
+
+        private static bool TryFindResource(ResourceDictionary dictionary, string key, out object? value)
+        {
+            if (dictionary != null)
+            {
+                if (dictionary.TryGetValue(key, out value)) return true;
+
+                if (dictionary.MergedDictionaries != null)
+                {
+                    foreach (var merged in dictionary.MergedDictionaries)
+                    {
+                        if (TryFindResource(merged, key, out value)) return true;
+                    }
+                }
+            }
+
+            value = null;
+            return false;
         }
 
         /// <summary>

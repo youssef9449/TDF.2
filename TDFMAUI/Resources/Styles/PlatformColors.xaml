@@ -2,86 +2,287 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
+    <!--
+        Theme-aware platform colors.
+
+        Each theme-aware resource is declared as three sibling <Color> keys:
+          - XxxLight / XxxDark : the per-theme values
+          - Xxx                : the "current" value, seeded with the light
+                                 value and swapped by ThemeHelper.ApplyThemeColors
+                                 at runtime.
+
+        See Colors.xaml for the rationale behind this layout (MAUI does not
+        expose <OnAppTheme> as a resolvable XAML element type, only the
+        AppThemeBinding markup extension).
+    -->
+
     <!-- Windows specific colors -->
     <Color x:Key="WindowsControlHighlightColor">#0078D7</Color>
     <Color x:Key="WindowsAccentColor">#0078D7</Color>
 
-    <OnAppTheme x:Key="WindowsControlBorderColor" x:TypeArguments="Color" Light="#CCCCCC" Dark="#404040" />
-    <OnAppTheme x:Key="WindowsControlForegroundColor" x:TypeArguments="Color" Light="#000000" Dark="#FFFFFF" />
-    <OnAppTheme x:Key="WindowsControlBackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#2D2D2D" />
-    <OnAppTheme x:Key="WindowsControlDisabledColor" x:TypeArguments="Color" Light="#AAAAAA" Dark="#666666" />
-    <OnAppTheme x:Key="WindowBackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#202020" />
-    <OnAppTheme x:Key="WindowTitleBarColor" x:TypeArguments="Color" Light="#F0F0F0" Dark="#202020" />
-    <OnAppTheme x:Key="WindowTitleBarButtonBackgroundColor" x:TypeArguments="Color" Light="#F0F0F0" Dark="#202020" />
-    <OnAppTheme x:Key="WindowTitleBarButtonForegroundColor" x:TypeArguments="Color" Light="#000000" Dark="#FFFFFF" />
-    <OnAppTheme x:Key="WindowTitleBarButtonHoverBackgroundColor" x:TypeArguments="Color" Light="#E0E0E0" Dark="#404040" />
-    <OnAppTheme x:Key="WindowTitleBarButtonHoverForegroundColor" x:TypeArguments="Color" Light="#000000" Dark="#FFFFFF" />
-    <OnAppTheme x:Key="WindowTitleBarButtonPressedBackgroundColor" x:TypeArguments="Color" Light="#D0D0D0" Dark="#606060" />
-    <OnAppTheme x:Key="WindowTitleBarButtonPressedForegroundColor" x:TypeArguments="Color" Light="#000000" Dark="#FFFFFF" />
-    <OnAppTheme x:Key="WindowTitleBarButtonInactiveBackgroundColor" x:TypeArguments="Color" Light="#F0F0F0" Dark="#202020" />
-    <OnAppTheme x:Key="WindowTitleBarButtonInactiveForegroundColor" x:TypeArguments="Color" Light="#808080" Dark="#808080" />
-    <OnAppTheme x:Key="WindowBorderColor" x:TypeArguments="Color" Light="#E0E0E0" Dark="#404040" />
-    <OnAppTheme x:Key="WindowShadowColor" x:TypeArguments="Color" Light="#20000000" Dark="#40000000" />
+    <Color x:Key="WindowsControlBorderColorLight">#CCCCCC</Color>
+    <Color x:Key="WindowsControlBorderColorDark">#404040</Color>
+    <Color x:Key="WindowsControlBorderColor">#CCCCCC</Color>
+
+    <Color x:Key="WindowsControlForegroundColorLight">#000000</Color>
+    <Color x:Key="WindowsControlForegroundColorDark">#FFFFFF</Color>
+    <Color x:Key="WindowsControlForegroundColor">#000000</Color>
+
+    <Color x:Key="WindowsControlBackgroundColorLight">#FFFFFF</Color>
+    <Color x:Key="WindowsControlBackgroundColorDark">#2D2D2D</Color>
+    <Color x:Key="WindowsControlBackgroundColor">#FFFFFF</Color>
+
+    <Color x:Key="WindowsControlDisabledColorLight">#AAAAAA</Color>
+    <Color x:Key="WindowsControlDisabledColorDark">#666666</Color>
+    <Color x:Key="WindowsControlDisabledColor">#AAAAAA</Color>
+
+    <Color x:Key="WindowBackgroundColorLight">#FFFFFF</Color>
+    <Color x:Key="WindowBackgroundColorDark">#202020</Color>
+    <Color x:Key="WindowBackgroundColor">#FFFFFF</Color>
+
+    <Color x:Key="WindowTitleBarColorLight">#F0F0F0</Color>
+    <Color x:Key="WindowTitleBarColorDark">#202020</Color>
+    <Color x:Key="WindowTitleBarColor">#F0F0F0</Color>
+
+    <Color x:Key="WindowTitleBarButtonBackgroundColorLight">#F0F0F0</Color>
+    <Color x:Key="WindowTitleBarButtonBackgroundColorDark">#202020</Color>
+    <Color x:Key="WindowTitleBarButtonBackgroundColor">#F0F0F0</Color>
+
+    <Color x:Key="WindowTitleBarButtonForegroundColorLight">#000000</Color>
+    <Color x:Key="WindowTitleBarButtonForegroundColorDark">#FFFFFF</Color>
+    <Color x:Key="WindowTitleBarButtonForegroundColor">#000000</Color>
+
+    <Color x:Key="WindowTitleBarButtonHoverBackgroundColorLight">#E0E0E0</Color>
+    <Color x:Key="WindowTitleBarButtonHoverBackgroundColorDark">#404040</Color>
+    <Color x:Key="WindowTitleBarButtonHoverBackgroundColor">#E0E0E0</Color>
+
+    <Color x:Key="WindowTitleBarButtonHoverForegroundColorLight">#000000</Color>
+    <Color x:Key="WindowTitleBarButtonHoverForegroundColorDark">#FFFFFF</Color>
+    <Color x:Key="WindowTitleBarButtonHoverForegroundColor">#000000</Color>
+
+    <Color x:Key="WindowTitleBarButtonPressedBackgroundColorLight">#D0D0D0</Color>
+    <Color x:Key="WindowTitleBarButtonPressedBackgroundColorDark">#606060</Color>
+    <Color x:Key="WindowTitleBarButtonPressedBackgroundColor">#D0D0D0</Color>
+
+    <Color x:Key="WindowTitleBarButtonPressedForegroundColorLight">#000000</Color>
+    <Color x:Key="WindowTitleBarButtonPressedForegroundColorDark">#FFFFFF</Color>
+    <Color x:Key="WindowTitleBarButtonPressedForegroundColor">#000000</Color>
+
+    <Color x:Key="WindowTitleBarButtonInactiveBackgroundColorLight">#F0F0F0</Color>
+    <Color x:Key="WindowTitleBarButtonInactiveBackgroundColorDark">#202020</Color>
+    <Color x:Key="WindowTitleBarButtonInactiveBackgroundColor">#F0F0F0</Color>
+
+    <Color x:Key="WindowTitleBarButtonInactiveForegroundColorLight">#808080</Color>
+    <Color x:Key="WindowTitleBarButtonInactiveForegroundColorDark">#808080</Color>
+    <Color x:Key="WindowTitleBarButtonInactiveForegroundColor">#808080</Color>
+
+    <Color x:Key="WindowBorderColorLight">#E0E0E0</Color>
+    <Color x:Key="WindowBorderColorDark">#404040</Color>
+    <Color x:Key="WindowBorderColor">#E0E0E0</Color>
+
+    <Color x:Key="WindowShadowColorLight">#20000000</Color>
+    <Color x:Key="WindowShadowColorDark">#40000000</Color>
+    <Color x:Key="WindowShadowColor">#20000000</Color>
 
     <!-- macOS specific colors -->
     <Color x:Key="MacOSAccentColor">#007AFF</Color>
-    <OnAppTheme x:Key="MacOSControlHighlightColor" x:TypeArguments="Color" Light="#0078D7" Dark="#0078D7" />
-    <OnAppTheme x:Key="MacOSControlForegroundColor" x:TypeArguments="Color" Light="#000000" Dark="#FFFFFF" />
-    <OnAppTheme x:Key="MacOSControlBorderColor" x:TypeArguments="Color" Light="#CCCCCC" Dark="#555555" />
-    <OnAppTheme x:Key="MacOSControlBackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#3D3D3D" />
-    <OnAppTheme x:Key="MacOSControlDisabledColor" x:TypeArguments="Color" Light="#AAAAAA" Dark="#666666" />
-    <OnAppTheme x:Key="MacOSWindowBackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#2D2D2D" />
-    <OnAppTheme x:Key="MacOSTitleBarColor" x:TypeArguments="Color" Light="#F5F5F5" Dark="#3D3D3D" />
-    <OnAppTheme x:Key="MacOSToolbarColor" x:TypeArguments="Color" Light="#F5F5F5" Dark="#3D3D3D" />
-    <OnAppTheme x:Key="MacOSSidebarColor" x:TypeArguments="Color" Light="#F0F0F0" Dark="#252525" />
+
+    <Color x:Key="MacOSControlHighlightColorLight">#0078D7</Color>
+    <Color x:Key="MacOSControlHighlightColorDark">#0078D7</Color>
+    <Color x:Key="MacOSControlHighlightColor">#0078D7</Color>
+
+    <Color x:Key="MacOSControlForegroundColorLight">#000000</Color>
+    <Color x:Key="MacOSControlForegroundColorDark">#FFFFFF</Color>
+    <Color x:Key="MacOSControlForegroundColor">#000000</Color>
+
+    <Color x:Key="MacOSControlBorderColorLight">#CCCCCC</Color>
+    <Color x:Key="MacOSControlBorderColorDark">#555555</Color>
+    <Color x:Key="MacOSControlBorderColor">#CCCCCC</Color>
+
+    <Color x:Key="MacOSControlBackgroundColorLight">#FFFFFF</Color>
+    <Color x:Key="MacOSControlBackgroundColorDark">#3D3D3D</Color>
+    <Color x:Key="MacOSControlBackgroundColor">#FFFFFF</Color>
+
+    <Color x:Key="MacOSControlDisabledColorLight">#AAAAAA</Color>
+    <Color x:Key="MacOSControlDisabledColorDark">#666666</Color>
+    <Color x:Key="MacOSControlDisabledColor">#AAAAAA</Color>
+
+    <Color x:Key="MacOSWindowBackgroundColorLight">#FFFFFF</Color>
+    <Color x:Key="MacOSWindowBackgroundColorDark">#2D2D2D</Color>
+    <Color x:Key="MacOSWindowBackgroundColor">#FFFFFF</Color>
+
+    <Color x:Key="MacOSTitleBarColorLight">#F5F5F5</Color>
+    <Color x:Key="MacOSTitleBarColorDark">#3D3D3D</Color>
+    <Color x:Key="MacOSTitleBarColor">#F5F5F5</Color>
+
+    <Color x:Key="MacOSToolbarColorLight">#F5F5F5</Color>
+    <Color x:Key="MacOSToolbarColorDark">#3D3D3D</Color>
+    <Color x:Key="MacOSToolbarColor">#F5F5F5</Color>
+
+    <Color x:Key="MacOSSidebarColorLight">#F0F0F0</Color>
+    <Color x:Key="MacOSSidebarColorDark">#252525</Color>
+    <Color x:Key="MacOSSidebarColor">#F0F0F0</Color>
 
     <!-- iOS specific colors -->
-    <OnAppTheme x:Key="iOSBackgroundColor" x:TypeArguments="Color" Light="#F2F2F7" Dark="#000000" />
-    <OnAppTheme x:Key="iOSGroupedBackgroundColor" x:TypeArguments="Color" Light="#F2F2F7" Dark="#1C1C1E" />
-    <OnAppTheme x:Key="iOSNavigationBarColor" x:TypeArguments="Color" Light="#F8F8F8" Dark="#1C1C1E" />
-    <OnAppTheme x:Key="iOSTabBarColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#2C2C2E" />
-    <OnAppTheme x:Key="iOSToolbarColor" x:TypeArguments="Color" Light="#F8F8F8" Dark="#1C1C1E" />
-    <OnAppTheme x:Key="iOSSearchBarColor" x:TypeArguments="Color" Light="#F8F8F8" Dark="#1C1C1E" />
-    <OnAppTheme x:Key="iOSCellBackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#1C1C1E" />
-    <OnAppTheme x:Key="iOSCellSelectedBackgroundColor" x:TypeArguments="Color" Light="#D9D9D9" Dark="#2C2C2E" />
-    <OnAppTheme x:Key="iOSSeparatorColor" x:TypeArguments="Color" Light="#C6C6C8" Dark="#38383A" />
-    <OnAppTheme x:Key="iOSLabelColor" x:TypeArguments="Color" Light="#000000" Dark="#FFFFFF" />
-    <OnAppTheme x:Key="iOSSecondaryLabelColor" x:TypeArguments="Color" Light="#993C3C43" Dark="#99FFFFFF" />
-    <OnAppTheme x:Key="iOSTertiaryLabelColor" x:TypeArguments="Color" Light="#663C3C43" Dark="#66FFFFFF" />
-    <OnAppTheme x:Key="iOSSystemFillColor" x:TypeArguments="Color" Light="#33787880" Dark="#33FFFFFF" />
-    <OnAppTheme x:Key="iOSSystemBackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#1C1C1E" />
-    <OnAppTheme x:Key="iOSSystemGroupedBackgroundColor" x:TypeArguments="Color" Light="#F2F2F7" Dark="#000000" />
+    <Color x:Key="iOSBackgroundColorLight">#F2F2F7</Color>
+    <Color x:Key="iOSBackgroundColorDark">#000000</Color>
+    <Color x:Key="iOSBackgroundColor">#F2F2F7</Color>
+
+    <Color x:Key="iOSGroupedBackgroundColorLight">#F2F2F7</Color>
+    <Color x:Key="iOSGroupedBackgroundColorDark">#1C1C1E</Color>
+    <Color x:Key="iOSGroupedBackgroundColor">#F2F2F7</Color>
+
+    <Color x:Key="iOSNavigationBarColorLight">#F8F8F8</Color>
+    <Color x:Key="iOSNavigationBarColorDark">#1C1C1E</Color>
+    <Color x:Key="iOSNavigationBarColor">#F8F8F8</Color>
+
+    <Color x:Key="iOSTabBarColorLight">#FFFFFF</Color>
+    <Color x:Key="iOSTabBarColorDark">#2C2C2E</Color>
+    <Color x:Key="iOSTabBarColor">#FFFFFF</Color>
+
+    <Color x:Key="iOSToolbarColorLight">#F8F8F8</Color>
+    <Color x:Key="iOSToolbarColorDark">#1C1C1E</Color>
+    <Color x:Key="iOSToolbarColor">#F8F8F8</Color>
+
+    <Color x:Key="iOSSearchBarColorLight">#F8F8F8</Color>
+    <Color x:Key="iOSSearchBarColorDark">#1C1C1E</Color>
+    <Color x:Key="iOSSearchBarColor">#F8F8F8</Color>
+
+    <Color x:Key="iOSCellBackgroundColorLight">#FFFFFF</Color>
+    <Color x:Key="iOSCellBackgroundColorDark">#1C1C1E</Color>
+    <Color x:Key="iOSCellBackgroundColor">#FFFFFF</Color>
+
+    <Color x:Key="iOSCellSelectedBackgroundColorLight">#D9D9D9</Color>
+    <Color x:Key="iOSCellSelectedBackgroundColorDark">#2C2C2E</Color>
+    <Color x:Key="iOSCellSelectedBackgroundColor">#D9D9D9</Color>
+
+    <Color x:Key="iOSSeparatorColorLight">#C6C6C8</Color>
+    <Color x:Key="iOSSeparatorColorDark">#38383A</Color>
+    <Color x:Key="iOSSeparatorColor">#C6C6C8</Color>
+
+    <Color x:Key="iOSLabelColorLight">#000000</Color>
+    <Color x:Key="iOSLabelColorDark">#FFFFFF</Color>
+    <Color x:Key="iOSLabelColor">#000000</Color>
+
+    <Color x:Key="iOSSecondaryLabelColorLight">#993C3C43</Color>
+    <Color x:Key="iOSSecondaryLabelColorDark">#99FFFFFF</Color>
+    <Color x:Key="iOSSecondaryLabelColor">#993C3C43</Color>
+
+    <Color x:Key="iOSTertiaryLabelColorLight">#663C3C43</Color>
+    <Color x:Key="iOSTertiaryLabelColorDark">#66FFFFFF</Color>
+    <Color x:Key="iOSTertiaryLabelColor">#663C3C43</Color>
+
+    <Color x:Key="iOSSystemFillColorLight">#33787880</Color>
+    <Color x:Key="iOSSystemFillColorDark">#33FFFFFF</Color>
+    <Color x:Key="iOSSystemFillColor">#33787880</Color>
+
+    <Color x:Key="iOSSystemBackgroundColorLight">#FFFFFF</Color>
+    <Color x:Key="iOSSystemBackgroundColorDark">#1C1C1E</Color>
+    <Color x:Key="iOSSystemBackgroundColor">#FFFFFF</Color>
+
+    <Color x:Key="iOSSystemGroupedBackgroundColorLight">#F2F2F7</Color>
+    <Color x:Key="iOSSystemGroupedBackgroundColorDark">#000000</Color>
+    <Color x:Key="iOSSystemGroupedBackgroundColor">#F2F2F7</Color>
+
     <Color x:Key="iOSSystemGray">#8E8E93</Color>
-    <OnAppTheme x:Key="iOSSystemGray2" x:TypeArguments="Color" Light="#AEAEB2" Dark="#636366" />
-    <OnAppTheme x:Key="iOSSystemGray3" x:TypeArguments="Color" Light="#C7C7CC" Dark="#48484A" />
-    <OnAppTheme x:Key="iOSSystemGray4" x:TypeArguments="Color" Light="#D1D1D6" Dark="#3A3A3C" />
-    <OnAppTheme x:Key="iOSSystemGray5" x:TypeArguments="Color" Light="#E5E5EA" Dark="#2C2C2E" />
-    <OnAppTheme x:Key="iOSSystemGray6" x:TypeArguments="Color" Light="#F2F2F7" Dark="#1C1C1E" />
+
+    <Color x:Key="iOSSystemGray2Light">#AEAEB2</Color>
+    <Color x:Key="iOSSystemGray2Dark">#636366</Color>
+    <Color x:Key="iOSSystemGray2">#AEAEB2</Color>
+
+    <Color x:Key="iOSSystemGray3Light">#C7C7CC</Color>
+    <Color x:Key="iOSSystemGray3Dark">#48484A</Color>
+    <Color x:Key="iOSSystemGray3">#C7C7CC</Color>
+
+    <Color x:Key="iOSSystemGray4Light">#D1D1D6</Color>
+    <Color x:Key="iOSSystemGray4Dark">#3A3A3C</Color>
+    <Color x:Key="iOSSystemGray4">#D1D1D6</Color>
+
+    <Color x:Key="iOSSystemGray5Light">#E5E5EA</Color>
+    <Color x:Key="iOSSystemGray5Dark">#2C2C2E</Color>
+    <Color x:Key="iOSSystemGray5">#E5E5EA</Color>
+
+    <Color x:Key="iOSSystemGray6Light">#F2F2F7</Color>
+    <Color x:Key="iOSSystemGray6Dark">#1C1C1E</Color>
+    <Color x:Key="iOSSystemGray6">#F2F2F7</Color>
 
     <!-- Android specific colors -->
-    <OnAppTheme x:Key="AndroidStatusBarColor" x:TypeArguments="Color" Light="#F5F5F5" Dark="#121212" />
-    <OnAppTheme x:Key="AndroidNavigationBarColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#1E1E1E" />
-    <OnAppTheme x:Key="AndroidBackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#121212" />
-    <OnAppTheme x:Key="AndroidSurfaceColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#1E1E1E" />
-    <OnAppTheme x:Key="AndroidPrimaryColor" x:TypeArguments="Color" Light="#0078D7" Dark="#1F1F1F" />
-    <OnAppTheme x:Key="AndroidPrimaryDarkColor" x:TypeArguments="Color" Light="#005A9E" Dark="#121212" />
+    <Color x:Key="AndroidStatusBarColorLight">#F5F5F5</Color>
+    <Color x:Key="AndroidStatusBarColorDark">#121212</Color>
+    <Color x:Key="AndroidStatusBarColor">#F5F5F5</Color>
+
+    <Color x:Key="AndroidNavigationBarColorLight">#FFFFFF</Color>
+    <Color x:Key="AndroidNavigationBarColorDark">#1E1E1E</Color>
+    <Color x:Key="AndroidNavigationBarColor">#FFFFFF</Color>
+
+    <Color x:Key="AndroidBackgroundColorLight">#FFFFFF</Color>
+    <Color x:Key="AndroidBackgroundColorDark">#121212</Color>
+    <Color x:Key="AndroidBackgroundColor">#FFFFFF</Color>
+
+    <Color x:Key="AndroidSurfaceColorLight">#FFFFFF</Color>
+    <Color x:Key="AndroidSurfaceColorDark">#1E1E1E</Color>
+    <Color x:Key="AndroidSurfaceColor">#FFFFFF</Color>
+
+    <Color x:Key="AndroidPrimaryColorLight">#0078D7</Color>
+    <Color x:Key="AndroidPrimaryColorDark">#1F1F1F</Color>
+    <Color x:Key="AndroidPrimaryColor">#0078D7</Color>
+
+    <Color x:Key="AndroidPrimaryDarkColorLight">#005A9E</Color>
+    <Color x:Key="AndroidPrimaryDarkColorDark">#121212</Color>
+    <Color x:Key="AndroidPrimaryDarkColor">#005A9E</Color>
+
     <Color x:Key="AndroidAccentColor">#0078D7</Color>
-    <OnAppTheme x:Key="AndroidPrimaryTextColor" x:TypeArguments="Color" Light="#DE000000" Dark="#FFFFFF" />
-    <OnAppTheme x:Key="AndroidSecondaryTextColor" x:TypeArguments="Color" Light="#8A000000" Dark="#B3FFFFFF" />
-    <OnAppTheme x:Key="AndroidDisabledTextColor" x:TypeArguments="Color" Light="#61000000" Dark="#61FFFFFF" />
+
+    <Color x:Key="AndroidPrimaryTextColorLight">#DE000000</Color>
+    <Color x:Key="AndroidPrimaryTextColorDark">#FFFFFF</Color>
+    <Color x:Key="AndroidPrimaryTextColor">#DE000000</Color>
+
+    <Color x:Key="AndroidSecondaryTextColorLight">#8A000000</Color>
+    <Color x:Key="AndroidSecondaryTextColorDark">#B3FFFFFF</Color>
+    <Color x:Key="AndroidSecondaryTextColor">#8A000000</Color>
+
+    <Color x:Key="AndroidDisabledTextColorLight">#61000000</Color>
+    <Color x:Key="AndroidDisabledTextColorDark">#61FFFFFF</Color>
+    <Color x:Key="AndroidDisabledTextColor">#61000000</Color>
+
     <Color x:Key="AndroidButtonColor">#0078D7</Color>
     <Color x:Key="AndroidButtonTextColor">#FFFFFF</Color>
     <Color x:Key="AndroidSwitchThumbColor">#0078D7</Color>
     <Color x:Key="AndroidSwitchTrackColor">#520078D7</Color>
-    <OnAppTheme x:Key="AndroidDividerColor" x:TypeArguments="Color" Light="#1F000000" Dark="#1FFFFFFF" />
-    <OnAppTheme x:Key="AndroidRippleColor" x:TypeArguments="Color" Light="#33000000" Dark="#33FFFFFF" />
-    <OnAppTheme x:Key="AndroidToolbarColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#1F1F1F" />
-    <OnAppTheme x:Key="AndroidTabLayoutColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#1F1F1F" />
-    <OnAppTheme x:Key="AndroidCardViewColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#2D2D2D" />
-    <OnAppTheme x:Key="AndroidDialogBackgroundColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#2D2D2D" />
+
+    <Color x:Key="AndroidDividerColorLight">#1F000000</Color>
+    <Color x:Key="AndroidDividerColorDark">#1FFFFFFF</Color>
+    <Color x:Key="AndroidDividerColor">#1F000000</Color>
+
+    <Color x:Key="AndroidRippleColorLight">#33000000</Color>
+    <Color x:Key="AndroidRippleColorDark">#33FFFFFF</Color>
+    <Color x:Key="AndroidRippleColor">#33000000</Color>
+
+    <Color x:Key="AndroidToolbarColorLight">#FFFFFF</Color>
+    <Color x:Key="AndroidToolbarColorDark">#1F1F1F</Color>
+    <Color x:Key="AndroidToolbarColor">#FFFFFF</Color>
+
+    <Color x:Key="AndroidTabLayoutColorLight">#FFFFFF</Color>
+    <Color x:Key="AndroidTabLayoutColorDark">#1F1F1F</Color>
+    <Color x:Key="AndroidTabLayoutColor">#FFFFFF</Color>
+
+    <Color x:Key="AndroidCardViewColorLight">#FFFFFF</Color>
+    <Color x:Key="AndroidCardViewColorDark">#2D2D2D</Color>
+    <Color x:Key="AndroidCardViewColor">#FFFFFF</Color>
+
+    <Color x:Key="AndroidDialogBackgroundColorLight">#FFFFFF</Color>
+    <Color x:Key="AndroidDialogBackgroundColorDark">#2D2D2D</Color>
+    <Color x:Key="AndroidDialogBackgroundColor">#FFFFFF</Color>
+
     <Color x:Key="AndroidProgressIndicatorColor">#0078D7</Color>
     <Color x:Key="AndroidSelectionHandleColor">#0078D7</Color>
-    <OnAppTheme x:Key="AndroidNavigationViewColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#1F1F1F" />
-    <OnAppTheme x:Key="AndroidBottomNavigationColor" x:TypeArguments="Color" Light="#FFFFFF" Dark="#1F1F1F" />
+
+    <Color x:Key="AndroidNavigationViewColorLight">#FFFFFF</Color>
+    <Color x:Key="AndroidNavigationViewColorDark">#1F1F1F</Color>
+    <Color x:Key="AndroidNavigationViewColor">#FFFFFF</Color>
+
+    <Color x:Key="AndroidBottomNavigationColorLight">#FFFFFF</Color>
+    <Color x:Key="AndroidBottomNavigationColorDark">#1F1F1F</Color>
+    <Color x:Key="AndroidBottomNavigationColor">#FFFFFF</Color>
 
 </ResourceDictionary>

@@ -1,6 +1,6 @@
 using System;
 
-namespace TDFShared.Utils
+namespace TDFShared.Utilities
 {
     public static class DateUtils
     {

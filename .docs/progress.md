@@ -416,3 +416,53 @@ grep that no `ApiConfig.CurrentToken` / `.TokenExpiration` /
 remain in any `.cs` file under the repo.
 
 ---
+
+## Phase 10 - Merge Utils/Utilities + Rename Duplicate Interfaces
+
+### Features Implemented
+1. Merged `TDFShared/Utils/` into `TDFShared/Utilities/`:
+   - Moved `DateUtils.cs` from `TDFShared/Utils/` to `TDFShared/Utilities/`
+   - Updated its namespace from `TDFShared.Utils` to `TDFShared.Utilities`
+   - Fixed the two `TDFShared.Utils.DateUtils.CalculateBusinessDays(...)`
+     call sites in `TDFAPI/CQRS/Commands/CreateRequestCommand.cs` and
+     `UpdateRequestCommand.cs`
+   - Deleted the now-empty `TDFShared/Utils/` directory
+2. Renamed `TDFAPI.Services.INotificationService` to `INotificationDispatchService`:
+   - Renamed interface file `INotificationService.cs` ->
+     `INotificationDispatchService.cs`; updated the interface name inside
+   - Sed-replaced the bare identifier across all TDFAPI .cs files
+   - Restored the 6 fully-qualified `TDFShared.Services.INotificationService`
+     references that the sed would otherwise have broken (these are the
+     shared cross-cutting interface, which is intentionally left untouched)
+   - Deleted the three `using INotificationService = TDFAPI.Services.INotificationService;`
+     aliases from `ApproveRequestCommand.cs`, `RejectRequestCommand.cs`,
+     and `UpdateRequestCommand.cs` — those existed only to work around the
+     name collision that no longer exists
+3. Renamed `TDFMAUI.Services.INotificationService` to `INotificationClient`:
+   - Renamed interface file `INotificationService.cs` -> `INotificationClient.cs`;
+     updated the interface name inside
+   - Sed-replaced the bare identifier across all TDFMAUI .cs files
+   - Restored any `TDFShared.Services.INotificationService` references
+   - Deleted the `using INotificationService = TDFMAUI.Services.INotificationService;`
+     alias from `DashboardViewModel.cs`
+
+### Errors Encountered
+The sed run intentionally rewrote the `using INotificationService = ...` lines
+into tautological `using INotificationDispatchService = TDFAPI.Services.INotificationDispatchService;`
+self-aliases. Same thing happened in the MAUI ViewModel with
+`using INotificationClient = TDFMAUI.Services.INotificationClient;`.
+
+### How Errors Were Fixed
+Deleted the now-useless tautological `using ... = ...` lines directly; no
+consumer referenced them through their alias form (they were hand-written
+collision workarounds, not renamings).
+
+### Build Verification
+`TDFAPI.csproj` + `TDFShared.csproj`: 0 errors. TDFMAUI full build still not
+possible locally (no iOS/Android SDKs); verified by source grep that no `.cs`
+file under `TDFMAUI/` still contains the identifier `INotificationService`
+(every reference is now either `INotificationClient` for the MAUI-side
+interface or the fully-qualified `TDFShared.Services.INotificationService`
+for the shared one). Same grep check passed for `TDFAPI/`.
+
+---

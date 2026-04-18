@@ -14,7 +14,7 @@ namespace TDFAPI.Services
 {
     /// <summary>
     /// Server-side implementation of <see cref="TDFShared.Services.INotificationService"/>.
-    /// Thin facade over the API's own <see cref="INotificationService"/> plus the
+    /// Thin facade over the API's own <see cref="INotificationDispatchService"/> plus the
     /// <see cref="WebSocketConnectionManager"/> — the shared contract is intentionally
     /// narrow enough that every method here has a real implementation.
     ///
@@ -25,7 +25,7 @@ namespace TDFAPI.Services
     /// </summary>
     public class NotificationServiceAdapter : TDFShared.Services.INotificationService
     {
-        private readonly INotificationService _notificationService;
+        private readonly INotificationDispatchService _notificationService;
         private readonly WebSocketConnectionManager _webSocketManager;
         private readonly ILogger<NotificationServiceAdapter> _logger;
 
@@ -33,7 +33,7 @@ namespace TDFAPI.Services
         private const int ReceiveBufferSize = 4 * 1024;
 
         public NotificationServiceAdapter(
-            INotificationService notificationService,
+            INotificationDispatchService notificationService,
             WebSocketConnectionManager webSocketManager,
             ILogger<NotificationServiceAdapter> logger)
         {
@@ -54,7 +54,7 @@ namespace TDFAPI.Services
 
         public void Dispose()
         {
-            // No owned resources; WebSocketConnectionManager and INotificationService
+            // No owned resources; WebSocketConnectionManager and INotificationDispatchService
             // are owned by the DI container.
         }
 

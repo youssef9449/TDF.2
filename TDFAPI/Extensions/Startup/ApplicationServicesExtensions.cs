@@ -72,7 +72,7 @@ namespace TDFAPI.Extensions.Startup
             services.AddScoped<TDFAPI.Services.IMessageService, MessageService>();
             services.AddScoped<ILookupService, LookupService>();
             services.AddScoped<TDFAPI.Services.IUserPresenceService, UserPresenceService>();
-            services.AddScoped<TDFAPI.Services.INotificationService, TDFAPI.Services.NotificationService>();
+            services.AddScoped<TDFAPI.Services.INotificationDispatchService, TDFAPI.Services.NotificationService>();
             services.AddScoped<TDFShared.Services.INotificationService, NotificationServiceAdapter>();
             services.AddScoped<TDFShared.Services.IRoleService, TDFShared.Services.RoleService>();
             services.AddScoped<IPushTokenService, PushTokenService>();

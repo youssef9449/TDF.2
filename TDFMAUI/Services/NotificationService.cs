@@ -11,7 +11,7 @@ using TDFShared.Services;
 
 namespace TDFMAUI.Services
 {
-    public class NotificationService : INotificationService, IExtendedNotificationService, IUserFeedbackService
+    public class NotificationService : INotificationClient, IExtendedNotificationService, IUserFeedbackService
     {
         private readonly IHttpClientService _httpClientService;
         private readonly WebSocketService _webSocketService;

@@ -22,7 +22,7 @@ namespace TDFMAUI.Services
         private readonly ILogger<NotificationExtensionService> _logger;
         private readonly IUserApiService _userApiService;
 
-        // Correct event signature to match INotificationService
+        // Correct event signature to match INotificationClient
         public event EventHandler<NotificationDto> NotificationReceived;
 
         public NotificationExtensionService(

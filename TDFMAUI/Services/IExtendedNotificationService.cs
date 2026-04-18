@@ -7,7 +7,7 @@ namespace TDFMAUI.Services
     /// <summary>
     /// Extended notification service interface for additional notification features
     /// </summary>
-    public interface IExtendedNotificationService : INotificationService
+    public interface IExtendedNotificationService : INotificationClient
     {
         /// <summary>
         /// Shows a local platform-specific notification

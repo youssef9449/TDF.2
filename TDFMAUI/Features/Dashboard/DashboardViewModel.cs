@@ -11,7 +11,6 @@ using TDFShared.Enums;
 using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Users;
 using TDFShared.Services;
-using INotificationService = TDFMAUI.Services.INotificationService;
 using System.Threading;
 using System.Linq;
 
@@ -20,7 +19,7 @@ namespace TDFMAUI.Features.Dashboard
     public partial class DashboardViewModel : BaseViewModel, IDisposable
     {
         private readonly IRequestService _requestService;
-        private readonly INotificationService _notificationService;
+        private readonly INotificationClient _notificationService;
         private readonly ILogger<DashboardViewModel> _logger;
         private readonly IAuthService _authService;
         private CancellationTokenSource? _refreshCts;
@@ -58,7 +57,7 @@ namespace TDFMAUI.Features.Dashboard
 
         public DashboardViewModel(
             IRequestService requestService,
-            INotificationService notificationService,
+            INotificationClient notificationService,
             ILogger<DashboardViewModel> logger,
             IAuthService authService)
         {

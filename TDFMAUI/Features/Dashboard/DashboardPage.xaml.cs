@@ -30,7 +30,7 @@ namespace TDFMAUI.Features.Dashboard
                 if (_viewModel == null)
                 {
                     var requestService = IPlatformApplication.Current?.Services.GetService<IRequestService>();
-                    var notificationService = IPlatformApplication.Current?.Services.GetService<TDFMAUI.Services.INotificationService>();
+                    var notificationService = IPlatformApplication.Current?.Services.GetService<TDFMAUI.Services.INotificationClient>();
                     var logger = IPlatformApplication.Current?.Services.GetService<Microsoft.Extensions.Logging.ILogger<DashboardViewModel>>();
                     var authService = IPlatformApplication.Current?.Services.GetService<IAuthService>();
                     

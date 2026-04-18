@@ -19,13 +19,13 @@ namespace TDFAPI.CQRS.Commands
     public class CreateMessageCommandHandler : IRequestHandler<CreateMessageCommand, MessageDto>
     {
         private readonly IMessageRepository _messageRepository;
-        private readonly INotificationService _notificationService;
+        private readonly INotificationDispatchService _notificationService;
         private readonly IUserRepository _userRepository;
         private readonly IUnitOfWork _unitOfWork;
 
         public CreateMessageCommandHandler(
             IMessageRepository messageRepository,
-            INotificationService notificationService,
+            INotificationDispatchService notificationService,
             IUserRepository userRepository,
             IUnitOfWork unitOfWork)
         {

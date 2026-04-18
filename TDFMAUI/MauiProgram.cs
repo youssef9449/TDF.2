@@ -260,7 +260,6 @@ namespace TDFMAUI
 
             var userSessionService = app.Services.GetRequiredService<IUserSessionService>();
             App.InitializeUserSession(userSessionService);
-            ApiConfig.ConnectUserSessionService(userSessionService);
             _ = Task.Run(async () => await userSessionService.InitializeAsync());
             ApiConfig.Initialize(isDevelopment: true);
 

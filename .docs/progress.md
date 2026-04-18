@@ -372,3 +372,47 @@ by source grep that no `\bApiService\b` / `\bIApiService\b` references
 remain in `TDFMAUI/` outside comments/log strings.
 
 ---
+
+## Phase 9 - Drop Static Token State from ApiConfig
+
+### Features Implemented
+1. Deleted the static token surface from `TDFMAUI/Config/ApiConfig.cs`:
+   `CurrentToken`, `TokenExpiration`, `CurrentRefreshToken`,
+   `RefreshTokenExpiration`, `IsTokenValid`, `IsRefreshTokenValid`,
+   the four `_fallback*` fields that shadowed them, and the
+   `ConnectUserSessionService(...)` entry point. Token state now
+   lives exclusively on `IUserSessionService` (in-memory) /
+   `IAuthTokenStore` (HTTP pipeline) / `SecureStorageService` (disk).
+2. `AuthService` no longer mirrors tokens into `ApiConfig`. The three
+   call sites (`LoginAsync`, `LogoutAsync`, and the two
+   `RefreshToken*` helpers) already routed through
+   `_userSessionService.SetTokens(...)` and
+   `_httpClientService.SetAuthenticationTokenAsync(...)`; the
+   duplicate writes and the "desktop fallback" read in
+   `GetTokenAsync` / `RefreshTokenAsync` are removed. The lone
+   remaining ApiConfig touch point in AuthService is
+   `ApiConfig.BaseUrl`, which is configuration, not session state.
+3. `WebSocketTokenProvider` now injects `IUserSessionService` and
+   uses it as the desktop token source instead of reading the static
+   `ApiConfig.CurrentToken`/`TokenExpiration`. Updated its DocComment.
+4. `MauiProgram` dropped the
+   `ApiConfig.ConnectUserSessionService(userSessionService)` wire-up
+   that is no longer needed.
+
+### Errors Encountered
+None. The swap is mechanical: every ApiConfig token writer already
+called `UserSessionService.SetTokens(...)` in the same block, and
+every reader had a `_userSessionService` handle in scope.
+
+### How Errors Were Fixed
+N/A.
+
+### Build Verification
+`TDFAPI.csproj` + `TDFShared.csproj`: 0 errors. TDFMAUI full build
+still not possible locally (no iOS/Android SDKs); verified by source
+grep that no `ApiConfig.CurrentToken` / `.TokenExpiration` /
+`.CurrentRefreshToken` / `.RefreshTokenExpiration` / `.IsTokenValid` /
+`.IsRefreshTokenValid` / `.ConnectUserSessionService` references
+remain in any `.cs` file under the repo.
+
+---

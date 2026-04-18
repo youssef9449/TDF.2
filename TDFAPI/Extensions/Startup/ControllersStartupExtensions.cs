@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
+using TDFShared.DTOs.Common;
 
 namespace TDFAPI.Extensions.Startup
 {
@@ -26,6 +28,18 @@ namespace TDFAPI.Extensions.Startup
                         options.JsonSerializerOptions.Converters.Add(converter);
                     }
                 });
+
+            // Single source of truth for model-binding validation errors: the
+            // framework-level 400 response produced by [ApiController] gets
+            // wrapped in the same ApiResponse envelope every controller emits
+            // for its own errors. Individual controllers therefore no longer
+            // need redundant `if (!ModelState.IsValid)` guards.
+            services.Configure<ApiBehaviorOptions>(options =>
+            {
+                options.InvalidModelStateResponseFactory = context =>
+                    new BadRequestObjectResult(
+                        ApiResponse<object>.FromModelState(context.ModelState));
+            });
 
             services.AddEndpointsApiExplorer();
 

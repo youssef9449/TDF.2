@@ -57,7 +57,9 @@ namespace TDFAPI.Extensions.Startup
             services.AddScoped<TDFShared.Validation.IValidationService, TDFShared.Validation.ValidationService>();
             services.AddScoped<TDFShared.Validation.IBusinessRulesService, TDFShared.Validation.BusinessRulesService>();
             services.AddScoped<TDFShared.Services.IErrorHandlingService, TDFShared.Services.ErrorHandlingService>();
-            services.AddScoped<TDFShared.Services.IAuthService, AuthService>();
+            services.AddScoped<AuthService>();
+            services.AddScoped<TDFShared.Services.IAuthService>(sp => sp.GetRequiredService<AuthService>());
+            services.AddScoped<TDFAPI.Services.IAuthTokenIssuer>(sp => sp.GetRequiredService<AuthService>());
 
             // Unit of Work and repositories.
             services.AddScoped<IUnitOfWork, UnitOfWork>();

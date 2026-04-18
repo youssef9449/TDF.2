@@ -25,13 +25,14 @@ using Microsoft.Maui;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Controls;
 using TDFMAUI.Services.Presence;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.Services;
 
 /// <summary>
 /// Implementation of IAuthService that handles token management
 /// </summary>
-public class AuthService : IAuthService
+public class AuthService : IAuthService, IAuthClient
 {
     private readonly SecureStorageService _secureStorageService;
     private readonly IUserProfileService _userProfileService;

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TDFShared.DTOs.Users;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Presence
 {
     public class UserPresenceCacheService : IUserPresenceCacheService
     {

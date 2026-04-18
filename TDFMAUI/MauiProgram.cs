@@ -15,6 +15,8 @@ using System.Diagnostics;
 using TDFShared.Constants;
 using TDFShared.Validation;
 using TDFShared.Services;
+using TDFMAUI.Services.Notifications;
+using TDFMAUI.Services.Presence;
 
 namespace TDFMAUI
 {

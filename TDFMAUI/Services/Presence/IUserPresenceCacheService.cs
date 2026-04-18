@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using TDFShared.DTOs.Users;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Presence
 {
     public interface IUserPresenceCacheService
     {

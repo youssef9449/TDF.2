@@ -17,7 +17,7 @@ using Windows.UI.Notifications;
 #endif
 
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Notifications
 {
     public class PushNotificationService : IPushNotificationService
     {

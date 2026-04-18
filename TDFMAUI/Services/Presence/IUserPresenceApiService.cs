@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using TDFShared.DTOs.Common;
 using TDFShared.DTOs.Users;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Presence
 {
     public interface IUserPresenceApiService
     {

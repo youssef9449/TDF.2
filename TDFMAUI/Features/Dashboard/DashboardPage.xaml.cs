@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
 using System;
 using TDFShared.Services;
+using TDFMAUI.Services.Notifications;
 
 namespace TDFMAUI.Features.Dashboard
 {

@@ -9,6 +9,7 @@ using TDFMAUI.Services;
 using TDFShared.Enums;
 using TDFShared.DTOs.Users;
 using TDFMAUI.Pages;
+using TDFMAUI.Services.Presence;
 
 namespace TDFMAUI.ViewModels
 {

@@ -18,6 +18,8 @@ using Microsoft.Maui.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.ApplicationModel;
 using System.Threading;
+using TDFMAUI.Services.Notifications;
+using TDFMAUI.Services.Presence;
 #if ANDROID || IOS
 using Plugin.Firebase.CloudMessaging;
 using Plugin.Firebase.CloudMessaging.EventArgs;

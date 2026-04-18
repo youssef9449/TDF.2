@@ -3,6 +3,7 @@ using TDFMAUI.ViewModels;
 using TDFShared.Enums;
 using TDFShared.DTOs.Users;
 using Microsoft.Extensions.Logging;
+using TDFMAUI.Services.Presence;
 
 namespace TDFMAUI.Pages
 {

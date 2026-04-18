@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Notifications
 {
     /// <summary>
     /// Platform-specific notification permission service interface.

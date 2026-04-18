@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using TDFMAUI.Services;
 using UserNotifications;
 using Microsoft.Extensions.Logging;
+using TDFMAUI.Services.Notifications;
 
 namespace TDFMAUI.Platforms.iOS
 {

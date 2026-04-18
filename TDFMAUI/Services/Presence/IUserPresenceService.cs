@@ -2,7 +2,7 @@ using TDFShared.Enums;
 using TDFShared.DTOs.Users;
 using TDFShared.Services;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Presence
 {
     /// <summary>
     /// Service to manage user presence status and availability

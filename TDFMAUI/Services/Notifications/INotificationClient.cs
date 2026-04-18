@@ -2,7 +2,7 @@ using System;
 using TDFShared.DTOs.Messages;
 using TDFShared.Models.Notification;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Notifications
 {
     public interface INotificationClient
     {

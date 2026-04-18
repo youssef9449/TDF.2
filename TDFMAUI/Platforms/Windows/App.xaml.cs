@@ -19,6 +19,7 @@ using System.Linq;
 using Microsoft.Maui.Hosting;
 using Microsoft.Maui;
 using Microsoft.Extensions.DependencyInjection;
+using TDFMAUI.Services.Presence;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.

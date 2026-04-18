@@ -4,6 +4,7 @@ using TDFMAUI.Features.Admin;
 using TDFMAUI.Features.Auth;
 using TDFMAUI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using TDFMAUI.Services.Presence;
 
 namespace TDFMAUI.Pages;
 

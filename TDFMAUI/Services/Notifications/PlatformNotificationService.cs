@@ -23,7 +23,7 @@ using System.Collections.ObjectModel;
 using TDFShared.DTOs.Messages;
 using TDFShared.Services;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Notifications
 {
     public class PlatformNotificationService : IPlatformNotificationService
     {

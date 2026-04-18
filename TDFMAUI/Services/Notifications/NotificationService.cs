@@ -9,7 +9,7 @@ using TDFShared.Models.Notification;
 using TDFShared.Constants;
 using TDFShared.Services;
 
-namespace TDFMAUI.Services
+namespace TDFMAUI.Services.Notifications
 {
     public class NotificationService : INotificationClient, IExtendedNotificationService, IUserFeedbackService
     {

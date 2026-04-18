@@ -10,6 +10,7 @@ using TDFShared.Enums;
 using TDFShared.DTOs.Users;
 using TDFShared.Constants;
 using Microsoft.Maui.Graphics;
+using TDFMAUI.Services.Presence;
 
 namespace TDFMAUI.Helpers
 {

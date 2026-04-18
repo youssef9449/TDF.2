@@ -6,6 +6,7 @@ using TDFMAUI.ViewModels;
 using TDFShared.Enums;
 using Microsoft.Extensions.Logging;
 using TDFShared.Services;
+using TDFMAUI.Services.Presence;
 
 namespace TDFMAUI
 {

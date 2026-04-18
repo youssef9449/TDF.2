@@ -180,7 +180,7 @@ public class AuthService : IAuthService
                     if (userDetails.Roles.Count == 0) userDetails.Roles.Add("User");
                 }
 
-                // Token storage and HttpClient setting is already partially handled by ApiService.LoginAsync
+                // Token storage and HttpClient setting is already partially handled by IAuthApiService.LoginAsync
                 // But we ensure consistency here across all services
                 await _secureStorageService.SaveTokenAsync(tokenData.Token, tokenData.Expiration, tokenData.RefreshToken, tokenData.RefreshTokenExpiration);
                 _userProfileService.SetUserDetails(userDetails);
@@ -491,7 +491,7 @@ public class AuthService : IAuthService
             }
             else
             {
-                _logger.LogWarning("Failed to get current user from ApiService: {Message}", apiResponse?.Message);
+                _logger.LogWarning("Failed to get current user from IUserApiService: {Message}", apiResponse?.Message);
                 return null;
             }
         }

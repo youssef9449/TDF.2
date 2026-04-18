@@ -117,7 +117,7 @@ namespace TDFMAUI.Services.Api
 
         public async Task<bool> UploadProfilePictureAsync(Stream imageStream, string fileName, string contentType)
         {
-            // Placeholder for multipart upload - usually handled in ApiService facade or specialized helper
+            // TODO: implement multipart upload via IHttpClientService.
             return false;
         }
 

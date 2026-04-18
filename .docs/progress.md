@@ -313,3 +313,62 @@ The errors were fixed by:
 This systematic approach involved reading relevant files, identifying the root cause of each error, and applying targeted code edits to resolve them while improving the overall code structure and adherence to best practices like dependency injection and correct API response handling.
 
 ---
+## Phase 8 - Delete MAUI ApiService Facade; Inject Feature Interfaces Directly
+
+### Features Implemented
+1. Deleted `TDFMAUI/Services/ApiService.cs` (160 LOC) and
+   `TDFMAUI/Services/IApiService.cs` (21 LOC). The facade implemented six
+   interfaces (IApiService + five feature interfaces) as pure delegation
+   on top of services that DI already registered. Removing it forces
+   each caller to declare exactly which feature(s) it consumes.
+2. `NotificationService` now injects `IHttpClientService` directly in
+   place of `IApiService`. All four call sites
+   (`GetUnreadNotificationsAsync`, `MarkAsSeenAsync`,
+   `MarkNotificationsAsSeenAsync`, `BroadcastNotificationAsync`)
+   compile-compatibly against `IHttpClientService.GetAsync<T>` /
+   `PostAsync<TReq,TResp>`. `DeleteNotificationAsync` used the
+   non-existent `IApiService.DeleteAsync<T>` generic; switched to
+   `IHttpClientService.DeleteAsync` (returns `HttpResponseMessage`) plus
+   `JsonSerializer.Deserialize<ApiResponse<bool>>` on the body. Empty
+   2xx responses short-circuit to `true`.
+3. `UserPresenceApiService` dropped its injected-but-unused `IApiService`
+   parameter. Ctor now takes `IUserApiService + ILogger` and guards
+   both with `ArgumentNullException`.
+4. `LookupService` added explicit `IHttpClientService` injection in
+   place of the runtime `App.Services.GetService<IApiService>()` lookup
+   that `GetTitlesForDepartmentAsync` used. Also adds null-guards in
+   the ctor.
+5. `DiagnosticsPage` dropped its injected-but-unused `IApiService`
+   parameter. Ctor now takes only `IConnectivity + IHttpClientService`.
+6. `MauiProgram` removed the two DI registrations for `ApiService` and
+   `IApiService`, and the connectivity handler now resolves
+   `IHttpClientService` directly to call `TestConnectivityAsync()`.
+7. Swept two dead static references: `UserProfileViewModel` and
+   `PageExtensions` were calling `ApiService.GetFriendlyErrorMessage(ex)`,
+   a static method that never existed on the class we deleted. Both now
+   surface `ex.Message` (or `ApiException.Message`), matching the
+   fallback behaviour callers already saw.
+8. Comment/log drive-bys in `AuthService` and `UserApiService` to stop
+   referring to the deleted facade by name.
+
+### Errors Encountered
+None new. The refactor uncovered two latent compile errors
+(`ApiService.GetFriendlyErrorMessage` static call - no such symbol;
+`_apiService.DeleteAsync<T>` generic overload - no such member) which
+were fixed as part of the migration.
+
+### How Errors Were Fixed
+- `ApiService.GetFriendlyErrorMessage(ex)`: replaced with `ex.Message`
+  fallback at both call sites.
+- `_apiService.DeleteAsync<T>(endpoint)`: replaced with
+  `_httpClientService.DeleteAsync(endpoint)` +
+  `JsonSerializer.Deserialize<ApiResponse<bool>>` on the response body,
+  which matches the non-generic contract on `IHttpClientService`.
+
+### Build Verification
+`TDFAPI.csproj`: 0 errors, 229 warnings (unchanged from Phase 7).
+TDFMAUI full build not possible locally (no iOS/Android SDK); verified
+by source grep that no `\bApiService\b` / `\bIApiService\b` references
+remain in `TDFMAUI/` outside comments/log strings.
+
+---

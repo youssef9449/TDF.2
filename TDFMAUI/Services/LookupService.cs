@@ -6,19 +6,25 @@ using TDFShared.Constants;
 using TDFShared.DTOs.Common;
 using Microsoft.Extensions.Logging;
 using System.Linq;
+using TDFShared.Services;
 
 namespace TDFMAUI.Services
 {
     public class LookupService : ILookupService, IDisposable
     {
         private readonly ILookupApiService _lookupApiService;
+        private readonly IHttpClientService _httpClientService;
         private readonly ILogger<LookupService> _logger;
         private List<LookupItem> _departments;
         private bool _disposed;
 
-        public LookupService(ILookupApiService lookupApiService, ILogger<LookupService> logger)
+        public LookupService(
+            ILookupApiService lookupApiService,
+            IHttpClientService httpClientService,
+            ILogger<LookupService> logger)
         {
             _lookupApiService = lookupApiService ?? throw new ArgumentNullException(nameof(lookupApiService));
+            _httpClientService = httpClientService ?? throw new ArgumentNullException(nameof(httpClientService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _departments = new List<LookupItem>();
             _logger.LogInformation("LookupService initialized");
@@ -68,9 +74,8 @@ namespace TDFMAUI.Services
             try
             {
                 _logger.LogInformation("Fetching titles for department {DepartmentId}", departmentId);
-                // ILookupApiService doesn't have GetTitlesForDepartmentAsync, using IApiService directly for now or I should add it
-                var apiService = App.Services.GetService<IApiService>();
-                var response = await apiService.GetAsync<ApiResponse<List<string>>>(
+                // ILookupApiService has no GetTitlesForDepartmentAsync; call the endpoint directly.
+                var response = await _httpClientService.GetAsync<ApiResponse<List<string>>>(
                     string.Format(ApiRoutes.Lookups.GetTitlesByDepartment, departmentId));
 
                 if (response?.Success == true && response.Data != null)

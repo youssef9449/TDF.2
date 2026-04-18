@@ -16,15 +16,9 @@ namespace TDFMAUI
             // Log the error
             DebugService.LogError("ApiError", ex);
             
-            string message;
-            if (ex is ApiException apiEx)
-            {
-                message = ApiService.GetFriendlyErrorMessage(apiEx);
-            }
-            else
-            {
-                message = ex.Message;
-            }
+            string message = ex is ApiException apiEx
+                ? apiEx.Message
+                : ex.Message;
             
             await page.DisplayAlert(title, message, "OK");
         }

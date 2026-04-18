@@ -12,14 +12,12 @@ namespace TDFMAUI.Services
     public class UserPresenceApiService : IUserPresenceApiService
     {
         private readonly IUserApiService _userApiService;
-        private readonly IApiService _apiService;
         private readonly ILogger<UserPresenceApiService> _logger;
 
-        public UserPresenceApiService(IUserApiService userApiService, IApiService apiService, ILogger<UserPresenceApiService> logger)
+        public UserPresenceApiService(IUserApiService userApiService, ILogger<UserPresenceApiService> logger)
         {
-            _userApiService = userApiService;
-            _apiService = apiService;
-            _logger = logger;
+            _userApiService = userApiService ?? throw new ArgumentNullException(nameof(userApiService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public async Task<UserPresenceInfo> GetUserStatusAsync(int userId)

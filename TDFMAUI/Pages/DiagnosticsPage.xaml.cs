@@ -10,15 +10,13 @@ namespace TDFMAUI.Pages
     public partial class DiagnosticsPage : ContentPage
     {
         private readonly IConnectivity _connectivity;
-        private readonly IApiService _apiService;
         private readonly IHttpClientService _httpClientService;
 
-        public DiagnosticsPage(IConnectivity connectivity, IApiService apiService, IHttpClientService httpClientService)
+        public DiagnosticsPage(IConnectivity connectivity, IHttpClientService httpClientService)
         {
             InitializeComponent();
 
             _connectivity = connectivity;
-            _apiService = apiService;
             _httpClientService = httpClientService;
 
             // Load initial data

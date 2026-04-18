@@ -137,9 +137,6 @@ namespace TDFMAUI
             builder.Services.AddSingleton<IMessageService, TDFMAUI.Services.Api.MessageService>();
             builder.Services.AddSingleton<ILookupApiService, TDFMAUI.Services.Api.LookupApiService>();
 
-            builder.Services.AddSingleton<ApiService>();
-            builder.Services.AddSingleton<IApiService>(sp => sp.GetRequiredService<ApiService>());
-
             builder.Services.AddSingleton<SecureStorageService>();
             builder.Services.AddSingleton(SecureStorage.Default);
             builder.Services.AddSingleton<NetworkService>();
@@ -272,11 +269,11 @@ namespace TDFMAUI
             {
                 connectivityService.ConnectivityChanged += async (sender, e) =>
                 {
-                    var apiService = app.Services.GetService<IApiService>();
+                    var httpClientService = app.Services.GetService<IHttpClientService>();
                     var webSocketService = app.Services.GetService<WebSocketService>();
                     if (e.IsConnected)
                     {
-                        if (apiService != null) await apiService.TestConnectivityAsync();
+                        if (httpClientService != null) await httpClientService.TestConnectivityAsync();
                         if (webSocketService != null) await webSocketService.ConnectAsync();
                     }
                     else if (webSocketService != null) await webSocketService.DisconnectAsync();

@@ -1,90 +1,63 @@
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using TDFAPI.Services;
-using TDFShared.DTOs.Users;
-using TDFShared.DTOs.Common;
-using TDFAPI.Models;
 using TDFAPI.Extensions;
-using System.Security.Claims;
+using TDFAPI.Models;
+using TDFAPI.Services;
+using TDFShared.Constants;
+using TDFShared.DTOs.Common;
+using TDFShared.DTOs.Users;
 
 namespace TDFAPI.Controllers
 {
     [Authorize]
     [ApiController]
-    [Route(TDFShared.Constants.ApiRoutes.PushToken.Base)]
+    [Route(ApiRoutes.PushToken.Base)]
     public class PushTokenController : ControllerBase
     {
         private readonly IPushTokenService _pushTokenService;
-        private readonly ILogger<PushTokenController> _logger;
 
-        public PushTokenController(
-            IPushTokenService pushTokenService,
-            ILogger<PushTokenController> logger)
+        public PushTokenController(IPushTokenService pushTokenService)
         {
             _pushTokenService = pushTokenService;
-            _logger = logger;
         }
 
         /// <summary>
-        /// Register a new push notification token for the current user
+        /// Register a new push notification token for the current user.
         /// </summary>
         [HttpPost("register")]
-        public async Task<ActionResult<ApiResponse<bool>>> RegisterToken([FromBody] PushTokenRegistrationDto registration)
+        public async Task<ActionResult<ApiResponse<bool>>> RegisterToken(
+            [FromBody] PushTokenRegistrationDto registration)
         {
-            try
-            {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-                await _pushTokenService.RegisterTokenAsync(userId, registration);
-                return Ok(ApiResponse<bool>.SuccessResponse(true, "Push token registered successfully"));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error registering push token");
-                return StatusCode(500, ApiResponse<bool>.ErrorResponse("Error registering push token"));
-            }
+            await _pushTokenService.RegisterTokenAsync(GetCurrentUserId(), registration);
+            return Ok(ApiResponse<bool>.SuccessResponse(true, "Push token registered successfully"));
         }
 
         /// <summary>
-        /// Unregister a push notification token for the current user
+        /// Unregister a push notification token for the current user.
         /// </summary>
         [HttpPost("unregister")]
         public async Task<ActionResult<ApiResponse<bool>>> UnregisterToken([FromBody] string token)
         {
-            try
-            {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-                await _pushTokenService.UnregisterTokenAsync(userId, token);
-                return Ok(ApiResponse<bool>.SuccessResponse(true, "Push token unregistered successfully"));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error unregistering push token");
-                return StatusCode(500, ApiResponse<bool>.ErrorResponse("Error unregistering push token"));
-            }
+            await _pushTokenService.UnregisterTokenAsync(GetCurrentUserId(), token);
+            return Ok(ApiResponse<bool>.SuccessResponse(true, "Push token unregistered successfully"));
         }
 
         /// <summary>
-        /// Get all active push tokens for the current user
+        /// Get all active push tokens for the current user.
         /// </summary>
         [HttpGet]
         public async Task<ActionResult<ApiResponse<IEnumerable<PushTokenDto>>>> GetUserTokens()
         {
-            try
-            {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-                var tokens = await _pushTokenService.GetUserTokensAsync(userId);
-                var dtos = tokens.Select(t => t.ToDto());
-                return Ok(ApiResponse<IEnumerable<PushTokenDto>>.SuccessResponse(dtos));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving push tokens");
-                return StatusCode(500, ApiResponse<IEnumerable<PushTokenDto>>.ErrorResponse("Error retrieving push tokens"));
-            }
+            var tokens = await _pushTokenService.GetUserTokensAsync(GetCurrentUserId());
+            var dtos = tokens.Select(t => t.ToDto());
+            return Ok(ApiResponse<IEnumerable<PushTokenDto>>.SuccessResponse(dtos));
+        }
+
+        private int GetCurrentUserId()
+        {
+            var value = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return int.TryParse(value, out var id) ? id : 0;
         }
     }
 }

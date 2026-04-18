@@ -13,13 +13,14 @@ using TDFShared.Enums;
 using TDFShared.Exceptions;
 using TDFShared.Services;
 using TDFShared.Utilities;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.ViewModels
 {
     public partial class AddRequestViewModel : BaseViewModel
     {
         private readonly IRequestService _requestService;
-        private readonly IAuthService _authService;
+        private readonly IAuthClient _authService;
         private readonly ILogger<AddRequestViewModel> _logger;
         private readonly TDFShared.Validation.IValidationService _validationService;
         private readonly TDFShared.Validation.IBusinessRulesService _businessRulesService;
@@ -156,7 +157,7 @@ namespace TDFMAUI.ViewModels
 
         public AddRequestViewModel(
             IRequestService requestService,
-            IAuthService authService,
+            IAuthClient authService,
             ILogger<AddRequestViewModel> logger,
             TDFShared.Validation.IValidationService validationService,
             TDFShared.Validation.IBusinessRulesService businessRulesService,

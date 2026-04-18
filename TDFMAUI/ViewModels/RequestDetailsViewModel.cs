@@ -12,6 +12,7 @@ using TDFShared.DTOs.Users;
 using TDFShared.Enums;
 using TDFShared.Services;
 using TDFShared.Utilities;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.ViewModels
 {
@@ -19,7 +20,7 @@ namespace TDFMAUI.ViewModels
     public partial class RequestDetailsViewModel : BaseViewModel
     {
         private readonly IRequestApiService _requestApiService;
-        private readonly IAuthService _authService;
+        private readonly IAuthClient _authService;
         private readonly ILogger<RequestDetailsViewModel> _logger;
 
         [ObservableProperty]
@@ -33,7 +34,7 @@ namespace TDFMAUI.ViewModels
         [ObservableProperty] private bool _canEdit;
         [ObservableProperty] private bool _canDelete;
 
-        public RequestDetailsViewModel(IRequestApiService requestApiService, IAuthService authService, ILogger<RequestDetailsViewModel> logger)
+        public RequestDetailsViewModel(IRequestApiService requestApiService, IAuthClient authService, ILogger<RequestDetailsViewModel> logger)
         {
             _requestApiService = requestApiService;
             _authService = authService;

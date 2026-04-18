@@ -14,6 +14,7 @@ using TDFShared.Services;
 using System.Threading;
 using System.Linq;
 using TDFMAUI.Services.Notifications;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.Features.Dashboard
 {
@@ -22,7 +23,7 @@ namespace TDFMAUI.Features.Dashboard
         private readonly IRequestService _requestService;
         private readonly INotificationClient _notificationService;
         private readonly ILogger<DashboardViewModel> _logger;
-        private readonly IAuthService _authService;
+        private readonly IAuthClient _authService;
         private CancellationTokenSource? _refreshCts;
         private bool _disposed = false;
 
@@ -60,7 +61,7 @@ namespace TDFMAUI.Features.Dashboard
             IRequestService requestService,
             INotificationClient notificationService,
             ILogger<DashboardViewModel> logger,
-            IAuthService authService)
+            IAuthClient authService)
         {
             _requestService = requestService;
             _notificationService = notificationService;

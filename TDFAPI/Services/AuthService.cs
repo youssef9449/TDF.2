@@ -27,7 +27,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace TDFAPI.Services;
 
-public class AuthService : TDFShared.Services.IAuthService, IAuthTokenIssuer, IDisposable
+public class AuthService : IAuthTokenIssuer, IDisposable
 {
     private readonly ILogger<AuthService> _logger;
     private readonly IUserRepository _userRepository;

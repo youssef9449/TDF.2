@@ -19,13 +19,13 @@ namespace TDFAPI.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly IAuthService _authService;
+        private readonly IAuthTokenIssuer _authService;
         private readonly IUserService _userService;
         private readonly IUserRepository _userRepository;
         private readonly ILogger<AuthController> _logger;
 
         public AuthController(
-            IAuthService authService,
+            IAuthTokenIssuer authService,
             IUserService userService,
             IUserRepository userRepository,
             ILogger<AuthController> logger)

@@ -30,9 +30,9 @@ using TDFShared.Contracts;
 namespace TDFMAUI.Services;
 
 /// <summary>
-/// Implementation of IAuthService that handles token management
+/// Implementation of <see cref="IAuthClient"/> that handles token management on the client side.
 /// </summary>
-public class AuthService : IAuthService, IAuthClient
+public class AuthService : IAuthClient
 {
     private readonly SecureStorageService _secureStorageService;
     private readonly IUserProfileService _userProfileService;

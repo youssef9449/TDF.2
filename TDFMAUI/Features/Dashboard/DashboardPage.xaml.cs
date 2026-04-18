@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System;
 using TDFShared.Services;
 using TDFMAUI.Services.Notifications;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.Features.Dashboard
 {
@@ -33,7 +34,7 @@ namespace TDFMAUI.Features.Dashboard
                     var requestService = IPlatformApplication.Current?.Services.GetService<IRequestService>();
                     var notificationService = IPlatformApplication.Current?.Services.GetService<TDFMAUI.Services.INotificationClient>();
                     var logger = IPlatformApplication.Current?.Services.GetService<Microsoft.Extensions.Logging.ILogger<DashboardViewModel>>();
-                    var authService = IPlatformApplication.Current?.Services.GetService<IAuthService>();
+                    var authService = IPlatformApplication.Current?.Services.GetService<IAuthClient>();
                     
                     if (requestService != null && notificationService != null && authService != null)
                     {

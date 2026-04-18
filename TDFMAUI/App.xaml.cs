@@ -23,6 +23,7 @@ using TDFMAUI.Services.Presence;
 #if ANDROID || IOS
 using Plugin.Firebase.CloudMessaging;
 using Plugin.Firebase.CloudMessaging.EventArgs;
+using TDFShared.Contracts;
 #endif
 
 
@@ -367,7 +368,7 @@ namespace TDFMAUI
                     using var authTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     authTimeout.CancelAfter(TokenValidationTimeout + CurrentUserLookupTimeout);
 
-                    var authService = Services.GetRequiredService<IAuthService>();
+                    var authService = Services.GetRequiredService<IAuthClient>();
                     var secureStorage = Services.GetRequiredService<SecureStorageService>();
 
                     bool hasValidToken = await ExecuteWithTimeoutAsync(

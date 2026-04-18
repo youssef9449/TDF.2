@@ -7,12 +7,13 @@ using TDFShared.Enums;
 using TDFShared.DTOs.Users;
 using TDFShared.Services;
 using TDFMAUI.Services.Presence;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.ViewModels
 {
     public partial class LoginPageViewModel : BaseViewModel
     {
-        private readonly IAuthService _authService;
+        private readonly IAuthClient _authService;
         private readonly IAuthApiService _authApiService;
         private readonly IWebSocketService _webSocketService;
         private readonly ILogger<LoginPageViewModel> _logger;
@@ -28,7 +29,7 @@ namespace TDFMAUI.ViewModels
         private string _password = string.Empty;
 
         public LoginPageViewModel(
-            IAuthService authService,
+            IAuthClient authService,
             IAuthApiService authApiService,
             IWebSocketService webSocketService,
             IUserPresenceService userPresenceService,

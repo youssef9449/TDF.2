@@ -16,7 +16,7 @@ namespace TDFAPI.Services
     public class UserService : IUserService
     {
         private readonly IUserRepository _userRepository;
-        private readonly IAuthService _authService;
+        private readonly IAuthTokenIssuer _authService;
         private readonly ILogger<UserService> _logger;
         private readonly IServiceProvider _serviceProvider;
         private readonly IBusinessRulesService _businessRulesService;
@@ -26,7 +26,7 @@ namespace TDFAPI.Services
 
         public UserService(
             IUserRepository userRepository, 
-            IAuthService authService, 
+            IAuthTokenIssuer authService, 
             ILogger<UserService> logger, 
             IServiceProvider serviceProvider,
             IBusinessRulesService businessRulesService,

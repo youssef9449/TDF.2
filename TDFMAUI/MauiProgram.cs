@@ -186,7 +186,6 @@ namespace TDFMAUI
             builder.Services.AddSingleton<App>();
             builder.Services.AddSingleton<AppShell>();
             builder.Services.AddSingleton<AuthService>();
-            builder.Services.AddSingleton<IAuthService>(sp => sp.GetRequiredService<AuthService>());
             builder.Services.AddSingleton<TDFShared.Contracts.IAuthClient>(sp => sp.GetRequiredService<AuthService>());
             builder.Services.AddSingleton<IPlatformNotificationService, PlatformNotificationService>();
             builder.Services.AddSingleton<NotificationService>();

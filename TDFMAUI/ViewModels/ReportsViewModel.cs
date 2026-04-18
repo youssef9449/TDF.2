@@ -13,6 +13,7 @@ using TDFMAUI.Features.Requests;
 using TDFShared.Services;
 using TDFShared.Utilities;
 using TDFShared.DTOs.Users;
+using TDFShared.Contracts;
 
 namespace TDFMAUI.ViewModels
 {
@@ -20,7 +21,7 @@ namespace TDFMAUI.ViewModels
     {
         private readonly IRequestService _requestService;
         private readonly IErrorHandlingService _errorHandlingService;
-        private readonly IAuthService _authService;
+        private readonly IAuthClient _authService;
 
         [ObservableProperty]
         private ObservableCollection<RequestResponseDto> _requests = new();
@@ -49,7 +50,7 @@ namespace TDFMAUI.ViewModels
         public ReportsViewModel(
             IRequestService requestService, 
             IErrorHandlingService errorHandlingService,
-            IAuthService authService)
+            IAuthClient authService)
         {
             _requestService = requestService;
             _errorHandlingService = errorHandlingService;

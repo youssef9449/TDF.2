@@ -1,6 +1,7 @@
 using System.Text.Json;
 using TDFMAUI.Helpers;
 using Microsoft.Extensions.Logging;
+using TDFShared.Contracts;
 using TDFShared.DTOs.Messages;
 using TDFShared.Enums;
 using TDFShared.Models.Notification;
@@ -9,7 +10,7 @@ using TDFShared.Services;
 
 namespace TDFMAUI.Services
 {
-    public class NotificationService : INotificationService, IExtendedNotificationService
+    public class NotificationService : INotificationService, IExtendedNotificationService, IUserFeedbackService
     {
         private readonly IApiService _apiService;
         private readonly WebSocketService _webSocketService;

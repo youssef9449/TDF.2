@@ -134,8 +134,10 @@ namespace TDFMAUI.ViewModels
             {
                 var currentUser = await _authService.GetCurrentUserAsync();
                 ApiResponse<bool>? response = null;
-                if (currentUser?.IsManager == true) response = await _requestApiService.ManagerApproveRequestAsync(Request.RequestID, new ManagerApprovalDto { ManagerRemarks = comment });
-                else if (currentUser?.IsHR == true) response = await _requestApiService.HRApproveRequestAsync(Request.RequestID, new HRApprovalDto { HRRemarks = comment });
+                if (currentUser != null && RequestStateManager.CanManagerAct(Request, currentUser))
+                    response = await _requestApiService.ManagerApproveRequestAsync(Request.RequestID, new ManagerApprovalDto { ManagerRemarks = comment });
+                else if (currentUser != null && RequestStateManager.CanHRAct(Request, currentUser))
+                    response = await _requestApiService.HRApproveRequestAsync(Request.RequestID, new HRApprovalDto { HRRemarks = comment });
 
                 if (response?.Success == true) await LoadRequestDetailsAsync();
             }
@@ -155,8 +157,10 @@ namespace TDFMAUI.ViewModels
             {
                 var currentUser = await _authService.GetCurrentUserAsync();
                 ApiResponse<bool>? response = null;
-                if (currentUser?.IsManager == true) response = await _requestApiService.ManagerRejectRequestAsync(Request.RequestID, new ManagerRejectDto { ManagerRemarks = reason });
-                else if (currentUser?.IsHR == true) response = await _requestApiService.HRRejectRequestAsync(Request.RequestID, new HRRejectDto { HRRemarks = reason });
+                if (currentUser != null && RequestStateManager.CanManagerAct(Request, currentUser))
+                    response = await _requestApiService.ManagerRejectRequestAsync(Request.RequestID, new ManagerRejectDto { ManagerRemarks = reason });
+                else if (currentUser != null && RequestStateManager.CanHRAct(Request, currentUser))
+                    response = await _requestApiService.HRRejectRequestAsync(Request.RequestID, new HRRejectDto { HRRemarks = reason });
 
                 if (response?.Success == true) await LoadRequestDetailsAsync();
             }

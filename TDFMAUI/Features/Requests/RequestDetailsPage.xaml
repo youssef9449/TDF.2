@@ -129,19 +129,43 @@
                     </VerticalStackLayout>
                 </Border>
 
-                <!-- HR Status -->
+                <!-- Manager review -->
                 <Border Padding="15"
                         StrokeShape="RoundRectangle 10"
                         Stroke="{AppThemeBinding Light={StaticResource BorderColorLight}, Dark={StaticResource BorderColorDark}}"
                         BackgroundColor="{AppThemeBinding Light={StaticResource CardColorLight}, Dark={StaticResource CardColorDark}}">
                     <VerticalStackLayout Spacing="10">
-                        <Label Text="HR Status"
+                        <Label Text="Manager Review"
+                               FontSize="18"
+                               FontAttributes="Bold"
+                               TextColor="{AppThemeBinding Light={StaticResource TextColorLight}, Dark={StaticResource TextColorDark}}"/>
+                        <Label Text="{Binding Request.Status, StringFormat='Manager Status: {0}'}"
+                               TextColor="{Binding Request.Status, Converter={StaticResource StatusToColorConverter}}"
+                               FontAttributes="Bold"/>
+                        <Label Text="{Binding Request.ManagerRemarks, StringFormat='Remarks: {0}'}"
+                               LineBreakMode="WordWrap"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
+                               IsVisible="{Binding Request.ManagerRemarks, Converter={StaticResource StringNotEmptyConverter}}"/>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- HR review -->
+                <Border Padding="15"
+                        StrokeShape="RoundRectangle 10"
+                        Stroke="{AppThemeBinding Light={StaticResource BorderColorLight}, Dark={StaticResource BorderColorDark}}"
+                        BackgroundColor="{AppThemeBinding Light={StaticResource CardColorLight}, Dark={StaticResource CardColorDark}}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="HR Review"
                                FontSize="18"
                                FontAttributes="Bold"
                                TextColor="{AppThemeBinding Light={StaticResource TextColorLight}, Dark={StaticResource TextColorDark}}"/>
                         <Label Text="{Binding Request.HRStatus, StringFormat='HR Status: {0}'}"
                                TextColor="{Binding Request.HRStatus, Converter={StaticResource StatusToColorConverter}}"
                                FontAttributes="Bold"/>
+                        <Label Text="{Binding Request.HRRemarks, StringFormat='Remarks: {0}'}"
+                               LineBreakMode="WordWrap"
+                               TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
+                               IsVisible="{Binding Request.HRRemarks, Converter={StaticResource StringNotEmptyConverter}}"/>
                         <Label Text="{Binding Request.RemainingBalance, StringFormat='Remaining Balance: {0}'}"
                                TextColor="{AppThemeBinding Light={StaticResource TextSecondaryColorLight}, Dark={StaticResource TextSecondaryColorDark}}"
                                IsVisible="{Binding Request.RemainingBalance.HasValue}"/>

@@ -323,8 +323,15 @@ namespace TDFMAUI.ViewModels
             {
                 var user = _userSessionService.CurrentUser;
                 ApiResponse<RequestResponseDto>? result = null;
-                if (user?.IsManager == true) result = await _requestService.ManagerApproveRequestAsync(requestId, new ManagerApprovalDto { ManagerRemarks = remarks });
-                else if (user?.IsHR == true || user?.IsAdmin == true) result = await _requestService.HRApproveRequestAsync(requestId, new HRApprovalDto { HRRemarks = remarks });
+
+                // Route by request state rather than user role so that a
+                // manager/HR hybrid user approves through the correct endpoint
+                // depending on whether the manager stage is still pending or
+                // already completed.
+                if (user != null && RequestStateManager.CanManagerAct(req, user))
+                    result = await _requestService.ManagerApproveRequestAsync(requestId, new ManagerApprovalDto { ManagerRemarks = remarks });
+                else if (user != null && RequestStateManager.CanHRAct(req, user))
+                    result = await _requestService.HRApproveRequestAsync(requestId, new HRApprovalDto { HRRemarks = remarks });
 
                 if (result?.Success == true) await LoadRequestsAsync();
             }
@@ -346,8 +353,10 @@ namespace TDFMAUI.ViewModels
             {
                 var user = _userSessionService.CurrentUser;
                 ApiResponse<RequestResponseDto>? result = null;
-                if (user?.IsManager == true) result = await _requestService.ManagerRejectRequestAsync(requestId, new ManagerRejectDto { ManagerRemarks = reason });
-                else if (user?.IsHR == true || user?.IsAdmin == true) result = await _requestService.HRRejectRequestAsync(requestId, new HRRejectDto { HRRemarks = reason });
+                if (user != null && RequestStateManager.CanManagerAct(req, user))
+                    result = await _requestService.ManagerRejectRequestAsync(requestId, new ManagerRejectDto { ManagerRemarks = reason });
+                else if (user != null && RequestStateManager.CanHRAct(req, user))
+                    result = await _requestService.HRRejectRequestAsync(requestId, new HRRejectDto { HRRemarks = reason });
 
                 if (result?.Success == true) await LoadRequestsAsync();
             }

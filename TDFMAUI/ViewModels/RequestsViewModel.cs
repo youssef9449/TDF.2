@@ -192,9 +192,13 @@ namespace TDFMAUI.ViewModels
 
                 var currentUser = await _authService.GetCurrentUserAsync();
                 ApiResponse<RequestResponseDto>? response = null;
-                if (currentUser?.IsManager == true)
+
+                // Route by request state, not by role: the same user may be both
+                // manager and HR, and the correct endpoint depends on whether the
+                // manager stage is still pending or has already completed.
+                if (RequestStateManager.CanManagerAct(request, currentUser!))
                     response = await _requestService.ManagerApproveRequestAsync(request.RequestID, new ManagerApprovalDto { ManagerRemarks = remarks });
-                else if (currentUser?.IsHR == true || currentUser?.IsAdmin == true)
+                else if (RequestStateManager.CanHRAct(request, currentUser!))
                     response = await _requestService.HRApproveRequestAsync(request.RequestID, new HRApprovalDto { HRRemarks = remarks });
 
                 if (response?.Success == true)
@@ -222,9 +226,9 @@ namespace TDFMAUI.ViewModels
 
                 var currentUser = await _authService.GetCurrentUserAsync();
                 ApiResponse<RequestResponseDto>? response = null;
-                if (currentUser?.IsManager == true)
+                if (RequestStateManager.CanManagerAct(request, currentUser!))
                     response = await _requestService.ManagerRejectRequestAsync(request.RequestID, new ManagerRejectDto { ManagerRemarks = reason });
-                else if (currentUser?.IsHR == true || currentUser?.IsAdmin == true)
+                else if (RequestStateManager.CanHRAct(request, currentUser!))
                     response = await _requestService.HRRejectRequestAsync(request.RequestID, new HRRejectDto { HRRemarks = reason });
 
                 if (response?.Success == true)

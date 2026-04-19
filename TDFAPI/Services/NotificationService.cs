@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using FirebaseAdmin;
+using FirebaseAdmin.Messaging;
+using Google.Apis.Auth.OAuth2;
 using Microsoft.Extensions.Logging;
 using TDFAPI.Repositories;
 using TDFShared.DTOs.Messages;
@@ -13,6 +17,10 @@ namespace TDFAPI.Services
 {
     public class NotificationService : INotificationDispatchService
     {
+        private static readonly object _firebaseInitLock = new();
+        private static bool _firebaseInitialized;
+        private static bool _firebaseUnavailable;
+
         private readonly INotificationRepository _notificationRepository;
         private readonly IUserRepository _userRepository;
         private readonly WebSocketConnectionManager _webSocketManager;
@@ -73,7 +81,8 @@ namespace TDFAPI.Services
                 };
                 await _notificationRepository.CreateNotificationAsync(notification);
 
-                // Notify via WebSocket
+                // Notify via WebSocket (fans out to all live connections of the user —
+                // desktop app and any mobile device that's currently online).
                 await _webSocketManager.SendToAsync(receiverId, new NotificationDto
                 {
                     NotificationId = notification.NotificationID,
@@ -83,6 +92,10 @@ namespace TDFAPI.Services
                     Timestamp = notification.Timestamp,
                     Title = "Notification"
                 });
+
+                // Fire-and-forget push so a mobile device that's not currently on
+                // WebSocket still gets the notification.
+                _ = SendPushNotificationIfNeededAsync(receiverId, notification, "Notification", NotificationType.Info, null);
 
                 return true;
             }
@@ -180,16 +193,104 @@ namespace TDFAPI.Services
         {
             try
             {
-                var tokens = await _pushTokenService.GetUserTokensAsync(userId);
+                var tokens = (await _pushTokenService.GetUserTokensAsync(userId)).ToList();
+                if (tokens.Count == 0) return;
+
+                if (!EnsureFirebaseInitialized()) return;
+
+                var messaging = FirebaseMessaging.DefaultInstance;
                 foreach (var token in tokens)
                 {
-                    // Logic to send push notification via FCM/APNS would go here
-                    _logger.LogInformation("Sending push notification to {Platform} for user {UserId}", token.Platform, userId);
+                    if (string.IsNullOrWhiteSpace(token.Token)) continue;
+                    try
+                    {
+                        var fcmMessage = new Message
+                        {
+                            Token = token.Token,
+                            Notification = new FirebaseAdmin.Messaging.Notification
+                            {
+                                Title = title,
+                                Body = notification.Message
+                            },
+                            Data = new Dictionary<string, string>
+                            {
+                                ["notificationId"] = notification.NotificationID.ToString(),
+                                ["type"] = ((int)type).ToString(),
+                                ["data"] = data ?? string.Empty
+                            }
+                        };
+
+                        var messageId = await messaging.SendAsync(fcmMessage);
+                        _logger.LogInformation("Sent FCM message {MessageId} to {Platform} token for user {UserId}",
+                            messageId, token.Platform, userId);
+                    }
+                    catch (FirebaseMessagingException fex) when (
+                        fex.MessagingErrorCode == MessagingErrorCode.Unregistered ||
+                        fex.MessagingErrorCode == MessagingErrorCode.SenderIdMismatch)
+                    {
+                        _logger.LogWarning(fex, "Removing stale push token for user {UserId} ({Platform})", userId, token.Platform);
+                        await _pushTokenService.UnregisterTokenAsync(userId, token.Token);
+                    }
+                    catch (Exception tokenEx)
+                    {
+                        _logger.LogError(tokenEx, "Failed to send FCM message to {Platform} token for user {UserId}",
+                            token.Platform, userId);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending push notification for user {UserId}", userId);
+            }
+        }
+
+        private bool EnsureFirebaseInitialized()
+        {
+            if (_firebaseInitialized) return true;
+            if (_firebaseUnavailable) return false;
+
+            lock (_firebaseInitLock)
+            {
+                if (_firebaseInitialized) return true;
+                if (_firebaseUnavailable) return false;
+
+                try
+                {
+                    if (FirebaseApp.DefaultInstance == null)
+                    {
+                        var credentialPath = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+                        if (string.IsNullOrWhiteSpace(credentialPath) || !File.Exists(credentialPath))
+                        {
+                            var fallback = Path.Combine(AppContext.BaseDirectory, "google-service-account.json");
+                            if (File.Exists(fallback)) credentialPath = fallback;
+                        }
+
+                        GoogleCredential credential;
+                        if (!string.IsNullOrWhiteSpace(credentialPath) && File.Exists(credentialPath))
+                        {
+                            credential = GoogleCredential.FromFile(credentialPath);
+                        }
+                        else
+                        {
+                            // Falls back to ADC (e.g. metadata server in GCP); if this throws we
+                            // treat Firebase as unavailable and log once.
+                            credential = GoogleCredential.GetApplicationDefault();
+                        }
+
+                        FirebaseApp.Create(new AppOptions { Credential = credential });
+                    }
+
+                    _firebaseInitialized = true;
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    _firebaseUnavailable = true;
+                    _logger.LogWarning(ex,
+                        "Firebase Admin SDK not initialized — push notifications disabled. " +
+                        "Set GOOGLE_APPLICATION_CREDENTIALS or place google-service-account.json alongside the API binary.");
+                    return false;
+                }
             }
         }
     }

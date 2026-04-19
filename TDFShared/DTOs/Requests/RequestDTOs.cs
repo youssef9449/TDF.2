@@ -215,6 +215,24 @@ namespace TDFShared.DTOs.Requests
         /// <summary>HR status of the request</summary>
         public RequestStatus HRStatus { get; set; } = Enums.RequestStatus.Pending;
 
+        /// <summary>Remarks from the manager when approving or rejecting</summary>
+        public string? ManagerRemarks { get; set; }
+
+        /// <summary>Remarks from HR when approving or rejecting</summary>
+        public string? HRRemarks { get; set; }
+
+        /// <summary>ID of the manager who approved or rejected the request, if any</summary>
+        public int? ManagerApproverId { get; set; }
+
+        /// <summary>Full name of the manager who approved or rejected the request, if available</summary>
+        public string? ManagerApproverName { get; set; }
+
+        /// <summary>ID of the HR user who approved or rejected the request, if any</summary>
+        public int? HRApproverId { get; set; }
+
+        /// <summary>Full name of the HR user who approved or rejected the request, if available</summary>
+        public string? HRApproverName { get; set; }
+
         /// <summary>Date the request was created</summary>
         public DateTime CreatedDate { get; set; }
 

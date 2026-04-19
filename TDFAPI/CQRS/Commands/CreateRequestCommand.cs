@@ -3,6 +3,7 @@ using TDFAPI.CQRS.Core;
 using TDFShared.DTOs.Requests;
 using TDFAPI.Services;
 using TDFAPI.Repositories;
+using TDFShared.Services;
 using System.ComponentModel.DataAnnotations;
 using TDFAPI.Extensions;
 
@@ -102,21 +103,32 @@ namespace TDFAPI.CQRS.Commands
             int requestId = await _requestRepository.CreateAsync(requestEntity);
             var createdEntity = await _requestRepository.GetByIdAsync(requestId);
 
-            await NotifyDepartmentManagers(requestEntity.RequestDepartment,
+            await NotifyApprovers(requestEntity.RequestDepartment,
                 $"New {requestEntity.RequestType} request from {user.FullName}", userId);
 
             return createdEntity.ToResponseDto();
         }
 
-        private async Task NotifyDepartmentManagers(string department, string message, int excludedUserId = 0)
+        private async Task NotifyApprovers(string requestDepartment, string message, int excludedUserId = 0)
         {
-            var usersInDepartment = await _userRepository.GetUsersByDepartmentAsync(department);
+            // Managers of the requester's department (including multi-department managers
+            // whose Department field is like "dep1-dep2" and thus covers both constituents).
             var managers = await _userRepository.GetUsersByRoleAsync("Manager");
-            var departmentManagers = managers.Where(m => usersInDepartment.Any(u => u.UserID == m.UserID) && m.UserID != excludedUserId);
+            var departmentManagers = managers.Where(m =>
+                !string.IsNullOrEmpty(m.Department) &&
+                RequestStateManager.CanAccessDepartment(m.Department, requestDepartment) &&
+                m.UserID != excludedUserId);
 
             foreach (var manager in departmentManagers)
             {
                 await _notificationService.CreateNotificationAsync(manager.UserID, message);
+            }
+
+            // HR users see every request regardless of department.
+            var hrUsers = await _userRepository.GetUsersByRoleAsync("HR");
+            foreach (var hr in hrUsers.Where(h => h.UserID != excludedUserId))
+            {
+                await _notificationService.CreateNotificationAsync(hr.UserID, message);
             }
         }
     }

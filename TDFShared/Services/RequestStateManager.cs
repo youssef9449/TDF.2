@@ -123,53 +123,64 @@ namespace TDFShared.Services
         }
 
         /// <summary>
-        /// Determines if a user can approve a specific request
+        /// Determines if a user can act at the manager stage (approve or reject while
+        /// the request is still pending manager review).
         /// </summary>
-        /// <param name="request">The request to check approval rights for</param>
-        /// <param name="currentUser">The current user attempting to approve</param>
-        /// <returns>True if the user can approve the request</returns>
-        public static bool CanApproveRequest(RequestResponseDto request, UserDto currentUser)
+        public static bool CanManagerAct(RequestResponseDto request, UserDto currentUser)
         {
             if (request == null || currentUser == null) return false;
-
-            // Request must be pending
-            if (request.Status != RequestStatus.Pending) return false;
-
-            // Users cannot approve their own requests
             if (request.RequestUserID == currentUser.UserID) return false;
 
-            // Admin and HR can approve all requests
+            // Manager stage only applies while the request has not left Pending
+            if (request.Status != RequestStatus.Pending) return false;
+
+            // Admin/HR can always act at the manager stage
             if ((currentUser.IsAdmin ?? false) || (currentUser.IsHR ?? false)) return true;
 
-            // Managers can approve requests from their department (including constituent departments for hyphenated departments)
-            if ((currentUser.IsManager ?? false) &&
-                !string.IsNullOrEmpty(currentUser.Department) &&
-                CanAccessDepartment(currentUser.Department, request.RequestDepartment))
-            {
-                return true;
-            }
-
-            return false;
+            // Managers can act on requests from their department (including
+            // constituent departments for hyphenated departments like "dep1-dep2")
+            return (currentUser.IsManager ?? false) &&
+                   !string.IsNullOrEmpty(currentUser.Department) &&
+                   CanAccessDepartment(currentUser.Department, request.RequestDepartment);
         }
 
         /// <summary>
-        /// Determines if a user can reject a specific request
+        /// Determines if a user can act at the HR stage (approve or reject after
+        /// the manager has already approved).
         /// </summary>
-        /// <param name="request">The request to check rejection rights for</param>
-        /// <param name="currentUser">The current user attempting to reject</param>
-        /// <returns>True if the user can reject the request</returns>
+        public static bool CanHRAct(RequestResponseDto request, UserDto currentUser)
+        {
+            if (request == null || currentUser == null) return false;
+            if (request.RequestUserID == currentUser.UserID) return false;
+
+            // HR stage only applies after manager approval and before a final HR decision
+            if (request.Status != RequestStatus.ManagerApproved) return false;
+            if (request.HRStatus != RequestStatus.Pending) return false;
+
+            return (currentUser.IsAdmin ?? false) || (currentUser.IsHR ?? false);
+        }
+
+        /// <summary>
+        /// Determines if a user can approve a specific request at whichever stage it
+        /// is currently at (manager or HR).
+        /// </summary>
+        public static bool CanApproveRequest(RequestResponseDto request, UserDto currentUser)
+        {
+            return CanManagerAct(request, currentUser) || CanHRAct(request, currentUser);
+        }
+
+        /// <summary>
+        /// Determines if a user can reject a specific request at whichever stage it
+        /// is currently at (manager or HR).
+        /// </summary>
         public static bool CanRejectRequest(RequestResponseDto request, UserDto currentUser)
         {
-            // Same logic as approval
             return CanApproveRequest(request, currentUser);
         }
 
         /// <summary>
         /// Determines if a user can approve or reject a specific request (Legacy/Helper)
         /// </summary>
-        /// <param name="request">The request to check approval rights for</param>
-        /// <param name="currentUser">The current user attempting to approve/reject</param>
-        /// <returns>True if the user can approve/reject the request</returns>
         public static bool CanApproveOrRejectRequest(RequestResponseDto request, UserDto currentUser)
         {
             return CanApproveRequest(request, currentUser);

@@ -94,23 +94,44 @@ namespace TDFAPI.CQRS.Commands
             existingEntity.RequestNumberOfDays = numberOfDays;
             existingEntity.UpdatedAt = DateTime.UtcNow;
 
+            // Any edit invalidates previous approvals/rejections: the manager and HR
+            // must review the new content from scratch.
+            existingEntity.RequestManagerStatus = TDFShared.Enums.RequestStatus.Pending;
+            existingEntity.RequestHRStatus = TDFShared.Enums.RequestStatus.Pending;
+            existingEntity.ManagerApproverId = null;
+            existingEntity.ManagerRemarks = null;
+            existingEntity.HRApproverId = null;
+            existingEntity.HRRemarks = null;
+
             await _requestRepository.UpdateAsync(existingEntity);
             var updatedEntity = await _requestRepository.GetByIdAsync(request.RequestId);
 
-            await NotifyDepartmentManagers(updatedEntity.RequestDepartment, $"Request from {updatedEntity.RequestUserFullName} was updated", request.UserId);
+            await NotifyApprovers(updatedEntity.RequestDepartment,
+                $"Request from {updatedEntity.RequestUserFullName} was updated and needs re-review",
+                request.UserId);
 
             return updatedEntity.ToResponseDto();
         }
 
-        private async Task NotifyDepartmentManagers(string department, string message, int excludedUserId = 0)
+        private async Task NotifyApprovers(string requestDepartment, string message, int excludedUserId = 0)
         {
-            var usersInDepartment = await _userRepository.GetUsersByDepartmentAsync(department);
+            // Managers whose department covers the request's department (including
+            // hyphenated "dep1-dep2" managers who should cover both constituents).
             var managers = await _userRepository.GetUsersByRoleAsync("Manager");
-            var departmentManagers = managers.Where(m => usersInDepartment.Any(u => u.UserID == m.UserID) && m.UserID != excludedUserId);
+            var departmentManagers = managers.Where(m =>
+                !string.IsNullOrEmpty(m.Department) &&
+                RequestStateManager.CanAccessDepartment(m.Department, requestDepartment) &&
+                m.UserID != excludedUserId);
 
             foreach (var manager in departmentManagers)
             {
                 await _notificationService.CreateNotificationAsync(manager.UserID, message);
+            }
+
+            var hrUsers = await _userRepository.GetUsersByRoleAsync("HR");
+            foreach (var hr in hrUsers.Where(h => h.UserID != excludedUserId))
+            {
+                await _notificationService.CreateNotificationAsync(hr.UserID, message);
             }
         }
     }
